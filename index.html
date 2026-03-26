@@ -607,6 +607,33 @@
         </div>
     </div>
 
+    <!-- Device Activation Screen -->
+    <div id="device-screen" class="screen">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="login-icon">📱</div>
+                <h1 class="login-title">Appareil non enregistré</h1>
+                <p style="color: var(--gray-500); margin-top: 8px; font-size: 14px;">Cet appareil doit être activé par un administrateur pour accéder à PlanB Tools.</p>
+            </div>
+            <div class="login-content">
+                <p style="font-weight: 600; margin-bottom: 8px;">Code d'activation</p>
+                <input type="text" id="device-code-input" maxlength="6" placeholder="Code 6 chiffres" 
+                    style="width: 100%; padding: 16px; font-size: 24px; text-align: center; letter-spacing: 8px;
+                    border: 2px solid var(--gray-200); border-radius: var(--radius); font-weight: 700;
+                    -webkit-appearance: none;">
+                <p id="device-error" style="color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px;"></p>
+                <button id="device-activate-btn" class="numpad-btn submit" style="width: 100%; margin-top: 8px;" disabled>
+                    Activer cet appareil
+                </button>
+                <button id="device-back-btn" style="width: 100%; margin-top: 12px; padding: 12px; background: none; 
+                    border: 1px solid var(--gray-300); border-radius: var(--radius); color: var(--gray-500); 
+                    font-size: 14px; cursor: pointer;">
+                    Retour
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Dashboard Screen -->
     <div id="dashboard-screen" class="screen">
         <div class="header">
@@ -650,6 +677,7 @@
         const loginScreen = document.getElementById('login-screen');
         const establishmentScreen = document.getElementById('establishment-screen');
         const dashboardScreen = document.getElementById('dashboard-screen');
+        const deviceScreen = document.getElementById('device-screen');
         const pinDisplay = document.getElementById('pin-display');
         const clearBtn = document.getElementById('clear-btn');
         const submitBtn = document.getElementById('submit-btn');
@@ -665,6 +693,7 @@
 
         // ============= State =============
         let currentPin = '';
+        let currentDevice = null; // Device info from Supabase
         let currentUser = null;
         let currentEstablishment = null;
 
@@ -741,7 +770,69 @@
                 };
                 return names[code] || code;
             }
-        };
+        ,
+
+            // === Device Management ===
+            async checkDeviceToken(token) {
+                if (DEMO_MODE) return { id: 'demo-device', nom: 'iPad Demo', actif: true };
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('devices')
+                        .select('*')
+                        .eq('device_token', token)
+                        .eq('actif', true)
+                        .single();
+                    if (error || !data) return null;
+                    // Update last connection
+                    await supabaseClient.from('devices').update({ derniere_connexion: new Date().toISOString() }).eq('id', data.id);
+                    return data;
+                } catch (e) { console.error('checkDeviceToken error:', e); return null; }
+            },
+
+            async activateDevice(code) {
+                if (DEMO_MODE) return { id: 'demo-device', nom: 'iPad Demo', device_token: 'demo-token-123', actif: true };
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('devices')
+                        .select('*')
+                        .eq('code_activation', code)
+                        .single();
+                    if (error || !data) return null;
+                    if (data.date_enregistrement) return { error: 'already_activated' };
+                    // Mark as registered
+                    const { data: updated, error: updateError } = await supabaseClient
+                        .from('devices')
+                        .update({ date_enregistrement: new Date().toISOString(), derniere_connexion: new Date().toISOString() })
+                        .eq('id', data.id)
+                        .select()
+                        .single();
+                    return updated || data;
+                } catch (e) { console.error('activateDevice error:', e); return null; }
+            },
+
+            async getDevices() {
+                if (DEMO_MODE) return [];
+                try {
+                    const { data } = await supabaseClient.from('devices').select('*').order('nom');
+                    return data || [];
+                } catch (e) { return []; }
+            },
+
+            async createDevice(nom, etablissement) {
+                if (DEMO_MODE) return null;
+                const code = String(Math.floor(100000 + Math.random() * 900000));
+                try {
+                    const { data } = await supabaseClient.from('devices')
+                        .insert({ nom, etablissement, code_activation: code })
+                        .select().single();
+                    return data;
+                } catch (e) { console.error('createDevice error:', e); return null; }
+            },
+
+            async deleteDevice(id) {
+                if (DEMO_MODE) return;
+                await supabaseClient.from('devices').delete().eq('id', id);
+            }};
 
         // ============= Modules Definition =============
         const MODULES = [
@@ -851,6 +942,8 @@
                 initiales: user.initiales,
                 role: user.role,
                 etablissement: establishment,
+                device_id: currentDevice ? currentDevice.id : null,
+                device_nom: currentDevice ? currentDevice.nom : null,
                 timestamp: Date.now()
             };
             sessionStorage.setItem('planb_user', JSON.stringify(sessionData));
@@ -936,6 +1029,70 @@
 
         submitBtn.addEventListener('click', handleLogin);
 
+        // Device activation listeners
+        const deviceCodeInput = document.getElementById('device-code-input');
+        const deviceActivateBtn = document.getElementById('device-activate-btn');
+        const deviceBackBtn = document.getElementById('device-back-btn');
+        const deviceError = document.getElementById('device-error');
+
+        if (deviceCodeInput) {
+            deviceCodeInput.addEventListener('input', () => {
+                const val = deviceCodeInput.value.replace(/[^0-9]/g, '');
+                deviceCodeInput.value = val;
+                deviceActivateBtn.disabled = val.length !== 6;
+                deviceError.textContent = '';
+            });
+
+            deviceActivateBtn.addEventListener('click', async () => {
+                const code = deviceCodeInput.value;
+                deviceActivateBtn.disabled = true;
+                deviceActivateBtn.textContent = 'Activation...';
+                deviceError.textContent = '';
+
+                const device = await db.activateDevice(code);
+
+                if (!device) {
+                    deviceError.textContent = 'Code d\'activation invalide.';
+                    deviceActivateBtn.disabled = false;
+                    deviceActivateBtn.textContent = 'Activer cet appareil';
+                    return;
+                }
+                if (device.error === 'already_activated') {
+                    deviceError.textContent = 'Ce code a déjà été utilisé sur un autre appareil.';
+                    deviceActivateBtn.disabled = false;
+                    deviceActivateBtn.textContent = 'Activer cet appareil';
+                    return;
+                }
+
+                // Store token in localStorage (persists)
+                localStorage.setItem('planb_device_token', device.device_token);
+                currentDevice = device;
+                showToast('Appareil activé : ' + device.nom, 'success');
+
+                // Continue login flow
+                deviceCodeInput.value = '';
+                if (currentUser.etablissements.length === 1) {
+                    currentEstablishment = currentUser.etablissements[0];
+                    storeSession(currentUser, currentEstablishment);
+                    updateHeader();
+                    renderModules();
+                    showScreen('dashboardScreen');
+                } else {
+                    establishmentSubtitle.textContent = `Bienvenue, ${currentUser.nom}`;
+                    showScreen('establishmentScreen');
+                }
+            });
+
+            deviceBackBtn.addEventListener('click', () => {
+                currentUser = null;
+                currentPin = '';
+                updatePinDisplay();
+                deviceCodeInput.value = '';
+                deviceError.textContent = '';
+                showScreen(loginScreen);
+            });
+        }
+
         function updatePinDisplay() {
             const display = '•'.repeat(currentPin.length) + '•'.repeat(4 - Math.min(currentPin.length, 4));
             pinDisplay.textContent = display.substring(0, Math.max(currentPin.length, 4));
@@ -974,20 +1131,52 @@
             pinDisplay.classList.add('success');
             currentUser = user;
 
-            setTimeout(() => {
-                if (user.etablissements.length === 1) {
-                    // Auto-select single establishment
-                    currentEstablishment = user.etablissements[0];
-                    storeSession(user, currentEstablishment);
-                    updateHeader();
-                    renderModules();
-                    showScreen(dashboardScreen);
+                // Device check for collaborateurs
+                const deviceToken = localStorage.getItem('planb_device_token');
+                const needsDeviceCheck = (user.role === 'collaborateur');
+
+                if (needsDeviceCheck) {
+                    if (deviceToken) {
+                        // Verify device token
+                        const device = await db.checkDeviceToken(deviceToken);
+                        if (!device) {
+                            // Token invalid - show activation screen
+                            localStorage.removeItem('planb_device_token');
+                            pinDisplay.classList.remove('loading');
+                            showScreen(deviceScreen);
+                            submitBtn.disabled = false;
+                            return;
+                        }
+                        currentDevice = device;
+                    } else {
+                        // No token - show activation screen
+                        pinDisplay.classList.remove('loading');
+                        showScreen(deviceScreen);
+                        submitBtn.disabled = false;
+                        return;
+                    }
                 } else {
-                    // Show establishment selector
-                    establishmentSubtitle.textContent = `Bienvenue ${user.nom}`;
-                    showScreen(establishmentScreen);
+                    // Responsables & Admins: check device if token exists (for tracking) but don't block
+                    if (deviceToken) {
+                        const device = await db.checkDeviceToken(deviceToken);
+                        if (device) currentDevice = device;
+                    }
                 }
-            }, 500);
+
+                setTimeout(() => {
+                    if (user.etablissements.length === 1) {
+                        // Auto-select single establishment
+                        currentEstablishment = user.etablissements[0];
+                        storeSession(user, currentEstablishment);
+                        updateHeader();
+                        renderModules();
+                        showScreen('dashboardScreen');
+                    } else {
+                        // Show establishment selector
+                        establishmentSubtitle.textContent = `Bienvenue, ${user.nom}`;
+                        showScreen('establishmentScreen');
+                    }
+                }, 500);
         }
 
         // ============= Event Listeners: Establishment =============
@@ -1027,6 +1216,10 @@
             if (session) {
                 currentUser = session;
                 currentEstablishment = session.etablissement;
+                // Restore device info
+                if (session.device_id) {
+                    currentDevice = { id: session.device_id, nom: session.device_nom };
+                }
                 updateHeader();
                 renderModules();
                 showScreen(dashboardScreen);
