@@ -159,21 +159,21 @@
 
         .numpad {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: 80px 80px 80px;
             gap: 12px;
         }
 
         .numpad-btn {
-            aspect-ratio: 1;
+            width: 80px;                height: 80px;
             border: 2px solid var(--gray-200);
             background: white;
             color: var(--gray-900);
-            border-radius: 12px;
+            border-radius: 50%;
             font-size: 24px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
-            touch-action: manipulation;
+            touch-action: manipulation; -webkit-appearance: none; display: flex; align-items: center; justify-content: center;
         }
 
         .numpad-btn:active {
