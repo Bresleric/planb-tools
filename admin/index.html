@@ -508,7 +508,49 @@
 
         .etab-badge.freddy { background: #164e4a; color: white; }
         .etab-badge.bonbao { background: #8b1a2b; color: white; }
-    </style>
+    
+            /* Admin Tabs */
+            .admin-tabs { display: flex; gap: 4px; }
+            .admin-tab-btn {
+                padding: 6px 16px; border: none; border-radius: 20px;
+                font-size: 13px; font-weight: 600; cursor: pointer;
+                background: transparent; color: var(--gray-500);
+                transition: all 0.2s;
+            }
+            .admin-tab-btn.active {
+                background: var(--orange); color: white;
+            }
+            .admin-section { display: none; }
+            .admin-section.active { display: block; }
+
+            /* Device cards */
+            .device-card {
+                background: white; border-radius: 12px; padding: 16px;
+                margin-bottom: 8px; box-shadow: var(--shadow-sm);
+                display: flex; justify-content: space-between; align-items: center;
+            }
+            .device-card .device-info { flex: 1; }
+            .device-card .device-name { font-weight: 600; font-size: 15px; }
+            .device-card .device-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+            .device-card .device-code {
+                font-family: monospace; font-size: 18px; font-weight: 700;
+                letter-spacing: 4px; color: var(--orange); background: var(--orange-light);
+                padding: 6px 14px; border-radius: 8px;
+            }
+            .device-card .device-status {
+                display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                margin-right: 6px;
+            }
+            .device-card .device-status.active { background: var(--success); }
+            .device-card .device-status.pending { background: var(--orange); }
+            .device-card .device-status.inactive { background: var(--gray-400); }
+            .device-actions { display: flex; gap: 8px; align-items: center; }
+            .device-actions button {
+                padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: 8px;
+                background: white; font-size: 12px; cursor: pointer; color: var(--gray-600);
+            }
+            .device-actions button.delete-btn { color: var(--error); border-color: var(--error); }
+        </style>
 </head>
 <body>
     <div class="app">
@@ -518,7 +560,12 @@
                 <button class="back-btn" id="back-btn">← Portail</button>
                 <div>
                     <div class="header-title">Administration</div>
-                    <div class="header-info" id="header-info">Gestion des utilisateurs</div>
+                    <div class="header-info" id="header-info">
+                        <div class="admin-tabs" style="display: flex; gap: 4px;">
+                            <button class="admin-tab-btn active" data-admin-tab="users" onclick="switchAdminTab('users')">Utilisateurs</button>
+                            <button class="admin-tab-btn" data-admin-tab="devices" onclick="switchAdminTab('devices')">Appareils</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <button class="add-btn" id="add-user-btn">+ Ajouter</button>
@@ -526,6 +573,7 @@
 
         <!-- Content -->
         <div class="content">
+            <div id="users-section" class="admin-section active">
             <!-- Filter bar -->
             <div class="filter-bar">
                 <button class="filter-btn active" data-filter="all">Tous</button>
@@ -543,7 +591,19 @@
         </div>
     </div>
 
-    <!-- Add/Edit User Modal -->
+    </div>
+
+            <div id="devices-section" class="admin-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div id="device-count" style="font-size: 13px; color: var(--gray-500);"></div>
+                    <button class="add-btn" id="add-device-btn" style="padding: 8px 16px; background: var(--orange); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">+ Ajouter</button>
+                </div>
+                <div id="devices-list">
+                    <div class="loading-spinner">Chargement des appareils...</div>
+                </div>
+            </div>
+
+            <!-- Add/Edit User Modal -->
     <div class="modal-overlay" id="user-modal">
         <div class="modal">
             <div class="modal-header">
@@ -604,7 +664,36 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script>
+    
+    <!-- Add Device Modal -->
+    <div class="modal-overlay" id="device-modal" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="device-modal-title">Nouvel appareil</h2>
+                <button class="modal-close" onclick="closeDeviceModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nom de l'appareil</label>
+                    <input type="text" id="device-nom" placeholder="Ex: iPad Cuisine Freddy">
+                </div>
+                <div class="form-group">
+                    <label>Établissement</label>
+                    <select id="device-etablissement">
+                        <option value="">Tous les établissements</option>
+                        <option value="freddy">Freddy</option>
+                        <option value="bonbao">Liesel</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeDeviceModal()">Annuler</button>
+                <button class="btn-save" id="save-device-btn" onclick="saveDevice()">Créer</button>
+            </div>
+        </div>
+    </div>
+
+<script>
         // ============= Configuration =============
         const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
@@ -1013,9 +1102,114 @@
         });
 
         // ============= Init =============
-        async function init() {
+        async // ========== DEVICE MANAGEMENT ==========
+
+        let devices = [];
+
+        function switchAdminTab(tab) {
+            document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.adminTab === tab));
+            document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+            const section = document.getElementById(tab + '-section');
+            if (section) section.classList.add('active');
+            
+            // Update add button
+            const addUserBtn = document.getElementById('add-user-btn');
+            const addDeviceBtn = document.getElementById('add-device-btn');
+            if (addUserBtn) addUserBtn.style.display = tab === 'users' ? '' : 'none';
+            
+            if (tab === 'devices') loadDevices();
+        }
+
+        async function loadDevices() {
+            const list = document.getElementById('devices-list');
+            const count = document.getElementById('device-count');
+            try {
+                const { data } = await supabase.from('devices').select('*').order('nom');
+                devices = data || [];
+                count.textContent = devices.length + ' appareil(s)';
+                renderDevices();
+            } catch (e) {
+                list.innerHTML = '<p style="color: var(--error);">Erreur de chargement</p>';
+            }
+        }
+
+        function renderDevices() {
+            const list = document.getElementById('devices-list');
+            if (devices.length === 0) {
+                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun appareil enregistr\u00e9.<br>Cliquez sur "+ Ajouter" pour enregistrer un iPad.</p>';
+                return;
+            }
+            list.innerHTML = devices.map(d => {
+                const status = d.date_enregistrement ? (d.actif ? 'active' : 'inactive') : 'pending';
+                const statusLabel = d.date_enregistrement ? (d.actif ? 'Actif' : 'Inactif') : 'En attente';
+                const lastConn = d.derniere_connexion ? new Date(d.derniere_connexion).toLocaleDateString('fr-FR') : '-';
+                const registered = d.date_enregistrement ? new Date(d.date_enregistrement).toLocaleDateString('fr-FR') : 'Non activ\u00e9';
+                const estab = d.etablissement ? (d.etablissement === 'freddy' ? 'Freddy' : 'Liesel') : 'Tous';
+                return '<div class="device-card">' +
+                    '<div class="device-info">' +
+                        '<div class="device-name"><span class="device-status ' + status + '"></span>' + escapeHtml(d.nom) + '</div>' +
+                        '<div class="device-meta">' + estab + ' | ' + statusLabel + ' | Derni\u00e8re connexion: ' + lastConn + ' | Enregistr\u00e9: ' + registered + '</div>' +
+                    '</div>' +
+                    (!d.date_enregistrement ? '<div class="device-code">' + d.code_activation + '</div>' : '') +
+                    '<div class="device-actions">' +
+                        '<button onclick="toggleDeviceActive(\'' + d.id + '\', ' + d.actif + ')">' + (d.actif ? 'D\u00e9sactiver' : 'Activer') + '</button>' +
+                        '<button class="delete-btn" onclick="deleteDevice(\'' + d.id + '\')">Supprimer</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function openAddDeviceModal() {
+            document.getElementById('device-nom').value = '';
+            document.getElementById('device-etablissement').value = '';
+            document.getElementById('device-modal').style.display = 'flex';
+        }
+
+        function closeDeviceModal() {
+            document.getElementById('device-modal').style.display = 'none';
+        }
+
+        async function saveDevice() {
+            const nom = document.getElementById('device-nom').value.trim();
+            const etablissement = document.getElementById('device-etablissement').value || null;
+            if (!nom) { alert('Veuillez saisir un nom pour l\'appareil.'); return; }
+            
+            const code = String(Math.floor(100000 + Math.random() * 900000));
+            try {
+                await supabase.from('devices').insert({ nom, etablissement, code_activation: code, actif: true });
+                closeDeviceModal();
+                showToast('Appareil cr\u00e9\u00e9 ! Code d\'activation : ' + code);
+                loadDevices();
+            } catch (e) {
+                alert('Erreur: ' + e.message);
+            }
+        }
+
+        async function toggleDeviceActive(id, currentState) {
+            await supabase.from('devices').update({ actif: !currentState }).eq('id', id);
+            loadDevices();
+        }
+
+        async function deleteDevice(id) {
+            if (!confirm('Supprimer cet appareil ? Il ne pourra plus acc\u00e9der \u00e0 PlanB Tools.')) return;
+            await supabase.from('devices').delete().eq('id', id);
+            showToast('Appareil supprim\u00e9');
+            loadDevices();
+        }
+
+        function init() {
             if (!checkSession()) return;
             await loadUsers();
+        
+            // Device management
+            const addDeviceBtn = document.getElementById('add-device-btn');
+            if (addDeviceBtn) addDeviceBtn.addEventListener('click', openAddDeviceModal);
         }
 
         init();
