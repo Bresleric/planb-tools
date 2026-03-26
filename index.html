@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PlanB Tools">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23f97316' width='180' height='180'/><text x='90' y='100' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='system-ui'>🍴</text></svg>">
-    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22PlanB%20Tools%22,%22short_name%22:%22PlanB%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Crect%20fill='%23f97316'%20width='192'%20height='192'/%3E%3Ctext%20x='96'%20y='110'%20font-size='100'%20fill='white'%20text-anchor='middle'%20dominant-baseline='middle'%20font-family='system-ui'%3E🍴%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}],%22display%22:%22standalone%22,%22scope%22:%22/%22,%22start_url%22:%22/index.html%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%23f97316%22}">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23f97316' width='180' height='180'/><text x='90' y='100' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='system-ui'>ð´</text></svg>">
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22PlanB%20Tools%22,%22short_name%22:%22PlanB%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Crect%20fill='%23f97316'%20width='192'%20height='192'/%3E%3Ctext%20x='96'%20y='110'%20font-size='100'%20fill='white'%20text-anchor='middle'%20dominant-baseline='middle'%20font-family='system-ui'%3Eð´%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}],%22display%22:%22standalone%22,%22scope%22:%22/%22,%22start_url%22:%22/index.html%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%23f97316%22}">
     <title>PlanB Tools</title>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -268,6 +268,14 @@
             border-color: var(--orange);
             color: white;
             transform: scale(0.95);
+        }
+
+        .establishment-logo {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            margin-bottom: 12px;
+            border-radius: 16px;
         }
 
         .establishment-icon {
@@ -546,12 +554,12 @@
     <div id="login-screen" class="screen active">
         <div class="login-container">
             <div class="login-header">
-                <span class="login-icon">🍴</span>
+                <span class="login-icon">ð´</span>
                 <h1 class="login-title">PlanB Tools</h1>
                 <p class="login-subtitle">Gestion interne</p>
             </div>
             <div class="login-content">
-                <div class="pin-display" id="pin-display">····</div>
+                <div class="pin-display" id="pin-display">Â·Â·Â·Â·</div>
                 <p class="hint">
                     <strong>4 chiffres</strong> = Collaborateur<br>
                     <strong>5 chiffres</strong> = Responsable<br>
@@ -579,18 +587,20 @@
     <div id="establishment-screen" class="screen">
         <div class="establishment-container">
             <div class="establishment-header">
-                <h1>Sélectionner un établissement</h1>
+                <h1>SÃ©lectionner un Ã©tablissement</h1>
                 <p id="establishment-subtitle"></p>
             </div>
             <div class="establishment-cards">
                 <div class="establishment-card" data-establishment="freddy">
-                    <span class="establishment-icon">🏪</span>
+                    <img class="establishment-logo" src="img/freddy-logo.png" alt="Freddy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+                    <span class="establishment-icon" style="display:none">ðª</span>
                     <h2 class="establishment-name">Freddy</h2>
                     <p class="establishment-description">Burger & Frites</p>
                 </div>
                 <div class="establishment-card" data-establishment="bonbao">
-                    <span class="establishment-icon">🍜</span>
-                    <h2 class="establishment-name">Bonbao/Liesel</h2>
+                    <img class="establishment-logo" src="img/liesel-logo.png" alt="Liesel" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+                    <span class="establishment-icon" style="display:none">ð</span>
+                    <h2 class="establishment-name">Liesel</h2>
                     <p class="establishment-description">Noodles & Sushis</p>
                 </div>
             </div>
@@ -602,9 +612,9 @@
         <div class="header">
             <div class="header-left">
                 <div class="header-user" id="header-user">Utilisateur</div>
-                <div class="header-establishment" id="header-establishment">Établissement</div>
+                <div class="header-establishment" id="header-establishment">Ãtablissement</div>
             </div>
-            <button class="logout-btn" id="logout-btn">Déconnexion</button>
+            <button class="logout-btn" id="logout-btn">DÃ©connexion</button>
         </div>
         <div class="dashboard-content">
             <div class="modules-grid" id="modules-grid"></div>
@@ -617,7 +627,7 @@
     <!-- Modal for Coming Soon -->
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal">
-            <h2>Module en cours de développement</h2>
+            <h2>Module en cours de dÃ©veloppement</h2>
             <p id="modal-message"></p>
             <button class="modal-button" id="modal-close-btn">Fermer</button>
         </div>
@@ -727,7 +737,7 @@
             getEstablishmentName(code) {
                 const names = {
                     'freddy': 'Freddy',
-                    'bonbao': 'Bonbao/Liesel'
+                    'bonbao': 'Liesel'
                 };
                 return names[code] || code;
             }
@@ -738,31 +748,31 @@
             {
                 id: 'kitchen-taf',
                 name: 'Kitchen TAF',
-                icon: '🍴',
-                description: 'Tâches à faire cuisine',
+                icon: 'ð´',
+                description: 'TÃ¢ches Ã  faire cuisine',
                 minRole: 'collaborateur',
                 url: './kitchen-taf/'
             },
             {
                 id: 'pointages',
                 name: 'Pointages',
-                icon: '⏰',
+                icon: 'â°',
                 description: 'Saisie des mouvements',
                 minRole: 'collaborateur',
                 url: null
             },
             {
                 id: 'caisse',
-                name: 'Contrôle Caisse',
-                icon: '💰',
-                description: 'Contrôles fin de service',
+                name: 'ContrÃ´le Caisse',
+                icon: 'ð°',
+                description: 'ContrÃ´les fin de service',
                 minRole: 'responsable',
                 url: null
             },
             {
                 id: 'briefings',
                 name: 'Briefings',
-                icon: '📋',
+                icon: 'ð',
                 description: 'Briefings d\'avant service',
                 minRole: 'responsable',
                 url: null
@@ -770,26 +780,26 @@
             {
                 id: 'approvisionnement',
                 name: 'Approvisionnement',
-                icon: '📦',
+                icon: 'ð¦',
                 description: 'Besoins en achats',
                 minRole: 'responsable',
                 url: null
             },
             {
                 id: 'receptions',
-                name: 'Réceptions',
-                icon: '🚛',
-                description: 'Réception marchandises',
+                name: 'RÃ©ceptions',
+                icon: 'ð',
+                description: 'RÃ©ception marchandises',
                 minRole: 'responsable',
                 url: null
             },
             {
                 id: 'admin',
                 name: 'Administration',
-                icon: '⚙️',
+                icon: 'âï¸',
                 description: 'Gestion utilisateurs',
                 minRole: 'admin',
-                url: null
+                url: './admin/'
             }
         ];
 
@@ -829,7 +839,7 @@
         function getEstablishmentDisplayName(code) {
             const names = {
                 'freddy': 'Freddy',
-                'bonbao': 'Bonbao/Liesel'
+                'bonbao': 'Liesel'
             };
             return names[code] || code;
         }
@@ -901,9 +911,9 @@
 
         function handleModuleClick(module) {
             if (module.url) {
-                window.open(module.url, '_blank');
+                window.location.href = module.url;
             } else {
-                showModal(`Le module "${module.name}" est en cours de développement.`);
+                showModal(`Le module "${module.name}" est en cours de dÃ©veloppement.`);
             }
         }
 
@@ -927,7 +937,7 @@
         submitBtn.addEventListener('click', handleLogin);
 
         function updatePinDisplay() {
-            const display = '•'.repeat(currentPin.length) + '•'.repeat(4 - Math.min(currentPin.length, 4));
+            const display = 'â¢'.repeat(currentPin.length) + 'â¢'.repeat(4 - Math.min(currentPin.length, 4));
             pinDisplay.textContent = display.substring(0, Math.max(currentPin.length, 4));
             pinDisplay.classList.remove('error', 'success');
         }
@@ -999,7 +1009,7 @@
             updatePinDisplay();
             submitBtn.disabled = true;
             showScreen(loginScreen);
-            showToast('Déconnexion réussie');
+            showToast('DÃ©connexion rÃ©ussie');
         });
 
         // ============= Modal =============
