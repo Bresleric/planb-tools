@@ -512,7 +512,7 @@
         <!-- Header -->
         <div class="header">
             <div class="header-left">
-                <button class="back-btn" id="back-btn">â Portail</button>
+                <button class="back-btn" id="back-btn">← Portail</button>
                 <div>
                     <div class="header-title">Administration</div>
                     <div class="header-info" id="header-info">Gestion des utilisateurs</div>
@@ -545,7 +545,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 id="modal-title">Nouvel utilisateur</h2>
-                <button class="modal-close" id="modal-close">â</button>
+                <button class="modal-close" id="modal-close">✕</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -555,7 +555,7 @@
                 <div class="form-group">
                     <label for="user-initiales">Initiales</label>
                     <input type="text" id="user-initiales" placeholder="Ex: JD" maxlength="3" style="text-transform: uppercase;">
-                    <div class="hint">2-3 caractÃ¨res pour identifier sur les tÃ¢ches</div>
+                    <div class="hint">2-3 caractères pour identifier sur les tâches</div>
                 </div>
                 <div class="form-group">
                     <label for="user-code">Code PIN</label>
@@ -563,7 +563,7 @@
                     <div class="hint">4 chiffres = collaborateur, 5 = responsable, 6 = admin</div>
                 </div>
                 <div class="form-group">
-                    <label for="user-role">RÃ´le</label>
+                    <label for="user-role">Rôle</label>
                     <select id="user-role">
                         <option value="collaborateur">Collaborateur</option>
                         <option value="responsable">Responsable</option>
@@ -571,14 +571,14 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="user-etablissement">Ãtablissement principal</label>
+                    <label for="user-etablissement">Établissement principal</label>
                     <select id="user-etablissement">
                         <option value="freddy">Freddy</option>
                         <option value="bonbao">Bonbao/Liesel</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>AccÃ¨s Ã©tablissements</label>
+                    <label>Accès établissements</label>
                     <div style="display: flex; gap: 16px; margin-top: 6px;">
                         <label class="module-checkbox" style="flex:1;">
                             <input type="checkbox" id="acces-freddy" value="freddy">
@@ -614,13 +614,13 @@
 
         // ============= Modules Definition =============
         const ALL_MODULES = [
-            { id: 'kitchen-taf', name: 'Kitchen TAF', icon: 'ð´', minRole: 'collaborateur' },
-            { id: 'pointages', name: 'Pointages', icon: 'â°', minRole: 'collaborateur' },
-            { id: 'caisse', name: 'ContrÃ´le Caisse', icon: 'ð°', minRole: 'responsable' },
-            { id: 'briefings', name: 'Briefings', icon: 'ð', minRole: 'responsable' },
-            { id: 'approvisionnement', name: 'Appro.', icon: 'ð¦', minRole: 'responsable' },
-            { id: 'receptions', name: 'RÃ©ceptions', icon: 'ð', minRole: 'responsable' },
-            { id: 'admin', name: 'Admin', icon: 'âï¸', minRole: 'admin' }
+            { id: 'kitchen-taf', name: 'Kitchen TAF', icon: '🍴', minRole: 'collaborateur' },
+            { id: 'pointages', name: 'Pointages', icon: '⏰', minRole: 'collaborateur' },
+            { id: 'caisse', name: 'Contrôle Caisse', icon: '💰', minRole: 'responsable' },
+            { id: 'briefings', name: 'Briefings', icon: '📋', minRole: 'responsable' },
+            { id: 'approvisionnement', name: 'Appro.', icon: '📦', minRole: 'responsable' },
+            { id: 'receptions', name: 'Réceptions', icon: '🚛', minRole: 'responsable' },
+            { id: 'admin', name: 'Admin', icon: '⚙️', minRole: 'admin' }
         ];
 
         const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, admin: 3 };
@@ -645,11 +645,11 @@
             }
             currentSession = JSON.parse(userJson);
             if (currentSession.role !== 'admin') {
-                alert('AccÃ¨s rÃ©servÃ© aux administrateurs');
+                alert('Accès réservé aux administrateurs');
                 window.location.href = '../';
                 return false;
             }
-            document.getElementById('header-info').textContent = `ConnectÃ©: ${currentSession.nom}`;
+            document.getElementById('header-info').textContent = `Connecté: ${currentSession.nom}`;
             return true;
         }
 
@@ -690,7 +690,7 @@
             document.getElementById('user-count').textContent = `${filtered.length} utilisateur${filtered.length > 1 ? 's' : ''} sur ${users.length}`;
 
             if (filtered.length === 0) {
-                list.innerHTML = '<div class="loading-spinner">Aucun utilisateur trouvÃ©</div>';
+                list.innerHTML = '<div class="loading-spinner">Aucun utilisateur trouvé</div>';
                 return;
             }
 
@@ -746,11 +746,11 @@
                         </div>
                     </div>
                     <span class="user-role-badge ${user.role}">${user.role}</span>
-                    <span class="expand-icon">â¼</span>
+                    <span class="expand-icon">▼</span>
                 </div>
                 <div class="user-details">
                     <div class="detail-section">
-                        <h4>AccÃ¨s modules ${isCustom ? '(personnalisÃ©)' : '(par rÃ´le)'}</h4>
+                        <h4>Accès modules ${isCustom ? '(personnalisé)' : '(par rôle)'}</h4>
                         <div class="modules-grid">
                             ${ALL_MODULES.map(m => {
                                 const checked = userMods.includes(m.id);
@@ -765,10 +765,10 @@
                         </div>
                     </div>
                     <div class="user-actions">
-                        <button class="btn btn-save btn-save-modules" data-user-id="${user.id}">Sauvegarder accÃ¨s</button>
+                        <button class="btn btn-save btn-save-modules" data-user-id="${user.id}">Sauvegarder accès</button>
                         <button class="btn btn-toggle btn-edit-user" data-user-id="${user.id}">Modifier</button>
                         <button class="btn btn-toggle btn-toggle-active" data-user-id="${user.id}">
-                            ${user.actif ? 'DÃ©sactiver' : 'RÃ©activer'}
+                            ${user.actif ? 'Désactiver' : 'Réactiver'}
                         </button>
                     </div>
                 </div>
@@ -800,7 +800,7 @@
             if (DEMO_MODE) {
                 const user = users.find(u => u.id === userId);
                 if (user) user.acces_modules = modules;
-                showToast('AccÃ¨s sauvegardÃ©s (dÃ©mo)', 'success');
+                showToast('Accès sauvegardés (démo)', 'success');
                 return;
             }
 
@@ -814,7 +814,7 @@
                 const user = users.find(u => u.id === userId);
                 if (user) user.acces_modules = modules;
 
-                showToast('AccÃ¨s modules sauvegardÃ©s', 'success');
+                showToast('Accès modules sauvegardés', 'success');
             } catch (e) {
                 console.error('Erreur sauvegarde:', e);
                 showToast('Erreur de sauvegarde', 'error');
@@ -830,7 +830,7 @@
             if (DEMO_MODE) {
                 user.actif = newActif;
                 renderUsers();
-                showToast(`Utilisateur ${newActif ? 'rÃ©activÃ©' : 'dÃ©sactivÃ©'}`, 'success');
+                showToast(`Utilisateur ${newActif ? 'réactivé' : 'désactivé'}`, 'success');
                 return;
             }
 
@@ -843,10 +843,10 @@
 
                 user.actif = newActif;
                 renderUsers();
-                showToast(`Utilisateur ${newActif ? 'rÃ©activÃ©' : 'dÃ©sactivÃ©'}`, 'success');
+                showToast(`Utilisateur ${newActif ? 'réactivé' : 'désactivé'}`, 'success');
             } catch (e) {
                 console.error('Erreur:', e);
-                showToast('Erreur de mise Ã  jour', 'error');
+                showToast('Erreur de mise à jour', 'error');
             }
         }
 
@@ -902,18 +902,18 @@
                 return;
             }
             if (!/^\d{4,6}$/.test(code)) {
-                showToast('Le code PIN doit contenir 4 Ã  6 chiffres', 'error');
+                showToast('Le code PIN doit contenir 4 à 6 chiffres', 'error');
                 return;
             }
             if (initiales.length < 2 || initiales.length > 3) {
-                showToast('Les initiales doivent avoir 2-3 caractÃ¨res', 'error');
+                showToast('Les initiales doivent avoir 2-3 caractères', 'error');
                 return;
             }
 
             // Check code uniqueness
             const existing = users.find(u => u.code === code && (!editingUser || u.id !== editingUser.id));
             if (existing) {
-                showToast('Ce code PIN est dÃ©jÃ  utilisÃ©', 'error');
+                showToast('Ce code PIN est déjà utilisé', 'error');
                 return;
             }
 
@@ -937,7 +937,7 @@
                 }
                 closeModal();
                 renderUsers();
-                showToast(editingUser ? 'Utilisateur modifiÃ© (dÃ©mo)' : 'Utilisateur ajoutÃ© (dÃ©mo)', 'success');
+                showToast(editingUser ? 'Utilisateur modifié (démo)' : 'Utilisateur ajouté (démo)', 'success');
                 return;
             }
 
@@ -949,7 +949,7 @@
                         .eq('id', editingUser.id);
                     if (error) throw error;
                     Object.assign(editingUser, userData);
-                    showToast('Utilisateur modifiÃ©', 'success');
+                    showToast('Utilisateur modifié', 'success');
                 } else {
                     const { data, error } = await supabaseClient
                         .from('users')
@@ -957,13 +957,13 @@
                         .select();
                     if (error) throw error;
                     if (data && data[0]) users.push(data[0]);
-                    showToast('Utilisateur ajoutÃ©', 'success');
+                    showToast('Utilisateur ajouté', 'success');
                 }
                 closeModal();
                 renderUsers();
             } catch (e) {
                 console.error('Erreur sauvegarde:', e);
-                showToast('Erreur: ' + (e.message || 'sauvegarde Ã©chouÃ©e'), 'error');
+                showToast('Erreur: ' + (e.message || 'sauvegarde échouée'), 'error');
             }
         }
 
