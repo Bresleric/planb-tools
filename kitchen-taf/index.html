@@ -356,6 +356,8 @@ if (!DEMO_MODE && window.supabase) {
 // ===========================================================
 let currentUser = null;
 let currentEtablissement = null;
+    let currentDeviceId = null;
+    let currentDeviceNom = null;
 let pinCode = '';
 let currentTab = 'tasks';
 let filterEquipe = null;
@@ -501,6 +503,8 @@ function checkPortalSession() {
 function initializeFromSession(sessionData) {
     currentUser = sessionData.user;
     currentEtablissement = sessionData.etablissement;
+    currentDeviceId = sessionData.device_id || null;
+    currentDeviceNom = sessionData.device_nom || null;
     showApp();
 }
 
@@ -807,7 +811,9 @@ async function submitCreateTask() {
             tache: selectedPredefinedTask.nom,
             priorite: parseInt(document.querySelector('.priority-btn.active')?.dataset.p || '3'),
             observation: document.getElementById('create-observation')?.value || '',
-            etablissement: currentEtablissement
+            etablissement: currentEtablissement,
+                device_id: currentDeviceId,
+                device_nom: currentDeviceNom
         });
         showToast('Tâche créée !');
         setTimeout(() => renderCreateTab(), 1500);
