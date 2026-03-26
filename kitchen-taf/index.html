@@ -1036,8 +1036,9 @@ if (portalSession) {
     initializeFromSession(portalSession);
 } else {
     // Standalone mode - need PIN and establishment selector
-    seedDefaultData();
 }
+// Seed default predefined tasks if table is empty (runs in both portal and standalone modes)
+seedDefaultData();
 </script>
 </body>
 </html>
