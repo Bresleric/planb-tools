@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Administration - PlanB Tools</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --orange: #f97316;
+            --orange-dark: #ea580c;
+            --gray-50: #fafafa;
+            --gray-100: #f5f5f5;
+            --gray-200: #e5e5e5;
+            --gray-300: #d4d4d4;
+            --gray-400: #a3a3a3;
+            --gray-500: #737373;
+            --gray-600: #525252;
+            --gray-700: #404040;
+            --gray-800: #262626;
+            --gray-900: #171717;
+            --success: #22c55e;
+            --error: #ef4444;
+            --blue: #3b82f6;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%; height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-btn {
+            background: var(--gray-100);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--gray-700);
+            font-weight: 500;
+            touch-action: manipulation;
+        }
+
+        .back-btn:active { background: var(--gray-200); }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .header-info {
+            font-size: 12px;
+            color: var(--gray-500);
+        }
+
+        .add-btn {
+            background: var(--orange);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .add-btn:active { background: var(--orange-dark); }
+
+        /* Main content */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* User cards */
+        .user-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+        }
+
+        .user-card-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            gap: 12px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .user-card-header:active {
+            background: var(--gray-50);
+        }
+
+        .user-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .user-avatar.collaborateur { background: var(--blue); }
+        .user-avatar.responsable { background: var(--orange); }
+        .user-avatar.admin { background: var(--error); }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .user-meta {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin-top: 2px;
+        }
+
+        .user-role-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .user-role-badge.collaborateur { background: #dbeafe; color: #1d4ed8; }
+        .user-role-badge.responsable { background: #fed7aa; color: #c2410c; }
+        .user-role-badge.admin { background: #fecaca; color: #b91c1c; }
+
+        .user-inactive {
+            opacity: 0.5;
+        }
+
+        .expand-icon {
+            color: var(--gray-400);
+            font-size: 18px;
+            transition: transform 0.2s;
+        }
+
+        .user-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* User details (expandable) */
+        .user-details {
+            display: none;
+            border-top: 1px solid var(--gray-200);
+            padding: 16px;
+        }
+
+        .user-card.expanded .user-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 16px;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-section h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        /* Module checkboxes */
+        .modules-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        @media (min-width: 768px) {
+            .modules-grid {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+        }
+
+        .module-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .module-checkbox:active {
+            background: var(--gray-100);
+        }
+
+        .module-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--orange);
+            flex-shrink: 0;
+        }
+
+        .module-checkbox-label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .module-checkbox-icon {
+            font-size: 16px;
+        }
+
+        .module-checkbox.role-default {
+            border: 1px dashed var(--gray-300);
+        }
+
+        .module-checkbox.role-default .module-checkbox-label {
+            color: var(--gray-500);
+        }
+
+        /* Action buttons */
+        .user-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .btn-save {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-save:active { background: #16a34a; }
+
+        .btn-toggle {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .btn-toggle:active { background: var(--gray-300); }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-danger:active { background: #dc2626; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-header {
+            padding: 20px 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: var(--gray-100);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--gray-700);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            -webkit-appearance: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--orange);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+        }
+
+        .form-group .hint {
+            font-size: 12px;
+            color: var(--gray-500);
+            margin-top: 4px;
+        }
+
+        .modal-footer {
+            padding: 0 20px 20px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .modal-footer .btn {
+            padding: 10px 24px;
+        }
+
+        .btn-cancel {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .btn-primary {
+            background: var(--orange);
+            color: white;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+        }
+
+        .toast {
+            background: var(--gray-800);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 8px;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
+            white-space: nowrap;
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+
+        @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* Loading */
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: var(--gray-500);
+            font-size: 16px;
+        }
+
+        /* Etab filter */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--gray-300);
+            background: white;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .filter-btn.active {
+            background: var(--orange);
+            color: white;
+            border-color: var(--orange);
+        }
+
+        .filter-btn:active {
+            opacity: 0.8;
+        }
+
+        .user-count {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin-bottom: 12px;
+        }
+
+        /* Establishment badges */
+        .etab-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .etab-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .etab-badge.freddy { background: #164e4a; color: white; }
+        .etab-badge.bonbao { background: #8b1a2b; color: white; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <button class="back-btn" id="back-btn">â Portail</button>
+                <div>
+                    <div class="header-title">Administration</div>
+                    <div class="header-info" id="header-info">Gestion des utilisateurs</div>
+                </div>
+            </div>
+            <button class="add-btn" id="add-user-btn">+ Ajouter</button>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Filter bar -->
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="all">Tous</button>
+                <button class="filter-btn" data-filter="freddy">Freddy</button>
+                <button class="filter-btn" data-filter="bonbao">Liesel</button>
+                <button class="filter-btn" data-filter="admin">Admins</button>
+            </div>
+
+            <div class="user-count" id="user-count"></div>
+
+            <!-- User list -->
+            <div id="users-list">
+                <div class="loading-spinner">Chargement des utilisateurs...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit User Modal -->
+    <div class="modal-overlay" id="user-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Nouvel utilisateur</h2>
+                <button class="modal-close" id="modal-close">â</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="user-nom">Nom complet</label>
+                    <input type="text" id="user-nom" placeholder="Ex: Jean Dupont">
+                </div>
+                <div class="form-group">
+                    <label for="user-initiales">Initiales</label>
+                    <input type="text" id="user-initiales" placeholder="Ex: JD" maxlength="3" style="text-transform: uppercase;">
+                    <div class="hint">2-3 caractÃ¨res pour identifier sur les tÃ¢ches</div>
+                </div>
+                <div class="form-group">
+                    <label for="user-code">Code PIN</label>
+                    <input type="text" id="user-code" placeholder="4-6 chiffres" maxlength="6" inputmode="numeric">
+                    <div class="hint">4 chiffres = collaborateur, 5 = responsable, 6 = admin</div>
+                </div>
+                <div class="form-group">
+                    <label for="user-role">RÃ´le</label>
+                    <select id="user-role">
+                        <option value="collaborateur">Collaborateur</option>
+                        <option value="responsable">Responsable</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="user-etablissement">Ãtablissement principal</label>
+                    <select id="user-etablissement">
+                        <option value="freddy">Freddy</option>
+                        <option value="bonbao">Bonbao/Liesel</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>AccÃ¨s Ã©tablissements</label>
+                    <div style="display: flex; gap: 16px; margin-top: 6px;">
+                        <label class="module-checkbox" style="flex:1;">
+                            <input type="checkbox" id="acces-freddy" value="freddy">
+                            <span class="module-checkbox-label">Freddy</span>
+                        </label>
+                        <label class="module-checkbox" style="flex:1;">
+                            <input type="checkbox" id="acces-bonbao" value="bonbao">
+                            <span class="module-checkbox-label">Liesel</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" id="modal-cancel">Annuler</button>
+                <button class="btn btn-primary" id="modal-save">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // ============= Configuration =============
+        const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+        const DEMO_MODE = SUPABASE_URL.includes('VOTRE-PROJET');
+
+        let supabaseClient = null;
+        if (!DEMO_MODE && window.supabase) {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
+        // ============= Modules Definition =============
+        const ALL_MODULES = [
+            { id: 'kitchen-taf', name: 'Kitchen TAF', icon: 'ð´', minRole: 'collaborateur' },
+            { id: 'pointages', name: 'Pointages', icon: 'â°', minRole: 'collaborateur' },
+            { id: 'caisse', name: 'ContrÃ´le Caisse', icon: 'ð°', minRole: 'responsable' },
+            { id: 'briefings', name: 'Briefings', icon: 'ð', minRole: 'responsable' },
+            { id: 'approvisionnement', name: 'Appro.', icon: 'ð¦', minRole: 'responsable' },
+            { id: 'receptions', name: 'RÃ©ceptions', icon: 'ð', minRole: 'responsable' },
+            { id: 'admin', name: 'Admin', icon: 'âï¸', minRole: 'admin' }
+        ];
+
+        const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, admin: 3 };
+
+        function getDefaultModules(role) {
+            const level = ROLE_HIERARCHY[role] || 0;
+            return ALL_MODULES.filter(m => (ROLE_HIERARCHY[m.minRole] || 0) <= level).map(m => m.id);
+        }
+
+        // ============= State =============
+        let users = [];
+        let currentFilter = 'all';
+        let editingUser = null;
+        let currentSession = null;
+
+        // ============= Session Check =============
+        function checkSession() {
+            const userJson = sessionStorage.getItem('planb_user');
+            if (!userJson) {
+                window.location.href = '../';
+                return false;
+            }
+            currentSession = JSON.parse(userJson);
+            if (currentSession.role !== 'admin') {
+                alert('AccÃ¨s rÃ©servÃ© aux administrateurs');
+                window.location.href = '../';
+                return false;
+            }
+            document.getElementById('header-info').textContent = `ConnectÃ©: ${currentSession.nom}`;
+            return true;
+        }
+
+        // ============= Data Loading =============
+        async function loadUsers() {
+            if (DEMO_MODE) {
+                users = getDemoUsers();
+            } else {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('users')
+                        .select('*')
+                        .order('nom');
+                    if (error) throw error;
+                    users = data || [];
+                } catch (e) {
+                    console.error('Erreur chargement utilisateurs:', e);
+                    showToast('Erreur de chargement', 'error');
+                    users = [];
+                }
+            }
+            renderUsers();
+        }
+
+        function getDemoUsers() {
+            return [
+                { id: '1', nom: 'Admin PlanB', initiales: 'AP', code: '000000', role: 'admin', etablissement: 'freddy', acces_etablissements: ['freddy', 'bonbao'], acces_modules: [], actif: true },
+                { id: '2', nom: 'Marc Durand', initiales: 'MD', code: '1234', role: 'collaborateur', etablissement: 'freddy', acces_etablissements: ['freddy'], acces_modules: [], actif: true },
+                { id: '3', nom: 'Sophie Martin', initiales: 'SM', code: '12345', role: 'responsable', etablissement: 'bonbao', acces_etablissements: ['bonbao'], acces_modules: [], actif: true },
+            ];
+        }
+
+        // ============= Rendering =============
+        function renderUsers() {
+            const list = document.getElementById('users-list');
+            const filtered = filterUsers(users);
+
+            document.getElementById('user-count').textContent = `${filtered.length} utilisateur${filtered.length > 1 ? 's' : ''} sur ${users.length}`;
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<div class="loading-spinner">Aucun utilisateur trouvÃ©</div>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(user => renderUserCard(user)).join('');
+
+            // Attach event listeners
+            list.querySelectorAll('.user-card-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const card = header.closest('.user-card');
+                    card.classList.toggle('expanded');
+                });
+            });
+
+            list.querySelectorAll('.module-cb').forEach(cb => {
+                cb.addEventListener('change', handleModuleToggle);
+            });
+
+            list.querySelectorAll('.btn-save-modules').forEach(btn => {
+                btn.addEventListener('click', () => saveModules(btn.dataset.userId));
+            });
+
+            list.querySelectorAll('.btn-edit-user').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const user = users.find(u => u.id === btn.dataset.userId);
+                    if (user) openEditModal(user);
+                });
+            });
+
+            list.querySelectorAll('.btn-toggle-active').forEach(btn => {
+                btn.addEventListener('click', () => toggleActive(btn.dataset.userId));
+            });
+        }
+
+        function renderUserCard(user) {
+            const defaultMods = getDefaultModules(user.role);
+            const userMods = (user.acces_modules && user.acces_modules.length > 0) ? user.acces_modules : defaultMods;
+            const isCustom = user.acces_modules && user.acces_modules.length > 0;
+            const etabs = (user.acces_etablissements && user.acces_etablissements.length > 0)
+                ? user.acces_etablissements
+                : [user.etablissement];
+
+            return `
+            <div class="user-card ${!user.actif ? 'user-inactive' : ''}" data-user-id="${user.id}">
+                <div class="user-card-header">
+                    <div class="user-avatar ${user.role}">${user.initiales}</div>
+                    <div class="user-info">
+                        <div class="user-name">${user.nom} ${!user.actif ? '(inactif)' : ''}</div>
+                        <div class="user-meta">
+                            <div class="etab-badges">
+                                ${etabs.map(e => `<span class="etab-badge ${e}">${e === 'freddy' ? 'Freddy' : 'Liesel'}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <span class="user-role-badge ${user.role}">${user.role}</span>
+                    <span class="expand-icon">â¼</span>
+                </div>
+                <div class="user-details">
+                    <div class="detail-section">
+                        <h4>AccÃ¨s modules ${isCustom ? '(personnalisÃ©)' : '(par rÃ´le)'}</h4>
+                        <div class="modules-grid">
+                            ${ALL_MODULES.map(m => {
+                                const checked = userMods.includes(m.id);
+                                const isDefault = defaultMods.includes(m.id);
+                                return `
+                                <label class="module-checkbox ${!isCustom && isDefault ? 'role-default' : ''}">
+                                    <input type="checkbox" class="module-cb" data-user-id="${user.id}" data-module="${m.id}" ${checked ? 'checked' : ''}>
+                                    <span class="module-checkbox-icon">${m.icon}</span>
+                                    <span class="module-checkbox-label">${m.name}</span>
+                                </label>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <div class="user-actions">
+                        <button class="btn btn-save btn-save-modules" data-user-id="${user.id}">Sauvegarder accÃ¨s</button>
+                        <button class="btn btn-toggle btn-edit-user" data-user-id="${user.id}">Modifier</button>
+                        <button class="btn btn-toggle btn-toggle-active" data-user-id="${user.id}">
+                            ${user.actif ? 'DÃ©sactiver' : 'RÃ©activer'}
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function filterUsers(list) {
+            if (currentFilter === 'all') return list;
+            if (currentFilter === 'admin') return list.filter(u => u.role === 'admin');
+            return list.filter(u => {
+                const etabs = (u.acces_etablissements && u.acces_etablissements.length > 0)
+                    ? u.acces_etablissements : [u.etablissement];
+                return etabs.includes(currentFilter);
+            });
+        }
+
+        // ============= Actions =============
+        function handleModuleToggle(e) {
+            // Just visual - saved on button click
+        }
+
+        async function saveModules(userId) {
+            const checkboxes = document.querySelectorAll(`.module-cb[data-user-id="${userId}"]`);
+            const modules = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) modules.push(cb.dataset.module);
+            });
+
+            if (DEMO_MODE) {
+                const user = users.find(u => u.id === userId);
+                if (user) user.acces_modules = modules;
+                showToast('AccÃ¨s sauvegardÃ©s (dÃ©mo)', 'success');
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .update({ acces_modules: modules })
+                    .eq('id', userId);
+                if (error) throw error;
+
+                const user = users.find(u => u.id === userId);
+                if (user) user.acces_modules = modules;
+
+                showToast('AccÃ¨s modules sauvegardÃ©s', 'success');
+            } catch (e) {
+                console.error('Erreur sauvegarde:', e);
+                showToast('Erreur de sauvegarde', 'error');
+            }
+        }
+
+        async function toggleActive(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            const newActif = !user.actif;
+
+            if (DEMO_MODE) {
+                user.actif = newActif;
+                renderUsers();
+                showToast(`Utilisateur ${newActif ? 'rÃ©activÃ©' : 'dÃ©sactivÃ©'}`, 'success');
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .update({ actif: newActif })
+                    .eq('id', userId);
+                if (error) throw error;
+
+                user.actif = newActif;
+                renderUsers();
+                showToast(`Utilisateur ${newActif ? 'rÃ©activÃ©' : 'dÃ©sactivÃ©'}`, 'success');
+            } catch (e) {
+                console.error('Erreur:', e);
+                showToast('Erreur de mise Ã  jour', 'error');
+            }
+        }
+
+        // ============= Modal: Add/Edit User =============
+        function openAddModal() {
+            editingUser = null;
+            document.getElementById('modal-title').textContent = 'Nouvel utilisateur';
+            document.getElementById('user-nom').value = '';
+            document.getElementById('user-initiales').value = '';
+            document.getElementById('user-code').value = '';
+            document.getElementById('user-role').value = 'collaborateur';
+            document.getElementById('user-etablissement').value = 'freddy';
+            document.getElementById('acces-freddy').checked = true;
+            document.getElementById('acces-bonbao').checked = false;
+            document.getElementById('user-modal').classList.add('active');
+        }
+
+        function openEditModal(user) {
+            editingUser = user;
+            document.getElementById('modal-title').textContent = 'Modifier ' + user.nom;
+            document.getElementById('user-nom').value = user.nom;
+            document.getElementById('user-initiales').value = user.initiales;
+            document.getElementById('user-code').value = user.code;
+            document.getElementById('user-role').value = user.role;
+            document.getElementById('user-etablissement').value = user.etablissement;
+
+            const etabs = (user.acces_etablissements && user.acces_etablissements.length > 0)
+                ? user.acces_etablissements : [user.etablissement];
+            document.getElementById('acces-freddy').checked = etabs.includes('freddy');
+            document.getElementById('acces-bonbao').checked = etabs.includes('bonbao');
+
+            document.getElementById('user-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('user-modal').classList.remove('active');
+            editingUser = null;
+        }
+
+        async function saveUser() {
+            const nom = document.getElementById('user-nom').value.trim();
+            const initiales = document.getElementById('user-initiales').value.trim().toUpperCase();
+            const code = document.getElementById('user-code').value.trim();
+            const role = document.getElementById('user-role').value;
+            const etablissement = document.getElementById('user-etablissement').value;
+            const accesEtabs = [];
+            if (document.getElementById('acces-freddy').checked) accesEtabs.push('freddy');
+            if (document.getElementById('acces-bonbao').checked) accesEtabs.push('bonbao');
+
+            // Validation
+            if (!nom || !initiales || !code) {
+                showToast('Veuillez remplir tous les champs', 'error');
+                return;
+            }
+            if (!/^\d{4,6}$/.test(code)) {
+                showToast('Le code PIN doit contenir 4 Ã  6 chiffres', 'error');
+                return;
+            }
+            if (initiales.length < 2 || initiales.length > 3) {
+                showToast('Les initiales doivent avoir 2-3 caractÃ¨res', 'error');
+                return;
+            }
+
+            // Check code uniqueness
+            const existing = users.find(u => u.code === code && (!editingUser || u.id !== editingUser.id));
+            if (existing) {
+                showToast('Ce code PIN est dÃ©jÃ  utilisÃ©', 'error');
+                return;
+            }
+
+            const userData = {
+                nom,
+                initiales,
+                code,
+                role,
+                etablissement,
+                acces_etablissements: accesEtabs,
+                actif: true
+            };
+
+            if (DEMO_MODE) {
+                if (editingUser) {
+                    Object.assign(editingUser, userData);
+                } else {
+                    userData.id = 'demo-' + Date.now();
+                    userData.acces_modules = [];
+                    users.push(userData);
+                }
+                closeModal();
+                renderUsers();
+                showToast(editingUser ? 'Utilisateur modifiÃ© (dÃ©mo)' : 'Utilisateur ajoutÃ© (dÃ©mo)', 'success');
+                return;
+            }
+
+            try {
+                if (editingUser) {
+                    const { error } = await supabaseClient
+                        .from('users')
+                        .update(userData)
+                        .eq('id', editingUser.id);
+                    if (error) throw error;
+                    Object.assign(editingUser, userData);
+                    showToast('Utilisateur modifiÃ©', 'success');
+                } else {
+                    const { data, error } = await supabaseClient
+                        .from('users')
+                        .insert(userData)
+                        .select();
+                    if (error) throw error;
+                    if (data && data[0]) users.push(data[0]);
+                    showToast('Utilisateur ajoutÃ©', 'success');
+                }
+                closeModal();
+                renderUsers();
+            } catch (e) {
+                console.error('Erreur sauvegarde:', e);
+                showToast('Erreur: ' + (e.message || 'sauvegarde Ã©chouÃ©e'), 'error');
+            }
+        }
+
+        // ============= Toast =============
+        function showToast(message, type = 'default') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.getElementById('toast-container').appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // ============= Event Listeners =============
+        document.getElementById('back-btn').addEventListener('click', () => {
+            window.location.href = '../';
+        });
+
+        document.getElementById('add-user-btn').addEventListener('click', openAddModal);
+        document.getElementById('modal-close').addEventListener('click', closeModal);
+        document.getElementById('modal-cancel').addEventListener('click', closeModal);
+        document.getElementById('modal-save').addEventListener('click', saveUser);
+
+        document.getElementById('user-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'user-modal') closeModal();
+        });
+
+        // Auto-fill role based on PIN length
+        document.getElementById('user-code').addEventListener('input', (e) => {
+            const len = e.target.value.length;
+            const roleSelect = document.getElementById('user-role');
+            if (len === 4) roleSelect.value = 'collaborateur';
+            else if (len === 5) roleSelect.value = 'responsable';
+            else if (len === 6) roleSelect.value = 'admin';
+        });
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderUsers();
+            });
+        });
+
+        // ============= Init =============
+        async function init() {
+            if (!checkSession()) return;
+            await loadUsers();
+        }
+
+        init();
+    </script>
+</body>
+</html>
