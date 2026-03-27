@@ -1203,7 +1203,7 @@
             loadDevices();
         }
 
-        function init() {
+        async function init() {
             if (!checkSession()) return;
             await loadUsers();
         
