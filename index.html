@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PlanB Tools">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23f97316' width='180' height='180'/><text x='90' y='100' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='system-ui'>ð´</text></svg>">
-    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22PlanB%20Tools%22,%22short_name%22:%22PlanB%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Crect%20fill='%23f97316'%20width='192'%20height='192'/%3E%3Ctext%20x='96'%20y='110'%20font-size='100'%20fill='white'%20text-anchor='middle'%20dominant-baseline='middle'%20font-family='system-ui'%3Eð´%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}],%22display%22:%22standalone%22,%22scope%22:%22/%22,%22start_url%22:%22/index.html%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%23f97316%22}">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23f97316' width='180' height='180'/><text x='90' y='100' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='system-ui'>🍴</text></svg>">
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22PlanB%20Tools%22,%22short_name%22:%22PlanB%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Crect%20fill='%23f97316'%20width='192'%20height='192'/%3E%3Ctext%20x='96'%20y='110'%20font-size='100'%20fill='white'%20text-anchor='middle'%20dominant-baseline='middle'%20font-family='system-ui'%3E🍴%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}],%22display%22:%22standalone%22,%22scope%22:%22/%22,%22start_url%22:%22/index.html%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%23f97316%22}">
     <title>PlanB Tools</title>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -554,12 +554,12 @@
     <div id="login-screen" class="screen active">
         <div class="login-container">
             <div class="login-header">
-                <span class="login-icon">ð´</span>
+                <span class="login-icon">🍴</span>
                 <h1 class="login-title">PlanB Tools</h1>
                 <p class="login-subtitle">Gestion interne</p>
             </div>
             <div class="login-content">
-                <div class="pin-display" id="pin-display">ÃÂ·ÃÂ·ÃÂ·ÃÂ·</div>
+                <div class="pin-display" id="pin-display">Â·Â·Â·Â·</div>
                 <p class="hint">
                     <strong>4 chiffres</strong> = Collaborateur<br>
                     <strong>5 chiffres</strong> = Responsable<br>
@@ -587,19 +587,19 @@
     <div id="establishment-screen" class="screen">
         <div class="establishment-container">
             <div class="establishment-header">
-                <h1>SÃ©lectionner un Ã©tablissement</h1>
+                <h1>Sélectionner un établissement</h1>
                 <p id="establishment-subtitle"></p>
             </div>
             <div class="establishment-cards">
                 <div class="establishment-card" data-establishment="freddy">
                     <img class="establishment-logo" src="Logo%20Freddy.png" alt="Freddy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-                    <span class="establishment-icon" style="display:none">ðª</span>
+                    <span class="establishment-icon" style="display:none">🏪</span>
                     <h2 class="establishment-name">Freddy</h2>
                     <p class="establishment-description">L'Oncle Freddy</p>
                 </div>
                 <div class="establishment-card" data-establishment="bonbao">
                     <img class="establishment-logo" src="Logo%20Liesel.png" alt="Liesel" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-                    <span class="establishment-icon" style="display:none">ð</span>
+                    <span class="establishment-icon" style="display:none">🍜</span>
                     <h2 class="establishment-name">Liesel</h2>
                     <p class="establishment-description">Chez Tante Liesel</p>
                 </div>
@@ -611,9 +611,9 @@
     <div id="device-screen" class="screen">
         <div class="login-container">
             <div class="login-header">
-                <div class="login-icon">ð±</div>
-                <h1 class="login-title">Appareil non enregistrÃ©</h1>
-                <p style="color: var(--gray-500); margin-top: 8px; font-size: 14px;">Cet appareil doit Ãªtre activÃ© par un administrateur pour accÃ©der Ã  PlanB Tools.</p>
+                <div class="login-icon">📱</div>
+                <h1 class="login-title">Appareil non enregistré</h1>
+                <p style="color: var(--gray-500); margin-top: 8px; font-size: 14px;">Cet appareil doit être activé par un administrateur pour accéder à PlanB Tools.</p>
             </div>
             <div class="login-content">
                 <p style="font-weight: 600; margin-bottom: 8px;">Code d'activation</p>
@@ -639,9 +639,9 @@
         <div class="header">
             <div class="header-left">
                 <div class="header-user" id="header-user">Utilisateur</div>
-                <div class="header-establishment" id="header-establishment">Ãtablissement</div>
+                <div class="header-establishment" id="header-establishment">Établissement</div>
             </div>
-            <button class="logout-btn" id="logout-btn">DÃ©connexion</button>
+            <button class="logout-btn" id="logout-btn">Déconnexion</button>
         </div>
         <div class="dashboard-content">
             <div class="modules-grid" id="modules-grid"></div>
@@ -654,7 +654,7 @@
     <!-- Modal for Coming Soon -->
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal">
-            <h2>Module en cours de dÃ©veloppement</h2>
+            <h2>Module en cours de développement</h2>
             <p id="modal-message"></p>
             <button class="modal-button" id="modal-close-btn">Fermer</button>
         </div>
@@ -839,31 +839,31 @@
             {
                 id: 'kitchen-taf',
                 name: 'Kitchen TAF',
-                icon: 'ð´',
-                description: 'TÃ¢ches Ã  faire cuisine',
+                icon: '🍴',
+                description: 'Tâches à faire cuisine',
                 minRole: 'collaborateur',
                 url: './kitchen-taf/'
             },
             {
                 id: 'pointages',
                 name: 'Pointages',
-                icon: 'â°',
+                icon: '⏰',
                 description: 'Saisie des mouvements',
                 minRole: 'collaborateur',
                 url: null
             },
             {
                 id: 'caisse',
-                name: 'ContrÃ´le Caisse',
-                icon: 'ð°',
-                description: 'ContrÃ´les fin de service',
+                name: 'Contrôle Caisse',
+                icon: '💰',
+                description: 'Contrôles fin de service',
                 minRole: 'collaborateur',
                 url: './caisse/'
             },
             {
                 id: 'briefings',
                 name: 'Briefings',
-                icon: 'ð',
+                icon: '📋',
                 description: 'Briefings d\'avant service',
                 minRole: 'responsable',
                 url: null
@@ -871,23 +871,23 @@
             {
                 id: 'approvisionnement',
                 name: 'Approvisionnement',
-                icon: 'ð¦',
+                icon: '📦',
                 description: 'Besoins en achats',
                 minRole: 'responsable',
                 url: null
             },
             {
                 id: 'receptions',
-                name: 'RÃ©ceptions',
-                icon: 'ð',
-                description: 'RÃ©ception marchandises',
+                name: 'Réceptions',
+                icon: '🚛',
+                description: 'Réception marchandises',
                 minRole: 'responsable',
                 url: null
             },
             {
                 id: 'admin',
                 name: 'Administration',
-                icon: 'âï¸',
+                icon: '⚙️',
                 description: 'Gestion utilisateurs',
                 minRole: 'admin',
                 url: './admin/'
@@ -1006,7 +1006,7 @@
             if (module.url) {
                 window.location.href = module.url;
             } else {
-                showModal(`Le module "${module.name}" est en cours de dÃ©veloppement.`);
+                showModal(`Le module "${module.name}" est en cours de développement.`);
             }
         }
 
@@ -1058,7 +1058,7 @@
                     return;
                 }
                 if (device.error === 'already_activated') {
-                    deviceError.textContent = 'Ce code a dÃ©jÃ  Ã©tÃ© utilisÃ© sur un autre appareil.';
+                    deviceError.textContent = 'Ce code a déjà été utilisé sur un autre appareil.';
                     deviceActivateBtn.disabled = false;
                     deviceActivateBtn.textContent = 'Activer cet appareil';
                     return;
@@ -1067,7 +1067,7 @@
                 // Store token in localStorage (persists)
                 localStorage.setItem('planb_device_token', device.device_token);
                 currentDevice = device;
-                showToast('Appareil activÃ© : ' + device.nom, 'success');
+                showToast('Appareil activé : ' + device.nom, 'success');
 
                 // Continue login flow
                 deviceCodeInput.value = '';
@@ -1094,7 +1094,7 @@
         }
 
         function updatePinDisplay() {
-            const display = 'â¢'.repeat(currentPin.length) + 'â¢'.repeat(4 - Math.min(currentPin.length, 4));
+            const display = '•'.repeat(currentPin.length) + '•'.repeat(4 - Math.min(currentPin.length, 4));
             pinDisplay.textContent = display.substring(0, Math.max(currentPin.length, 4));
             pinDisplay.classList.remove('error', 'success');
         }
@@ -1198,7 +1198,7 @@
             updatePinDisplay();
             submitBtn.disabled = true;
             showScreen(loginScreen);
-            showToast('DÃ©connexion rÃ©ussie');
+            showToast('Déconnexion réussie');
         });
 
         // ============= Modal =============
