@@ -507,7 +507,7 @@
         }
 
         .etab-badge.freddy { background: #164e4a; color: white; }
-        .etab-badge.bonbao { background: #8b1a2b; color: white; }
+        .etab-badge.liesel { background: #8b1a2b; color: white; }
     
             /* Admin Tabs */
             .admin-tabs { display: flex; gap: 4px; }
@@ -578,7 +578,7 @@
             <div class="filter-bar">
                 <button class="filter-btn active" data-filter="all">Tous</button>
                 <button class="filter-btn" data-filter="freddy">Freddy</button>
-                <button class="filter-btn" data-filter="bonbao">Liesel</button>
+                <button class="filter-btn" data-filter="liesel">Liesel</button>
                 <button class="filter-btn" data-filter="admin">Admins</button>
             </div>
 
@@ -637,7 +637,7 @@
                     <label for="user-etablissement">Établissement principal</label>
                     <select id="user-etablissement">
                         <option value="freddy">Freddy</option>
-                        <option value="bonbao">Bonbao/Liesel</option>
+                        <option value="liesel">Liesel/Liesel</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -648,7 +648,7 @@
                             <span class="module-checkbox-label">Freddy</span>
                         </label>
                         <label class="module-checkbox" style="flex:1;">
-                            <input type="checkbox" id="acces-bonbao" value="bonbao">
+                            <input type="checkbox" id="acces-liesel" value="liesel">
                             <span class="module-checkbox-label">Liesel</span>
                         </label>
                     </div>
@@ -682,7 +682,7 @@
                     <select id="device-etablissement">
                         <option value="">Tous les établissements</option>
                         <option value="freddy">Freddy</option>
-                        <option value="bonbao">Liesel</option>
+                        <option value="liesel">Liesel</option>
                     </select>
                 </div>
             </div>
@@ -768,9 +768,9 @@
 
         function getDemoUsers() {
             return [
-                { id: '1', nom: 'Admin PlanB', initiales: 'AP', code: '000000', role: 'admin', etablissement: 'freddy', acces_etablissements: ['freddy', 'bonbao'], acces_modules: [], actif: true },
+                { id: '1', nom: 'Admin PlanB', initiales: 'AP', code: '000000', role: 'admin', etablissement: 'freddy', acces_etablissements: ['freddy', 'liesel'], acces_modules: [], actif: true },
                 { id: '2', nom: 'Marc Durand', initiales: 'MD', code: '1234', role: 'collaborateur', etablissement: 'freddy', acces_etablissements: ['freddy'], acces_modules: [], actif: true },
-                { id: '3', nom: 'Sophie Martin', initiales: 'SM', code: '12345', role: 'responsable', etablissement: 'bonbao', acces_etablissements: ['bonbao'], acces_modules: [], actif: true },
+                { id: '3', nom: 'Sophie Martin', initiales: 'SM', code: '12345', role: 'responsable', etablissement: 'liesel', acces_etablissements: ['liesel'], acces_modules: [], actif: true },
             ];
         }
 
@@ -952,7 +952,7 @@
             document.getElementById('user-role').value = 'collaborateur';
             document.getElementById('user-etablissement').value = 'freddy';
             document.getElementById('acces-freddy').checked = true;
-            document.getElementById('acces-bonbao').checked = false;
+            document.getElementById('acces-liesel').checked = false;
             document.getElementById('user-modal').classList.add('active');
         }
 
@@ -968,7 +968,7 @@
             const etabs = (user.acces_etablissements && user.acces_etablissements.length > 0)
                 ? user.acces_etablissements : [user.etablissement];
             document.getElementById('acces-freddy').checked = etabs.includes('freddy');
-            document.getElementById('acces-bonbao').checked = etabs.includes('bonbao');
+            document.getElementById('acces-liesel').checked = etabs.includes('liesel');
 
             document.getElementById('user-modal').classList.add('active');
         }
@@ -986,7 +986,7 @@
             const etablissement = document.getElementById('user-etablissement').value;
             const accesEtabs = [];
             if (document.getElementById('acces-freddy').checked) accesEtabs.push('freddy');
-            if (document.getElementById('acces-bonbao').checked) accesEtabs.push('bonbao');
+            if (document.getElementById('acces-liesel').checked) accesEtabs.push('liesel');
 
             // Validation
             if (!nom || !initiales || !code) {
