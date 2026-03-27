@@ -401,7 +401,7 @@ const FIELDS = {
             return theo - n(d.comptage_caisse) + n(d.pourboires);
         }
     },
-    bonbao: {
+    liesel: {
         ca: [
             { key: 'ca', label: 'CA (Chiffre d\'affaires)', type: 'input' },
             { key: 'plus_cash', label: '+ Cash', type: 'input' },
@@ -439,7 +439,7 @@ const FIELDS = {
                 - n(d.acomptes_verse) - n(d.achats_divers) - n(d.prelevement) + n(d.ajout);
         },
         calcEcart: (d, cashDebut) => {
-            const theo = FIELDS.bonbao.calcCaisseTheorique(d, cashDebut);
+            const theo = FIELDS.liesel.calcCaisseTheorique(d, cashDebut);
             return n(d.comptage_caisse) - theo;
         }
     }
