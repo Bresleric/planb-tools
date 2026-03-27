@@ -1,0 +1,995 @@
+undefined<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Contrôle Caisse">
+    <meta name="theme-color" content="#f97316">
+    <title>Contrôle Caisse - PlanB Tools</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed; --orange-dark: #ea580c;
+            --green: #22c55e; --green-light: #f0fdf4;
+            --red: #ef4444; --red-light: #fef2f2;
+            --blue: #3b82f6;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+            --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+            --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--gray-50); color: var(--gray-800);
+            height: 100vh; display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: white; border-bottom: 1px solid var(--gray-200);
+            padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+            flex-shrink: 0; z-index: 100;
+        }
+        .header .back-btn {
+            background: none; border: none; font-size: 20px; cursor: pointer;
+            padding: 4px 8px; color: var(--orange);
+        }
+        .header .title { font-size: 17px; font-weight: 700; flex: 1; }
+        .header .etab-badge {
+            background: var(--orange-light); color: var(--orange-dark);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        }
+        .header .user-badge {
+            background: var(--gray-100); color: var(--gray-600);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        }
+
+        /* Date Navigation */
+        .date-nav {
+            background: white; border-bottom: 1px solid var(--gray-200);
+            padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+            flex-shrink: 0;
+        }
+        .date-nav button {
+            background: var(--gray-100); border: none; border-radius: 8px;
+            padding: 8px 12px; font-size: 14px; cursor: pointer; color: var(--gray-700);
+            font-weight: 600;
+        }
+        .date-nav button:active { background: var(--gray-200); }
+        .date-nav button.today-btn { background: var(--orange); color: white; }
+        .date-nav .date-display {
+            flex: 1; text-align: center; font-weight: 700; font-size: 15px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex; background: white; border-bottom: 1px solid var(--gray-200);
+            flex-shrink: 0;
+        }
+        .tab {
+            flex: 1; padding: 12px; text-align: center; font-size: 13px; font-weight: 600;
+            color: var(--gray-400); border-bottom: 2px solid transparent;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+        /* Content area */
+        .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .tab-content { display: none; padding: 16px; padding-bottom: 100px; }
+        .tab-content.active { display: block; }
+
+        /* Form groups */
+        .section-title {
+            font-size: 13px; font-weight: 700; color: var(--gray-500);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin: 20px 0 10px; padding-bottom: 6px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .section-title:first-child { margin-top: 0; }
+
+        .form-row {
+            display: flex; align-items: center; padding: 10px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .form-row label {
+            flex: 1; font-size: 14px; font-weight: 500; color: var(--gray-700);
+        }
+        .form-row input {
+            width: 120px; text-align: right; border: 1px solid var(--gray-300);
+            border-radius: 8px; padding: 10px 12px; font-size: 15px;
+            font-weight: 600; color: var(--gray-800);
+            -webkit-appearance: none; appearance: none;
+        }
+        .form-row input:focus {
+            outline: none; border-color: var(--orange);
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+        }
+        .form-row input[readonly] {
+            background: var(--gray-50); color: var(--gray-500);
+            border-color: var(--gray-200); cursor: default;
+        }
+
+        /* Calculated fields */
+        .calc-row {
+            display: flex; align-items: center; padding: 12px 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .calc-row label { flex: 1; font-size: 14px; font-weight: 700; color: var(--gray-800); }
+        .calc-value {
+            font-size: 16px; font-weight: 800; padding: 8px 16px;
+            border-radius: 8px; min-width: 120px; text-align: right;
+        }
+        .calc-value.ok { background: var(--green-light); color: var(--green); }
+        .calc-value.error { background: var(--red-light); color: var(--red); }
+        .calc-value.neutral { background: var(--gray-100); color: var(--gray-700); }
+
+        /* Save button */
+        .save-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: white; border-top: 1px solid var(--gray-200);
+            padding: 12px 16px; display: flex; gap: 10px; z-index: 100;
+        }
+        .save-bar .btn {
+            flex: 1; padding: 14px; border-radius: 12px; font-size: 15px;
+            font-weight: 700; border: none; cursor: pointer;
+        }
+        .save-bar .btn-primary {
+            background: var(--orange); color: white;
+        }
+        .save-bar .btn-primary:active { background: var(--orange-dark); }
+        .save-bar .btn-primary:disabled {
+            background: var(--gray-300); cursor: default;
+        }
+        .save-bar .btn-secondary {
+            background: var(--gray-100); color: var(--gray-700); flex: 0 0 auto;
+            padding: 14px 20px;
+        }
+
+        /* Comptage */
+        .comptage-grid {
+            display: grid; grid-template-columns: 1fr 80px 100px;
+            gap: 0; margin-top: 10px;
+        }
+        .comptage-header {
+            font-size: 12px; font-weight: 700; color: var(--gray-500);
+            text-transform: uppercase; padding: 8px 4px;
+            border-bottom: 2px solid var(--gray-300);
+        }
+        .comptage-cell {
+            padding: 6px 4px; border-bottom: 1px solid var(--gray-100);
+            display: flex; align-items: center; font-size: 15px;
+        }
+        .comptage-cell.denom { font-weight: 700; color: var(--gray-700); }
+        .comptage-cell input {
+            width: 100%; text-align: center; border: 1px solid var(--gray-300);
+            border-radius: 6px; padding: 8px; font-size: 15px; font-weight: 600;
+            -webkit-appearance: none;
+        }
+        .comptage-cell input:focus {
+            outline: none; border-color: var(--orange);
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+        }
+        .comptage-cell.subtotal { font-weight: 700; color: var(--gray-600); text-align: right; }
+        .comptage-total {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 16px; padding: 16px;
+            background: var(--orange-light); border-radius: 12px;
+        }
+        .comptage-total label { font-size: 16px; font-weight: 800; color: var(--orange-dark); }
+        .comptage-total .total-value { font-size: 22px; font-weight: 900; color: var(--orange); }
+        .comptage-actions { margin-top: 16px; }
+        .comptage-actions .btn {
+            width: 100%; padding: 14px; border-radius: 12px; font-size: 15px;
+            font-weight: 700; border: none; cursor: pointer;
+            background: var(--orange); color: white;
+        }
+        .comptage-actions .btn:active { background: var(--orange-dark); }
+
+        /* Historique */
+        .history-card {
+            background: white; border-radius: 12px; padding: 16px;
+            margin-bottom: 10px; box-shadow: var(--shadow);
+        }
+        .history-card .date { font-weight: 700; font-size: 15px; color: var(--gray-800); }
+        .history-card .meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+        .history-card .stats {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px;
+        }
+        .history-card .stat-item { text-align: center; }
+        .history-card .stat-label { font-size: 11px; color: var(--gray-500); }
+        .history-card .stat-value { font-size: 15px; font-weight: 800; margin-top: 2px; }
+
+        /* Dashboard KPIs */
+        .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .kpi-card {
+            background: white; border-radius: 12px; padding: 16px;
+            box-shadow: var(--shadow); text-align: center;
+        }
+        .kpi-card.wide { grid-column: 1 / -1; }
+        .kpi-card .kpi-icon { font-size: 28px; margin-bottom: 6px; }
+        .kpi-card .kpi-label { font-size: 12px; color: var(--gray-500); font-weight: 600; }
+        .kpi-card .kpi-value { font-size: 22px; font-weight: 900; margin-top: 4px; }
+
+        /* Month selector */
+        .month-nav {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+        }
+        .month-nav button {
+            background: var(--gray-100); border: none; border-radius: 8px;
+            padding: 8px 14px; font-size: 14px; cursor: pointer; font-weight: 600;
+        }
+        .month-nav .month-display { flex: 1; text-align: center; font-weight: 700; font-size: 16px; }
+
+        /* Status badge */
+        .status-saved {
+            display: inline-block; background: var(--green-light); color: var(--green);
+            padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+        }
+        .status-unsaved {
+            display: inline-block; background: var(--orange-light); color: var(--orange);
+            padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--gray-800); color: white; padding: 12px 24px;
+            border-radius: 12px; font-size: 14px; font-weight: 600;
+            z-index: 1000; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+
+        /* Demo banner */
+        .demo-banner {
+            background: linear-gradient(90deg, #f97316, #ea580c);
+            color: white; text-align: center; padding: 6px 16px;
+            font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+            flex-shrink: 0; z-index: 200;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Demo Banner -->
+    <div class="demo-banner" id="demo-banner" style="display:none">MODE DÉMO — Données non sauvegardées</div>
+
+    <!-- Header -->
+    <div class="header">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <div class="title">💰 Contrôle de Caisse</div>
+        <div class="etab-badge" id="etab-badge">—</div>
+        <div class="user-badge" id="user-badge">—</div>
+    </div>
+
+    <!-- Date Navigation -->
+    <div class="date-nav">
+        <button onclick="changeDate(-1)">◀</button>
+        <div class="date-display" id="date-display">—</div>
+        <button onclick="changeDate(1)">▶</button>
+        <button class="today-btn" onclick="goToday()">Aujourd'hui</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="saisie" onclick="switchTab('saisie')">Saisie</div>
+        <div class="tab" data-tab="comptage" onclick="switchTab('comptage')">Comptage</div>
+        <div class="tab" data-tab="historique" onclick="switchTab('historique')">Historique</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+        <!-- === TAB SAISIE === -->
+        <div class="tab-content active" id="tab-saisie">
+            <div id="form-container"></div>
+        </div>
+
+        <!-- === TAB COMPTAGE === -->
+        <div class="tab-content" id="tab-comptage">
+            <div id="comptage-container"></div>
+        </div>
+
+        <!-- === TAB HISTORIQUE === -->
+        <div class="tab-content" id="tab-historique">
+            <div class="month-nav">
+                <button onclick="changeMonth(-1)">◀</button>
+                <div class="month-display" id="month-display">—</div>
+                <button onclick="changeMonth(1)">▶</button>
+            </div>
+            <div class="kpi-grid" id="kpi-grid"></div>
+            <div style="margin-top:16px" id="history-list"></div>
+        </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar" id="save-bar">
+        <button class="btn btn-primary" id="btn-save" onclick="saveData()">Enregistrer</button>
+    </div>
+
+<script>
+// ============================================
+// CONFIG
+// ============================================
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTY2NDYsImV4cCI6MjA1ODU5MjY0Nn0.053vMJGBOqQ2wJGqBv0JxpN3Othe3pGJm8rMePSNRG0';
+
+let DEMO_MODE = false;
+let supabaseClient = null;
+
+try {
+    if (SUPABASE_URL.includes('VOTRE-PROJET')) { DEMO_MODE = true; }
+    else { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
+} catch(e) { DEMO_MODE = true; }
+
+if (DEMO_MODE) document.getElementById('demo-banner').style.display = 'block';
+
+// ============================================
+// STATE
+// ============================================
+let currentUser = null;
+let currentEtab = null;
+let currentDate = new Date();
+let currentMonth = new Date();
+let formData = {};
+let comptageData = {};
+let isDirty = false;
+let currentRecordId = null;
+
+// Demo storage
+let _demoControle = [];
+let _demoComptage = [];
+
+// ============================================
+// FIELD DEFINITIONS PER ESTABLISHMENT
+// ============================================
+const FIELDS = {
+    freddy: {
+        ca: [
+            { key: 'ca', label: 'CA (Chiffre d\'affaires)', type: 'input' },
+            { key: 'vae', label: 'VAE', type: 'input' },
+            { key: 'plus_cash', label: '+ Cash', type: 'input' },
+        ],
+        paiements: [
+            { key: 'cb_sans_contact', label: 'CB Sans Contact', type: 'input' },
+            { key: 'cb_emv', label: 'CB EMV', type: 'input' },
+            { key: 'cb_sans_contact_sg', label: 'CB Sans Contact SG', type: 'input' },
+            { key: 'cb_emv_sg', label: 'CB EMV SG', type: 'input' },
+            { key: 'credit', label: 'Crédit', type: 'input' },
+            { key: 'titres_restaurant', label: 'Titres restaurant', type: 'input' },
+            { key: 'amex', label: 'AMEX', type: 'input' },
+        ],
+        autres: [
+            { key: 'plus_tr', label: '+ Titres rest.', type: 'input' },
+            { key: 'plus_chq_virement', label: '+ Chèque / Virement', type: 'input' },
+            { key: 'pourboire_cb', label: 'Pourboire CB', type: 'input' },
+            { key: 'click_collect', label: 'Click & Collect', type: 'input' },
+            { key: 'compte_client', label: 'Compte client', type: 'input' },
+        ],
+        mouvements: [
+            { key: 'acomptes_verse', label: 'Acomptes versés', type: 'input' },
+            { key: 'prelevement', label: 'Prélèvement', type: 'input' },
+            { key: 'depense_caisse', label: 'Dépense caisse', type: 'input' },
+            { key: 'ajout', label: 'Ajout', type: 'input' },
+            { key: 'pourboires', label: 'Pourboires (espèces)', type: 'input' },
+        ],
+        denominations: [500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01],
+        calcControleCA: (d) => {
+            const totalCB = n(d.cb_sans_contact) + n(d.cb_emv) + n(d.cb_sans_contact_sg) + n(d.cb_emv_sg)
+                + n(d.credit) + n(d.titres_restaurant) + n(d.amex);
+            return n(d.ca) - n(d.plus_cash) - totalCB - n(d.plus_tr) - n(d.plus_chq_virement)
+                + n(d.pourboire_cb) - n(d.click_collect) - n(d.compte_client);
+        },
+        calcTotalCB: (d) => {
+            return n(d.cb_sans_contact) + n(d.cb_emv) + n(d.cb_sans_contact_sg) + n(d.cb_emv_sg)
+                + n(d.credit) + n(d.titres_restaurant) + n(d.amex);
+        },
+        calcCaisseTheorique: (d, cashDebut) => {
+            return n(cashDebut) + n(d.plus_cash) + n(d.prelevement) - n(d.pourboire_cb)
+                - n(d.acomptes_verse) + n(d.depense_caisse) + n(d.ajout);
+        },
+        calcEcart: (d, cashDebut) => {
+            const theo = FIELDS.freddy.calcCaisseTheorique(d, cashDebut);
+            return theo - n(d.comptage_caisse) + n(d.pourboires);
+        }
+    },
+    bonbao: {
+        ca: [
+            { key: 'ca', label: 'CA (Chiffre d\'affaires)', type: 'input' },
+            { key: 'plus_cash', label: '+ Cash', type: 'input' },
+        ],
+        paiements: [
+            { key: 'cb_emv', label: 'CB EMV', type: 'input' },
+            { key: 'cm_cic', label: 'CM-CIC SCHEM', type: 'input' },
+            { key: 'cb_sans_contact', label: 'CB Sans Contact', type: 'input' },
+            { key: 'amex', label: 'AMEX', type: 'input' },
+            { key: 'titres_restaurant', label: 'Titres restaurant', type: 'input' },
+            { key: 'compte_client', label: 'Compte client', type: 'input' },
+        ],
+        autres: [
+            { key: 'plus_chq_virement', label: '+ Chèque', type: 'input' },
+            { key: 'pourboire_cb', label: 'Pourboire CB', type: 'input' },
+        ],
+        mouvements: [
+            { key: 'acomptes_verse', label: 'Acomptes versés', type: 'input' },
+            { key: 'achats_divers', label: 'Achats divers', type: 'input' },
+            { key: 'prelevement', label: 'Prélèvement', type: 'input' },
+            { key: 'ajout', label: 'Ajout', type: 'input' },
+            { key: 'pourboires', label: 'Pourboires (espèces)', type: 'input' },
+        ],
+        denominations: [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01],
+        calcControleCA: (d) => {
+            return n(d.ca) - n(d.plus_cash) - n(d.cb_emv) - n(d.cm_cic) - n(d.cb_sans_contact)
+                - n(d.amex) - n(d.titres_restaurant) - n(d.compte_client) - n(d.plus_chq_virement)
+                + n(d.pourboire_cb);
+        },
+        calcTotalCB: (d) => {
+            return n(d.cb_emv) + n(d.cm_cic) + n(d.cb_sans_contact) + n(d.amex) + n(d.titres_restaurant);
+        },
+        calcCaisseTheorique: (d, cashDebut) => {
+            return n(cashDebut) + n(d.plus_cash) - n(d.pourboire_cb)
+                - n(d.acomptes_verse) - n(d.achats_divers) - n(d.prelevement) + n(d.ajout);
+        },
+        calcEcart: (d, cashDebut) => {
+            const theo = FIELDS.bonbao.calcCaisseTheorique(d, cashDebut);
+            return n(d.comptage_caisse) - theo;
+        }
+    }
+};
+
+// Helper: parse number
+function n(v) { return parseFloat(v) || 0; }
+
+// ============================================
+// INIT
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Get session from portal
+    const session = sessionStorage.getItem('planb_user');
+    const etab = sessionStorage.getItem('planb_etablissement');
+
+    if (session) {
+        try { currentUser = JSON.parse(session); } catch(e) {}
+    }
+    currentEtab = etab || 'freddy';
+
+    if (!currentUser) {
+        // Demo mode fallback
+        DEMO_MODE = true;
+        document.getElementById('demo-banner').style.display = 'block';
+        currentUser = { id: 'demo', nom: 'Démo', initiales: 'DM', role: 'admin' };
+        currentEtab = 'freddy';
+    }
+
+    document.getElementById('etab-badge').textContent =
+        currentEtab === 'freddy' ? 'Freddy' : 'Liesel';
+    document.getElementById('user-badge').textContent = currentUser.initiales || '—';
+
+    goToday();
+});
+
+// ============================================
+// NAVIGATION
+// ============================================
+function goBack() {
+    if (isDirty && !confirm('Données non enregistrées. Quitter quand même ?')) return;
+    window.location.href = '../';
+}
+
+function formatDate(d) {
+    const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function dateToISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function changeDate(delta) {
+    if (isDirty && !confirm('Données non enregistrées. Changer de jour ?')) return;
+    currentDate.setDate(currentDate.getDate() + delta);
+    loadDay();
+}
+
+function goToday() {
+    currentDate = new Date();
+    loadDay();
+}
+
+function changeMonth(delta) {
+    currentMonth.setMonth(currentMonth.getMonth() + delta);
+    loadHistory();
+}
+
+// ============================================
+// TABS
+// ============================================
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-' + tab));
+
+    // Show/hide save bar
+    const saveBar = document.getElementById('save-bar');
+    saveBar.style.display = (tab === 'historique') ? 'none' : 'flex';
+
+    if (tab === 'historique') loadHistory();
+}
+
+// ============================================
+// LOAD DAY DATA
+// ============================================
+async function loadDay() {
+    document.getElementById('date-display').textContent = formatDate(currentDate);
+    isDirty = false;
+    currentRecordId = null;
+
+    const isoDate = dateToISO(currentDate);
+
+    // Load existing data
+    let record = null;
+    let comptageRecord = null;
+
+    if (DEMO_MODE) {
+        record = _demoControle.find(r => r.date === isoDate && r.etablissement === currentEtab);
+        comptageRecord = _demoComptage.find(r => r.date === isoDate && r.etablissement === currentEtab);
+    } else {
+        try {
+            const { data } = await supabaseClient.from('caisse_controle')
+                .select('*').eq('date', isoDate).eq('etablissement', currentEtab).single();
+            record = data;
+        } catch(e) {}
+        try {
+            const { data } = await supabaseClient.from('caisse_comptage')
+                .select('*').eq('date', isoDate).eq('etablissement', currentEtab).single();
+            comptageRecord = data;
+        } catch(e) {}
+    }
+
+    // Populate form data
+    formData = {};
+    if (record) {
+        currentRecordId = record.id;
+        const fields = FIELDS[currentEtab];
+        [...fields.ca, ...fields.paiements, ...fields.autres, ...fields.mouvements].forEach(f => {
+            formData[f.key] = record[f.key] || 0;
+        });
+        formData.comptage_caisse = record.comptage_caisse || 0;
+    }
+
+    // Populate comptage data
+    comptageData = {};
+    if (comptageRecord && comptageRecord.denominations) {
+        comptageData = typeof comptageRecord.denominations === 'string'
+            ? JSON.parse(comptageRecord.denominations) : comptageRecord.denominations;
+    }
+
+    // Get previous day's comptage for cash_debut
+    const prevDate = new Date(currentDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevISO = dateToISO(prevDate);
+    let cashDebut = 0;
+
+    if (DEMO_MODE) {
+        const prev = _demoControle.find(r => r.date === prevISO && r.etablissement === currentEtab);
+        if (prev) cashDebut = n(prev.comptage_caisse);
+    } else {
+        try {
+            const { data } = await supabaseClient.from('caisse_controle')
+                .select('comptage_caisse').eq('date', prevISO).eq('etablissement', currentEtab).single();
+            if (data) cashDebut = n(data.comptage_caisse);
+        } catch(e) {}
+    }
+
+    renderForm(cashDebut);
+    renderComptage();
+    updateCalculations(cashDebut);
+}
+
+// ============================================
+// RENDER FORM (SAISIE TAB)
+// ============================================
+function renderForm(cashDebut) {
+    const fields = FIELDS[currentEtab];
+    let html = '';
+
+    // Cash début (readonly)
+    html += `<div class="section-title">Ouverture</div>`;
+    html += `<div class="form-row">
+        <label>Cash début de journée</label>
+        <input type="text" id="cash-debut" value="${cashDebut.toFixed(2)}" readonly>
+    </div>`;
+
+    // CA section
+    html += `<div class="section-title">Chiffre d'affaires</div>`;
+    fields.ca.forEach(f => { html += renderField(f); });
+
+    // Paiements CB
+    html += `<div class="section-title">Paiements CB</div>`;
+    fields.paiements.forEach(f => { html += renderField(f); });
+
+    // Total CB (calculated)
+    html += `<div class="calc-row">
+        <label>Total CB</label>
+        <div class="calc-value neutral" id="calc-total-cb">0.00</div>
+    </div>`;
+
+    // Autres encaissements
+    html += `<div class="section-title">Autres encaissements</div>`;
+    fields.autres.forEach(f => { html += renderField(f); });
+
+    // Contrôle CA (calculated)
+    html += `<div class="calc-row">
+        <label>Contrôle CA</label>
+        <div class="calc-value ok" id="calc-controle-ca">0.00</div>
+    </div>`;
+
+    // Mouvements de caisse
+    html += `<div class="section-title">Mouvements de caisse</div>`;
+    fields.mouvements.forEach(f => { html += renderField(f); });
+
+    // Comptage caisse (linked from comptage tab)
+    html += `<div class="section-title">Clôture</div>`;
+    html += `<div class="form-row">
+        <label>Comptage caisse</label>
+        <input type="number" inputmode="decimal" step="0.01" id="field-comptage_caisse"
+            value="${n(formData.comptage_caisse).toFixed(2)}"
+            onchange="onFieldChange('comptage_caisse', this.value)"
+            onfocus="this.select()">
+    </div>`;
+
+    // Caisse théorique (calculated)
+    html += `<div class="calc-row">
+        <label>Caisse théorique</label>
+        <div class="calc-value neutral" id="calc-caisse-theo">0.00</div>
+    </div>`;
+
+    // Écart de caisse (calculated)
+    html += `<div class="calc-row">
+        <label>Écart de caisse</label>
+        <div class="calc-value ok" id="calc-ecart">0.00</div>
+    </div>`;
+
+    document.getElementById('form-container').innerHTML = html;
+}
+
+function renderField(f) {
+    const val = n(formData[f.key]).toFixed(2);
+    return `<div class="form-row">
+        <label>${f.label}</label>
+        <input type="number" inputmode="decimal" step="0.01"
+            id="field-${f.key}" value="${val !== '0.00' ? val : ''}"
+            placeholder="0.00"
+            onchange="onFieldChange('${f.key}', this.value)"
+            onfocus="this.select()">
+    </div>`;
+}
+
+function onFieldChange(key, value) {
+    formData[key] = parseFloat(value) || 0;
+    isDirty = true;
+    const cashDebut = parseFloat(document.getElementById('cash-debut').value) || 0;
+    updateCalculations(cashDebut);
+}
+
+// ============================================
+// CALCULATIONS
+// ============================================
+function updateCalculations(cashDebut) {
+    const fields = FIELDS[currentEtab];
+
+    // Total CB
+    const totalCB = fields.calcTotalCB(formData);
+    const elTotalCB = document.getElementById('calc-total-cb');
+    if (elTotalCB) { elTotalCB.textContent = totalCB.toFixed(2) + ' €'; }
+
+    // Contrôle CA
+    const controleCA = fields.calcControleCA(formData);
+    const elControle = document.getElementById('calc-controle-ca');
+    if (elControle) {
+        elControle.textContent = controleCA.toFixed(2) + ' €';
+        elControle.className = 'calc-value ' + (Math.abs(controleCA) < 0.01 ? 'ok' : 'error');
+    }
+
+    // Caisse théorique
+    const caisseTheo = fields.calcCaisseTheorique(formData, cashDebut);
+    const elTheo = document.getElementById('calc-caisse-theo');
+    if (elTheo) { elTheo.textContent = caisseTheo.toFixed(2) + ' €'; }
+
+    // Écart
+    const ecart = fields.calcEcart(formData, cashDebut);
+    const elEcart = document.getElementById('calc-ecart');
+    if (elEcart) {
+        elEcart.textContent = ecart.toFixed(2) + ' €';
+        elEcart.className = 'calc-value ' + (Math.abs(ecart) < 0.01 ? 'ok' : 'error');
+    }
+}
+
+// ============================================
+// RENDER COMPTAGE (COUNTING TAB)
+// ============================================
+function renderComptage() {
+    const denoms = FIELDS[currentEtab].denominations;
+    let html = `<div class="section-title">Comptage par coupure</div>`;
+    html += `<div class="comptage-grid">`;
+    html += `<div class="comptage-header">Coupure</div>`;
+    html += `<div class="comptage-header">Qté</div>`;
+    html += `<div class="comptage-header">Sous-total</div>`;
+
+    denoms.forEach(d => {
+        const qty = comptageData[String(d)] || 0;
+        const subtotal = (qty * d).toFixed(2);
+        const denomLabel = d >= 1 ? d + ' €' : (d * 100).toFixed(0) + ' ct';
+        html += `<div class="comptage-cell denom">${denomLabel}</div>`;
+        html += `<div class="comptage-cell">
+            <input type="number" inputmode="numeric" min="0" value="${qty || ''}" placeholder="0"
+                id="denom-${String(d).replace('.','_')}"
+                onchange="onDenomChange('${d}', this.value)">
+        </div>`;
+        html += `<div class="comptage-cell subtotal" id="subtotal-${String(d).replace('.','_')}">${subtotal} €</div>`;
+    });
+
+    html += `</div>`;
+
+    // Total
+    const total = calcComptageTotal();
+    html += `<div class="comptage-total">
+        <label>TOTAL COMPTAGE</label>
+        <div class="total-value" id="comptage-total-value">${total.toFixed(2)} €</div>
+    </div>`;
+
+    html += `<div class="comptage-actions">
+        <button class="btn" onclick="applyComptage()">Reporter dans la saisie</button>
+    </div>`;
+
+    document.getElementById('comptage-container').innerHTML = html;
+}
+
+function onDenomChange(denom, value) {
+    comptageData[String(denom)] = parseInt(value) || 0;
+    isDirty = true;
+
+    const qty = comptageData[String(denom)] || 0;
+    const subtotal = (qty * parseFloat(denom)).toFixed(2);
+    const safeId = String(denom).replace('.','_');
+    const elSub = document.getElementById('subtotal-' + safeId);
+    if (elSub) elSub.textContent = subtotal + ' €';
+
+    const total = calcComptageTotal();
+    const elTotal = document.getElementById('comptage-total-value');
+    if (elTotal) elTotal.textContent = total.toFixed(2) + ' €';
+}
+
+function calcComptageTotal() {
+    const denoms = FIELDS[currentEtab].denominations;
+    let total = 0;
+    denoms.forEach(d => {
+        total += (comptageData[String(d)] || 0) * d;
+    });
+    return Math.round(total * 100) / 100;
+}
+
+function applyComptage() {
+    const total = calcComptageTotal();
+    formData.comptage_caisse = total;
+
+    // Update the comptage_caisse field in the form
+    const el = document.getElementById('field-comptage_caisse');
+    if (el) el.value = total.toFixed(2);
+
+    isDirty = true;
+    const cashDebut = parseFloat(document.getElementById('cash-debut')?.value) || 0;
+    updateCalculations(cashDebut);
+
+    switchTab('saisie');
+    showToast(`Comptage reporté : ${total.toFixed(2)} €`);
+}
+
+// ============================================
+// SAVE DATA
+// ============================================
+async function saveData() {
+    const btn = document.getElementById('btn-save');
+    btn.disabled = true;
+    btn.textContent = 'Enregistrement...';
+
+    const isoDate = dateToISO(currentDate);
+    const fields = FIELDS[currentEtab];
+
+    // Build record
+    const record = {
+        date: isoDate,
+        etablissement: currentEtab,
+        saisi_par_id: currentUser.id,
+        saisi_par_nom: currentUser.nom,
+        updated_at: new Date().toISOString()
+    };
+
+    // Add all field values
+    [...fields.ca, ...fields.paiements, ...fields.autres, ...fields.mouvements].forEach(f => {
+        record[f.key] = n(formData[f.key]);
+    });
+    record.comptage_caisse = n(formData.comptage_caisse);
+
+    // Save comptage
+    const comptageRecord = {
+        date: isoDate,
+        etablissement: currentEtab,
+        denominations: comptageData,
+        total: calcComptageTotal(),
+        saisi_par_id: currentUser.id,
+        saisi_par_nom: currentUser.nom,
+    };
+
+    if (DEMO_MODE) {
+        // Upsert in demo arrays
+        const idx = _demoControle.findIndex(r => r.date === isoDate && r.etablissement === currentEtab);
+        if (idx >= 0) { _demoControle[idx] = { ..._demoControle[idx], ...record }; }
+        else { _demoControle.push({ id: 'demo-' + Date.now(), ...record }); }
+
+        const cidx = _demoComptage.findIndex(r => r.date === isoDate && r.etablissement === currentEtab);
+        if (cidx >= 0) { _demoComptage[cidx] = { ..._demoComptage[cidx], ...comptageRecord }; }
+        else { _demoComptage.push({ id: 'demo-c-' + Date.now(), ...comptageRecord }); }
+    } else {
+        try {
+            // Upsert controle
+            const { error: e1 } = await supabaseClient.from('caisse_controle')
+                .upsert(record, { onConflict: 'date,etablissement' });
+            if (e1) throw e1;
+
+            // Upsert comptage
+            const { error: e2 } = await supabaseClient.from('caisse_comptage')
+                .upsert(comptageRecord, { onConflict: 'date,etablissement' });
+            if (e2) throw e2;
+        } catch(e) {
+            console.error('Erreur sauvegarde:', e);
+            showToast('Erreur de sauvegarde !');
+            btn.disabled = false;
+            btn.textContent = 'Enregistrer';
+            return;
+        }
+    }
+
+    isDirty = false;
+    showToast('Enregistré avec succès');
+    btn.disabled = false;
+    btn.textContent = 'Enregistrer';
+}
+
+// ============================================
+// HISTORY / DASHBOARD
+// ============================================
+async function loadHistory() {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const months = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    document.getElementById('month-display').textContent = `${months[month]} ${year}`;
+
+    const startDate = `${year}-${String(month+1).padStart(2,'0')}-01`;
+    const endDay = new Date(year, month+1, 0).getDate();
+    const endDate = `${year}-${String(month+1).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
+
+    let records = [];
+    if (DEMO_MODE) {
+        records = _demoControle.filter(r =>
+            r.etablissement === currentEtab && r.date >= startDate && r.date <= endDate
+        );
+    } else {
+        try {
+            const { data } = await supabaseClient.from('caisse_controle')
+                .select('*')
+                .eq('etablissement', currentEtab)
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .order('date', { ascending: false });
+            records = data || [];
+        } catch(e) { records = []; }
+    }
+
+    // KPIs
+    const fields = FIELDS[currentEtab];
+    let totalCA = 0, totalCash = 0, totalCB = 0, totalEcart = 0, joursEcart = 0, totalPourboires = 0;
+
+    records.forEach(r => {
+        totalCA += n(r.ca);
+        totalCash += n(r.plus_cash);
+        totalCB += fields.calcTotalCB(r);
+        // Simplified ecart calc (without cashDebut for KPI summary)
+        const ecart = n(r.comptage_caisse) - fields.calcCaisseTheorique(r, 0);
+        totalEcart += ecart;
+        if (Math.abs(ecart) >= 0.01) joursEcart++;
+        totalPourboires += n(r.pourboires);
+    });
+
+    document.getElementById('kpi-grid').innerHTML = `
+        <div class="kpi-card">
+            <div class="kpi-icon">💶</div>
+            <div class="kpi-label">CA Total</div>
+            <div class="kpi-value">${totalCA.toFixed(0)} €</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon">💳</div>
+            <div class="kpi-label">Total CB</div>
+            <div class="kpi-value">${totalCB.toFixed(0)} €</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon">💵</div>
+            <div class="kpi-label">Espèces</div>
+            <div class="kpi-value">${totalCash.toFixed(0)} €</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon">🎁</div>
+            <div class="kpi-label">Pourboires</div>
+            <div class="kpi-value">${totalPourboires.toFixed(0)} €</div>
+        </div>
+        <div class="kpi-card" style="background:${Math.abs(totalEcart) < 0.01 ? 'var(--green-light)' : 'var(--red-light)'}">
+            <div class="kpi-icon">⚖️</div>
+            <div class="kpi-label">Écart cumulé</div>
+            <div class="kpi-value" style="color:${Math.abs(totalEcart) < 0.01 ? 'var(--green)' : 'var(--red)'}">${totalEcart.toFixed(2)} €</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon">📅</div>
+            <div class="kpi-label">Jours avec écart</div>
+            <div class="kpi-value">${joursEcart} / ${records.length}</div>
+        </div>
+    `;
+
+    // History list
+    let histHtml = '';
+    if (records.length === 0) {
+        histHtml = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Aucune saisie ce mois-ci</div>';
+    } else {
+        records.forEach(r => {
+            const d = new Date(r.date + 'T12:00:00');
+            const ecart = n(r.comptage_caisse) - fields.calcCaisseTheorique(r, 0);
+            const ecartClass = Math.abs(ecart) < 0.01 ? 'color:var(--green)' : 'color:var(--red)';
+            histHtml += `
+                <div class="history-card" onclick="goToDate('${r.date}')">
+                    <div class="date">${formatDate(d)}</div>
+                    <div class="meta">Saisi par ${r.saisi_par_nom || '—'}</div>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-label">CA</div>
+                            <div class="stat-value">${n(r.ca).toFixed(0)} €</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Comptage</div>
+                            <div class="stat-value">${n(r.comptage_caisse).toFixed(2)} €</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Écart</div>
+                            <div class="stat-value" style="${ecartClass}">${ecart.toFixed(2)} €</div>
+                        </div>
+                    </div>
+                </div>`;
+        });
+    }
+    document.getElementById('history-list').innerHTML = histHtml;
+}
+
+function goToDate(isoDate) {
+    currentDate = new Date(isoDate + 'T12:00:00');
+    switchTab('saisie');
+    loadDay();
+}
+
+// ============================================
+// TOAST
+// ============================================
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
