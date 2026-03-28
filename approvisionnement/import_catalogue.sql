@@ -3,20 +3,28 @@
 -- Généré depuis Base_Achats_Matieres 2025+2026
 -- ============================================
 
+-- Nettoyage des données existantes (ordre important pour les FK)
+DELETE FROM appro_commande_lignes;
+DELETE FROM appro_commandes;
+DELETE FROM appro_besoins;
+DELETE FROM appro_prix;
+DELETE FROM appro_catalogue;
+DELETE FROM appro_fournisseurs;
+
 -- 1. FOURNISSEURS
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('e6217bfa-cc2c-4b7b-9f68-af53dfe20479', 'Alsabret (Au Pain de mon Grand-Père)', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('8f1bd2cd-b23a-4fa5-b270-aad415051639', 'Café Sati', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('b0a1a51e-0ec8-4eae-8bbe-a922649465e7', 'Distribution Iller', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('cf4d1399-a4c8-422f-ae11-c9e5a97f733a', 'Essentiel RHF', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('6615983c-bd95-4160-a4c6-589d4033aef7', 'Herbes Fines Christian', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('c9927e05-8576-449c-9912-93595ac33f1e', 'Koch & Fils', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('3ef9d8c3-4455-420e-a3f9-0074777761e5', 'Malt et Houblon', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('873c4e87-78f3-48d8-8f88-0c67d8274ccb', 'Nos Belles Quilles', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('ba2f7076-33c2-4ce9-ad90-5778e30c29d3', 'Promocash', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('b11dbed0-0d23-4e23-b6db-7a5dda2c8d33', 'Ruhlmann-Schutz', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('21fbe47e-0b13-40b5-984f-673cb012149f', 'Sapam', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('2b28ab5a-0091-4d1b-9f77-a56647888abc', 'Wolfberger', true) ON CONFLICT (nom) DO NOTHING;
-INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('d55c0dfd-d61a-432b-896f-30cbad6c68f7', 'Zeyssolff', true) ON CONFLICT (nom) DO NOTHING;
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('e6217bfa-cc2c-4b7b-9f68-af53dfe20479', 'Alsabret (Au Pain de mon Grand-Père)', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('8f1bd2cd-b23a-4fa5-b270-aad415051639', 'Café Sati', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('b0a1a51e-0ec8-4eae-8bbe-a922649465e7', 'Distribution Iller', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('cf4d1399-a4c8-422f-ae11-c9e5a97f733a', 'Essentiel RHF', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('6615983c-bd95-4160-a4c6-589d4033aef7', 'Herbes Fines Christian', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('c9927e05-8576-449c-9912-93595ac33f1e', 'Koch & Fils', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('3ef9d8c3-4455-420e-a3f9-0074777761e5', 'Malt et Houblon', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('873c4e87-78f3-48d8-8f88-0c67d8274ccb', 'Nos Belles Quilles', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('ba2f7076-33c2-4ce9-ad90-5778e30c29d3', 'Promocash', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('b11dbed0-0d23-4e23-b6db-7a5dda2c8d33', 'Ruhlmann-Schutz', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('21fbe47e-0b13-40b5-984f-673cb012149f', 'Sapam', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('2b28ab5a-0091-4d1b-9f77-a56647888abc', 'Wolfberger', true);
+INSERT INTO appro_fournisseurs (id, nom, actif) VALUES ('d55c0dfd-d61a-432b-896f-30cbad6c68f7', 'Zeyssolff', true);
 
 -- 13 fournisseurs
 

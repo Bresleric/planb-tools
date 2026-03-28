@@ -1316,17 +1316,22 @@
                     urgence: false,
                     statut: 'demande',
                     etablissement: currentEstablishment,
-                    date: new Date().toISOString().split('T')[0],
                     observation: '',
                 };
 
                 if (!isDemo) {
                     const res = await supabase.from('appro_besoins').insert([newBesoin]).select();
-                    if (res.data) {
+                    if (res.error) {
+                        console.error('Insert besoin error:', res.error);
+                        showToast('Erreur: ' + res.error.message, 'error');
+                        return;
+                    }
+                    if (res.data && res.data.length > 0) {
                         besoins.push(res.data[0]);
                     }
                 } else {
                     newBesoin.id = 'b' + Date.now();
+                    newBesoin.date_demande = new Date().toISOString();
                     besoins.push(newBesoin);
                 }
 
@@ -1367,7 +1372,7 @@
                                     <div class="item-name">${b.article_nom}</div>
                                     <div class="item-meta">
                                         ${b.urgence ? '<span class="badge badge-urgent">🔴 Urgent</span>' : ''}
-                                        Demandé par ${b.demandeur_initiales} le ${b.date || new Date(b.date_demande).toLocaleDateString('fr-FR')}
+                                        Demandé par ${b.demandeur_initiales || '?'} le ${b.date_demande ? new Date(b.date_demande).toLocaleDateString('fr-FR') : 'aujourd\'hui'}
                                         ${b.observation ? ' — ' + b.observation : ''}
                                     </div>
                                 </div>
@@ -2037,7 +2042,7 @@
                 source: source || '',
                 etablissement: currentEstablishment,
                 actif: true,
-                date: new Date().toISOString().split('T')[0],
+                date_prix: new Date().toISOString().split('T')[0],
             };
 
             try {
