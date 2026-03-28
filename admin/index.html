@@ -634,6 +634,15 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="user-equipe">Équipe</label>
+                    <select id="user-equipe">
+                        <option value="salle">Salle</option>
+                        <option value="cuisine">Cuisine</option>
+                        <option value="plonge">Plonge</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="user-etablissement">Établissement principal</label>
                     <select id="user-etablissement">
                         <option value="freddy">Freddy</option>
@@ -834,6 +843,7 @@
                         <div class="user-meta">
                             <div class="etab-badges">
                                 ${etabs.map(e => `<span class="etab-badge ${e}">${e === 'freddy' ? 'Freddy' : 'Liesel'}</span>`).join('')}
+                        <span class="role-badge" style="margin-left:4px;">${user.equipe || 'autre'}</span>
                             </div>
                         </div>
                     </div>
@@ -950,6 +960,8 @@
             document.getElementById('user-initiales').value = '';
             document.getElementById('user-code').value = '';
             document.getElementById('user-role').value = 'collaborateur';
+            document.getElementById('user-equipe').value = 'autre';
+            document.getElementById('user-equipe').value = user.equipe || 'autre';
             document.getElementById('user-etablissement').value = 'freddy';
             document.getElementById('acces-freddy').checked = true;
             document.getElementById('acces-liesel').checked = false;
@@ -983,6 +995,7 @@
             const initiales = document.getElementById('user-initiales').value.trim().toUpperCase();
             const code = document.getElementById('user-code').value.trim();
             const role = document.getElementById('user-role').value;
+            const equipe = document.getElementById('user-equipe').value;
             const etablissement = document.getElementById('user-etablissement').value;
             const accesEtabs = [];
             if (document.getElementById('acces-freddy').checked) accesEtabs.push('freddy');
@@ -1016,6 +1029,7 @@
                 role,
                 etablissement,
                 acces_etablissements: accesEtabs,
+                equipe,
                 actif: true
             };
 
