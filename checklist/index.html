@@ -1179,7 +1179,7 @@
 
     <script>
         // ============ INITIALIZATION & STATE ============
-        let supabase = null;
+        var supabaseClient = null;
         let currentUser = null;
         let currentEstablishment = null;
         let isDemo = false;
@@ -1231,10 +1231,10 @@
                 const supabaseUrl = 'https://dzrherfavgiuygnimtux.supabase.co';
                 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
 
-                supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
                 // Test Supabase connection
-                const { data, error } = await supabase.from('checklists').select('count', { count: 'exact' }).limit(1);
+                const { data, error } = await supabaseClient.from('checklists').select('count', { count: 'exact' }).limit(1);
 
                 if (error) {
                     console.warn('Supabase connection failed, using demo mode:', error);
@@ -1306,7 +1306,7 @@
                 if (isDemo) {
                     checklists = demoChecklists;
                 } else {
-                    const { data, error } = await supabase
+                    const { data, error } = await supabaseClient
                         .from('checklists')
                         .select('*, checklist_items(*)')
                         .eq('etablissement', currentEstablishment)
@@ -1443,7 +1443,7 @@
                     return [];
                 }
 
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('checklist_completions')
                     .select('*')
                     .eq('checklist_id', cl.id)
@@ -1494,7 +1494,7 @@
                     return;
                 }
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('checklist_completions')
                     .upsert({
                         checklist_id: checklistId,
@@ -1539,7 +1539,7 @@
                     return;
                 }
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('checklist_completions')
                     .delete()
                     .eq('checklist_id', checklistId)
@@ -1581,7 +1581,7 @@
                     return;
                 }
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('checklist_completions')
                     .update({ observation })
                     .eq('checklist_id', currentItemForObservation.checklistId)
@@ -1603,7 +1603,7 @@
             try {
                 if (isDemo) return;
 
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('checklists')
                     .select('*, checklist_items(id)')
                     .eq('etablissement', currentEstablishment)
@@ -1636,7 +1636,7 @@
                         periode = today.substring(0, 7);
                     }
 
-                    const { data: completions } = await supabase
+                    const { data: completions } = await supabaseClient
                         .from('checklist_completions')
                         .select('id')
                         .eq('checklist_id', cl.id)
@@ -1672,7 +1672,7 @@
                 if (isDemo) {
                     checklists = demoChecklists;
                 } else {
-                    const { data, error } = await supabase
+                    const { data, error } = await supabaseClient
                         .from('checklists')
                         .select('*, checklist_items(*)')
                         .eq('etablissement', currentEstablishment)
@@ -1819,7 +1819,7 @@
 
                 if (currentChecklistForModal) {
                     // Update existing
-                    const { error: clError } = await supabase
+                    const { error: clError } = await supabaseClient
                         .from('checklists')
                         .update({
                             nom,
@@ -1835,13 +1835,13 @@
                     if (clError) throw clError;
 
                     // Delete old items and create new ones
-                    await supabase
+                    await supabaseClient
                         .from('checklist_items')
                         .delete()
                         .eq('checklist_id', currentChecklistForModal);
 
                     for (const item of items) {
-                        await supabase
+                        await supabaseClient
                             .from('checklist_items')
                             .insert({
                                 checklist_id: currentChecklistForModal,
@@ -1853,7 +1853,7 @@
                     }
                 } else {
                     // Create new
-                    const { data: clData, error: clError } = await supabase
+                    const { data: clData, error: clError } = await supabaseClient
                         .from('checklists')
                         .insert({
                             nom,
@@ -1876,7 +1876,7 @@
 
                     // Create items
                     for (const item of items) {
-                        await supabase
+                        await supabaseClient
                             .from('checklist_items')
                             .insert({
                                 checklist_id: checklistId,
@@ -1903,7 +1903,7 @@
                 if (isDemo) {
                     cl = demoChecklists.find(c => c.id === checklistId);
                 } else {
-                    const { data, error } = await supabase
+                    const { data, error } = await supabaseClient
                         .from('checklists')
                         .select('*, checklist_items(*)')
                         .eq('id', checklistId)
@@ -1972,7 +1972,7 @@
                     return;
                 }
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('checklists')
                     .update({ actif: false })
                     .eq('id', checklistId);
@@ -2011,7 +2011,7 @@
                     completions = [];
                 } else {
                     // Query by valide_at date range instead of periode (covers all frequency types)
-                    const { data, error } = await supabase
+                    const { data, error } = await supabaseClient
                         .from('checklist_completions')
                         .select('*, checklists:checklist_id(nom, frequence, equipe), checklist_items:item_id(nom)')
                         .eq('etablissement', currentEstablishment)
@@ -2061,7 +2061,7 @@
                 // Load existing validations for this date
                 let existingValidations = {};
                 if (!isDemo) {
-                    const { data: valData } = await supabase
+                    const { data: valData } = await supabaseClient
                         .from('checklist_validations')
                         .select('*')
                         .eq('etablissement', currentEstablishment)
@@ -2138,7 +2138,7 @@
                     return;
                 }
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('checklist_validations')
                     .insert({
                         checklist_id: currentChecklistForValidation,
