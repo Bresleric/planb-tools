@@ -2,1221 +2,2208 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="PlanB Tools - Check-Lists">
-    <meta name="theme-color" content="#f97316">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Check-Lists">
+    <meta name="theme-color" content="#f97316">
     <title>Check-Lists - PlanB Tools</title>
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         :root {
             --orange: #f97316;
-            --orange-dark: #ea580c;
             --orange-light: #fff7ed;
-            --gray-50: #fafafa;
-            --gray-100: #f5f5f5;
-            --gray-200: #e5e5e5;
-            --gray-300: #d4d4d4;
-            --gray-400: #a3a3a3;
-            --gray-500: #737373;
-            --gray-600: #525252;
-            --gray-700: #404040;
-            --gray-800: #262626;
-            --gray-900: #171717;
-            --success: #22c55e;
-            --success-light: #dcfce7;
-            --error: #ef4444;
-            --warning: #f59e0b;
-            --info: #3b82f6;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --orange-dark: #ea580c;
+            --green: #22c55e;
+            --green-light: #f0fdf4;
+            --red: #ef4444;
+            --red-light: #fef2f2;
+            --blue: #3b82f6;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius: 12px;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        html, body { width: 100%; height: 100%; }
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-            background-color: var(--gray-50);
-            color: var(--gray-900);
-            line-height: 1.5;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            display: flex;
+            flex-direction: column;
             -webkit-font-smoothing: antialiased;
-            -webkit-user-select: none;
-            user-select: none;
+            overflow: hidden;
         }
 
-        /* ========== HEADER ========== */
+        /* Header */
         .header {
             background: white;
+            border-bottom: 1px solid var(--gray-200);
             padding: 12px 16px;
             display: flex;
             align-items: center;
             gap: 12px;
-            box-shadow: var(--shadow-sm);
-            position: sticky;
-            top: 0;
+            flex-shrink: 0;
             z-index: 100;
         }
+
         .header .back-btn {
             background: none;
             border: none;
             font-size: 20px;
             cursor: pointer;
             padding: 4px 8px;
-            border-radius: 8px;
-            color: var(--gray-700);
+            color: var(--orange);
+            flex-shrink: 0;
+            transition: all 0.15s;
         }
-        .header .back-btn:active { background: var(--gray-100); }
+
+        .header .back-btn:active {
+            transform: scale(0.9);
+        }
+
         .header .title {
+            font-size: 17px;
+            font-weight: 700;
             flex: 1;
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--gray-900);
         }
-        .header .badge {
-            font-size: 11px;
-            font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 20px;
-            text-transform: uppercase;
-        }
+
         .header .etab-badge {
             background: var(--orange-light);
             color: var(--orange-dark);
-        }
-        .header .user-badge {
-            background: var(--gray-100);
-            color: var(--gray-700);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
         }
 
-        /* ========== TABS ========== */
+        .header .user-badge {
+            background: var(--gray-100);
+            color: var(--gray-600);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        /* Tabs */
         .tabs {
             display: flex;
             background: white;
             border-bottom: 1px solid var(--gray-200);
-            padding: 0 8px;
-            overflow-x: auto;
+            flex-shrink: 0;
         }
+
         .tab {
-            padding: 10px 16px;
+            flex: 1;
+            padding: 12px;
+            text-align: center;
             font-size: 13px;
             font-weight: 600;
-            color: var(--gray-500);
-            border: none;
-            background: none;
-            cursor: pointer;
+            color: var(--gray-400);
             border-bottom: 3px solid transparent;
-            white-space: nowrap;
+            cursor: pointer;
             transition: all 0.2s;
+            touch-action: manipulation;
         }
+
         .tab.active {
             color: var(--orange);
             border-bottom-color: var(--orange);
         }
-        .tab:active { opacity: 0.7; }
 
-        /* ========== CONTENT ========== */
+        /* Content area */
         .content {
-            padding: 16px;
-            max-width: 600px;
-            margin: 0 auto;
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* ========== SERVICE SELECTOR ========== */
+        .tab-content {
+            display: none;
+            flex: 1;
+            padding: 16px;
+            padding-bottom: 20px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Validation Tab */
         .service-selector {
             display: flex;
             gap: 8px;
             margin-bottom: 16px;
+            flex-shrink: 0;
         }
+
         .service-btn {
             flex: 1;
             padding: 10px;
-            border: 2px solid var(--gray-200);
-            border-radius: 10px;
+            border: 2px solid var(--gray-300);
             background: white;
-            font-size: 14px;
-            font-weight: 600;
             color: var(--gray-600);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            text-align: center;
-            transition: all 0.2s;
+            transition: all 0.15s;
+            touch-action: manipulation;
         }
-        .service-btn.active {
-            border-color: var(--orange);
-            background: var(--orange-light);
-            color: var(--orange-dark);
-        }
-        .service-btn:active { transform: scale(0.97); }
 
-        /* ========== CHECKLIST CARD ========== */
+        .service-btn.active {
+            background: var(--orange);
+            color: white;
+            border-color: var(--orange);
+        }
+
+        /* Checklist Card */
         .checklist-card {
             background: white;
-            border-radius: 12px;
-            box-shadow: var(--shadow-sm);
-            margin-bottom: 16px;
-            overflow: hidden;
-            border: 1px solid var(--gray-100);
-        }
-        .checklist-header {
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            border-radius: var(--radius);
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
             cursor: pointer;
-            gap: 12px;
+            transition: all 0.15s;
+            touch-action: manipulation;
         }
-        .checklist-header:active { background: var(--gray-50); }
-        .checklist-title {
+
+        .checklist-card:active {
+            transform: scale(0.98);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .checklist-card.celebrating {
+            animation: celebrate 0.6s ease;
+        }
+
+        .checklist-card-header {
+            display: flex;
+            align-items: start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .checklist-card-title {
             font-size: 15px;
             font-weight: 700;
-            color: var(--gray-900);
+            color: var(--gray-800);
             flex: 1;
         }
-        .checklist-freq {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .freq-service { background: #dbeafe; color: #1d4ed8; }
-        .freq-journaliere { background: #fef3c7; color: #92400e; }
-        .freq-hebdomadaire { background: #ede9fe; color: #6d28d9; }
-        .freq-mensuelle { background: #fce7f3; color: #9d174d; }
 
-        .checklist-progress {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--gray-400);
+        .checklist-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
             white-space: nowrap;
         }
-        .checklist-progress.complete { color: var(--success); }
-        .progress-bar {
-            height: 3px;
-            background: var(--gray-100);
-        }
-        .progress-bar-fill {
-            height: 100%;
-            background: var(--orange);
-            transition: width 0.3s ease;
-            border-radius: 0 2px 2px 0;
-        }
-        .progress-bar-fill.complete { background: var(--success); }
 
-        /* ========== CHECKLIST ITEMS ========== */
+        .badge-freq {
+            background: var(--blue);
+            color: white;
+        }
+
+        .badge-equipe {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .checklist-progress {
+            font-size: 12px;
+            color: var(--gray-600);
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--gray-200);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--green);
+            transition: width 0.3s ease;
+        }
+
         .checklist-items {
             display: none;
-            border-top: 1px solid var(--gray-100);
+            border-top: 1px solid var(--gray-200);
+            padding-top: 12px;
+            margin-top: 12px;
         }
-        .checklist-items.open { display: block; }
+
+        .checklist-items.expanded {
+            display: block;
+        }
+
         .checklist-item {
             display: flex;
             align-items: center;
-            padding: 12px 16px;
-            gap: 12px;
-            border-bottom: 1px solid var(--gray-50);
-            cursor: pointer;
-            transition: background 0.15s;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--gray-100);
         }
-        .checklist-item:last-child { border-bottom: none; }
-        .checklist-item:active { background: var(--gray-50); }
+
+        .checklist-item:last-child {
+            border-bottom: none;
+        }
 
         .item-checkbox {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
+            width: 24px;
+            height: 24px;
             border: 2px solid var(--gray-300);
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: all 0.2s;
-            font-size: 14px;
-            color: transparent;
-        }
-        .item-checkbox.checked {
-            background: var(--success);
-            border-color: var(--success);
-            color: white;
+            transition: all 0.15s;
+            touch-action: manipulation;
         }
 
-        .item-info { flex: 1; }
+        .item-checkbox:active {
+            transform: scale(1.1);
+        }
+
+        .item-checkbox.checked {
+            background: var(--green);
+            border-color: var(--green);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .item-details {
+            flex: 1;
+            min-width: 0;
+        }
+
         .item-name {
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             color: var(--gray-800);
+            word-break: break-word;
         }
-        .item-name.checked {
-            text-decoration: line-through;
-            color: var(--gray-400);
-        }
-        .item-validated-by {
-            font-size: 11px;
-            color: var(--gray-400);
+
+        .item-meta {
+            font-size: 12px;
+            color: var(--gray-500);
             margin-top: 2px;
         }
 
-        /* ========== GESTION TAB ========== */
-        .section-title {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--gray-500);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 20px 0 10px;
-        }
-        .section-title:first-child { margin-top: 0; }
-
-        .add-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            width: 100%;
-            padding: 14px;
-            border: 2px dashed var(--gray-300);
-            border-radius: 12px;
-            background: transparent;
-            color: var(--gray-500);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-bottom: 12px;
-            transition: all 0.2s;
-        }
-        .add-btn:active {
-            border-color: var(--orange);
-            color: var(--orange);
-            background: var(--orange-light);
-        }
-
-        .manage-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: var(--shadow-sm);
-            margin-bottom: 10px;
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border: 1px solid var(--gray-100);
-        }
-        .manage-card .mc-info { flex: 1; }
-        .manage-card .mc-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--gray-800);
-        }
-        .manage-card .mc-meta {
-            font-size: 11px;
+        .item-duration {
+            font-size: 12px;
             color: var(--gray-400);
-            margin-top: 2px;
         }
-        .manage-card .mc-actions {
-            display: flex;
-            gap: 6px;
-        }
-        .icon-btn {
-            width: 34px;
-            height: 34px;
+
+        .item-note-btn {
+            background: none;
             border: none;
-            border-radius: 8px;
-            background: var(--gray-100);
-            color: var(--gray-600);
-            font-size: 16px;
+            font-size: 14px;
             cursor: pointer;
+            padding: 4px;
+            color: var(--gray-400);
+            transition: all 0.15s;
+        }
+
+        .item-note-btn:active {
+            color: var(--orange);
+            transform: scale(1.2);
+        }
+
+        /* Empty State */
+        .empty-state {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+            flex: 1;
         }
-        .icon-btn:active { background: var(--gray-200); }
-        .icon-btn.danger:active { background: #fee2e2; color: var(--error); }
 
-        /* ========== HIMTORIQUE TAB ========== */
-        .history-entry {
-            background: white;
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 8px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--gray-100);
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
         }
-        .history-date {
-            font-size: 13px;
+
+        .empty-state-title {
+            font-size: 16px;
             font-weight: 700;
-            color: var(--gray-800);
+            color: var(--gray-700);
             margin-bottom: 6px;
         }
-        .history-line {
+
+        .empty-state-text {
+            font-size: 13px;
+            color: var(--gray-500);
+        }
+
+        /* Gestion Tab */
+        .gestion-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: var(--orange);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            touch-action: manipulation;
+        }
+
+        .btn-primary:active {
+            background: var(--orange-dark);
+            transform: scale(0.95);
+        }
+
+        .btn-primary:disabled {
+            background: var(--gray-300);
+            cursor: not-allowed;
+        }
+
+        .gestion-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            gap: 10px;
+        }
+
+        .gestion-card-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .gestion-card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: 4px;
+        }
+
+        .gestion-card-meta {
             font-size: 12px;
             color: var(--gray-500);
-            padding: 3px 0;
+        }
+
+        .gestion-card-actions {
             display: flex;
             gap: 6px;
+            flex-shrink: 0;
         }
-        .history-line .check-mark { color: var(--success); }
 
-        /* ========== MODAL ========== */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 200;
-            align-items: flex-end;
-            justify-content: center;
-        }
-        .modal-overlay.open {
+        .btn-icon {
+            background: var(--gray-100);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
             display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            touch-action: manipulation;
         }
-        .modal {
-            background: white;
-            border-radius: 16px 16px 0 0;
-            width: 100%;
-            max-width: 600px;
-            max-height: 85vh;
-            overflow-y: auto;
-            padding: 20px;
-            animation: slideUp 0.25s ease;
+
+        .btn-icon:active {
+            background: var(--gray-200);
+            transform: scale(0.9);
         }
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+
+        .btn-icon.delete:active {
+            background: var(--red-light);
+            color: var(--red);
         }
-        .modal-title {
-            font-size: 18px;
-            font-weight: 700;
+
+        /* Historique Tab */
+        .historique-header {
+            display: flex;
+            gap: 8px;
             margin-bottom: 16px;
-            color: var(--gray-900);
+            align-items: center;
+            flex-shrink: 0;
         }
-        .form-group {
-            margin-bottom: 14px;
+
+        .date-picker-wrapper {
+            flex: 1;
         }
-        .form-label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--gray-600);
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .form-input, .form-select {
+
+        .date-picker-wrapper input {
             width: 100%;
             padding: 10px 12px;
-            border: 2px solid var(--gray-200);
-            border-radius: 10px;
-            font-size: 15px;
-            color: var(--gray-900);
-            background: white;
-            outline: none;
-            font-family: inherit;
-        }
-        .form-input:focus, .form-select:focus {
-            border-color: var(--orange);
-        }
-        .form-textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 2px solid var(--gray-200);
-            border-radius: 10px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
             font-size: 14px;
-            color: var(--gray-700);
-            background: white;
-            outline: none;
-            font-family: inherit;
-            min-height: 80px;
-            resize: vertical;
+            font-weight: 600;
+            color: var(--gray-800);
+            -webkit-appearance: none;
+            appearance: none;
         }
-        .form-textarea:focus { border-color: var(--orange); }
-        .form-hint {
-            font-size: 11px;
-            color: var(--gray-400);
+
+        .date-picker-wrapper input:focus {
+            outline: none;
+            border-color: var(--orange);
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+        }
+
+        .history-group {
+            margin-bottom: 20px;
+        }
+
+        .history-group-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .history-item {
+            background: white;
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .history-item-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        .history-item-meta {
+            font-size: 12px;
+            color: var(--gray-500);
             margin-top: 4px;
         }
 
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
+        .history-item-observation {
+            font-size: 13px;
+            color: var(--gray-700);
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--gray-100);
+            font-style: italic;
         }
-        .btn {
+
+        .validation-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .validation-badge.ok {
+            background: var(--green-light);
+            color: var(--green);
+        }
+
+        .validation-badge.probleme {
+            background: var(--red-light);
+            color: var(--red);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: var(--radius);
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-500);
+            transition: all 0.15s;
+        }
+
+        .modal-close:active {
+            color: var(--gray-700);
+            transform: scale(0.9);
+        }
+
+        .modal-content {
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-700);
+            margin-bottom: 6px;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-800);
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--orange);
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 30px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .form-row .form-input {
+            flex: 1;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 13px;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--orange);
+        }
+
+        .checkbox-label:has(input:checked) {
+            background: var(--orange-light);
+            border-color: var(--orange);
+        }
+
+        .days-input {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .days-input input {
+            text-align: center;
+        }
+
+        .items-editor {
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .item-editor-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .item-editor-row:last-child {
+            border-bottom: none;
+        }
+
+        .item-editor-row input {
+            font-size: 13px;
+            padding: 8px 10px;
+        }
+
+        .item-editor-row .form-input:first-child {
+            flex: 1;
+        }
+
+        .item-editor-row .form-input:nth-child(2) {
+            width: 60px;
+        }
+
+        .btn-small {
+            background: var(--gray-100);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-600);
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-small:active {
+            background: var(--red-light);
+            color: var(--red);
+            transform: scale(0.9);
+        }
+
+        .modal-footer {
+            padding: 16px;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .modal-footer button {
             flex: 1;
             padding: 12px;
             border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
-            text-align: center;
+            transition: all 0.15s;
+            touch-action: manipulation;
         }
-        .btn-primary {
-            background: var(--orange);
-            color: white;
-        }
-        .btn-primary:active { background: var(--orange-dark); }
+
         .btn-secondary {
             background: var(--gray-100);
             color: var(--gray-700);
         }
-        .btn-secondary:active { background: var(--gray-200); }
 
-        /* ========== ITEMS EDITOR (dans modal) ========== */
-        .items-editor {
-            margin-top: 12px;
-        }
-        .item-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .item-row input {
-            flex: 1;
-            padding: 8px 10px;
-            border: 1px solid var(--gray-200);
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-        }
-        .item-row input:focus { border-color: var(--orange); }
-        .item-row .remove-item {
-            width: 30px;
-            height: 30px;
-            border: none;
-            border-radius: 8px;
-            background: none;
-            color: var(--gray-400);
-            font-size: 18px;
-            cursor: pointer;
-        }
-        .item-row .remove-item:active { color: var(--error); }
-        .add-item-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 12px;
-            border: 1px dashed var(--gray-300);
-            border-radius: 8px;
-            background: none;
-            color: var(--gray-500);
-            font-size: 13px;
-            cursor: pointer;
-            width: 100%;
-            justify-content: center;
+        .btn-secondary:active {
+            background: var(--gray-200);
+            transform: scale(0.95);
         }
 
-        /* ========== TOAST ========== */
-        .toast-container {
-            position: fixed;
-            top: 70px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 300;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
+        /* Toast */
         .toast {
-            padding: 10px 20px;
-            border-radius: 10px;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            max-width: 300px;
+            background: var(--gray-800);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
             font-size: 13px;
             font-weight: 600;
-            color: white;
-            background: var(--gray-800);
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+            pointer-events: none;
+            display: none;
+        }
+
+        .toast.success {
+            background: var(--green);
+        }
+
+        .toast.error {
+            background: var(--red);
+        }
+
+        .toast.info {
+            background: var(--blue);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes celebrate {
+            0% { background: white; }
+            50% { background: var(--green-light); }
+            100% { background: white; }
+        }
+
+        /* Popup confirmation */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: var(--radius);
+            padding: 16px;
             box-shadow: var(--shadow-lg);
-            animation: fadeIn 0.2s ease;
-            text-align: center;
-        }
-        .toast.success { background: var(--success); }
-        .toast.error { background: var(--error); }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+            z-index: 2001;
+            min-width: 200px;
+            max-width: 300px;
+            display: none;
         }
 
-        /* ========== EMPTY STATE ========== */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--gray-400);
+        .popup.active {
+            display: block;
         }
-        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-        .empty-state .text { font-size: 14px; font-weight: 500; }
 
-        /* ========== DATE FILTER ========== */
-        .date-filter {
+        .popup-content {
+            font-size: 14px;
+            color: var(--gray-800);
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .popup-buttons {
             display: flex;
-            align-items: center;
             gap: 8px;
-            margin-bottom: 16px;
         }
-        .date-filter input[type="date"] {
+
+        .popup-buttons button {
             flex: 1;
             padding: 8px 12px;
-            border: 2px solid var(--gray-200);
-            border-radius: 10px;
-            font-size: 14px;
-            font-family: inherit;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            touch-action: manipulation;
         }
-        .date-filter input[type="date"]:focus { border-color: var(--orange); outline: none; }
+
+        .popup-btn-cancel {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        .popup-btn-cancel:active {
+            background: var(--gray-200);
+        }
+
+        .popup-btn-confirm {
+            background: var(--red);
+            color: white;
+        }
+
+        .popup-btn-confirm:active {
+            background: var(--red);
+            transform: scale(0.95);
+        }
+
+        /* Demo banner */
+        .demo-banner {
+            background: linear-gradient(90deg, #f97316, #ea580c);
+            color: white;
+            text-align: center;
+            padding: 6px 16px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+            z-index: 200;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gray-300);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gray-400);
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <!-- HEADER -->
+    <!-- Demo Banner -->
+    <div class="demo-banner" id="demo-banner" style="display:none">MODE DÉMO — Données non sauvegardées</div>
+
+    <!-- Header -->
     <div class="header">
-        <button class="back-btn" onclick="goBack()">&#8592;</button>
-        <div class="title">Check-Lists</div>
-        <div class="badge etab-badge" id="etab-badge">--</div>
-        <div class="badge user-badge" id="user-badge">--</div>
+        <button class="back-btn" onclick="goBack()">←</button>
+        <div class="title">✓ Check-Lists</div>
+        <div class="etab-badge" id="etab-badge">—</div>
+        <div class="user-badge" id="user-badge">—</div>
     </div>
 
-    <!-- TABS -->
-    <div class="tabs" id="tabs-bar">
-        <button class="tab active" onclick="switchTab('check')">Validation</button>
-        <button class="tab" onclick="switchTab('gestion')">Gestion</button>
-        <button class="tab" onclick="switchTab('historique')">Historique</button>
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="validation" onclick="switchTab('validation')">Validation</div>
+        <div class="tab" data-tab="gestion" onclick="switchTab('gestion')">Gestion</div>
+        <div class="tab" data-tab="historique" onclick="switchTab('historique')">Historique</div>
     </div>
 
-    <!-- TAB: VALIDATION -->
-    <div class="content" id="tab-check">
-        <!-- Service selector for service-frequency checklists -->
-        <div class="service-selector" id="service-selector">
-            <button class="service-btn active" onclick="selectService('midi')">Midi</button>
-            <button class="service-btn" onclick="selectService('soir')">Soir</button>
-        </div>
-        <div id="checklists-container"></div>
-    </div>
-
-    <!-- TAB: GESTION -->
-    <div class="content" id="tab-gestion" style="display:none">
-        <button class="add-btn" onclick="openChecklistModal()">+ Nouvelle check-liste</button>
-        <div id="manage-container"></div>
-    </div>
-
-    <!-- TAB: HISTORIQUE -->
-    <div class="content" id="tab-historique" style="display:none">
-        <div class="date-filter">
-            <input type="date" id="history-date" onchange="loadHistory()">
-        </div>
-        <div id="history-container"></div>
-    </div>
-
-    <!-- MODAL: EDIT CHECKLIST -->
-    <div class="modal-overlay" id="modal-checklist">
-        <div class="modal">
-            <div class="modal-title" id="modal-title">Nouvelle check-liste</div>
-            <input type="hidden" id="edit-id">
-
-            <div class="form-group">
-                <label class="form-label">Nom:/label>
-                <input class="form-input" id="cl-nom" placeholder="Ex: Fin de service salle">
+    <!-- Content -->
+    <div class="content">
+        <!-- === TAB VALIDATION === -->
+        <div class="tab-content active" id="tab-validation">
+            <div class="service-selector">
+                <button class="service-btn active" data-service="midi" onclick="selectService('midi')">🌞 Midi</button>
+                <button class="service-btn" data-service="soir" onclick="selectService('soir')">🌙 Soir</button>
             </div>
+            <div id="validation-container"></div>
+        </div>
 
-            <div class="form-group">
-                <label class="form-label">Description (optionnel)</label>
-                <input class="form-input" id="cl-description" placeholder="Courte description">
+        <!-- === TAB GESTION === -->
+        <div class="tab-content" id="tab-gestion">
+            <div class="gestion-header">
+                <button class="btn-primary" onclick="openCreateModal()">+ Nouvelle check-list</button>
+            </div>
+            <div id="gestion-container"></div>
+        </div>
+
+        <!-- === TAB HISTORIQUE === -->
+        <div class="tab-content" id="tab-historique">
+            <div class="historique-header">
+                <div class="date-picker-wrapper">
+                    <input type="date" id="history-date-picker" onchange="loadHistory()">
+                </div>
+            </div>
+            <div id="historique-container"></div>
+        </div>
+    </div>
+
+    <!-- CREATE/EDIT CHECKLIST MODAL -->
+    <div class="modal-overlay" id="checklist-modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">Nouvelle check-list</h2>
+                <button class="modal-close" onclick="closeChecklistModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label class="form-label">Nom *</label>
+                    <input type="text" class="form-input" id="form-nom" placeholder="Ex: Nettoyage du matin">
                 </div>
 
-            <div class="form-group">
-                <label class="form-label">FrÃ©quence</label>
-                <select class="form-select" id="cl-frequence">
-                    <option value="service">Par service (midi/soir)</option>
-                    <option value="journaliere">JournaliÃ¨re</option>
-                    <option value="hebdomadaire">Hebdomadaire</option>
-                    <option value="mensuelle">Mensuelle</option>
-                </select>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-textarea" id="form-description" placeholder="Description détaillée..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Équipe *</label>
+                    <select class="form-select" id="form-equipe" onchange="onEquipeChange()">
+                        <option value="">-- Sélectionner --</option>
+                        <option value="salle">Salle</option>
+                        <option value="cuisine">Cuisine</option>
+                        <option value="plonge">Plonge</option>
+                        <option value="autre">Autre</option>
+                        <option value="tous">Tous</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Fréquence *</label>
+                    <select class="form-select" id="form-frequence" onchange="onFrequenceChange()">
+                        <option value="">-- Sélectionner --</option>
+                        <option value="service">À chaque service (Midi + Soir)</option>
+                        <option value="journaliere">Journalière (chaque jour)</option>
+                        <option value="hebdomadaire">Hebdomadaire (jours de la semaine)</option>
+                        <option value="mensuelle">Mensuelle (jours du mois)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="hebdo-days-group" style="display:none;">
+                    <label class="form-label">Jours de la semaine</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="1" class="hebdo-day"> Lun
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="2" class="hebdo-day"> Mar
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="3" class="hebdo-day"> Mer
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="4" class="hebdo-day"> Jeu
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="5" class="hebdo-day"> Ven
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="6" class="hebdo-day"> Sam
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="7" class="hebdo-day"> Dim
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="mois-days-group" style="display:none;">
+                    <label class="form-label">Jours du mois (séparés par des virgules)</label>
+                    <input type="text" class="form-input" id="form-jour-mois" placeholder="Ex: 1, 15, 30">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Service *</label>
+                    <select class="form-select" id="form-service">
+                        <option value="">-- Sélectionner --</option>
+                        <option value="midi">Midi</option>
+                        <option value="soir">Soir</option>
+                        <option value="tous">Tous</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Éléments de la check-list</label>
+                    <div class="items-editor" id="items-editor"></div>
+                    <button type="button" class="btn-primary" style="margin-top:8px;" onclick="addItemRow()">+ Ajouter un élément</button>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Ãtapes</label>
-                <div class="items-editor" id="items-editor"></div>
-                <button class="add-item-btn" onclick="addItemRow()">+ Ajouter une Ã©tape</button>
-                <div class="form-hint">Glissez pour rÃ©ordonner. Minimum 1 Ã©tape.</div>
-            </div>
-
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="saveChecklist()">Enregistrer</button>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeChecklistModal()">Annuler</button>
+                <button class="btn-primary" onclick="saveChecklist()">Enregistrer</button>
             </div>
         </div>
     </div>
 
-    <!-- TOAST CONTAINER -->
-    <div class="toast-container" id="toast-container"></div>
+    <!-- OBSERVATION MODAL -->
+    <div class="modal-overlay" id="observation-modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Observation</h2>
+                <button class="modal-close" onclick="closeObservationModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label class="form-label">Notes supplémentaires</label>
+                    <textarea class="form-textarea" id="observation-text" placeholder="Ajouter une observation..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeObservationModal()">Annuler</button>
+                <button class="btn-primary" onclick="saveObservation()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VALIDATION MANAGER MODAL -->
+    <div class="modal-overlay" id="validation-manager-modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Validation Manager</h2>
+                <button class="modal-close" onclick="closeValidationModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <div style="display:flex; gap:8px;">
+                        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:10px; border:1px solid var(--gray-300); border-radius:8px; cursor:pointer; transition:all 0.15s;">
+                            <input type="radio" name="validation-status" value="ok"> ✓ OK
+                        </label>
+                        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:10px; border:1px solid var(--gray-300); border-radius:8px; cursor:pointer; transition:all 0.15s;">
+                            <input type="radio" name="validation-status" value="probleme"> ⚠ Problème
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Commentaire</label>
+                    <textarea class="form-textarea" id="validation-commentaire" placeholder="Ajouter un commentaire..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeValidationModal()">Annuler</button>
+                <button class="btn-primary" onclick="submitValidation()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- POPUP CONFIRMATION -->
+    <div id="confirmation-popup" class="popup">
+        <div class="popup-content" id="popup-message"></div>
+        <div class="popup-buttons">
+            <button class="popup-btn-cancel" onclick="closePopup()">Non</button>
+            <button class="popup-btn-confirm" id="popup-confirm-btn">Oui</button>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="toast"></div>
 
     <script>
-        // ========== CONFIG ==========
-        const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+        // ============ INITIALIZATION & STATE ============
+        let supabase = null;
+        let currentUser = null;
+        let currentEstablishment = null;
+        let isDemo = false;
+        let currentTab = 'validation';
+        let currentService = 'midi';
+        let currentChecklistForModal = null;
+        let currentItemForObservation = null;
+        let currentChecklistForValidation = null;
+        let currentHistoryDate = new Date().toISOString().split('T')[0];
 
-        let DEMO_MODE = false;
-        let supabaseClient = null;
+        // Demo data
+        const demoChecklists = [
+            {
+                id: 'demo-1',
+                nom: 'Nettoyage comptoir',
+                description: 'Nettoyage quotidien du comptoir',
+                frequence: 'service',
+                equipe: 'salle',
+                service: 'tous',
+                jours_semaine: null,
+                jour_mois: null,
+                actif: true,
+                etablissement: 'freddy',
+                ordre: 1,
+                created_by_id: 'demo',
+                created_by_nom: 'Demo',
+                checklist_items: [
+                    { id: 'item-1', nom: 'Essuyer le comptoir', duree_indicative: 5 },
+                    { id: 'item-2', nom: 'Vider les poubelles', duree_indicative: 3 }
+                ]
+            }
+        ];
 
-        try {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        } catch(e) {
-            DEMO_MODE = true;
+        // Initialize app
+        async function initApp() {
+            try {
+                const user = JSON.parse(sessionStorage.getItem('planb_user'));
+                const etab = sessionStorage.getItem('planb_etablissement');
+
+                if (!user || !etab) {
+                    goBack();
+                    return;
+                }
+
+                currentUser = user;
+                currentEstablishment = etab;
+
+                // Initialize Supabase
+                const supabaseUrl = 'https://dzrherfavgiuygnimtux.supabase.co';
+                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+                supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+                // Test Supabase connection
+                const { data, error } = await supabase.from('checklists').select('count', { count: 'exact' }).limit(1);
+
+                if (error) {
+                    console.warn('Supabase connection failed, using demo mode:', error);
+                    isDemo = true;
+                    document.getElementById('demo-banner').style.display = 'block';
+                }
+            } catch (err) {
+                console.warn('Error initializing Supabase:', err);
+                isDemo = true;
+                document.getElementById('demo-banner').style.display = 'block';
+            }
+
+            updateHeader();
+            autoSelectService();
+            loadValidation();
+            loadHistoryDate();
         }
 
-        // ========== STATE ==========
-        let currentUser = null;
-        let currentEtab = null;
-        let currentService = 'midi';
-        let currentTab = 'check';
-        let allChecklists = [];
-        let allItems = {};      // checklist_id -> [items]
-        let completions = {};   // item_id -> completion
+        // ============ HEADER & NAVIGATION ============
+        function updateHeader() {
+            if (!currentUser) return;
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽 Liesel';
+            document.getElementById('user-badge').textContent = currentUser.initiales || 'U';
+        }
 
-        // ========== HELPERS ==========
         function goBack() {
             window.location.href = '../';
         }
 
-        function showToast(msg, type = 'default') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'toast' + (type !== 'default' ? ' ' + type : '');
-            toast.textContent = msg;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 2500);
-        }
+        function switchTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
 
-        function isManager() {
-            if (!currentUser) return false;
-            const level = { collaborateur: 1, responsable: 2, admin: 3 };
-            return (level[currentUser.role] || 0) >= 2;
-        }
-
-        function getToday() {
-            return new Date().toISOString().split('T')[0];
-        }
-
-        function getCurrentPeriode() {
-            // PÃ©riode = clÃ© unique pour savoir si la check-list est dÃ©jÃ  faite
-            const now = new Date();
-            return getToday(); // pour journaliÃ¨re
-        }
-
-        function getPeriodeForFrequency(freq) {
-            const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-
-            switch (freq) {
-                case 'service':
-                case 'journaliere':
-                    return `${y}-${m}-${d}`;
-                case 'hebdomadaire':
-                    // Semaine ISO : lundi de la semaine
-                    const day = now.getDay() || 7;
-                    const monday = new Date(now);
-                    monday.setDate(now.getDate() - day + 1);
-                    return `S-${monday.toISOString().split('T')[0]}`;
-                case 'mensuelle':
-                    return `M-${y}-${m}`;
-                default:
-                    return `${y}-${m}-${d}`;
+            if (tabName === 'validation') {
+                loadValidation();
+            } else if (tabName === 'gestion') {
+                loadGestion();
+            } else if (tabName === 'historique') {
+                loadHistory();
             }
         }
 
-        function getFreqLabel(freq) {
-            const labels = {
-                'service': 'Service',
-                'journaliere': 'JournaliÃ¨re',
-                'hebdomadaire': 'Hebdomadaire',
-                'mensuelle': 'Mensuelle'
-            };
-            return labels[freq] || freq;
-        }
-
-        // ========== SUPABASE OPERATIONS ==========
-        async function loadChecklists() {
-            if (DEMO_MODE) {
-                allChecklists = [];
-                return;
-            }
-            try {
-                const { data, error } = await supabaseClient
-                    .from('checklists')
-                    .select('*')
-                    .eq('etablissement', currentEtab)
-                    .eq('actif', true)
-                    .order('ordre', { ascending: true });
-                if (error) throw error;
-                allChecklists = data || [];
-            } catch(e) {
-                console.error('loadChecklists:', e);
-                allChecklists = [];
-            }
-        }
-
-        async function loadItems(checklistId) {
-            if (DEMO_MODE) return [];
-            try {
-                const { data, error } = await supabaseClient
-                    .from('checklist_items')
-                    .select('*')
-                    .eq('checklist_id', checklistId)
-                    .eq('actif', true)
-                    .order('ordre', { ascending: true });
-                if (error) throw error;
-                return data || [];
-            } catch(e) {
-                console.error('loadItems:', e);
-                return [];
-            }
-        }
-
-        async function loadAllItems() {
-            allItems = {};
-            for (const cl of allChecklists) {
-                allItems[cl.id] = await loadItems(cl.id);
-            }
-        }
-
-        async function loadCompletions() {
-            if (DEMO_MODE) { completions = {}; return; }
-
-            // Charger les completions pour toutes les pÃ©riodes actuelles
-            const periodes = [...new Set(allChecklists.map(cl => getPeriodeForFrequence(cl.frequence)))];
-            completions = {};
-
-            try {
-                for (const periode of periodes) {
-                    let query = supabaseClient
-                        .from('checklist_completions')
-                        .select('*')
-                        .eq('etablissement', currentEtab)
-                        .eq('periode', periode);
-
-                    const { data, error } = await query;
-                    if (error) throw error;
-                    if (data) {
-                        data.forEach(c => {
-                            // ClÃ© unique : item_id + service (pour les check-lists par service)
-                            const key = c.service ? `${c.item_id}_${c.service}` : c.item_id;
-                            completions[key] = c;
-                        });
-                    }
-                }
-            } catch(e) {
-                console.error('loadCompletions:', e);
-            }
-        }
-
-        async function toggleItem(checklistId, itemId, freq) {
-            const service = freq === 'service' ? currentService : null;
-            const key = service ? `${itemId}_${service}` : itemId;
-            const periode = getPeriodeForFrequency(freq);
-
-            if (completions[key]) {
-                // DÃ©cocher : supprimer la completion
-                try {
-                    const { error } = await supabaseClient
-                        .from('checklist_completions')
-                        .delete()
-                        .eq('id', completions[key].id);
-                    if (error) throw error;
-                    delete completions[key];
-                } catch(e) {
-                    showToast('Erreur lors de la suppression', 'error');
-                    return;
-                }
-            } else {
-                // Cocher : ajouter une completion
-                const record = {
-                    checklist_id: checklistId,
-                    item_id: itemId,
-                    etablissement: currentEtab,
-                    periode: periode,
-                    service: service,
-                    valide_par_id: currentUser?.id || null,
-                    valide_par_nom: currentUser?.nom || 'Inconnu',
-                    valide_par_initiales: currentUser?.initiales || '??'
-                };
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('checklist_completions')
-                        .insert(record)
-                        .select();
-                    if (error) throw error;
-                    if (data && data[0]) {
-                        completions[key] = data[0];
-                    }
-                } catch(e) {
-                    showToast('Erreur lors de la validation', 'error');
-                    return;
-                }
-            }
-
-            renderChecklists();
-        }
-
-        // ========== RENDERING ==========
-        function renderChecklists() {
-            const container = document.getElementById('checklists-container');
-
-            // Filtrer : les check-lists "service" ne s'affichent que dans le bon mode
-            const showServiceSelector = allChecklists.some(cl => cl.frequence === 'service');
-            document.getElementById('service-selector').style.display = showServiceSelector ? 'flex' : 'none';
-
-            if (allChecklists.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">ð</div>
-                        <div class="text">Aucune check-list configurÃ©e.<br>
-                        ${isManager() ? 'Allez dans l\'onglet Gestion pour en crÃ©er.' : 'Demandez Ã  un responsable d\'en crÃ©er.'}</div>
-                    </div>`;
-                return;
-            }
-
-            container.innerHTML = allChecklists.map(cl => {
-                const items = allItems[cl.id] || [];
-                const periode = getPeriodeForFrequency(cl.frequence);
-
-                const completedCount = items.filter(item => {
-                    const key = cl.frequence === 'service'
-                        ? `${item.id}_${currentService}`
-                        : item.id;
-                    return !!completions[key];
-                }).length;
-
-                const total = items.length;
-                const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
-                const isComplete = completedCount === total && total > 0;
-
-                return `
-                    <div class="checklist-card">
-                        <div class="checklist-header" onclick="toggleChecklistOpen('${cl.id}')">
-                            <div class="checklist-title">${cl.nom}</div>
-                            <span class="checklist-freq freq-${cl.frequence}">${getFreqLabel(cl.frequency)}</span>
-                            <div class="checklist-progress ${isComplete ? 'complete' : ''}">${completedCount}/${total}</div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-bar-fill ${isComplete ? 'complete' : ''}" style="width: ${pct}%"></div>
-                        </div>
-                        <div class="checklist-items" id="items-${cl.id}">
-                            ${items.map(item => {
-                                const key = cl.frequence === 'service'
-                                    ? `${item.id}_${currentService}`
-                                    : item.id;
-                                const comp = completions[key];
-                                const checked = !!comp;
-                                return `
-                                    <div class="checklist-item" onclick="toggleItem('${cl.id}','${item.id}','${cl.frequency}')">
-                                        <div class="item-checkbox ${checked ? 'checked' : ''}">â</div>
-                                        <div class="item-info">
-                                            <div class="item-name ${checked ? 'checked' : ''}">${item.nom}</div>
-                                            ${checked ? `<div class="item-validated-by">${comp.valide_par_initiales} Â· ${new Date(comp.valide_at).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>` : ''}
-                                        </div>
-                                    </div>`;
-                            }).join('')}
-                        </div>
-                    </div>`;
-            }).join('');
-        }
-
-        function toggleChecklistOpen(id) {
-            const el = document.getElementById('items-' + id);
-            el.classList.toggle('open');
-        }
-
-        // ========== TABS ==========
-        function switchTab(tab) {
-            currentTab = tab;
-            document.querySelectorAll('.tab').forEach((t, i) => {
-                t.classList.toggle('active', ['check', 'gestion', 'historique'][i] === tab);
-            });
-            document.getElementById('tab-check').style.display = tab === 'check' ? 'block' : 'none';
-            document.getElementById('tab-gestion').style.display = tab === 'gestion' ? 'block' : 'none';
-            document.getElementById('tab-historique').style.display = tab === 'historique' ? 'block' : 'none';
-
-            if (tab === 'gestion') {
-                if (!isManager()) {
-                    showToast('AccÃ¨s rÃ©servÃ© aux responsables et admins', 'error');
-                    switchTab('check');
-                    return;
-                }
-                renderManage();
-            }
-            if (tab === 'historique') loadHistory();
+        function autoSelectService() {
+            const hour = new Date().getHours();
+            const service = hour < 16 ? 'midi' : 'soir';
+            selectService(service);
         }
 
         function selectService(service) {
             currentService = service;
-            document.querySelectorAll('.service-btn').forEach(b => {
-                b.classList.toggle('active', b.textContent.toLowerCase().includes(service));
-            });
-            renderChecklists();
+            document.querySelectorAll('.service-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-service="${service}"]`).classList.add('active');
+            if (currentTab === 'validation') {
+                loadValidation();
+            }
         }
 
-        // ========== GESTION ==========
-        function renderManage() {
-            const container = document.getElementById('manage-container');
-            if (allChecklists.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">âï¸</div>
-                        <div class="text">Aucune check-list. CrÃ©ez-en une !</div>
-                    </div>`;
+        // ============ VALIDATION TAB ============
+        async function loadValidation() {
+            const container = document.getElementById('validation-container');
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Chargement...</div></div>';
+
+            try {
+                let checklists = [];
+
+                if (isDemo) {
+                    checklists = demoChecklists;
+                } else {
+                    const { data, error } = await supabase
+                        .from('checklists')
+                        .select('*, checklist_items(*)')
+                        .eq('etablissement', currentEstablishment)
+                        .eq('actif', true)
+                        .order('ordre');
+
+                    if (error) throw error;
+                    checklists = data || [];
+                }
+
+                // Filter checklists for current service and user's equipe
+                const filtered = checklists.filter(cl => {
+                    const matchEquipe = cl.equipe === currentUser.equipe || cl.equipe === 'tous';
+                    const matchService = cl.service === currentService || cl.service === 'tous';
+                    const matchFrequency = shouldShowChecklist(cl);
+                    return matchEquipe && matchService && matchFrequency;
+                });
+
+                if (filtered.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✓</div><div class="empty-state-title">Aucune check-list</div><div class="empty-state-text">Aucune check-list à valider pour cette période</div></div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                for (const cl of filtered) {
+                    const completed = await getChecklistCompletion(cl);
+                    const card = createChecklistCard(cl, completed);
+                    container.appendChild(card);
+                }
+
+                updatePendingCount();
+            } catch (err) {
+                console.error('Error loading validation:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        function shouldShowChecklist(cl) {
+            const today = new Date();
+            const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+            const dayOfMonth = today.getDate();
+
+            switch (cl.frequence) {
+                case 'service':
+                    return true;
+                case 'journaliere':
+                    return true;
+                case 'hebdomadaire':
+                    return cl.jours_semaine && cl.jours_semaine.includes(dayOfWeek);
+                case 'mensuelle':
+                    return cl.jour_mois && cl.jour_mois.includes(dayOfMonth);
+                default:
+                    return false;
+            }
+        }
+
+        function createChecklistCard(cl, completed) {
+            const card = document.createElement('div');
+            card.className = 'checklist-card';
+
+            const total = cl.checklist_items?.length || 0;
+            const done = completed.length;
+            const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+            const itemsHtml = (cl.checklist_items || []).map((item, idx) => {
+                const isDone = completed.some(c => c.item_id === item.id);
+                const completion = completed.find(c => c.item_id === item.id);
+                return `
+                    <div class="checklist-item">
+                        <div class="item-checkbox ${isDone ? 'checked' : ''}" onclick="toggleItem(event, '${cl.id}', '${item.id}', '${cl.frequence}')">
+                            ${isDone ? '✓' : ''}
+                        </div>
+                        <div class="item-details">
+                            <div class="item-name">${escapeHtml(item.nom)}</div>
+                            ${completion ? `<div class="item-meta">${completion.valide_par_initiales} • ${formatTime(completion.valide_at)}</div>` : ''}
+                            ${item.duree_indicative ? `<div class="item-duration">⏱ ${item.duree_indicative}min</div>` : ''}
+                        </div>
+                        ${completion ? `<button class="item-note-btn" onclick="editObservation('${cl.id}', '${item.id}')">💬</button>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            const freqBadges = {
+                service: { text: 'Service', color: 'badge-freq' },
+                journaliere: { text: 'Jour', color: 'badge-freq' },
+                hebdomadaire: { text: 'Semaine', color: 'badge-freq' },
+                mensuelle: { text: 'Mois', color: 'badge-freq' }
+            };
+
+            const freqBadge = freqBadges[cl.frequence] || {};
+
+            card.innerHTML = `
+                <div class="checklist-card-header">
+                    <div class="checklist-card-title">${escapeHtml(cl.nom)}</div>
+                    <div class="checklist-badges">
+                        <span class="badge ${freqBadge.color}">${freqBadge.text}</span>
+                        <span class="badge badge-equipe">${cl.equipe}</span>
+                    </div>
+                </div>
+                <div class="checklist-progress">${done}/${total} complétés</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width:${percent}%"></div>
+                </div>
+                ${itemsHtml ? `<div class="checklist-items expanded">${itemsHtml}</div>` : ''}
+            `;
+
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.item-checkbox') && !e.target.closest('[onclick*="edit"]')) {
+                    const items = card.querySelector('.checklist-items');
+                    if (items) {
+                        items.classList.toggle('expanded');
+                    }
+                }
+            });
+
+            return card;
+        }
+
+        async function getChecklistCompletion(cl) {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                let periode = today;
+
+                // Calculate periode based on frequence
+                if (cl.frequence === 'hebdomadaire') {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - d.getDay() + 1);
+                    periode = d.toISOString().split('T')[0];
+                } else if (cl.frequence === 'mensuelle') {
+                    periode = today.substring(0, 7); // YYYY-MM
+                }
+
+                if (isDemo) {
+                    return [];
+                }
+
+                const { data, error } = await supabase
+                    .from('checklist_completions')
+                    .select('*')
+                    .eq('checklist_id', cl.id)
+                    .eq('etablissement', currentEstablishment)
+                    .eq('periode', periode)
+                    .eq('service', currentService);
+
+                if (error) throw error;
+                return data || [];
+            } catch (err) {
+                console.error('Error getting completion:', err);
+                return [];
+            }
+        }
+
+        async function toggleItem(event, checklistId, itemId, frequence) {
+            event.stopPropagation();
+            const checkbox = event.currentTarget;
+            const isCurrentlyChecked = checkbox.classList.contains('checked');
+
+            if (isCurrentlyChecked) {
+                // Show uncheck confirmation popup
+                showConfirmation('Décrocher cet élément?', () => {
+                    uncheckItem(checklistId, itemId, frequence);
+                });
+            } else {
+                checkItem(checklistId, itemId, frequence);
+            }
+        }
+
+        async function checkItem(checklistId, itemId, frequence) {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                let periode = today;
+
+                if (frequence === 'hebdomadaire') {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - d.getDay() + 1);
+                    periode = d.toISOString().split('T')[0];
+                } else if (frequence === 'mensuelle') {
+                    periode = today.substring(0, 7);
+                }
+
+                if (isDemo) {
+                    showToast('✓ Item marqué comme complété', 'success');
+                    await new Promise(r => setTimeout(r, 500));
+                    loadValidation();
+                    return;
+                }
+
+                const { error } = await supabase
+                    .from('checklist_completions')
+                    .upsert({
+                        checklist_id: checklistId,
+                        item_id: itemId,
+                        etablissement: currentEstablishment,
+                        periode: periode,
+                        service: currentService,
+                        valide_par_id: currentUser.id,
+                        valide_par_nom: currentUser.nom,
+                        valide_par_initiales: currentUser.initiales,
+                        valide_at: new Date().toISOString(),
+                        observation: null
+                    });
+
+                if (error) throw error;
+
+                showToast('✓ Élément marqué', 'success');
+                loadValidation();
+            } catch (err) {
+                console.error('Error checking item:', err);
+                showToast('Erreur', 'error');
+            }
+        }
+
+        async function uncheckItem(checklistId, itemId, frequence) {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                let periode = today;
+
+                if (frequence === 'hebdomadaire') {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - d.getDay() + 1);
+                    periode = d.toISOString().split('T')[0];
+                } else if (frequence === 'mensuelle') {
+                    periode = today.substring(0, 7);
+                }
+
+                if (isDemo) {
+                    showToast('✓ Item décoché', 'success');
+                    await new Promise(r => setTimeout(r, 500));
+                    loadValidation();
+                    return;
+                }
+
+                const { error } = await supabase
+                    .from('checklist_completions')
+                    .delete()
+                    .eq('checklist_id', checklistId)
+                    .eq('item_id', itemId)
+                    .eq('etablissement', currentEstablishment)
+                    .eq('periode', periode)
+                    .eq('service', currentService);
+
+                if (error) throw error;
+
+                showToast('✓ Élément décoché', 'success');
+                loadValidation();
+            } catch (err) {
+                console.error('Error unchecking item:', err);
+                showToast('Erreur', 'error');
+            }
+        }
+
+        function editObservation(checklistId, itemId) {
+            currentItemForObservation = { checklistId, itemId };
+            document.getElementById('observation-text').value = '';
+            document.getElementById('observation-modal-overlay').classList.add('active');
+        }
+
+        function closeObservationModal() {
+            document.getElementById('observation-modal-overlay').classList.remove('active');
+            currentItemForObservation = null;
+        }
+
+        async function saveObservation() {
+            if (!currentItemForObservation) return;
+
+            const observation = document.getElementById('observation-text').value.trim();
+
+            try {
+                if (isDemo) {
+                    showToast('✓ Observation enregistrée', 'success');
+                    closeObservationModal();
+                    return;
+                }
+
+                const { error } = await supabase
+                    .from('checklist_completions')
+                    .update({ observation })
+                    .eq('checklist_id', currentItemForObservation.checklistId)
+                    .eq('item_id', currentItemForObservation.itemId)
+                    .eq('etablissement', currentEstablishment);
+
+                if (error) throw error;
+
+                showToast('✓ Observation enregistrée', 'success');
+                closeObservationModal();
+                loadValidation();
+            } catch (err) {
+                console.error('Error saving observation:', err);
+                showToast('Erreur', 'error');
+            }
+        }
+
+        async function updatePendingCount() {
+            try {
+                if (isDemo) return;
+
+                const { data, error } = await supabase
+                    .from('checklists')
+                    .select('*, checklist_items(id)')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('actif', true);
+
+                if (error) throw error;
+
+                let pendingCount = 0;
+                const today = new Date().toISOString().split('T')[0];
+
+                for (const cl of (data || [])) {
+                    // Filter by equipe and frequency visibility
+                    const matchEquipe = cl.equipe === currentUser.equipe || cl.equipe === 'tous';
+                    if (!matchEquipe || !shouldShowChecklist(cl)) continue;
+
+                    // Check if service matches
+                    const matchService = cl.service === currentService || cl.service === 'tous';
+                    if (!matchService) continue;
+
+                    const totalItems = (cl.checklist_items || []).length;
+                    if (totalItems === 0) continue;
+
+                    // Get completions for this checklist
+                    let periode = today;
+                    if (cl.frequence === 'hebdomadaire') {
+                        const d = new Date(today);
+                        d.setDate(d.getDate() - d.getDay() + 1);
+                        periode = d.toISOString().split('T')[0];
+                    } else if (cl.frequence === 'mensuelle') {
+                        periode = today.substring(0, 7);
+                    }
+
+                    const { data: completions } = await supabase
+                        .from('checklist_completions')
+                        .select('id')
+                        .eq('checklist_id', cl.id)
+                        .eq('etablissement', currentEstablishment)
+                        .eq('periode', periode)
+                        .eq('service', currentService);
+
+                    const doneCount = (completions || []).length;
+                    if (doneCount < totalItems) pendingCount++;
+                }
+
+                sessionStorage.setItem('planb_checklist_pending_count', String(pendingCount));
+            } catch (err) {
+                console.error('Error updating pending count:', err);
+                sessionStorage.setItem('planb_checklist_pending_count', '0');
+            }
+        }
+
+        // ============ GESTION TAB ============
+        async function loadGestion() {
+            // Only responsable and admin can access this
+            if (currentUser.role === 'collaborateur') {
+                document.getElementById('gestion-container').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><div class="empty-state-title">Accès refusé</div><div class="empty-state-text">Seuls les responsables et admins peuvent gérer les check-lists</div></div>';
                 return;
             }
 
-            container.innerHTML = allChecklists.map(cl => {
-                const items = allItems[cl.id] || [];
-                return `
-                    <div class="manage-card">
-                        <div class="mc-info">
-                            <div class="mc-name">${cl.nom}</div>
-                            <div class="mc-meta">${getFreqLabel(cl.frequence)} Â· ${items.length} Ã©tapes</div>
-                        </div>
-                        <div class="mc-actions">
-                            <button class="icon-btn" onclick="editChecklist('${cl.id}')" title="Modifier">âï¸</button>
-                            <button class="icon-btn danger" onclick="deleteChecklist('${cl.id}')" title="Supprimer">ðï¸</button>
-                        </div>
-                    </div>`;
-            }).join('');
-        }
+            const container = document.getElementById('gestion-container');
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Chargement...</div></div>';
 
-        // ========== MODAL ==========
-        function openChecklistModal(id = null) {
-            document.getElementById('edit-id').value = id || '';
-            document.getElementById('modal-title').textContent = id ? 'Modifier la check-liste' : 'Nouvelle check-liste';
-            if (id) {
-                const cl = allChecklists.find(c => c.id === id);
-                if (!cl) return;
-                document.getElementById('cl-nom').value = cl.nm;
-                document.getElementById('cl-description').value = cl.description || '';
-                document.getElementById('cl-frequence').value = cl.frequence;
+            try {
+                let checklists = [];
 
-                const items = allItems[cl.id] || [];
-                const editor = document.getElementById('items-editor');
-                editor.innerHTML = '';
-                items.forEach(item => addItemRow(item.nom, item.id));
-            } else {
-                document.getElementById('cl-nom').value = '';
-                document.getElementById('cl-description').value = '';
-                document.getElementById('cl-frequence').value = 'service';
-                document.getElementById('items-editor').innerHTML = '';
-                addItemRow();
-                addItemRow();
-                addItemRow();
+                if (isDemo) {
+                    checklists = demoChecklists;
+                } else {
+                    const { data, error } = await supabase
+                        .from('checklists')
+                        .select('*, checklist_items(*)')
+                        .eq('etablissement', currentEstablishment)
+                        .order('ordre');
+
+                    if (error) throw error;
+                    checklists = data || [];
+                }
+
+                if (checklists.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Aucune check-list</div><div class="empty-state-text">Créez votre première check-list</div></div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                for (const cl of checklists) {
+                    const card = createGestionCard(cl);
+                    container.appendChild(card);
+                }
+            } catch (err) {
+                console.error('Error loading gestion:', err);
+                showToast('Erreur au chargement', 'error');
             }
-
-            document.getElementById('modal-checklist').classList.add('open');
         }
 
-        function editChecklist(id) {
-            openChecklistModal(id);
+        function createGestionCard(cl) {
+            const card = document.createElement('div');
+            card.className = 'gestion-card';
+
+            const freqLabels = {
+                service: 'À chaque service',
+                journaliere: 'Journalière',
+                hebdomadaire: 'Hebdomadaire',
+                mensuelle: 'Mensuelle'
+            };
+
+            card.innerHTML = `
+                <div class="gestion-card-content">
+                    <div class="gestion-card-title">${escapeHtml(cl.nom)}</div>
+                    <div class="gestion-card-meta">${freqLabels[cl.frequence]} • ${cl.equipe} • ${(cl.checklist_items || []).length} éléments</div>
+                </div>
+                <div class="gestion-card-actions">
+                    <button class="btn-icon" onclick="editChecklist('${cl.id}')">✏️</button>
+                    <button class="btn-icon delete" onclick="deleteChecklistConfirm('${cl.id}')">🗑</button>
+                </div>
+            `;
+
+            return card;
         }
 
-        function closeModal() {
-            document.getElementById('modal-checklist').classList.remove('open');
+        function openCreateModal() {
+            currentChecklistForModal = null;
+            document.getElementById('modal-title').textContent = 'Nouvelle check-list';
+            document.getElementById('form-nom').value = '';
+            document.getElementById('form-description').value = '';
+            document.getElementById('form-equipe').value = '';
+            document.getElementById('form-frequence').value = '';
+            document.getElementById('form-service').value = '';
+            document.getElementById('form-jour-mois').value = '';
+            document.querySelectorAll('.hebdo-day').forEach(cb => cb.checked = false);
+            document.getElementById('items-editor').innerHTML = '';
+            addItemRow();
+            document.getElementById('checklist-modal-overlay').classList.add('active');
         }
 
-        function addItemRow(value = '', itemId = '') {
+        function closeChecklistModal() {
+            document.getElementById('checklist-modal-overlay').classList.remove('active');
+        }
+
+        function onEquipeChange() {
+            // Additional logic if needed
+        }
+
+        function onFrequenceChange() {
+            const freq = document.getElementById('form-frequence').value;
+            document.getElementById('hebdo-days-group').style.display = freq === 'hebdomadaire' ? 'block' : 'none';
+            document.getElementById('mois-days-group').style.display = freq === 'mensuelle' ? 'block' : 'none';
+        }
+
+        function addItemRow() {
             const editor = document.getElementById('items-editor');
             const row = document.createElement('div');
-            row.className = 'item-row';
+            row.className = 'item-editor-row';
             row.innerHTML = `
-                <input type="text" placeholder="Nom de l'Ã©tape" value="${value}" data-item-id="${itemId}">
-                <button class="remove-item" onclick="this.parentElement.remove()">Ã</button>`;
+                <input type="text" class="form-input item-name" placeholder="Nom de l'élément">
+                <input type="number" class="form-input item-duration" placeholder="min" min="0" max="999">
+                <button type="button" class="btn-small" onclick="this.parentElement.remove()">✕</button>
+            `;
             editor.appendChild(row);
         }
 
         async function saveChecklist() {
-            const id = document.getElementById('edit-id').value;
-            const nom = document.getElementById('cl-nom').value.trim();
-            const description = document.getElementById('cl-description').value.trim();
-            const frequency = document.getElementById('cl-frequence').value;
+            const nom = document.getElementById('form-nom').value.trim();
+            const description = document.getElementById('form-description').value.trim();
+            const equipe = document.getElementById('form-equipe').value;
+            const frequence = document.getElementById('form-frequence').value;
+            const service = document.getElementById('form-service').value;
 
-            if (!nom) {
-                showToast('Le nom est obligatoire', 'error');
+            if (!nom || !equipe || !frequence || !service) {
+                showToast('Remplissez tous les champs obligatoires', 'error');
                 return;
             }
 
-            const itemRows = document.querySelectorAll('#items-editor .item-row input');
-            const itemNames = Array.from(itemRows)
-                .map(inp => ({ nom: inp.value.trim(), existingId: inp.dataset.itemId }))
-                .filter(i => i.nom);
-
-            if (itemNames.length === 0) {
-                showToast('Au moins une Ã©tape est requise', 'error');
-                return;
+            let jourseSemaine = null;
+            if (frequence === 'hebdomadaire') {
+                jourseSemaine = Array.from(document.querySelectorAll('.hebdo-day:checked')).map(cb => parseInt(cb.value));
+                if (jourseSemaine.length === 0) {
+                    showToast('Sélectionnez au moins un jour de la semaine', 'error');
+                    return;
+                }
             }
 
-            if (DEMO_MODE) {
-                showToast('Mode dÃ©mo : sauvegarde dÃ©sactivÃ©e', 'error');
+            let jourMois = null;
+            if (frequence === 'mensuelle') {
+                const input = document.getElementById('form-jour-mois').value.trim();
+                if (!input) {
+                    showToast('Remplissez les jours du mois', 'error');
+                    return;
+                }
+                jourMois = input.split(',').map(d => parseInt(d.trim())).filter(d => d > 0 && d <= 31);
+                if (jourMois.length === 0) {
+                    showToast('Jours du mois invalides', 'error');
+                    return;
+                }
+            }
+
+            const items = Array.from(document.querySelectorAll('.item-editor-row')).map(row => ({
+                nom: row.querySelector('.item-name').value.trim(),
+                duree_indicative: parseInt(row.querySelector('.item-duration').value) || null
+            })).filter(item => item.nom);
+
+            if (items.length === 0) {
+                showToast('Ajoutez au moins un élément', 'error');
                 return;
             }
 
             try {
-                let checklistId = id;
-
-                if (id) {
-                    // Mise Ã  jour
-                    const { error } = await supabaseClient
-                        .from('checklists')
-                        .update({ nom, description, frequence, updated_at: new Date().toISOString() })
-                        .eq('id', id);
-                    if (error) throw error;
-
-                    // DÃ©sactiver les anciens items
-                    await supabaseClient
-                        .from('checklist_items')
-                        .update({ actif: false })
-                        .eq('checklist_id', id);
-
-                } else {
-                    // CrÃ©ation
-                    const { data, error } = await supabaseClient
-                        .from('checklists')
-                        .insert({
-                            nom, description, frequence,
-                            etablissement: currentEtab,
-                            ordre: allChecklists.length,
-                            created_by_id: currentUser?.id,
-                            created_by_nom: currentUser?.nom
-                        })
-                        .select();
-                    if (error) throw error;
-                    checklistId = data[0].id;
+                if (isDemo) {
+                    showToast('✓ Check-list sauvegardée (mode démo)', 'success');
+                    closeChecklistModal();
+                    loadGestion();
+                    return;
                 }
 
-                // InsÃ©rer/rÃ©activer les items
-                for (let i = 0; i < itemNames.length; i++) {
-                    const item = itemNames[i];
-                    if (item.existingId) {
-                        await supabaseClient
+                if (currentChecklistForModal) {
+                    // Update existing
+                    const { error: clError } = await supabase
+                        .from('checklists')
+                        .update({
+                            nom,
+                            description,
+                            equipe,
+                            frequence,
+                            service,
+                            jours_semaine: jourseSemaine,
+                            jour_mois: jourMois
+                        })
+                        .eq('id', currentChecklistForModal);
+
+                    if (clError) throw clError;
+
+                    // Delete old items and create new ones
+                    await supabase
+                        .from('checklist_items')
+                        .delete()
+                        .eq('checklist_id', currentChecklistForModal);
+
+                    for (const item of items) {
+                        await supabase
                             .from('checklist_items')
-                            .update({ nom: item.nom, ordre: i, actif: true })
-                            .eq('id', item.existingId);
-                    } else {
-                        await supabaseClient
+                            .insert({
+                                checklist_id: currentChecklistForModal,
+                                nom: item.nom,
+                                duree_indicative: item.duree_indicative,
+                                ordre: items.indexOf(item),
+                                actif: true
+                            });
+                    }
+                } else {
+                    // Create new
+                    const { data: clData, error: clError } = await supabase
+                        .from('checklists')
+                        .insert({
+                            nom,
+                            description,
+                            frequence,
+                            equipe,
+                            service,
+                            jours_semaine: jourseSemaine,
+                            jour_mois: jourMois,
+                            etablissement: currentEstablishment,
+                            actif: true,
+                            ordre: 999,
+                            created_by_id: currentUser.id,
+                            created_by_nom: currentUser.nom
+                        })
+                        .select();
+
+                    if (clError) throw clError;
+                    const checklistId = clData[0].id;
+
+                    // Create items
+                    for (const item of items) {
+                        await supabase
                             .from('checklist_items')
                             .insert({
                                 checklist_id: checklistId,
                                 nom: item.nom,
-                                ordre: i
+                                duree_indicative: item.duree_indicative,
+                                ordre: items.indexOf(item),
+                                actif: true
                             });
                     }
                 }
 
-                closeModal();
-                showToast(id ? 'Check-liste modifiÃ©e' : 'Check-liste crÃ©see', 'success');
-                await refreshAll();
-
-            } catch(e) {
-                console.error('saveChecklist:', e);
-                showToast('Erreur : ' + e.message, 'error');
+                showToast('✓ Check-list enregistrée', 'success');
+                closeChecklistModal();
+                loadGestion();
+            } catch (err) {
+                console.error('Error saving checklist:', err);
+                showToast('Erreur', 'error');
             }
         }
 
-        async function deleteChecklist(id) {
-            const cl = allChecklists.find(c => c.id === id);
-            if (!confirm(`Supprimer "${cl?.nom}" et toutes ses Ã©tapes ?`)) return;
-
+        async function editChecklist(checklistId) {
             try {
-                const { error } = await supabaseClient
+                let cl = null;
+                if (isDemo) {
+                    cl = demoChecklists.find(c => c.id === checklistId);
+                } else {
+                    const { data, error } = await supabase
+                        .from('checklists')
+                        .select('*, checklist_items(*)')
+                        .eq('id', checklistId)
+                        .single();
+                    if (error) throw error;
+                    cl = data;
+                }
+                if (!cl) return;
+
+                currentChecklistForModal = checklistId;
+                document.getElementById('modal-title').textContent = 'Modifier la check-list';
+                document.getElementById('form-nom').value = cl.nom || '';
+                document.getElementById('form-description').value = cl.description || '';
+                document.getElementById('form-equipe').value = cl.equipe || '';
+                document.getElementById('form-frequence').value = cl.frequence || '';
+                document.getElementById('form-service').value = cl.service || '';
+
+                // Frequence-specific fields
+                onFrequenceChange();
+                if (cl.frequence === 'hebdomadaire' && cl.jours_semaine) {
+                    document.querySelectorAll('.hebdo-day').forEach(cb => {
+                        cb.checked = cl.jours_semaine.includes(parseInt(cb.value));
+                    });
+                }
+                if (cl.frequence === 'mensuelle' && cl.jour_mois) {
+                    document.getElementById('form-jour-mois').value = cl.jour_mois.join(', ');
+                }
+
+                // Populate items
+                const editor = document.getElementById('items-editor');
+                editor.innerHTML = '';
+                const items = (cl.checklist_items || []).sort((a, b) => a.ordre - b.ordre);
+                if (items.length === 0) {
+                    addItemRow();
+                } else {
+                    items.forEach(item => {
+                        const row = document.createElement('div');
+                        row.className = 'item-editor-row';
+                        row.innerHTML = `
+                            <input type="text" class="form-input item-name" placeholder="Nom de l'élément" value="${escapeHtml(item.nom)}">
+                            <input type="number" class="form-input item-duration" placeholder="min" min="0" max="999" value="${item.duree_indicative || ''}">
+                            <button type="button" class="btn-small" onclick="this.parentElement.remove()">✕</button>
+                        `;
+                        editor.appendChild(row);
+                    });
+                }
+
+                document.getElementById('checklist-modal-overlay').classList.add('active');
+            } catch (err) {
+                console.error('Error loading checklist for edit:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        function deleteChecklistConfirm(checklistId) {
+            showConfirmation('Supprimer cette check-list?', () => {
+                deleteChecklist(checklistId);
+            });
+        }
+
+        async function deleteChecklist(checklistId) {
+            try {
+                if (isDemo) {
+                    showToast('✓ Check-list supprimée (mode démo)', 'success');
+                    loadGestion();
+                    return;
+                }
+
+                const { error } = await supabase
                     .from('checklists')
                     .update({ actif: false })
-                    .eq('id', id);
+                    .eq('id', checklistId);
+
                 if (error) throw error;
 
-                showToast('Check-liste supprimÃ©e', 'success');
-                await refreshAll();
-            } catch(e) {
-                showToast('Erreur : ' + e.message, 'error');
+                showToast('✓ Check-list désactivée', 'success');
+                loadGestion();
+            } catch (err) {
+                console.error('Error deleting checklist:', err);
+                showToast('Erreur', 'error');
             }
         }
 
-        // ========== HISTORIQUE ==========
-        async function loadHistory() {
-            const container = document.getElementById('history-container');
-            const dateInput = document.getElementById('history-date');
-            const targetDate = dateInput.value || getToday();
-            dateInput.value = targetDate;
+        // ============ HISTORIQUE TAB ============
+        function loadHistoryDate() {
+            document.getElementById('history-date-picker').value = currentHistoryDate;
+        }
 
-            if (DEMO_MODE) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">ð</div><div class="text">Historique indisponible en mode dÃ©mo</div></div>';
+        async function loadHistory() {
+            const container = document.getElementById('historique-container');
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Chargement...</div></div>';
+
+            const dateInput = document.getElementById('history-date-picker').value;
+            if (!dateInput) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-title">Sélectionnez une date</div></div>';
+                return;
+            }
+
+            currentHistoryDate = dateInput;
+
+            try {
+                let completions = [];
+
+                if (isDemo) {
+                    completions = [];
+                } else {
+                    // Query by valide_at date range instead of periode (covers all frequency types)
+                    const { data, error } = await supabase
+                        .from('checklist_completions')
+                        .select('*, checklists:checklist_id(nom, frequence, equipe), checklist_items:item_id(nom)')
+                        .eq('etablissement', currentEstablishment)
+                        .gte('valide_at', dateInput + 'T00:00:00')
+                        .lte('valide_at', dateInput + 'T23:59:59')
+                        .order('valide_at', { ascending: true });
+
+                    if (error) throw error;
+                    completions = data || [];
+                }
+
+                if (completions.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Aucune validation</div><div class="empty-state-text">Aucune check-list validée pour cette date</div></div>';
+                    return;
+                }
+
+                // Group by checklist
+                const grouped = {};
+                for (const comp of completions) {
+                    const clKey = comp.checklist_id;
+                    if (!grouped[clKey]) grouped[clKey] = [];
+                    grouped[clKey].push(comp);
+                }
+
+                container.innerHTML = '';
+                for (const [clId, items] of Object.entries(grouped)) {
+                    const group = document.createElement('div');
+                    group.className = 'history-group';
+
+                    const checklist = items[0].checklists || { nom: 'Check-list' };
+                    const itemsHtml = items.map(item => `
+                        <div class="history-item">
+                            <div class="history-item-title">${escapeHtml(item.checklist_items?.nom || 'Élément')}</div>
+                            <div class="history-item-meta">${item.valide_par_initiales} • ${formatTime(item.valide_at)}${item.service ? ' • ' + item.service : ''}</div>
+                            ${item.observation ? `<div class="history-item-observation">💬 ${escapeHtml(item.observation)}</div>` : ''}
+                        </div>
+                    `).join('');
+
+                    group.innerHTML = `
+                        <div class="history-group-title">${escapeHtml(checklist.nom)}</div>
+                        ${itemsHtml}
+                    `;
+
+                    container.appendChild(group);
+                }
+
+                // Load existing validations for this date
+                let existingValidations = {};
+                if (!isDemo) {
+                    const { data: valData } = await supabase
+                        .from('checklist_validations')
+                        .select('*')
+                        .eq('etablissement', currentEstablishment)
+                        .eq('periode', dateInput);
+                    if (valData) {
+                        valData.forEach(v => { existingValidations[v.checklist_id] = v; });
+                    }
+                }
+
+                // Add validation section for managers
+                if (currentUser.role !== 'collaborateur') {
+                    const validationSection = document.createElement('div');
+                    validationSection.style.marginTop = '20px';
+
+                    for (const [clId, items] of Object.entries(grouped)) {
+                        const existing = existingValidations[clId];
+                        const div = document.createElement('div');
+                        div.style.marginBottom = '12px';
+
+                        if (existing) {
+                            const statusColor = existing.statut === 'ok' ? 'var(--green)' : 'var(--orange)';
+                            const statusIcon = existing.statut === 'ok' ? '✓' : '⚠';
+                            div.innerHTML = `
+                                <div style="background:white; border-radius:8px; padding:12px; box-shadow:var(--shadow); border-left:4px solid ${statusColor};">
+                                    <div style="font-weight:700; font-size:13px; color:${statusColor};">${statusIcon} Validé par ${existing.valide_par_initiales} • ${formatTime(existing.valide_at)}</div>
+                                    <div style="font-size:12px; color:var(--gray-500); margin-top:4px;">${items[0].checklists?.nom || ''}</div>
+                                    ${existing.commentaire ? `<div style="font-size:12px; color:var(--gray-600); margin-top:4px; font-style:italic;">"${escapeHtml(existing.commentaire)}"</div>` : ''}
+                                </div>
+                            `;
+                        } else {
+                            const btn = document.createElement('button');
+                            btn.className = 'btn-primary';
+                            btn.style.width = '100%';
+                            btn.textContent = '✓ Valider : ' + (items[0].checklists?.nom || '');
+                            btn.onclick = () => openValidationModal(clId);
+                            div.appendChild(btn);
+                        }
+                        validationSection.appendChild(div);
+                    }
+                    container.appendChild(validationSection);
+                }
+            } catch (err) {
+                console.error('Error loading history:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        function openValidationModal(checklistId) {
+            currentChecklistForValidation = checklistId;
+            document.querySelectorAll('input[name="validation-status"]').forEach(r => r.checked = false);
+            document.getElementById('validation-commentaire').value = '';
+            document.getElementById('validation-manager-modal-overlay').classList.add('active');
+        }
+
+        function closeValidationModal() {
+            document.getElementById('validation-manager-modal-overlay').classList.remove('active');
+            currentChecklistForValidation = null;
+        }
+
+        async function submitValidation() {
+            const status = document.querySelector('input[name="validation-status"]:checked')?.value;
+            const commentaire = document.getElementById('validation-commentaire').value.trim();
+
+            if (!status) {
+                showToast('Sélectionnez un statut', 'error');
                 return;
             }
 
             try {
-                // Charger toutes les completions pour cette date (toutes pÃ©riodes contenant cette date)
-                const { data, error } = await supabaseClient
-                    .from('checklist_completions')
-                    .select('*, checklists!inner(nom), checklist_items!inner(nom)')
-                    .eq('etablissement', currentEtab)
-                    .gte('valide_at', targetDate + 'T00:00:00')
-                    .lte('valide_at', targetDate + 'T23:59:59')
-                    .order('valide_at', { ascending: true });
-
-                if (error) throw error;
-
-                if (!data || data.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><div class="icon">ð</div><div class="text">Aucune validation ce jour</div></div>';
+                if (isDemo) {
+                    showToast('✓ Validation enregistrée (mode démo)', 'success');
+                    closeValidationModal();
+                    loadHistory();
                     return;
                 }
 
-                // Regrouper par check-liste
-                const grouped = {};
-                data.forEach(icon => {
-                    const clName = c.checklists?.nom || 'Inconnue';
-                    if (!grouped[clName]) grouped[clName] = [];
-                    grouped[clName].push(icon);
-                });
+                const { error } = await supabase
+                    .from('checklist_validations')
+                    .insert({
+                        checklist_id: currentChecklistForValidation,
+                        etablissement: currentEstablishment,
+                        periode: currentHistoryDate,
+                        service: currentService,
+                        statut: status,
+                        commentaire,
+                        valide_par_id: currentUser.id,
+                        valide_par_nom: currentUser.nom,
+                        valide_par_initiales: currentUser.initiales
+                    });
 
-                container.innerHTML = Object.entries(grouped).map(([clName, entries]) => `
-                    <div class="history-entry">
-                        <div class="history-date">${clName}${entries[0]?.service ? ' (' + entries[0].service + ')' : ''}</div>
-                        ${entries.map(c => `
-                            <div class="history-line">
-                                <span class="check-mark">â</span>
-                                <span>${c.checklist_items?.nom || '?'}</span>
-                                <span style="margin-left:auto; color:var(--gray-400)">${c.valide_par_initiales || '??'} Â· ${new Date(c.valide_at).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</span>
-                            </div>`).join('')}
-                    </div>`).join('');
+                if (error) throw error;
 
-            } catch(e) {
-                console.error('loadHistory:', e);
-                container.innerHTML = '<div class="empty-state"><div class="icon">â ï¸</div><div class="text">Erreur de chargement</div></div>';
+                showToast('✓ Validation enregistrée', 'success');
+                closeValidationModal();
+                loadHistory();
+            } catch (err) {
+                console.error('Error submitting validation:', err);
+                showToast('Erreur', 'error');
             }
         }
 
-        // ========== INIT ==========
-        async function refreshAll() {
-            await loadChecklists();
-            await loadAllItems();
-            await loadCompletions();
-            renderChecklists();
-            if (currentTab === 'gestion') renderManage();
+        // ============ UTILITY FUNCTIONS ============
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Session
-            const session = sessionStorage.getItem('planb_user');
-            const etab = sessionStorage.getItem('planb_etablissement');
+        function showConfirmation(message, callback) {
+            document.getElementById('popup-message').textContent = message;
+            document.getElementById('popup-confirm-btn').onclick = () => {
+                callback();
+                closePopup();
+            };
+            document.getElementById('confirmation-popup').classList.add('active');
+        }
 
-            if (session) {
-                try { currentUser = JSON.parse(session); } catch(e) {}
-            }
-            currentEtab = etab || 'freddy';
+        function closePopup() {
+            document.getElementById('confirmation-popup').classList.remove('active');
+        }
 
-            if (!currentUser) {
-                DEMO_MODE = true;
-                currentUser = { id: 'demo', nom: 'DÃ©mo', initiales: 'DM', role: 'admin' };
-            }
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-            // Badges
-            document.getElementById('etab-badge').textContent =
-                currentEtab === 'freddy' ? 'Freddy' : 'Liesel';
-           
+        function formatTime(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
