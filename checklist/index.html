@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="PlanB Tools - Check-Lists">
+    <meta name="theme-color" content="#f97316">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Check-Lists">
+    <title>Check-Lists - PlanB Tools</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --orange: #f97316;
+            --orange-dark: #ea580c;
+            --orange-light: #fff7ed;
+            --gray-50: #fafafa;
+            --gray-100: #f5f5f5;
+            --gray-200: #e5e5e5;
+            --gray-300: #d4d4d4;
+            --gray-400: #a3a3a3;
+            --gray-500: #737373;
+            --gray-600: #525252;
+            --gray-700: #404040;
+            --gray-800: #262626;
+            --gray-900: #171717;
+            --success: #22c55e;
+            --success-light: #dcfce7;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { width: 100%; height: 100%; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background-color: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            background: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header .back-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            color: var(--gray-700);
+        }
+        .header .back-btn:active { background: var(--gray-100); }
+        .header .title {
+            flex: 1;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+        .header .badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+        .header .etab-badge {
+            background: var(--orange-light);
+            color: var(--orange-dark);
+        }
+        .header .user-badge {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        /* ========== TABS ========== */
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0 8px;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-500);
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            color: var(--orange);
+            border-bottom-color: var(--orange);
+        }
+        .tab:active { opacity: 0.7; }
+
+        /* ========== CONTENT ========== */
+        .content {
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ========== SERVICE SELECTOR ========== */
+        .service-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .service-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            background: white;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-600);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .service-btn.active {
+            border-color: var(--orange);
+            background: var(--orange-light);
+            color: var(--orange-dark);
+        }
+        .service-btn:active { transform: scale(0.97); }
+
+        /* ========== CHECKLIST CARD ========== */
+        .checklist-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 16px;
+            overflow: hidden;
+            border: 1px solid var(--gray-100);
+        }
+        .checklist-header {
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            gap: 12px;
+        }
+        .checklist-header:active { background: var(--gray-50); }
+        .checklist-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--gray-900);
+            flex: 1;
+        }
+        .checklist-freq {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .freq-service { background: #dbeafe; color: #1d4ed8; }
+        .freq-journaliere { background: #fef3c7; color: #92400e; }
+        .freq-hebdomadaire { background: #ede9fe; color: #6d28d9; }
+        .freq-mensuelle { background: #fce7f3; color: #9d174d; }
+
+        .checklist-progress {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-400);
+            white-space: nowrap;
+        }
+        .checklist-progress.complete { color: var(--success); }
+        .progress-bar {
+            height: 3px;
+            background: var(--gray-100);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--orange);
+            transition: width 0.3s ease;
+            border-radius: 0 2px 2px 0;
+        }
+        .progress-bar-fill.complete { background: var(--success); }
+
+        /* ========== CHECKLIST ITEMS ========== */
+        .checklist-items {
+            display: none;
+            border-top: 1px solid var(--gray-100);
+        }
+        .checklist-items.open { display: block; }
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+            border-bottom: 1px solid var(--gray-50);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .checklist-item:last-child { border-bottom: none; }
+        .checklist-item:active { background: var(--gray-50); }
+
+        .item-checkbox {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid var(--gray-300);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            font-size: 14px;
+            color: transparent;
+        }
+        .item-checkbox.checked {
+            background: var(--success);
+            border-color: var(--success);
+            color: white;
+        }
+
+        .item-info { flex: 1; }
+        .item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-800);
+        }
+        .item-name.checked {
+            text-decoration: line-through;
+            color: var(--gray-400);
+        }
+        .item-validated-by {
+            font-size: 11px;
+            color: var(--gray-400);
+            margin-top: 2px;
+        }
+
+        /* ========== GESTION TAB ========== */
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 20px 0 10px;
+        }
+        .section-title:first-child { margin-top: 0; }
+
+        .add-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 14px;
+            border: 2px dashed var(--gray-300);
+            border-radius: 12px;
+            background: transparent;
+            color: var(--gray-500);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+        .add-btn:active {
+            border-color: var(--orange);
+            color: var(--orange);
+            background: var(--orange-light);
+        }
+
+        .manage-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 10px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid var(--gray-100);
+        }
+        .manage-card .mc-info { flex: 1; }
+        .manage-card .mc-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        .manage-card .mc-meta {
+            font-size: 11px;
+            color: var(--gray-400);
+            margin-top: 2px;
+        }
+        .manage-card .mc-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .icon-btn {
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 8px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-btn:active { background: var(--gray-200); }
+        .icon-btn.danger:active { background: #fee2e2; color: var(--error); }
+
+        /* ========== HIMTORIQUE TAB ========== */
+        .history-entry {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .history-date {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: 6px;
+        }
+        .history-line {
+            font-size: 12px;
+            color: var(--gray-500);
+            padding: 3px 0;
+            display: flex;
+            gap: 6px;
+        }
+        .history-line .check-mark { color: var(--success); }
+
+        /* ========== MODAL ========== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+        .modal {
+            background: white;
+            border-radius: 16px 16px 0 0;
+            width: 100%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 20px;
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--gray-900);
+        }
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-600);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            font-size: 15px;
+            color: var(--gray-900);
+            background: white;
+            outline: none;
+            font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus {
+            border-color: var(--orange);
+        }
+        .form-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--gray-700);
+            background: white;
+            outline: none;
+            font-family: inherit;
+            min-height: 80px;
+            resize: vertical;
+        }
+        .form-textarea:focus { border-color: var(--orange); }
+        .form-hint {
+            font-size: 11px;
+            color: var(--gray-400);
+            margin-top: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-primary {
+            background: var(--orange);
+            color: white;
+        }
+        .btn-primary:active { background: var(--orange-dark); }
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+        .btn-secondary:active { background: var(--gray-200); }
+
+        /* ========== ITEMS EDITOR (dans modal) ========== */
+        .items-editor {
+            margin-top: 12px;
+        }
+        .item-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .item-row input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        .item-row input:focus { border-color: var(--orange); }
+        .item-row .remove-item {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 8px;
+            background: none;
+            color: var(--gray-400);
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .item-row .remove-item:active { color: var(--error); }
+        .add-item-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px dashed var(--gray-300);
+            border-radius: 8px;
+            background: none;
+            color: var(--gray-500);
+            font-size: 13px;
+            cursor: pointer;
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* ========== TOAST ========== */
+        .toast-container {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            background: var(--gray-800);
+            box-shadow: var(--shadow-lg);
+            animation: fadeIn 0.2s ease;
+            text-align: center;
+        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== EMPTY STATE ========== */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray-400);
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state .text { font-size: 14px; font-weight: 500; }
+
+        /* ========== DATE FILTER ========== */
+        .date-filter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .date-filter input[type="date"] {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .date-filter input[type="date"]:focus { border-color: var(--orange); outline: none; }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <button class="back-btn" onclick="goBack()">&#8592;</button>
+        <div class="title">Check-Lists</div>
+        <div class="badge etab-badge" id="etab-badge">--</div>
+        <div class="badge user-badge" id="user-badge">--</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs" id="tabs-bar">
+        <button class="tab active" onclick="switchTab('check')">Validation</button>
+        <button class="tab" onclick="switchTab('gestion')">Gestion</button>
+        <button class="tab" onclick="switchTab('historique')">Historique</button>
+    </div>
+
+    <!-- TAB: VALIDATION -->
+    <div class="content" id="tab-check">
+        <!-- Service selector for service-frequency checklists -->
+        <div class="service-selector" id="service-selector">
+            <button class="service-btn active" onclick="selectService('midi')">Midi</button>
+            <button class="service-btn" onclick="selectService('soir')">Soir</button>
+        </div>
+        <div id="checklists-container"></div>
+    </div>
+
+    <!-- TAB: GESTION -->
+    <div class="content" id="tab-gestion" style="display:none">
+        <button class="add-btn" onclick="openChecklistModal()">+ Nouvelle check-liste</button>
+        <div id="manage-container"></div>
+    </div>
+
+    <!-- TAB: HISTORIQUE -->
+    <div class="content" id="tab-historique" style="display:none">
+        <div class="date-filter">
+            <input type="date" id="history-date" onchange="loadHistory()">
+        </div>
+        <div id="history-container"></div>
+    </div>
+
+    <!-- MODAL: EDIT CHECKLIST -->
+    <div class="modal-overlay" id="modal-checklist">
+        <div class="modal">
+            <div class="modal-title" id="modal-title">Nouvelle check-liste</div>
+            <input type="hidden" id="edit-id">
+
+            <div class="form-group">
+                <label class="form-label">Nom:/label>
+                <input class="form-input" id="cl-nom" placeholder="Ex: Fin de service salle">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description (optionnel)</label>
+                <input class="form-input" id="cl-description" placeholder="Courte description">
+                </div>
+
+            <div class="form-group">
+                <label class="form-label">FrÃ©quence</label>
+                <select class="form-select" id="cl-frequence">
+                    <option value="service">Par service (midi/soir)</option>
+                    <option value="journaliere">JournaliÃ¨re</option>
+                    <option value="hebdomadaire">Hebdomadaire</option>
+                    <option value="mensuelle">Mensuelle</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Ãtapes</label>
+                <div class="items-editor" id="items-editor"></div>
+                <button class="add-item-btn" onclick="addItemRow()">+ Ajouter une Ã©tape</button>
+                <div class="form-hint">Glissez pour rÃ©ordonner. Minimum 1 Ã©tape.</div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="saveChecklist()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // ========== CONFIG ==========
+        const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+        let DEMO_MODE = false;
+        let supabaseClient = null;
+
+        try {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } catch(e) {
+            DEMO_MODE = true;
+        }
+
+        // ========== STATE ==========
+        let currentUser = null;
+        let currentEtab = null;
+        let currentService = 'midi';
+        let currentTab = 'check';
+        let allChecklists = [];
+        let allItems = {};      // checklist_id -> [items]
+        let completions = {};   // item_id -> completion
+
+        // ========== HELPERS ==========
+        function goBack() {
+            window.location.href = '../';
+        }
+
+        function showToast(msg, type = 'default') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast' + (type !== 'default' ? ' ' + type : '');
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+
+        function isManager() {
+            if (!currentUser) return false;
+            const level = { collaborateur: 1, responsable: 2, admin: 3 };
+            return (level[currentUser.role] || 0) >= 2;
+        }
+
+        function getToday() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function getCurrentPeriode() {
+            // PÃ©riode = clÃ© unique pour savoir si la check-list est dÃ©jÃ  faite
+            const now = new Date();
+            return getToday(); // pour journaliÃ¨re
+        }
+
+        function getPeriodeForFrequency(freq) {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+
+            switch (freq) {
+                case 'service':
+                case 'journaliere':
+                    return `${y}-${m}-${d}`;
+                case 'hebdomadaire':
+                    // Semaine ISO : lundi de la semaine
+                    const day = now.getDay() || 7;
+                    const monday = new Date(now);
+                    monday.setDate(now.getDate() - day + 1);
+                    return `S-${monday.toISOString().split('T')[0]}`;
+                case 'mensuelle':
+                    return `M-${y}-${m}`;
+                default:
+                    return `${y}-${m}-${d}`;
+            }
+        }
+
+        function getFreqLabel(freq) {
+            const labels = {
+                'service': 'Service',
+                'journaliere': 'JournaliÃ¨re',
+                'hebdomadaire': 'Hebdomadaire',
+                'mensuelle': 'Mensuelle'
+            };
+            return labels[freq] || freq;
+        }
+
+        // ========== SUPABASE OPERATIONS ==========
+        async function loadChecklists() {
+            if (DEMO_MODE) {
+                allChecklists = [];
+                return;
+            }
+            try {
+                const { data, error } = await supabaseClient
+                    .from('checklists')
+                    .select('*')
+                    .eq('etablissement', currentEtab)
+                    .eq('actif', true)
+                    .order('ordre', { ascending: true });
+                if (error) throw error;
+                allChecklists = data || [];
+            } catch(e) {
+                console.error('loadChecklists:', e);
+                allChecklists = [];
+            }
+        }
+
+        async function loadItems(checklistId) {
+            if (DEMO_MODE) return [];
+            try {
+                const { data, error } = await supabaseClient
+                    .from('checklist_items')
+                    .select('*')
+                    .eq('checklist_id', checklistId)
+                    .eq('actif', true)
+                    .order('ordre', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            } catch(e) {
+                console.error('loadItems:', e);
+                return [];
+            }
+        }
+
+        async function loadAllItems() {
+            allItems = {};
+            for (const cl of allChecklists) {
+                allItems[cl.id] = await loadItems(cl.id);
+            }
+        }
+
+        async function loadCompletions() {
+            if (DEMO_MODE) { completions = {}; return; }
+
+            // Charger les completions pour toutes les pÃ©riodes actuelles
+            const periodes = [...new Set(allChecklists.map(cl => getPeriodeForFrequence(cl.frequence)))];
+            completions = {};
+
+            try {
+                for (const periode of periodes) {
+                    let query = supabaseClient
+                        .from('checklist_completions')
+                        .select('*')
+                        .eq('etablissement', currentEtab)
+                        .eq('periode', periode);
+
+                    const { data, error } = await query;
+                    if (error) throw error;
+                    if (data) {
+                        data.forEach(c => {
+                            // ClÃ© unique : item_id + service (pour les check-lists par service)
+                            const key = c.service ? `${c.item_id}_${c.service}` : c.item_id;
+                            completions[key] = c;
+                        });
+                    }
+                }
+            } catch(e) {
+                console.error('loadCompletions:', e);
+            }
+        }
+
+        async function toggleItem(checklistId, itemId, freq) {
+            const service = freq === 'service' ? currentService : null;
+            const key = service ? `${itemId}_${service}` : itemId;
+            const periode = getPeriodeForFrequency(freq);
+
+            if (completions[key]) {
+                // DÃ©cocher : supprimer la completion
+                try {
+                    const { error } = await supabaseClient
+                        .from('checklist_completions')
+                        .delete()
+                        .eq('id', completions[key].id);
+                    if (error) throw error;
+                    delete completions[key];
+                } catch(e) {
+                    showToast('Erreur lors de la suppression', 'error');
+                    return;
+                }
+            } else {
+                // Cocher : ajouter une completion
+                const record = {
+                    checklist_id: checklistId,
+                    item_id: itemId,
+                    etablissement: currentEtab,
+                    periode: periode,
+                    service: service,
+                    valide_par_id: currentUser?.id || null,
+                    valide_par_nom: currentUser?.nom || 'Inconnu',
+                    valide_par_initiales: currentUser?.initiales || '??'
+                };
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('checklist_completions')
+                        .insert(record)
+                        .select();
+                    if (error) throw error;
+                    if (data && data[0]) {
+                        completions[key] = data[0];
+                    }
+                } catch(e) {
+                    showToast('Erreur lors de la validation', 'error');
+                    return;
+                }
+            }
+
+            renderChecklists();
+        }
+
+        // ========== RENDERING ==========
+        function renderChecklists() {
+            const container = document.getElementById('checklists-container');
+
+            // Filtrer : les check-lists "service" ne s'affichent que dans le bon mode
+            const showServiceSelector = allChecklists.some(cl => cl.frequence === 'service');
+            document.getElementById('service-selector').style.display = showServiceSelector ? 'flex' : 'none';
+
+            if (allChecklists.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">ð</div>
+                        <div class="text">Aucune check-list configurÃ©e.<br>
+                        ${isManager() ? 'Allez dans l\'onglet Gestion pour en crÃ©er.' : 'Demandez Ã  un responsable d\'en crÃ©er.'}</div>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = allChecklists.map(cl => {
+                const items = allItems[cl.id] || [];
+                const periode = getPeriodeForFrequency(cl.frequence);
+
+                const completedCount = items.filter(item => {
+                    const key = cl.frequence === 'service'
+                        ? `${item.id}_${currentService}`
+                        : item.id;
+                    return !!completions[key];
+                }).length;
+
+                const total = items.length;
+                const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+                const isComplete = completedCount === total && total > 0;
+
+                return `
+                    <div class="checklist-card">
+                        <div class="checklist-header" onclick="toggleChecklistOpen('${cl.id}')">
+                            <div class="checklist-title">${cl.nom}</div>
+                            <span class="checklist-freq freq-${cl.frequence}">${getFreqLabel(cl.frequency)}</span>
+                            <div class="checklist-progress ${isComplete ? 'complete' : ''}">${completedCount}/${total}</div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill ${isComplete ? 'complete' : ''}" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="checklist-items" id="items-${cl.id}">
+                            ${items.map(item => {
+                                const key = cl.frequence === 'service'
+                                    ? `${item.id}_${currentService}`
+                                    : item.id;
+                                const comp = completions[key];
+                                const checked = !!comp;
+                                return `
+                                    <div class="checklist-item" onclick="toggleItem('${cl.id}','${item.id}','${cl.frequency}')">
+                                        <div class="item-checkbox ${checked ? 'checked' : ''}">â</div>
+                                        <div class="item-info">
+                                            <div class="item-name ${checked ? 'checked' : ''}">${item.nom}</div>
+                                            ${checked ? `<div class="item-validated-by">${comp.valide_par_initiales} Â· ${new Date(comp.valide_at).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>` : ''}
+                                        </div>
+                                    </div>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function toggleChecklistOpen(id) {
+            const el = document.getElementById('items-' + id);
+            el.classList.toggle('open');
+        }
+
+        // ========== TABS ==========
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', ['check', 'gestion', 'historique'][i] === tab);
+            });
+            document.getElementById('tab-check').style.display = tab === 'check' ? 'block' : 'none';
+            document.getElementById('tab-gestion').style.display = tab === 'gestion' ? 'block' : 'none';
+            document.getElementById('tab-historique').style.display = tab === 'historique' ? 'block' : 'none';
+
+            if (tab === 'gestion') {
+                if (!isManager()) {
+                    showToast('AccÃ¨s rÃ©servÃ© aux responsables et admins', 'error');
+                    switchTab('check');
+                    return;
+                }
+                renderManage();
+            }
+            if (tab === 'historique') loadHistory();
+        }
+
+        function selectService(service) {
+            currentService = service;
+            document.querySelectorAll('.service-btn').forEach(b => {
+                b.classList.toggle('active', b.textContent.toLowerCase().includes(service));
+            });
+            renderChecklists();
+        }
+
+        // ========== GESTION ==========
+        function renderManage() {
+            const container = document.getElementById('manage-container');
+            if (allChecklists.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">âï¸</div>
+                        <div class="text">Aucune check-list. CrÃ©ez-en une !</div>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = allChecklists.map(cl => {
+                const items = allItems[cl.id] || [];
+                return `
+                    <div class="manage-card">
+                        <div class="mc-info">
+                            <div class="mc-name">${cl.nom}</div>
+                            <div class="mc-meta">${getFreqLabel(cl.frequence)} Â· ${items.length} Ã©tapes</div>
+                        </div>
+                        <div class="mc-actions">
+                            <button class="icon-btn" onclick="editChecklist('${cl.id}')" title="Modifier">âï¸</button>
+                            <button class="icon-btn danger" onclick="deleteChecklist('${cl.id}')" title="Supprimer">ðï¸</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // ========== MODAL ==========
+        function openChecklistModal(id = null) {
+            document.getElementById('edit-id').value = id || '';
+            document.getElementById('modal-title').textContent = id ? 'Modifier la check-liste' : 'Nouvelle check-liste';
+            if (id) {
+                const cl = allChecklists.find(c => c.id === id);
+                if (!cl) return;
+                document.getElementById('cl-nom').value = cl.nm;
+                document.getElementById('cl-description').value = cl.description || '';
+                document.getElementById('cl-frequence').value = cl.frequence;
+
+                const items = allItems[cl.id] || [];
+                const editor = document.getElementById('items-editor');
+                editor.innerHTML = '';
+                items.forEach(item => addItemRow(item.nom, item.id));
+            } else {
+                document.getElementById('cl-nom').value = '';
+                document.getElementById('cl-description').value = '';
+                document.getElementById('cl-frequence').value = 'service';
+                document.getElementById('items-editor').innerHTML = '';
+                addItemRow();
+                addItemRow();
+                addItemRow();
+            }
+
+            document.getElementById('modal-checklist').classList.add('open');
+        }
+
+        function editChecklist(id) {
+            openChecklistModal(id);
+        }
+
+        function closeModal() {
+            document.getElementById('modal-checklist').classList.remove('open');
+        }
+
+        function addItemRow(value = '', itemId = '') {
+            const editor = document.getElementById('items-editor');
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <input type="text" placeholder="Nom de l'Ã©tape" value="${value}" data-item-id="${itemId}">
+                <button class="remove-item" onclick="this.parentElement.remove()">Ã</button>`;
+            editor.appendChild(row);
+        }
+
+        async function saveChecklist() {
+            const id = document.getElementById('edit-id').value;
+            const nom = document.getElementById('cl-nom').value.trim();
+            const description = document.getElementById('cl-description').value.trim();
+            const frequency = document.getElementById('cl-frequence').value;
+
+            if (!nom) {
+                showToast('Le nom est obligatoire', 'error');
+                return;
+            }
+
+            const itemRows = document.querySelectorAll('#items-editor .item-row input');
+            const itemNames = Array.from(itemRows)
+                .map(inp => ({ nom: inp.value.trim(), existingId: inp.dataset.itemId }))
+                .filter(i => i.nom);
+
+            if (itemNames.length === 0) {
+                showToast('Au moins une Ã©tape est requise', 'error');
+                return;
+            }
+
+            if (DEMO_MODE) {
+                showToast('Mode dÃ©mo : sauvegarde dÃ©sactivÃ©e', 'error');
+                return;
+            }
+
+            try {
+                let checklistId = id;
+
+                if (id) {
+                    // Mise Ã  jour
+                    const { error } = await supabaseClient
+                        .from('checklists')
+                        .update({ nom, description, frequence, updated_at: new Date().toISOString() })
+                        .eq('id', id);
+                    if (error) throw error;
+
+                    // DÃ©sactiver les anciens items
+                    await supabaseClient
+                        .from('checklist_items')
+                        .update({ actif: false })
+                        .eq('checklist_id', id);
+
+                } else {
+                    // CrÃ©ation
+                    const { data, error } = await supabaseClient
+                        .from('checklists')
+                        .insert({
+                            nom, description, frequence,
+                            etablissement: currentEtab,
+                            ordre: allChecklists.length,
+                            created_by_id: currentUser?.id,
+                            created_by_nom: currentUser?.nom
+                        })
+                        .select();
+                    if (error) throw error;
+                    checklistId = data[0].id;
+                }
+
+                // InsÃ©rer/rÃ©activer les items
+                for (let i = 0; i < itemNames.length; i++) {
+                    const item = itemNames[i];
+                    if (item.existingId) {
+                        await supabaseClient
+                            .from('checklist_items')
+                            .update({ nom: item.nom, ordre: i, actif: true })
+                            .eq('id', item.existingId);
+                    } else {
+                        await supabaseClient
+                            .from('checklist_items')
+                            .insert({
+                                checklist_id: checklistId,
+                                nom: item.nom,
+                                ordre: i
+                            });
+                    }
+                }
+
+                closeModal();
+                showToast(id ? 'Check-liste modifiÃ©e' : 'Check-liste crÃ©see', 'success');
+                await refreshAll();
+
+            } catch(e) {
+                console.error('saveChecklist:', e);
+                showToast('Erreur : ' + e.message, 'error');
+            }
+        }
+
+        async function deleteChecklist(id) {
+            const cl = allChecklists.find(c => c.id === id);
+            if (!confirm(`Supprimer "${cl?.nom}" et toutes ses Ã©tapes ?`)) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('checklists')
+                    .update({ actif: false })
+                    .eq('id', id);
+                if (error) throw error;
+
+                showToast('Check-liste supprimÃ©e', 'success');
+                await refreshAll();
+            } catch(e) {
+                showToast('Erreur : ' + e.message, 'error');
+            }
+        }
+
+        // ========== HISTORIQUE ==========
+        async function loadHistory() {
+            const container = document.getElementById('history-container');
+            const dateInput = document.getElementById('history-date');
+            const targetDate = dateInput.value || getToday();
+            dateInput.value = targetDate;
+
+            if (DEMO_MODE) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">ð</div><div class="text">Historique indisponible en mode dÃ©mo</div></div>';
+                return;
+            }
+
+            try {
+                // Charger toutes les completions pour cette date (toutes pÃ©riodes contenant cette date)
+                const { data, error } = await supabaseClient
+                    .from('checklist_completions')
+                    .select('*, checklists!inner(nom), checklist_items!inner(nom)')
+                    .eq('etablissement', currentEtab)
+                    .gte('valide_at', targetDate + 'T00:00:00')
+                    .lte('valide_at', targetDate + 'T23:59:59')
+                    .order('valide_at', { ascending: true });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">ð</div><div class="text">Aucune validation ce jour</div></div>';
+                    return;
+                }
+
+                // Regrouper par check-liste
+                const grouped = {};
+                data.forEach(icon => {
+                    const clName = c.checklists?.nom || 'Inconnue';
+                    if (!grouped[clName]) grouped[clName] = [];
+                    grouped[clName].push(icon);
+                });
+
+                container.innerHTML = Object.entries(grouped).map(([clName, entries]) => `
+                    <div class="history-entry">
+                        <div class="history-date">${clName}${entries[0]?.service ? ' (' + entries[0].service + ')' : ''}</div>
+                        ${entries.map(c => `
+                            <div class="history-line">
+                                <span class="check-mark">â</span>
+                                <span>${c.checklist_items?.nom || '?'}</span>
+                                <span style="margin-left:auto; color:var(--gray-400)">${c.valide_par_initiales || '??'} Â· ${new Date(c.valide_at).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>`).join('')}
+                    </div>`).join('');
+
+            } catch(e) {
+                console.error('loadHistory:', e);
+                container.innerHTML = '<div class="empty-state"><div class="icon">â ï¸</div><div class="text">Erreur de chargement</div></div>';
+            }
+        }
+
+        // ========== INIT ==========
+        async function refreshAll() {
+            await loadChecklists();
+            await loadAllItems();
+            await loadCompletions();
+            renderChecklists();
+            if (currentTab === 'gestion') renderManage();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Session
+            const session = sessionStorage.getItem('planb_user');
+            const etab = sessionStorage.getItem('planb_etablissement');
+
+            if (session) {
+                try { currentUser = JSON.parse(session); } catch(e) {}
+            }
+            currentEtab = etab || 'freddy';
+
+            if (!currentUser) {
+                DEMO_MODE = true;
+                currentUser = { id: 'demo', nom: 'DÃ©mo', initiales: 'DM', role: 'admin' };
+            }
+
+            // Badges
+            document.getElementById('etab-badge').textContent =
+                currentEtab === 'freddy' ? 'Freddy' : 'Liesel';
+           
