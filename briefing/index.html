@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Briefings">
+    <meta name="theme-color" content="#f97316">
+    <title>Briefings - PlanB Tools</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --orange: #f97316;
+            --orange-light: #fff7ed;
+            --orange-dark: #ea580c;
+            --green: #22c55e;
+            --green-light: #f0fdf4;
+            --red: #ef4444;
+            --red-light: #fef2f2;
+            --blue: #3b82f6;
+            --blue-light: #eff6ff;
+            --purple: #8b5cf6;
+            --purple-light: #f5f3ff;
+            --amber: #f59e0b;
+            --amber-light: #fffbeb;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+        .header .back-btn {
+            background: none; border: none; font-size: 20px; cursor: pointer;
+            padding: 4px 8px; color: var(--orange); flex-shrink: 0; transition: all 0.15s;
+        }
+        .header .back-btn:active { transform: scale(0.9); }
+        .header .title { font-size: 17px; font-weight: 700; flex: 1; }
+        .header .etab-badge {
+            background: var(--orange-light); color: var(--orange-dark);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; flex-shrink: 0;
+        }
+        .header .user-badge {
+            background: var(--gray-100); color: var(--gray-600);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; flex-shrink: 0;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex; background: white; border-bottom: 1px solid var(--gray-200); flex-shrink: 0;
+        }
+        .tab {
+            flex: 1; padding: 12px; text-align: center; font-size: 13px; font-weight: 600;
+            color: var(--gray-400); border-bottom: 3px solid transparent;
+            cursor: pointer; transition: all 0.2s; touch-action: manipulation;
+        }
+        .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+        /* Content */
+        .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+        .tab-content {
+            display: none; flex: 1; padding: 16px; padding-bottom: 20px;
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .tab-content.active { display: flex; flex-direction: column; }
+
+        /* Date navigator */
+        .date-nav {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+            background: white; padding: 10px 14px; border-radius: var(--radius);
+            box-shadow: var(--shadow); flex-shrink: 0;
+        }
+        .date-nav-btn {
+            background: var(--gray-100); border: none; width: 36px; height: 36px;
+            border-radius: 8px; cursor: pointer; font-size: 16px; display: flex;
+            align-items: center; justify-content: center; transition: all 0.15s;
+            touch-action: manipulation; color: var(--gray-700);
+        }
+        .date-nav-btn:active { background: var(--gray-200); transform: scale(0.9); }
+        .date-nav-label { flex: 1; text-align: center; font-size: 15px; font-weight: 700; color: var(--gray-800); }
+        .date-nav-today {
+            background: var(--orange); color: white; border: none; padding: 6px 12px;
+            border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+            transition: all 0.15s; touch-action: manipulation;
+        }
+        .date-nav-today:active { background: var(--orange-dark); transform: scale(0.95); }
+
+        /* Service selector */
+        .service-selector { display: flex; gap: 8px; margin-bottom: 16px; flex-shrink: 0; }
+        .service-btn {
+            flex: 1; padding: 10px; border: 2px solid var(--gray-300); background: white;
+            color: var(--gray-600); border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+        }
+        .service-btn.active { background: var(--orange); color: white; border-color: var(--orange); }
+
+        /* Briefing Sections */
+        .section-card {
+            background: white; border-radius: var(--radius); margin-bottom: 12px;
+            box-shadow: var(--shadow); overflow: hidden;
+        }
+        .section-header {
+            display: flex; align-items: center; gap: 10px; padding: 14px;
+            cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+        }
+        .section-header:active { background: var(--gray-50); }
+        .section-icon { font-size: 20px; flex-shrink: 0; }
+        .section-title { flex: 1; font-size: 15px; font-weight: 700; color: var(--gray-800); }
+        .section-count {
+            font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px;
+            background: var(--orange-light); color: var(--orange-dark);
+        }
+        .section-chevron {
+            color: var(--gray-400); font-size: 14px; transition: transform 0.2s; flex-shrink: 0;
+        }
+        .section-header.expanded .section-chevron { transform: rotate(90deg); }
+        .section-body { display: none; padding: 0 14px 14px; border-top: 1px solid var(--gray-100); }
+        .section-body.expanded { display: block; }
+
+        /* KPI Cards */
+        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+        .kpi-card {
+            background: var(--gray-50); border-radius: 8px; padding: 10px; text-align: center;
+        }
+        .kpi-label { font-size: 11px; font-weight: 600; color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase; }
+        .kpi-value { font-size: 18px; font-weight: 800; color: var(--gray-800); }
+        .kpi-card.highlight { background: var(--orange-light); }
+        .kpi-card.highlight .kpi-value { color: var(--orange-dark); }
+
+        /* List items */
+        .brief-item {
+            display: flex; align-items: start; gap: 10px; padding: 10px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .brief-item:last-child { border-bottom: none; }
+        .brief-item-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+        .brief-item-content { flex: 1; min-width: 0; }
+        .brief-item-title { font-size: 14px; font-weight: 600; color: var(--gray-800); word-break: break-word; }
+        .brief-item-subtitle { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        .brief-item-badge {
+            font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+            flex-shrink: 0; white-space: nowrap;
+        }
+        .badge-urgent { background: var(--red-light); color: var(--red); }
+        .badge-warning { background: var(--amber-light); color: var(--amber); }
+        .badge-info { background: var(--blue-light); color: var(--blue); }
+        .badge-success { background: var(--green-light); color: var(--green); }
+        .badge-vip { background: var(--purple-light); color: var(--purple); }
+
+        /* Team grid */
+        .team-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .team-member {
+            background: var(--gray-50); border-radius: 8px; padding: 10px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .team-avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: var(--orange);
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; flex-shrink: 0;
+        }
+        .team-info { flex: 1; min-width: 0; }
+        .team-name { font-size: 13px; font-weight: 600; color: var(--gray-800); }
+        .team-role { font-size: 11px; color: var(--gray-500); }
+
+        /* Read receipts */
+        .lecture-bar {
+            background: white; padding: 12px 16px; border-top: 1px solid var(--gray-200);
+            flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+        }
+        .lecture-bar-text { flex: 1; font-size: 13px; color: var(--gray-600); }
+        .lecture-bar-text strong { color: var(--gray-800); }
+        .lecture-avatars { display: flex; gap: -4px; }
+        .lecture-avatar {
+            width: 28px; height: 28px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+            margin-left: -6px; border: 2px solid white;
+        }
+        .lecture-avatar:first-child { margin-left: 0; }
+        .lecture-avatar.read { background: var(--green); color: white; }
+        .lecture-avatar.unread { background: var(--gray-300); color: var(--gray-600); }
+        .btn-read {
+            background: var(--green); color: white; border: none; padding: 10px 20px;
+            border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+            transition: all 0.15s; touch-action: manipulation; white-space: nowrap;
+        }
+        .btn-read:active { background: #16a34a; transform: scale(0.95); }
+        .btn-read:disabled { background: var(--gray-300); cursor: not-allowed; }
+
+        /* Empty state */
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 60px 20px; text-align: center; flex: 1;
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state-title { font-size: 16px; font-weight: 700; color: var(--gray-700); margin-bottom: 6px; }
+        .empty-state-text { font-size: 13px; color: var(--gray-500); }
+
+        /* Buttons */
+        .btn-primary {
+            background: var(--orange); color: white; border: none; padding: 12px 16px;
+            border-radius: var(--radius); font-size: 14px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+        }
+        .btn-primary:active { background: var(--orange-dark); transform: scale(0.95); }
+        .btn-primary:disabled { background: var(--gray-300); cursor: not-allowed; }
+        .btn-secondary {
+            background: var(--gray-100); color: var(--gray-700); border: none;
+            padding: 12px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+        }
+        .btn-secondary:active { background: var(--gray-200); transform: scale(0.95); }
+        .btn-danger {
+            background: var(--red); color: white; border: none; padding: 12px 16px;
+            border-radius: var(--radius); font-size: 14px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+        }
+        .btn-danger:active { background: #dc2626; transform: scale(0.95); }
+        .btn-icon {
+            background: var(--gray-100); border: none; width: 36px; height: 36px;
+            border-radius: 8px; cursor: pointer; font-size: 16px; display: flex;
+            align-items: center; justify-content: center; transition: all 0.15s;
+            touch-action: manipulation;
+        }
+        .btn-icon:active { background: var(--gray-200); transform: scale(0.9); }
+
+        /* Status badge */
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+        }
+        .status-brouillon { background: var(--amber-light); color: var(--amber); }
+        .status-publie { background: var(--green-light); color: var(--green); }
+
+        /* Create form sections */
+        .form-section {
+            background: white; border-radius: var(--radius); margin-bottom: 12px;
+            box-shadow: var(--shadow); overflow: hidden;
+        }
+        .form-section-header {
+            display: flex; align-items: center; gap: 10px; padding: 14px;
+            cursor: pointer; touch-action: manipulation;
+        }
+        .form-section-header:active { background: var(--gray-50); }
+        .form-section-body { display: none; padding: 0 14px 14px; }
+        .form-section-body.open { display: block; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-label { display: block; font-size: 13px; font-weight: 700; color: var(--gray-700); margin-bottom: 6px; }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300);
+            border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray-800);
+            font-family: inherit; -webkit-appearance: none; appearance: none;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+        }
+        .form-textarea { resize: vertical; min-height: 60px; }
+        .form-select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+        }
+        .form-row { display: flex; gap: 8px; }
+        .form-row > * { flex: 1; }
+
+        /* Dynamic list editor */
+        .list-editor { border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden; }
+        .list-editor-item {
+            display: flex; gap: 8px; align-items: start; padding: 10px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .list-editor-item:last-child { border-bottom: none; }
+        .list-editor-item .form-input, .list-editor-item .form-textarea {
+            font-size: 13px; padding: 8px 10px;
+        }
+        .list-editor-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .list-editor-fields .form-row { gap: 6px; }
+        .btn-remove {
+            background: var(--gray-100); border: none; width: 32px; height: 32px;
+            border-radius: 6px; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; color: var(--gray-500); transition: all 0.15s; flex-shrink: 0;
+        }
+        .btn-remove:active { background: var(--red-light); color: var(--red); transform: scale(0.9); }
+        .btn-add-item {
+            width: 100%; padding: 10px; border: 2px dashed var(--gray-300);
+            background: transparent; border-radius: 8px; font-size: 13px; font-weight: 600;
+            color: var(--gray-500); cursor: pointer; transition: all 0.15s; margin-top: 8px;
+            touch-action: manipulation;
+        }
+        .btn-add-item:active { border-color: var(--orange); color: var(--orange); }
+
+        /* Action bar */
+        .action-bar {
+            background: white; padding: 12px 16px; border-top: 1px solid var(--gray-200);
+            display: flex; gap: 8px; flex-shrink: 0;
+        }
+        .action-bar button { flex: 1; }
+
+        /* History cards */
+        .history-card {
+            background: white; border-radius: var(--radius); padding: 14px;
+            margin-bottom: 10px; box-shadow: var(--shadow); cursor: pointer;
+            transition: all 0.15s; touch-action: manipulation;
+        }
+        .history-card:active { transform: scale(0.98); }
+        .history-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+        .history-card-date { font-size: 15px; font-weight: 700; color: var(--gray-800); flex: 1; }
+        .history-card-meta { font-size: 12px; color: var(--gray-500); }
+        .history-card-stats { display: flex; gap: 12px; font-size: 12px; color: var(--gray-600); }
+        .history-card-stat { display: flex; align-items: center; gap: 4px; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 2000; align-items: center;
+            justify-content: center; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white; border-radius: var(--radius); max-width: 500px; width: 100%;
+            max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+            box-shadow: var(--shadow-lg); display: flex; flex-direction: column;
+        }
+        .modal-header {
+            padding: 16px; border-bottom: 1px solid var(--gray-200);
+            display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+        }
+        .modal-title { font-size: 18px; font-weight: 700; color: var(--gray-900); }
+        .modal-close {
+            background: none; border: none; font-size: 20px; cursor: pointer; padding: 0;
+            width: 32px; height: 32px; display: flex; align-items: center;
+            justify-content: center; color: var(--gray-500); transition: all 0.15s;
+        }
+        .modal-close:active { color: var(--gray-700); transform: scale(0.9); }
+        .modal-content { padding: 16px; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .modal-footer {
+            padding: 16px; border-top: 1px solid var(--gray-200); display: flex; gap: 8px; flex-shrink: 0;
+        }
+        .modal-footer button { flex: 1; }
+
+        /* Popup */
+        .popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; border-radius: var(--radius); padding: 16px;
+            box-shadow: var(--shadow-lg); z-index: 2001; min-width: 200px; max-width: 300px; display: none;
+        }
+        .popup.active { display: block; }
+        .popup-content { font-size: 14px; color: var(--gray-800); margin-bottom: 12px; text-align: center; }
+        .popup-buttons { display: flex; gap: 8px; }
+        .popup-buttons button {
+            flex: 1; padding: 8px 12px; border: none; border-radius: 6px;
+            font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+        }
+        .popup-btn-cancel { background: var(--gray-100); color: var(--gray-700); }
+        .popup-btn-cancel:active { background: var(--gray-200); }
+        .popup-btn-confirm { background: var(--orange); color: white; }
+        .popup-btn-confirm:active { transform: scale(0.95); }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 20px; left: 20px; right: 20px; max-width: 300px;
+            background: var(--gray-800); color: white; padding: 12px 16px; border-radius: 8px;
+            font-size: 13px; font-weight: 600; z-index: 3000; animation: slideUp 0.3s ease;
+            pointer-events: none; display: none;
+        }
+        .toast.success { background: var(--green); }
+        .toast.error { background: var(--red); }
+        .toast.info { background: var(--blue); }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Demo banner */
+        .demo-banner {
+            background: linear-gradient(90deg, #f97316, #ea580c); color: white;
+            text-align: center; padding: 6px 16px; font-size: 12px; font-weight: 700;
+            letter-spacing: 0.5px; flex-shrink: 0; z-index: 200;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+        .hidden { display: none !important; }
+
+        /* Mandatory briefing overlay */
+        .briefing-mandatory-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: white; z-index: 5000; display: flex; flex-direction: column;
+        }
+        .mandatory-header {
+            background: var(--orange); color: white; padding: 20px;
+            text-align: center; flex-shrink: 0;
+        }
+        .mandatory-header h2 { font-size: 18px; margin-bottom: 4px; }
+        .mandatory-header p { font-size: 13px; opacity: 0.9; }
+        .mandatory-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
+        .mandatory-footer {
+            padding: 16px; border-top: 1px solid var(--gray-200); flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Demo Banner -->
+    <div class="demo-banner" id="demo-banner" style="display:none">MODE DEMO — Donnees non sauvegardees</div>
+
+    <!-- Header -->
+    <div class="header">
+        <button class="back-btn" onclick="goBack()">&#8592;</button>
+        <div class="title">&#128227; Briefings</div>
+        <div class="etab-badge" id="etab-badge">—</div>
+        <div class="user-badge" id="user-badge">—</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="main-tabs">
+        <div class="tab active" data-tab="consultation" onclick="switchTab('consultation')">Briefing</div>
+        <div class="tab" data-tab="creation" onclick="switchTab('creation')">Redaction</div>
+        <div class="tab" data-tab="previsions" onclick="switchTab('previsions')">Previsions</div>
+        <div class="tab" data-tab="historique" onclick="switchTab('historique')">Historique</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+        <!-- === TAB CONSULTATION === -->
+        <div class="tab-content active" id="tab-consultation">
+            <!-- Date & service nav -->
+            <div class="date-nav">
+                <button class="date-nav-btn" onclick="navDate(-1)">&#9664;</button>
+                <div class="date-nav-label" id="consult-date-label">—</div>
+                <button class="date-nav-today" onclick="navToday()">Aujourd'hui</button>
+                <button class="date-nav-btn" onclick="navDate(1)">&#9654;</button>
+            </div>
+            <div class="service-selector" id="consult-service-selector">
+                <button class="service-btn" data-service="jour" onclick="selectConsultService('jour')">&#128197; Journee</button>
+                <button class="service-btn active" data-service="midi" onclick="selectConsultService('midi')">&#9728;&#65039; Midi</button>
+                <button class="service-btn" data-service="soir" onclick="selectConsultService('soir')">&#127769; Soir</button>
+            </div>
+            <div id="consult-container"></div>
+        </div>
+
+        <!-- === TAB CREATION (responsable/admin) === -->
+        <div class="tab-content" id="tab-creation">
+            <div id="creation-container"></div>
+        </div>
+
+        <!-- === TAB PREVISIONS === -->
+        <div class="tab-content" id="tab-previsions">
+            <div id="previsions-container"></div>
+        </div>
+
+        <!-- === TAB HISTORIQUE === -->
+        <div class="tab-content" id="tab-historique">
+            <div id="historique-container"></div>
+        </div>
+    </div>
+
+    <!-- Read receipt bar (shown at bottom when viewing published briefing) -->
+    <div class="lecture-bar hidden" id="lecture-bar">
+        <div class="lecture-bar-text" id="lecture-bar-text">—</div>
+        <div class="lecture-avatars" id="lecture-avatars"></div>
+        <button class="btn-read" id="btn-confirm-read" onclick="confirmRead()">J'ai lu &#10003;</button>
+    </div>
+
+    <!-- POPUP CONFIRMATION -->
+    <div id="confirmation-popup" class="popup">
+        <div class="popup-content" id="popup-message"></div>
+        <div class="popup-buttons">
+            <button class="popup-btn-cancel" onclick="closePopup()">Non</button>
+            <button class="popup-btn-confirm" id="popup-confirm-btn">Oui</button>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast"></div>
+
+    <!-- MANDATORY BRIEFING OVERLAY (for collaborators arriving) -->
+    <div class="briefing-mandatory-overlay hidden" id="mandatory-overlay">
+        <div class="mandatory-header">
+            <h2 id="mandatory-title">Briefing du jour</h2>
+            <p id="mandatory-subtitle">Veuillez lire le briefing avant de commencer votre service</p>
+        </div>
+        <div class="mandatory-content" id="mandatory-content"></div>
+        <div class="mandatory-footer">
+            <button class="btn-read" style="width:100%; padding:14px; font-size:16px;" onclick="confirmMandatoryRead()">
+                J'ai lu et compris le briefing &#10003;
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ============ INITIALIZATION & STATE ============
+        var supabaseClient = null;
+        let currentUser = null;
+        let currentEstablishment = null;
+        let isDemo = false;
+        let currentTab = 'consultation';
+
+        // Consultation state
+        let consultDate = new Date().toISOString().split('T')[0];
+        let consultService = 'midi'; // 'jour', 'midi', 'soir'
+        let currentBriefing = null;
+
+        // Creation state
+        let editingBriefing = null;
+
+        // Demo data
+        const demoBriefing = {
+            id: 'demo-1',
+            date: new Date().toISOString().split('T')[0],
+            etablissement: 'freddy',
+            type: 'service',
+            service: 'midi',
+            statut: 'publie',
+            equipes: [
+                { nom: 'Marie D.', initiales: 'MD', equipe: 'salle', poste: 'Rang 1', horaire: '10h-15h' },
+                { nom: 'Jean P.', initiales: 'JP', equipe: 'salle', poste: 'Rang 2', horaire: '10h-15h' },
+                { nom: 'Pierre L.', initiales: 'PL', equipe: 'cuisine', poste: 'Chaud', horaire: '9h-15h' },
+                { nom: 'Sophie B.', initiales: 'SB', equipe: 'cuisine', poste: 'Froid', horaire: '9h-15h' }
+            ],
+            chiffres: { ca_veille: 3250, couverts_veille: 85, ticket_moyen_veille: 38.24, ca_n1: 2980, couverts_n1: 78, reservations: 42, couverts_attendus: 70, ca_prevu: 2800 },
+            produits_limites: [
+                { produit: 'Souris d\'agneau', quantite: 6, unite: 'portions', observation: '' },
+                { produit: 'Tarte tatin', quantite: 4, unite: 'parts', observation: 'Derniere fournee' }
+            ],
+            produits_dates_courtes: [
+                { produit: 'Saumon fume', date_limite: '2026-03-29', action: 'Mettre en avant', observation: '' }
+            ],
+            incidents: [
+                { description: 'Retour client sur cuisson steak', mesure_corrective: 'Rappel equipe cuisine : toujours confirmer la cuisson', priorite: 'moyenne' }
+            ],
+            rappels: [
+                { message: 'Debarrasser sel, poivre et pain AVANT de proposer les desserts', categorie: 'service' },
+                { message: 'Terrasse ouverte si meteo OK', categorie: 'pratique' }
+            ],
+            evenements: [
+                { type: 'vip', description: 'Anniversaire table 12 - M. Martin', heure: '12h30', couverts: 6, allergies: 'Sans gluten x1' }
+            ],
+            plats_suggestions: [
+                { plat: 'Risotto aux cepes', prix: 18.50, commentaire: 'Nouveau plat, a pousser' }
+            ],
+            objectifs: [
+                { objectif: 'Proposer systematiquement l\'aperitif', priorite: 'haute' },
+                { objectif: 'Temps d\'attente entree < 15min', priorite: 'moyenne' }
+            ],
+            notes_libres: '',
+            cree_par_nom: 'Eric B.',
+            publie_at: new Date().toISOString()
+        };
+
+        // ============ INITIALIZATION ============
+        async function initApp() {
+            try {
+                const user = JSON.parse(sessionStorage.getItem('planb_user'));
+                const etab = sessionStorage.getItem('planb_etablissement');
+
+                if (!user || !etab) {
+                    goBack();
+                    return;
+                }
+
+                currentUser = user;
+                currentEstablishment = etab;
+
+                const supabaseUrl = 'https://dzrherfavgiuygnimtux.supabase.co';
+                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+                const { data, error } = await supabaseClient.from('briefings').select('count', { count: 'exact' }).limit(1);
+
+                if (error) {
+                    console.warn('Supabase connection failed, using demo mode:', error);
+                    isDemo = true;
+                    document.getElementById('demo-banner').style.display = 'block';
+                }
+            } catch (err) {
+                console.warn('Error initializing Supabase:', err);
+                isDemo = true;
+                document.getElementById('demo-banner').style.display = 'block';
+            }
+
+            updateHeader();
+            autoSelectService();
+            updateTabVisibility();
+            loadConsultation();
+            checkMandatoryBriefing();
+        }
+
+        // ============ HEADER & NAVIGATION ============
+        function updateHeader() {
+            if (!currentUser) return;
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '\uD83C\uDFEA Freddy' : '\uD83C\uDF7D Liesel';
+            document.getElementById('user-badge').textContent = currentUser.initiales || 'U';
+        }
+
+        function goBack() {
+            window.location.href = '../';
+        }
+
+        function updateTabVisibility() {
+            const isManager = currentUser && (currentUser.role === 'responsable' || currentUser.role === 'admin');
+            const creationTab = document.querySelector('[data-tab="creation"]');
+            const previsionsTab = document.querySelector('[data-tab="previsions"]');
+            if (!isManager) {
+                creationTab.style.display = 'none';
+                previsionsTab.style.display = 'none';
+            }
+        }
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            if (tabName === 'consultation') loadConsultation();
+            else if (tabName === 'creation') loadCreation();
+            else if (tabName === 'previsions') loadPrevisions();
+            else if (tabName === 'historique') loadHistorique();
+        }
+
+        function autoSelectService() {
+            const hour = new Date().getHours();
+            consultService = hour < 16 ? 'midi' : 'soir';
+            document.querySelectorAll('#consult-service-selector .service-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.service === consultService);
+            });
+        }
+
+        function selectConsultService(service) {
+            consultService = service;
+            document.querySelectorAll('#consult-service-selector .service-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.service === service);
+            });
+            loadConsultation();
+        }
+
+        function navDate(offset) {
+            const d = new Date(consultDate);
+            d.setDate(d.getDate() + offset);
+            consultDate = d.toISOString().split('T')[0];
+            loadConsultation();
+        }
+
+        function navToday() {
+            consultDate = new Date().toISOString().split('T')[0];
+            autoSelectService();
+            loadConsultation();
+        }
+
+        // ============ CONSULTATION TAB ============
+        async function loadConsultation() {
+            const container = document.getElementById('consult-container');
+            const dateLabel = document.getElementById('consult-date-label');
+            dateLabel.textContent = formatDateFr(consultDate);
+
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9203;</div><div class="empty-state-title">Chargement...</div></div>';
+
+            try {
+                let briefing = null;
+
+                if (isDemo) {
+                    if (consultDate === new Date().toISOString().split('T')[0]) {
+                        briefing = demoBriefing;
+                    }
+                } else {
+                    let query = supabaseClient
+                        .from('briefings')
+                        .select('*')
+                        .eq('date', consultDate)
+                        .eq('etablissement', currentEstablishment)
+                        .eq('statut', 'publie');
+
+                    if (consultService === 'jour') {
+                        query = query.eq('type', 'jour');
+                    } else {
+                        query = query.or(`and(type.eq.service,service.eq.${consultService}),type.eq.jour`);
+                    }
+
+                    const { data, error } = await query.order('type').limit(1);
+                    if (error) throw error;
+                    briefing = data && data.length > 0 ? data[0] : null;
+                }
+
+                currentBriefing = briefing;
+
+                if (!briefing) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">&#128227;</div>
+                            <div class="empty-state-title">Pas de briefing</div>
+                            <div class="empty-state-text">Aucun briefing publie pour ${formatDateFr(consultDate)}${consultService !== 'jour' ? ' - ' + (consultService === 'midi' ? 'Midi' : 'Soir') : ''}</div>
+                        </div>`;
+                    document.getElementById('lecture-bar').classList.add('hidden');
+                    return;
+                }
+
+                renderBriefing(container, briefing);
+                await loadLectureBar(briefing);
+
+            } catch (err) {
+                console.error('Error loading briefing:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        function renderBriefing(container, b) {
+            let html = '';
+
+            // Status header
+            const typeLabel = b.type === 'jour' ? 'Journee' : (b.service === 'midi' ? 'Midi' : 'Soir');
+            html += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                <span class="status-badge status-${b.statut}">${b.statut === 'publie' ? '&#10003; Publie' : '&#9998; Brouillon'}</span>
+                <span style="font-size:12px; color:var(--gray-500);">${typeLabel} — par ${escapeHtml(b.cree_par_nom || '—')}</span>
+            </div>`;
+
+            // Section: Chiffres cles
+            if (b.chiffres && Object.keys(b.chiffres).length > 0) {
+                const c = b.chiffres;
+                html += renderSection('&#128202;', 'Chiffres cles', '', `
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-label">CA Veille</div>
+                            <div class="kpi-value">${formatMoney(c.ca_veille)}</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Couverts</div>
+                            <div class="kpi-value">${c.couverts_veille || '—'}</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Ticket moy.</div>
+                            <div class="kpi-value">${formatMoney(c.ticket_moyen_veille)}</div>
+                        </div>
+                    </div>
+                    <div class="kpi-grid">
+                        <div class="kpi-card highlight">
+                            <div class="kpi-label">Reserv.</div>
+                            <div class="kpi-value">${c.reservations || '—'}</div>
+                        </div>
+                        <div class="kpi-card highlight">
+                            <div class="kpi-label">Couv. attendus</div>
+                            <div class="kpi-value">${c.couverts_attendus || '—'}</div>
+                        </div>
+                        <div class="kpi-card highlight">
+                            <div class="kpi-label">CA Prevu</div>
+                            <div class="kpi-value">${formatMoney(c.ca_prevu)}</div>
+                        </div>
+                    </div>
+                    <div class="kpi-grid" style="margin-bottom:0;">
+                        <div class="kpi-card" style="grid-column: span 3; background:var(--blue-light);">
+                            <div class="kpi-label">CA N-1 (meme jour)</div>
+                            <div class="kpi-value" style="color:var(--blue);">${formatMoney(c.ca_n1)} — ${c.couverts_n1 || '—'} couv.</div>
+                        </div>
+                    </div>
+                `, true);
+            }
+
+            // Section: Equipes
+            if (b.equipes && b.equipes.length > 0) {
+                const equipesByType = {};
+                b.equipes.forEach(e => {
+                    if (!equipesByType[e.equipe]) equipesByType[e.equipe] = [];
+                    equipesByType[e.equipe].push(e);
+                });
+                let equipesHtml = '';
+                for (const [equipe, members] of Object.entries(equipesByType)) {
+                    equipesHtml += `<div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; margin: 8px 0 6px;">${equipe}</div>`;
+                    equipesHtml += '<div class="team-grid">';
+                    members.forEach(m => {
+                        const colors = { salle: 'var(--orange)', cuisine: 'var(--green)', plonge: 'var(--blue)', autre: 'var(--purple)' };
+                        equipesHtml += `
+                            <div class="team-member">
+                                <div class="team-avatar" style="background:${colors[m.equipe] || 'var(--gray-400)'}">${escapeHtml(m.initiales || '?')}</div>
+                                <div class="team-info">
+                                    <div class="team-name">${escapeHtml(m.nom)}</div>
+                                    <div class="team-role">${escapeHtml(m.poste || '')} ${escapeHtml(m.horaire || '')}</div>
+                                </div>
+                            </div>`;
+                    });
+                    equipesHtml += '</div>';
+                }
+                html += renderSection('&#128101;', 'Equipes', b.equipes.length, equipesHtml, true);
+            }
+
+            // Section: Evenements / VIP
+            if (b.evenements && b.evenements.length > 0) {
+                let evHtml = '';
+                b.evenements.forEach(ev => {
+                    evHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">&#11088;</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(ev.description)}</div>
+                                <div class="brief-item-subtitle">${escapeHtml(ev.heure || '')} — ${ev.couverts || '?'} couv.${ev.allergies ? ' — Allergies: ' + escapeHtml(ev.allergies) : ''}</div>
+                            </div>
+                            <span class="brief-item-badge badge-vip">VIP</span>
+                        </div>`;
+                });
+                html += renderSection('&#11088;', 'Evenements / VIP', b.evenements.length, evHtml, true);
+            }
+
+            // Section: Plats du jour / Suggestions
+            if (b.plats_suggestions && b.plats_suggestions.length > 0) {
+                let platsHtml = '';
+                b.plats_suggestions.forEach(p => {
+                    platsHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">&#127869;</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(p.plat)}${p.prix ? ' — ' + formatMoney(p.prix) : ''}</div>
+                                ${p.commentaire ? `<div class="brief-item-subtitle">${escapeHtml(p.commentaire)}</div>` : ''}
+                            </div>
+                        </div>`;
+                });
+                html += renderSection('&#127869;', 'Plats / Suggestions', b.plats_suggestions.length, platsHtml, true);
+            }
+
+            // Section: Produits limites
+            if (b.produits_limites && b.produits_limites.length > 0) {
+                let plHtml = '';
+                b.produits_limites.forEach(p => {
+                    plHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">&#9888;&#65039;</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(p.produit)}</div>
+                                <div class="brief-item-subtitle">${p.quantite} ${escapeHtml(p.unite || 'pcs')} restants${p.observation ? ' — ' + escapeHtml(p.observation) : ''}</div>
+                            </div>
+                            <span class="brief-item-badge badge-warning">${p.quantite}</span>
+                        </div>`;
+                });
+                html += renderSection('&#9888;&#65039;', 'Produits limites', b.produits_limites.length, plHtml, true);
+            }
+
+            // Section: Dates courtes
+            if (b.produits_dates_courtes && b.produits_dates_courtes.length > 0) {
+                let dcHtml = '';
+                b.produits_dates_courtes.forEach(p => {
+                    dcHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">&#128197;</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(p.produit)}</div>
+                                <div class="brief-item-subtitle">DLC: ${formatDateShort(p.date_limite)} — ${escapeHtml(p.action || '')}${p.observation ? ' — ' + escapeHtml(p.observation) : ''}</div>
+                            </div>
+                            <span class="brief-item-badge badge-urgent">DLC</span>
+                        </div>`;
+                });
+                html += renderSection('&#128197;', 'Dates courtes', b.produits_dates_courtes.length, dcHtml, true);
+            }
+
+            // Section: Incidents
+            if (b.incidents && b.incidents.length > 0) {
+                let incHtml = '';
+                b.incidents.forEach(inc => {
+                    const prioClass = inc.priorite === 'haute' ? 'badge-urgent' : (inc.priorite === 'moyenne' ? 'badge-warning' : 'badge-info');
+                    incHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">&#128680;</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(inc.description)}</div>
+                                <div class="brief-item-subtitle" style="color:var(--green);">&#10132; ${escapeHtml(inc.mesure_corrective || 'Aucune mesure')}</div>
+                            </div>
+                            <span class="brief-item-badge ${prioClass}">${escapeHtml(inc.priorite || '—')}</span>
+                        </div>`;
+                });
+                html += renderSection('&#128680;', 'Incidents', b.incidents.length, incHtml, true);
+            }
+
+            // Section: Objectifs
+            if (b.objectifs && b.objectifs.length > 0) {
+                let objHtml = '';
+                b.objectifs.forEach(obj => {
+                    const prioClass = obj.priorite === 'haute' ? 'badge-urgent' : 'badge-info';
+                    objHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">&#127919;</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(obj.objectif)}</div>
+                            </div>
+                            <span class="brief-item-badge ${prioClass}">${escapeHtml(obj.priorite || '—')}</span>
+                        </div>`;
+                });
+                html += renderSection('&#127919;', 'Objectifs du service', b.objectifs.length, objHtml, true);
+            }
+
+            // Section: Rappels
+            if (b.rappels && b.rappels.length > 0) {
+                let rapHtml = '';
+                b.rappels.forEach(r => {
+                    const catIcons = { service: '&#127860;', hygiene: '&#129532;', securite: '&#128274;', pratique: '&#128161;', autre: '&#128172;' };
+                    rapHtml += `
+                        <div class="brief-item">
+                            <div class="brief-item-icon">${catIcons[r.categorie] || '&#128172;'}</div>
+                            <div class="brief-item-content">
+                                <div class="brief-item-title">${escapeHtml(r.message)}</div>
+                                <div class="brief-item-subtitle">${escapeHtml(r.categorie || '')}</div>
+                            </div>
+                        </div>`;
+                });
+                html += renderSection('&#128172;', 'Rappels', b.rappels.length, rapHtml, true);
+            }
+
+            // Section: Notes libres
+            if (b.notes_libres) {
+                html += renderSection('&#128221;', 'Notes', '', `<div style="font-size:14px; color:var(--gray-700); white-space:pre-wrap;">${escapeHtml(b.notes_libres)}</div>`, true);
+            }
+
+            container.innerHTML = html;
+
+            // Wire up section toggles
+            container.querySelectorAll('.section-header').forEach(h => {
+                h.addEventListener('click', () => {
+                    h.classList.toggle('expanded');
+                    const body = h.nextElementSibling;
+                    body.classList.toggle('expanded');
+                });
+            });
+        }
+
+        function renderSection(icon, title, count, bodyHtml, expanded) {
+            return `
+                <div class="section-card">
+                    <div class="section-header ${expanded ? 'expanded' : ''}">
+                        <div class="section-icon">${icon}</div>
+                        <div class="section-title">${title}</div>
+                        ${count !== '' ? `<span class="section-count">${count}</span>` : ''}
+                        <div class="section-chevron">&#9654;</div>
+                    </div>
+                    <div class="section-body ${expanded ? 'expanded' : ''}">${bodyHtml}</div>
+                </div>`;
+        }
+
+        // ============ LECTURE BAR ============
+        async function loadLectureBar(briefing) {
+            const bar = document.getElementById('lecture-bar');
+            const textEl = document.getElementById('lecture-bar-text');
+            const avatarsEl = document.getElementById('lecture-avatars');
+            const btnRead = document.getElementById('btn-confirm-read');
+
+            if (!briefing || briefing.statut !== 'publie') {
+                bar.classList.add('hidden');
+                return;
+            }
+
+            bar.classList.remove('hidden');
+
+            let lectures = [];
+            if (!isDemo) {
+                const { data, error } = await supabaseClient
+                    .from('briefing_lectures')
+                    .select('*')
+                    .eq('briefing_id', briefing.id);
+                if (!error && data) lectures = data;
+            }
+
+            const hasRead = lectures.some(l => l.user_id === currentUser.id);
+            btnRead.disabled = hasRead;
+            btnRead.textContent = hasRead ? 'Lu \u2713' : 'J\'ai lu \u2713';
+
+            textEl.innerHTML = `<strong>${lectures.length}</strong> lecture${lectures.length !== 1 ? 's' : ''}`;
+
+            avatarsEl.innerHTML = '';
+            lectures.slice(0, 8).forEach(l => {
+                avatarsEl.innerHTML += `<div class="lecture-avatar read" title="${escapeHtml(l.user_nom)}">${escapeHtml(l.user_initiales)}</div>`;
+            });
+        }
+
+        async function confirmRead() {
+            if (!currentBriefing || isDemo) {
+                showToast('Lecture confirmee', 'success');
+                document.getElementById('btn-confirm-read').disabled = true;
+                document.getElementById('btn-confirm-read').textContent = 'Lu \u2713';
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient.from('briefing_lectures').upsert({
+                    briefing_id: currentBriefing.id,
+                    user_id: currentUser.id,
+                    user_nom: currentUser.nom,
+                    user_initiales: currentUser.initiales,
+                    lu_at: new Date().toISOString()
+                }, { onConflict: 'briefing_id,user_id' });
+
+                if (error) throw error;
+                showToast('Lecture confirmee', 'success');
+                await loadLectureBar(currentBriefing);
+            } catch (err) {
+                console.error('Error confirming read:', err);
+                showToast('Erreur', 'error');
+            }
+        }
+
+        // ============ MANDATORY BRIEFING CHECK ============
+        async function checkMandatoryBriefing() {
+            if (currentUser.role === 'responsable' || currentUser.role === 'admin') return;
+
+            const today = new Date().toISOString().split('T')[0];
+            const hour = new Date().getHours();
+            const service = hour < 16 ? 'midi' : 'soir';
+
+            let briefing = null;
+            if (isDemo) {
+                briefing = demoBriefing;
+            } else {
+                const { data } = await supabaseClient
+                    .from('briefings')
+                    .select('*')
+                    .eq('date', today)
+                    .eq('etablissement', currentEstablishment)
+                    .eq('statut', 'publie')
+                    .or(`and(type.eq.service,service.eq.${service}),type.eq.jour`)
+                    .limit(1);
+                briefing = data && data.length > 0 ? data[0] : null;
+            }
+
+            if (!briefing) return;
+
+            // Check if already read
+            let alreadyRead = false;
+            if (!isDemo) {
+                const { data } = await supabaseClient
+                    .from('briefing_lectures')
+                    .select('id')
+                    .eq('briefing_id', briefing.id)
+                    .eq('user_id', currentUser.id)
+                    .limit(1);
+                alreadyRead = data && data.length > 0;
+            }
+
+            if (alreadyRead) return;
+
+            // Show mandatory overlay
+            const overlay = document.getElementById('mandatory-overlay');
+            const title = document.getElementById('mandatory-title');
+            const subtitle = document.getElementById('mandatory-subtitle');
+            const content = document.getElementById('mandatory-content');
+
+            title.textContent = `Briefing ${briefing.type === 'jour' ? 'du jour' : (briefing.service === 'midi' ? 'Midi' : 'Soir')}`;
+            subtitle.textContent = formatDateFr(today);
+
+            currentBriefing = briefing;
+            renderBriefing(content, briefing);
+
+            // Wire up section toggles in mandatory overlay
+            content.querySelectorAll('.section-header').forEach(h => {
+                h.addEventListener('click', () => {
+                    h.classList.toggle('expanded');
+                    h.nextElementSibling.classList.toggle('expanded');
+                });
+            });
+
+            overlay.classList.remove('hidden');
+        }
+
+        async function confirmMandatoryRead() {
+            await confirmRead();
+            document.getElementById('mandatory-overlay').classList.add('hidden');
+            showToast('Bon service !', 'success');
+        }
+
+        // ============ CREATION TAB ============
+        async function loadCreation() {
+            const container = document.getElementById('tab-creation');
+
+            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Seuls les responsables et admins peuvent creer des briefings</div></div>';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            // Date & service selection for creation
+            const headerHtml = `
+                <div style="padding:16px;">
+                    <div class="date-nav" style="margin-bottom:12px;">
+                        <button class="date-nav-btn" onclick="navCreateDate(-1)">&#9664;</button>
+                        <div class="date-nav-label" id="create-date-label">${formatDateFr(consultDate)}</div>
+                        <button class="date-nav-today" onclick="navCreateToday()">Aujourd'hui</button>
+                        <button class="date-nav-btn" onclick="navCreateDate(1)">&#9654;</button>
+                    </div>
+                    <div class="form-row" style="margin-bottom:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <select class="form-select" id="create-type" onchange="onCreateTypeChange()">
+                                <option value="service">Par service</option>
+                                <option value="jour">Journee entiere</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;" id="create-service-group">
+                            <select class="form-select" id="create-service">
+                                <option value="midi">Midi</option>
+                                <option value="soir">Soir</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:16px;">
+                        <button class="btn-primary" style="flex:1;" onclick="loadOrCreateBriefing()">Charger / Creer</button>
+                    </div>
+                    <div id="creation-form-container"></div>
+                </div>`;
+
+            container.innerHTML = headerHtml;
+        }
+
+        function navCreateDate(offset) {
+            const d = new Date(consultDate);
+            d.setDate(d.getDate() + offset);
+            consultDate = d.toISOString().split('T')[0];
+            document.getElementById('create-date-label').textContent = formatDateFr(consultDate);
+        }
+
+        function navCreateToday() {
+            consultDate = new Date().toISOString().split('T')[0];
+            document.getElementById('create-date-label').textContent = formatDateFr(consultDate);
+        }
+
+        function onCreateTypeChange() {
+            const type = document.getElementById('create-type').value;
+            document.getElementById('create-service-group').style.display = type === 'service' ? 'block' : 'none';
+        }
+
+        async function loadOrCreateBriefing() {
+            const type = document.getElementById('create-type').value;
+            const service = type === 'service' ? document.getElementById('create-service').value : null;
+            const formContainer = document.getElementById('creation-form-container');
+
+            formContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9203;</div><div class="empty-state-title">Chargement...</div></div>';
+
+            try {
+                let briefing = null;
+
+                if (!isDemo) {
+                    let query = supabaseClient
+                        .from('briefings')
+                        .select('*')
+                        .eq('date', consultDate)
+                        .eq('etablissement', currentEstablishment)
+                        .eq('type', type);
+
+                    if (service) query = query.eq('service', service);
+
+                    const { data, error } = await query.limit(1);
+                    if (error) throw error;
+                    briefing = data && data.length > 0 ? data[0] : null;
+                }
+
+                if (!briefing) {
+                    // Load previsions data if available
+                    let prevData = {};
+                    if (!isDemo) {
+                        const { data } = await supabaseClient
+                            .from('briefing_previsions')
+                            .select('*')
+                            .eq('date', consultDate)
+                            .eq('etablissement', currentEstablishment)
+                            .limit(1);
+                        if (data && data.length > 0) {
+                            const p = data[0];
+                            prevData = {
+                                ca_veille: p.ca_veille, couverts_veille: p.couverts_veille,
+                                ticket_moyen_veille: p.ticket_moyen_veille, ca_n1: p.ca_n1,
+                                couverts_n1: p.couverts_n1, reservations: p.reservations,
+                                couverts_attendus: p.couverts_attendus, ca_prevu: p.ca_prevu
+                            };
+                        }
+                    }
+
+                    briefing = {
+                        date: consultDate, etablissement: currentEstablishment,
+                        type: type, service: service, statut: 'brouillon',
+                        equipes: [], chiffres: prevData, produits_limites: [],
+                        produits_dates_courtes: [], incidents: [], rappels: [],
+                        evenements: [], plats_suggestions: [], objectifs: [],
+                        notes_libres: '', cree_par_id: currentUser.id, cree_par_nom: currentUser.nom
+                    };
+                }
+
+                editingBriefing = briefing;
+                renderCreationForm(formContainer, briefing);
+
+            } catch (err) {
+                console.error('Error loading briefing for edit:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        function renderCreationForm(container, b) {
+            let html = '';
+
+            // Status indicator
+            html += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                <span class="status-badge status-${b.statut}">${b.statut === 'publie' ? '&#10003; Publie' : '&#9998; Brouillon'}</span>
+                ${b.id ? '<span style="font-size:12px; color:var(--gray-500);">Briefing existant</span>' : '<span style="font-size:12px; color:var(--gray-500);">Nouveau briefing</span>'}
+            </div>`;
+
+            // Chiffres section
+            html += `<div class="form-section">
+                <div class="form-section-header" onclick="toggleFormSection(this)">
+                    <div class="section-icon">&#128202;</div>
+                    <div class="section-title">Chiffres cles</div>
+                    <div class="section-chevron">&#9654;</div>
+                </div>
+                <div class="form-section-body open">
+                    <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin-bottom:8px;">VEILLE</div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">CA</label><input type="number" class="form-input" id="f-ca-veille" value="${n(b.chiffres?.ca_veille)}" inputmode="decimal" step="0.01"></div>
+                        <div class="form-group"><label class="form-label">Couverts</label><input type="number" class="form-input" id="f-couverts-veille" value="${n(b.chiffres?.couverts_veille)}" inputmode="numeric"></div>
+                        <div class="form-group"><label class="form-label">Ticket moy.</label><input type="number" class="form-input" id="f-tm-veille" value="${n(b.chiffres?.ticket_moyen_veille)}" inputmode="decimal" step="0.01"></div>
+                    </div>
+                    <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin: 8px 0;">N-1</div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">CA N-1</label><input type="number" class="form-input" id="f-ca-n1" value="${n(b.chiffres?.ca_n1)}" inputmode="decimal" step="0.01"></div>
+                        <div class="form-group"><label class="form-label">Couverts N-1</label><input type="number" class="form-input" id="f-couverts-n1" value="${n(b.chiffres?.couverts_n1)}" inputmode="numeric"></div>
+                    </div>
+                    <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin: 8px 0;">PREVISIONS</div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Reservations</label><input type="number" class="form-input" id="f-reservations" value="${n(b.chiffres?.reservations)}" inputmode="numeric"></div>
+                        <div class="form-group"><label class="form-label">Couv. attendus</label><input type="number" class="form-input" id="f-couverts-attendus" value="${n(b.chiffres?.couverts_attendus)}" inputmode="numeric"></div>
+                        <div class="form-group"><label class="form-label">CA Prevu</label><input type="number" class="form-input" id="f-ca-prevu" value="${n(b.chiffres?.ca_prevu)}" inputmode="decimal" step="0.01"></div>
+                    </div>
+                </div>
+            </div>`;
+
+            // Equipes section
+            html += renderListEditorSection('&#128101;', 'Equipes', 'equipes', b.equipes || [], [
+                { key: 'nom', label: 'Nom', type: 'text', placeholder: 'Nom du collaborateur' },
+                { key: 'initiales', label: 'Init.', type: 'text', placeholder: 'AB', width: '60px' },
+                { key: 'equipe', label: 'Equipe', type: 'select', options: ['salle','cuisine','plonge','autre'] },
+                { key: 'poste', label: 'Poste', type: 'text', placeholder: 'Ex: Rang 1' },
+                { key: 'horaire', label: 'Horaire', type: 'text', placeholder: 'Ex: 10h-15h' }
+            ]);
+
+            // Evenements / VIP
+            html += renderListEditorSection('&#11088;', 'Evenements / VIP', 'evenements', b.evenements || [], [
+                { key: 'description', label: 'Description', type: 'text', placeholder: 'Ex: Anniversaire table 12' },
+                { key: 'heure', label: 'Heure', type: 'text', placeholder: '12h30', width: '70px' },
+                { key: 'couverts', label: 'Couv.', type: 'number', placeholder: '0', width: '60px' },
+                { key: 'allergies', label: 'Allergies', type: 'text', placeholder: 'Allergies connues' }
+            ]);
+
+            // Plats / Suggestions
+            html += renderListEditorSection('&#127869;', 'Plats / Suggestions', 'plats_suggestions', b.plats_suggestions || [], [
+                { key: 'plat', label: 'Plat', type: 'text', placeholder: 'Nom du plat' },
+                { key: 'prix', label: 'Prix', type: 'number', placeholder: '0.00', width: '70px' },
+                { key: 'commentaire', label: 'Commentaire', type: 'text', placeholder: 'A pousser...' }
+            ]);
+
+            // Produits limites
+            html += renderListEditorSection('&#9888;&#65039;', 'Produits limites', 'produits_limites', b.produits_limites || [], [
+                { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Nom du produit' },
+                { key: 'quantite', label: 'Qte', type: 'number', placeholder: '0', width: '60px' },
+                { key: 'unite', label: 'Unite', type: 'text', placeholder: 'portions', width: '80px' },
+                { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
+            ]);
+
+            // Dates courtes
+            html += renderListEditorSection('&#128197;', 'Dates courtes', 'produits_dates_courtes', b.produits_dates_courtes || [], [
+                { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Nom du produit' },
+                { key: 'date_limite', label: 'DLC', type: 'date' },
+                { key: 'action', label: 'Action', type: 'select', options: ['Mettre en avant','A ecouler','Retirer'] },
+                { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
+            ]);
+
+            // Incidents
+            html += renderListEditorSection('&#128680;', 'Incidents', 'incidents', b.incidents || [], [
+                { key: 'description', label: 'Incident', type: 'textarea', placeholder: 'Description de l\'incident' },
+                { key: 'mesure_corrective', label: 'Mesure corrective', type: 'textarea', placeholder: 'Action mise en place' },
+                { key: 'priorite', label: 'Priorite', type: 'select', options: ['haute','moyenne','basse'] }
+            ]);
+
+            // Objectifs
+            html += renderListEditorSection('&#127919;', 'Objectifs du service', 'objectifs', b.objectifs || [], [
+                { key: 'objectif', label: 'Objectif', type: 'text', placeholder: 'Ex: Temps d\'attente < 15min' },
+                { key: 'priorite', label: 'Priorite', type: 'select', options: ['haute','moyenne','basse'] }
+            ]);
+
+            // Rappels
+            html += renderListEditorSection('&#128172;', 'Rappels', 'rappels', b.rappels || [], [
+                { key: 'message', label: 'Message', type: 'textarea', placeholder: 'Rappel pour l\'equipe...' },
+                { key: 'categorie', label: 'Categorie', type: 'select', options: ['service','hygiene','securite','pratique','autre'] }
+            ]);
+
+            // Notes libres
+            html += `<div class="form-section">
+                <div class="form-section-header" onclick="toggleFormSection(this)">
+                    <div class="section-icon">&#128221;</div>
+                    <div class="section-title">Notes libres</div>
+                    <div class="section-chevron">&#9654;</div>
+                </div>
+                <div class="form-section-body">
+                    <textarea class="form-textarea" id="f-notes-libres" placeholder="Notes supplementaires..." style="min-height:100px;">${escapeHtml(b.notes_libres || '')}</textarea>
+                </div>
+            </div>`;
+
+            // Action buttons
+            html += `<div style="display:flex; gap:8px; margin-top:16px; padding-bottom:20px;">
+                <button class="btn-secondary" style="flex:1;" onclick="saveBriefing('brouillon')">&#128190; Sauvegarder</button>
+                <button class="btn-primary" style="flex:1;" onclick="saveBriefing('publie')">&#128227; Publier</button>
+            </div>`;
+
+            container.innerHTML = html;
+        }
+
+        function renderListEditorSection(icon, title, key, items, fields) {
+            let html = `<div class="form-section">
+                <div class="form-section-header" onclick="toggleFormSection(this)">
+                    <div class="section-icon">${icon}</div>
+                    <div class="section-title">${title}</div>
+                    ${items.length > 0 ? `<span class="section-count">${items.length}</span>` : ''}
+                    <div class="section-chevron">&#9654;</div>
+                </div>
+                <div class="form-section-body">
+                    <div class="list-editor" id="editor-${key}">`;
+
+            items.forEach((item, idx) => {
+                html += renderEditorItem(key, idx, item, fields);
+            });
+
+            html += `</div>
+                    <button class="btn-add-item" onclick="addEditorItem('${key}')">+ Ajouter</button>
+                </div>
+            </div>`;
+
+            return html;
+        }
+
+        function renderEditorItem(key, idx, item, fields) {
+            const fieldConfigs = getFieldConfigs(key);
+            let fieldsHtml = '<div class="list-editor-fields">';
+
+            // Group fields into rows of 2-3
+            let rowFields = [];
+            fieldConfigs.forEach(f => {
+                if (f.type === 'textarea') {
+                    if (rowFields.length > 0) {
+                        fieldsHtml += '<div class="form-row">' + rowFields.join('') + '</div>';
+                        rowFields = [];
+                    }
+                    fieldsHtml += `<textarea class="form-textarea" data-key="${key}" data-idx="${idx}" data-field="${f.key}" placeholder="${f.placeholder || ''}" style="min-height:40px;">${escapeHtml((item && item[f.key]) || '')}</textarea>`;
+                } else {
+                    let fieldHtml = '';
+                    const style = f.width ? `style="width:${f.width}; flex:none;"` : '';
+
+                    if (f.type === 'select') {
+                        fieldHtml = `<select class="form-select" data-key="${key}" data-idx="${idx}" data-field="${f.key}" ${style}>
+                            <option value="">—</option>
+                            ${f.options.map(o => `<option value="${o}" ${item && item[f.key] === o ? 'selected' : ''}>${o}</option>`).join('')}
+                        </select>`;
+                    } else {
+                        fieldHtml = `<input type="${f.type}" class="form-input" data-key="${key}" data-idx="${idx}" data-field="${f.key}" value="${escapeHtml(String((item && item[f.key]) || ''))}" placeholder="${f.placeholder || ''}" ${f.type === 'number' ? 'inputmode="decimal" step="0.01"' : ''} ${style}>`;
+                    }
+                    rowFields.push(fieldHtml);
+
+                    if (rowFields.length >= 3 || f.type === 'date') {
+                        fieldsHtml += '<div class="form-row">' + rowFields.join('') + '</div>';
+                        rowFields = [];
+                    }
+                }
+            });
+
+            if (rowFields.length > 0) {
+                fieldsHtml += '<div class="form-row">' + rowFields.join('') + '</div>';
+            }
+
+            fieldsHtml += '</div>';
+
+            return `<div class="list-editor-item" data-key="${key}" data-idx="${idx}">
+                ${fieldsHtml}
+                <button class="btn-remove" onclick="removeEditorItem('${key}', ${idx})">&#10005;</button>
+            </div>`;
+        }
+
+        function getFieldConfigs(key) {
+            const configs = {
+                equipes: [
+                    { key: 'nom', label: 'Nom', type: 'text', placeholder: 'Nom' },
+                    { key: 'initiales', label: 'Init.', type: 'text', placeholder: 'AB', width: '60px' },
+                    { key: 'equipe', label: 'Equipe', type: 'select', options: ['salle','cuisine','plonge','autre'] },
+                    { key: 'poste', label: 'Poste', type: 'text', placeholder: 'Poste' },
+                    { key: 'horaire', label: 'Horaire', type: 'text', placeholder: '10h-15h' }
+                ],
+                evenements: [
+                    { key: 'description', label: 'Description', type: 'text', placeholder: 'Description' },
+                    { key: 'heure', label: 'Heure', type: 'text', placeholder: '12h30', width: '70px' },
+                    { key: 'couverts', label: 'Couv.', type: 'number', placeholder: '0', width: '60px' },
+                    { key: 'allergies', label: 'Allergies', type: 'text', placeholder: 'Allergies' }
+                ],
+                plats_suggestions: [
+                    { key: 'plat', label: 'Plat', type: 'text', placeholder: 'Nom du plat' },
+                    { key: 'prix', label: 'Prix', type: 'number', placeholder: '0.00', width: '70px' },
+                    { key: 'commentaire', label: 'Commentaire', type: 'text', placeholder: 'Commentaire' }
+                ],
+                produits_limites: [
+                    { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Produit' },
+                    { key: 'quantite', label: 'Qte', type: 'number', placeholder: '0', width: '60px' },
+                    { key: 'unite', label: 'Unite', type: 'text', placeholder: 'portions', width: '80px' },
+                    { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
+                ],
+                produits_dates_courtes: [
+                    { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Produit' },
+                    { key: 'date_limite', label: 'DLC', type: 'date' },
+                    { key: 'action', label: 'Action', type: 'select', options: ['Mettre en avant','A ecouler','Retirer'] },
+                    { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
+                ],
+                incidents: [
+                    { key: 'description', label: 'Incident', type: 'textarea', placeholder: 'Description' },
+                    { key: 'mesure_corrective', label: 'Mesure', type: 'textarea', placeholder: 'Mesure corrective' },
+                    { key: 'priorite', label: 'Priorite', type: 'select', options: ['haute','moyenne','basse'] }
+                ],
+                objectifs: [
+                    { key: 'objectif', label: 'Objectif', type: 'text', placeholder: 'Objectif' },
+                    { key: 'priorite', label: 'Priorite', type: 'select', options: ['haute','moyenne','basse'] }
+                ],
+                rappels: [
+                    { key: 'message', label: 'Message', type: 'textarea', placeholder: 'Rappel...' },
+                    { key: 'categorie', label: 'Categorie', type: 'select', options: ['service','hygiene','securite','pratique','autre'] }
+                ]
+            };
+            return configs[key] || [];
+        }
+
+        function toggleFormSection(header) {
+            header.querySelector('.section-chevron').style.transform =
+                header.nextElementSibling.classList.contains('open') ? '' : 'rotate(90deg)';
+            header.nextElementSibling.classList.toggle('open');
+        }
+
+        function addEditorItem(key) {
+            const editor = document.getElementById(`editor-${key}`);
+            const items = editor.querySelectorAll(`.list-editor-item[data-key="${key}"]`);
+            const newIdx = items.length;
+            const fields = getFieldConfigs(key);
+            const itemHtml = renderEditorItem(key, newIdx, {}, fields);
+            editor.insertAdjacentHTML('beforeend', itemHtml);
+        }
+
+        function removeEditorItem(key, idx) {
+            const editor = document.getElementById(`editor-${key}`);
+            const item = editor.querySelector(`.list-editor-item[data-key="${key}"][data-idx="${idx}"]`);
+            if (item) item.remove();
+            // Reindex
+            editor.querySelectorAll(`.list-editor-item[data-key="${key}"]`).forEach((el, i) => {
+                el.dataset.idx = i;
+                el.querySelectorAll('[data-idx]').forEach(input => input.dataset.idx = i);
+                el.querySelector('.btn-remove').setAttribute('onclick', `removeEditorItem('${key}', ${i})`);
+            });
+        }
+
+        function collectEditorData(key) {
+            const editor = document.getElementById(`editor-${key}`);
+            if (!editor) return [];
+            const items = [];
+            const rows = editor.querySelectorAll(`.list-editor-item[data-key="${key}"]`);
+            rows.forEach(row => {
+                const item = {};
+                row.querySelectorAll('[data-field]').forEach(input => {
+                    const field = input.dataset.field;
+                    const tag = input.tagName.toLowerCase();
+                    if (tag === 'textarea') item[field] = input.value.trim();
+                    else if (tag === 'select') item[field] = input.value;
+                    else if (input.type === 'number') item[field] = parseFloat(input.value) || 0;
+                    else item[field] = input.value.trim();
+                });
+                // Only add if at least one field has a value
+                if (Object.values(item).some(v => v !== '' && v !== 0 && v !== null)) {
+                    items.push(item);
+                }
+            });
+            return items;
+        }
+
+        async function saveBriefing(statut) {
+            if (isDemo) {
+                showToast(statut === 'publie' ? 'Briefing publie (demo)' : 'Brouillon sauvegarde (demo)', 'success');
+                return;
+            }
+
+            try {
+                const record = {
+                    date: editingBriefing.date,
+                    etablissement: currentEstablishment,
+                    type: editingBriefing.type,
+                    service: editingBriefing.service,
+                    statut: statut,
+                    chiffres: {
+                        ca_veille: parseFloat(document.getElementById('f-ca-veille')?.value) || 0,
+                        couverts_veille: parseInt(document.getElementById('f-couverts-veille')?.value) || 0,
+                        ticket_moyen_veille: parseFloat(document.getElementById('f-tm-veille')?.value) || 0,
+                        ca_n1: parseFloat(document.getElementById('f-ca-n1')?.value) || 0,
+                        couverts_n1: parseInt(document.getElementById('f-couverts-n1')?.value) || 0,
+                        reservations: parseInt(document.getElementById('f-reservations')?.value) || 0,
+                        couverts_attendus: parseInt(document.getElementById('f-couverts-attendus')?.value) || 0,
+                        ca_prevu: parseFloat(document.getElementById('f-ca-prevu')?.value) || 0
+                    },
+                    equipes: collectEditorData('equipes'),
+                    evenements: collectEditorData('evenements'),
+                    plats_suggestions: collectEditorData('plats_suggestions'),
+                    produits_limites: collectEditorData('produits_limites'),
+                    produits_dates_courtes: collectEditorData('produits_dates_courtes'),
+                    incidents: collectEditorData('incidents'),
+                    objectifs: collectEditorData('objectifs'),
+                    rappels: collectEditorData('rappels'),
+                    notes_libres: document.getElementById('f-notes-libres')?.value || '',
+                    cree_par_id: currentUser.id,
+                    cree_par_nom: currentUser.nom,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (statut === 'publie') {
+                    record.publie_par_id = currentUser.id;
+                    record.publie_par_nom = currentUser.nom;
+                    record.publie_at = new Date().toISOString();
+                }
+
+                let result;
+                if (editingBriefing.id) {
+                    result = await supabaseClient
+                        .from('briefings')
+                        .update(record)
+                        .eq('id', editingBriefing.id)
+                        .select();
+                } else {
+                    result = await supabaseClient
+                        .from('briefings')
+                        .upsert(record, { onConflict: 'date,etablissement,type,service' })
+                        .select();
+                }
+
+                if (result.error) throw result.error;
+
+                if (result.data && result.data.length > 0) {
+                    editingBriefing = result.data[0];
+                }
+
+                showToast(statut === 'publie' ? 'Briefing publie !' : 'Brouillon sauvegarde', 'success');
+
+                // Reload form to reflect saved state
+                renderCreationForm(document.getElementById('creation-form-container'), editingBriefing);
+
+            } catch (err) {
+                console.error('Error saving briefing:', err);
+                showToast('Erreur: ' + (err.message || 'Sauvegarde impossible'), 'error');
+            }
+        }
+
+        // ============ PREVISIONS TAB ============
+        async function loadPrevisions() {
+            const container = document.getElementById('previsions-container');
+
+            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div></div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div style="padding:0;">
+                    <div class="date-nav" style="margin-bottom:16px;">
+                        <button class="date-nav-btn" onclick="navPrevDate(-1)">&#9664;</button>
+                        <div class="date-nav-label" id="prev-date-label">${formatDateFr(consultDate)}</div>
+                        <button class="date-nav-today" onclick="navPrevToday()">Aujourd'hui</button>
+                        <button class="date-nav-btn" onclick="navPrevDate(1)">&#9654;</button>
+                    </div>
+                    <div class="service-selector" id="prev-service-sel" style="margin-bottom:16px;">
+                        <button class="service-btn active" data-service="midi" onclick="selectPrevService('midi')">&#9728;&#65039; Midi</button>
+                        <button class="service-btn" data-service="soir" onclick="selectPrevService('soir')">&#127769; Soir</button>
+                    </div>
+                    <div id="previsions-form"></div>
+                </div>`;
+
+            loadPrevisionsData();
+        }
+
+        let prevService = 'midi';
+
+        function navPrevDate(offset) {
+            const d = new Date(consultDate);
+            d.setDate(d.getDate() + offset);
+            consultDate = d.toISOString().split('T')[0];
+            document.getElementById('prev-date-label').textContent = formatDateFr(consultDate);
+            loadPrevisionsData();
+        }
+
+        function navPrevToday() {
+            consultDate = new Date().toISOString().split('T')[0];
+            document.getElementById('prev-date-label').textContent = formatDateFr(consultDate);
+            loadPrevisionsData();
+        }
+
+        function selectPrevService(service) {
+            prevService = service;
+            document.querySelectorAll('#prev-service-sel .service-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.service === service);
+            });
+            loadPrevisionsData();
+        }
+
+        async function loadPrevisionsData() {
+            const form = document.getElementById('previsions-form');
+            if (!form) return;
+
+            let prev = null;
+            if (!isDemo) {
+                const { data } = await supabaseClient
+                    .from('briefing_previsions')
+                    .select('*')
+                    .eq('date', consultDate)
+                    .eq('etablissement', currentEstablishment)
+                    .eq('service', prevService)
+                    .limit(1);
+                prev = data && data.length > 0 ? data[0] : null;
+            }
+
+            form.innerHTML = `
+                <div class="form-section" style="box-shadow:none; border:1px solid var(--gray-200);">
+                    <div style="padding:14px;">
+                        <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin-bottom:10px;">CHIFFRES N-1</div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">CA N-1</label><input type="number" class="form-input" id="p-ca-n1" value="${n(prev?.ca_n1)}" inputmode="decimal" step="0.01"></div>
+                            <div class="form-group"><label class="form-label">Couverts N-1</label><input type="number" class="form-input" id="p-couverts-n1" value="${n(prev?.couverts_n1)}" inputmode="numeric"></div>
+                            <div class="form-group"><label class="form-label">Ticket moy. N-1</label><input type="number" class="form-input" id="p-tm-n1" value="${n(prev?.ticket_moyen_n1)}" inputmode="decimal" step="0.01"></div>
+                        </div>
+                        <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin: 10px 0;">CHIFFRES VEILLE</div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">CA Veille</label><input type="number" class="form-input" id="p-ca-veille" value="${n(prev?.ca_veille)}" inputmode="decimal" step="0.01"></div>
+                            <div class="form-group"><label class="form-label">Couverts</label><input type="number" class="form-input" id="p-couverts-veille" value="${n(prev?.couverts_veille)}" inputmode="numeric"></div>
+                            <div class="form-group"><label class="form-label">Ticket moy.</label><input type="number" class="form-input" id="p-tm-veille" value="${n(prev?.ticket_moyen_veille)}" inputmode="decimal" step="0.01"></div>
+                        </div>
+                        <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin: 10px 0;">PREVISIONS JOUR</div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Reservations</label><input type="number" class="form-input" id="p-reservations" value="${n(prev?.reservations)}" inputmode="numeric"></div>
+                            <div class="form-group"><label class="form-label">Couv. attendus</label><input type="number" class="form-input" id="p-couverts-attendus" value="${n(prev?.couverts_attendus)}" inputmode="numeric"></div>
+                            <div class="form-group"><label class="form-label">CA Prevu</label><input type="number" class="form-input" id="p-ca-prevu" value="${n(prev?.ca_prevu)}" inputmode="decimal" step="0.01"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-textarea" id="p-notes" placeholder="Contexte particulier...">${escapeHtml(prev?.notes || '')}</textarea>
+                        </div>
+                        <button class="btn-primary" style="width:100%;" onclick="savePrevisions()">&#128190; Enregistrer les previsions</button>
+                    </div>
+                </div>`;
+        }
+
+        async function savePrevisions() {
+            if (isDemo) {
+                showToast('Previsions enregistrees (demo)', 'success');
+                return;
+            }
+
+            try {
+                const record = {
+                    date: consultDate,
+                    etablissement: currentEstablishment,
+                    service: prevService,
+                    ca_n1: parseFloat(document.getElementById('p-ca-n1')?.value) || 0,
+                    couverts_n1: parseInt(document.getElementById('p-couverts-n1')?.value) || 0,
+                    ticket_moyen_n1: parseFloat(document.getElementById('p-tm-n1')?.value) || 0,
+                    ca_veille: parseFloat(document.getElementById('p-ca-veille')?.value) || 0,
+                    couverts_veille: parseInt(document.getElementById('p-couverts-veille')?.value) || 0,
+                    ticket_moyen_veille: parseFloat(document.getElementById('p-tm-veille')?.value) || 0,
+                    reservations: parseInt(document.getElementById('p-reservations')?.value) || 0,
+                    couverts_attendus: parseInt(document.getElementById('p-couverts-attendus')?.value) || 0,
+                    ca_prevu: parseFloat(document.getElementById('p-ca-prevu')?.value) || 0,
+                    notes: document.getElementById('p-notes')?.value || '',
+                    saisi_par_id: currentUser.id,
+                    saisi_par_nom: currentUser.nom,
+                    updated_at: new Date().toISOString()
+                };
+
+                const { error } = await supabaseClient
+                    .from('briefing_previsions')
+                    .upsert(record, { onConflict: 'date,etablissement,service' });
+
+                if (error) throw error;
+                showToast('Previsions enregistrees', 'success');
+            } catch (err) {
+                console.error('Error saving previsions:', err);
+                showToast('Erreur: ' + (err.message || ''), 'error');
+            }
+        }
+
+        // ============ HISTORIQUE TAB ============
+        async function loadHistorique() {
+            const container = document.getElementById('historique-container');
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9203;</div><div class="empty-state-title">Chargement...</div></div>';
+
+            try {
+                let briefings = [];
+
+                if (isDemo) {
+                    briefings = [demoBriefing];
+                } else {
+                    const { data, error } = await supabaseClient
+                        .from('briefings')
+                        .select('*')
+                        .eq('etablissement', currentEstablishment)
+                        .order('date', { ascending: false })
+                        .limit(30);
+
+                    if (error) throw error;
+                    briefings = data || [];
+                }
+
+                if (briefings.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128227;</div><div class="empty-state-title">Aucun briefing</div><div class="empty-state-text">L\'historique apparaitra ici</div></div>';
+                    return;
+                }
+
+                // Group by date
+                const byDate = {};
+                briefings.forEach(b => {
+                    if (!byDate[b.date]) byDate[b.date] = [];
+                    byDate[b.date].push(b);
+                });
+
+                let html = '';
+                for (const [date, briefs] of Object.entries(byDate)) {
+                    html += `<div style="font-size:13px; font-weight:700; color:var(--gray-500); text-transform:uppercase; margin:12px 0 6px; padding-bottom:6px; border-bottom:1px solid var(--gray-200);">${formatDateFr(date)}</div>`;
+
+                    briefs.forEach(b => {
+                        const typeLabel = b.type === 'jour' ? 'Journee' : (b.service === 'midi' ? 'Midi' : 'Soir');
+                        const sectionsCount = [b.equipes, b.produits_limites, b.produits_dates_courtes, b.incidents, b.rappels, b.evenements, b.plats_suggestions, b.objectifs]
+                            .filter(s => s && s.length > 0).length;
+
+                        html += `
+                            <div class="history-card" onclick="viewHistoricBriefing('${b.id}', '${date}', '${b.type}', '${b.service || ''}')">
+                                <div class="history-card-header">
+                                    <div class="history-card-date">${typeLabel}</div>
+                                    <span class="status-badge status-${b.statut}">${b.statut === 'publie' ? '&#10003; Publie' : '&#9998; Brouillon'}</span>
+                                </div>
+                                <div class="history-card-meta">Par ${escapeHtml(b.cree_par_nom || '—')} — ${sectionsCount} section${sectionsCount > 1 ? 's' : ''}</div>
+                                <div class="history-card-stats">
+                                    ${b.chiffres?.reservations ? `<span class="history-card-stat">&#128197; ${b.chiffres.reservations} reserv.</span>` : ''}
+                                    ${b.equipes?.length ? `<span class="history-card-stat">&#128101; ${b.equipes.length} equip.</span>` : ''}
+                                    ${b.evenements?.length ? `<span class="history-card-stat">&#11088; ${b.evenements.length} evt</span>` : ''}
+                                </div>
+                            </div>`;
+                    });
+                }
+
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error('Error loading history:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        function viewHistoricBriefing(id, date, type, service) {
+            consultDate = date;
+            consultService = service || 'jour';
+            document.querySelectorAll('#consult-service-selector .service-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.service === consultService);
+            });
+            switchTab('consultation');
+        }
+
+        // ============ UTILITIES ============
+        function n(v) { return parseFloat(v) || 0; }
+
+        function formatMoney(v) {
+            const num = parseFloat(v);
+            if (!num && num !== 0) return '—';
+            return num.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '\u20AC';
+        }
+
+        function formatDateFr(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr + 'T12:00:00');
+            const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+            const mois = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
+            return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]}`;
+        }
+
+        function formatDateShort(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr + 'T12:00:00');
+            return `${d.getDate()}/${d.getMonth() + 1}`;
+        }
+
+        function formatTime(isoStr) {
+            if (!isoStr) return '';
+            const d = new Date(isoStr);
+            return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + (type || '');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function closePopup() {
+            document.getElementById('confirmation-popup').classList.remove('active');
+        }
+
+        // ============ INIT ============
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
