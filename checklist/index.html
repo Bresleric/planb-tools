@@ -1319,7 +1319,8 @@
 
                 // Filter checklists for current service and user's equipe
                 const filtered = checklists.filter(cl => {
-                    const matchEquipe = cl.equipe === currentUser.equipe || cl.equipe === 'tous';
+                    const userEquipe = currentUser.equipe || null;
+                    const matchEquipe = !userEquipe || cl.equipe === userEquipe || cl.equipe === 'tous';
                     const matchService = cl.service === currentService || cl.service === 'tous';
                     const matchFrequency = shouldShowChecklist(cl);
                     return matchEquipe && matchService && matchFrequency;
