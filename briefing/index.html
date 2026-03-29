@@ -794,7 +794,7 @@
                     </div>
                     <div class="kpi-grid" style="margin-bottom:0;">
                         <div class="kpi-card" style="grid-column: span 3; background:var(--blue-light);">
-                            <div class="kpi-label">CA N-1 (meme jour)</div>
+                            <div class="kpi-label">CA N-1 (meme jour semaine)</div>
                             <div class="kpi-value" style="color:var(--blue);">${formatMoney(c.ca_n1)} — ${c.couverts_n1 || '—'} couv.</div>
                         </div>
                     </div>
@@ -1192,14 +1192,20 @@
                 }
 
                 if (!briefing) {
-                    // Load previsions data for the selected service
+                    // === N-1 PAR JOUR DE SEMAINE ===
+                    // Les previsions sont stockees avec date = date_originale_2025 + 365 jours
+                    // Pour comparer le meme jour de semaine, il faut chercher a date + 1 jour
+                    // (car 365 - 364 = 1, et 364 jours = 52 semaines exactes)
                     let prevData = {};
                     if (!isDemo) {
                         const svcFilter = service || 'midi';
+                        const lookupDate = new Date(consultDate + 'T12:00:00');
+                        lookupDate.setDate(lookupDate.getDate() + 1);
+                        const lookupDateStr = lookupDate.toISOString().split('T')[0];
                         const { data } = await supabaseClient
                             .from('briefing_previsions')
                             .select('*')
-                            .eq('date', consultDate)
+                            .eq('date', lookupDateStr)
                             .eq('etablissement', currentEstablishment)
                             .eq('service', svcFilter)
                             .limit(1);
@@ -1226,6 +1232,50 @@
                             .limit(1);
                         if (caisseData && caisseData.length > 0 && caisseData[0].ca > 0) {
                             prevData.ca_veille = caisseData[0].ca;
+                        }
+                    }
+
+                    // === CHARGEMENT PLANNING EQUIPES ===
+                    let planningEquipes = [];
+                    if (!isDemo) {
+                        const svcFilter = service || 'midi';
+                        const { data: planData } = await supabaseClient
+                            .from('planning_equipes')
+                            .select('*')
+                            .eq('date', consultDate)
+                            .eq('etablissement', currentEstablishment)
+                            .order('equipe', { ascending: true })
+                            .order('heure_debut', { ascending: true });
+                        if (planData && planData.length > 0) {
+                            // Filter by service: midi shifts for midi briefing, soir for soir, all for jour
+                            const filtered = planData.filter(s => {
+                                if (!service || service === 'jour') return true;
+                                if (service === 'midi') return s.service === 'midi' || s.service === 'journee';
+                                if (service === 'soir') return s.service === 'soir' || s.service === 'journee';
+                                return true;
+                            });
+                            planningEquipes = filtered.map(s => ({
+                                nom: s.employe_nom,
+                                initiales: s.employe_initiales,
+                                equipe: s.equipe === 'aide_cuisine_plonge' ? 'plonge' : s.equipe,
+                                poste: s.poste || '',
+                                horaire: s.heure_debut.substring(0,5) + '-' + s.heure_fin.substring(0,5)
+                            }));
+                        }
+                    }
+
+                    // === CONTINUITE : charger le briefing precedent ===
+                    let prevBriefing = null;
+                    if (!isDemo) {
+                        const { data: prevBData } = await supabaseClient
+                            .from('briefings')
+                            .select('*')
+                            .eq('etablissement', currentEstablishment)
+                            .lt('date', consultDate)
+                            .order('date', { ascending: false })
+                            .limit(1);
+                        if (prevBData && prevBData.length > 0) {
+                            prevBriefing = prevBData[0];
                         }
                     }
 
@@ -1273,14 +1323,20 @@
                         }
                     }
 
+                    // === CONSTRUCTION DU BRIEFING avec continuite ===
                     briefing = {
                         date: consultDate, etablissement: currentEstablishment,
                         type: type, service: service, statut: 'brouillon',
-                        equipes: [], chiffres: prevData, produits_limites: [],
-                        produits_dates_courtes: [],
+                        equipes: planningEquipes.length > 0 ? planningEquipes : [],
+                        chiffres: prevData,
+                        // Continuite : reporter produits limites et dates courtes du briefing precedent
+                        produits_limites: prevBriefing?.produits_limites || [],
+                        produits_dates_courtes: prevBriefing?.produits_dates_courtes || [],
                         incidents: recentIncidents,
                         rappels: randomRappels,
-                        evenements: [], plats_suggestions: [], objectifs: [],
+                        evenements: prevBriefing?.evenements || [],
+                        plats_suggestions: prevBriefing?.plats_suggestions || [],
+                        objectifs: prevBriefing?.objectifs || [],
                         notes_libres: '', cree_par_id: currentUser.id, cree_par_nom: currentUser.nom
                     };
                 }
