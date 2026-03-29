@@ -453,6 +453,7 @@
         <div class="tab" data-tab="creation" onclick="switchTab('creation')">Redaction</div>
         <div class="tab" data-tab="previsions" onclick="switchTab('previsions')">Previsions</div>
         <div class="tab" data-tab="historique" onclick="switchTab('historique')">Historique</div>
+        <div class="tab" data-tab="gestion" onclick="switchTab('gestion')">Gestion</div>
     </div>
 
     <!-- Content -->
@@ -487,6 +488,11 @@
         <!-- === TAB HISTORIQUE === -->
         <div class="tab-content" id="tab-historique">
             <div id="historique-container"></div>
+        </div>
+
+        <!-- === TAB GESTION (rappels + incidents) === -->
+        <div class="tab-content" id="tab-gestion">
+            <div id="gestion-container"></div>
         </div>
     </div>
 
@@ -637,9 +643,11 @@
             const isManager = currentUser && (currentUser.role === 'responsable' || currentUser.role === 'admin');
             const creationTab = document.querySelector('[data-tab="creation"]');
             const previsionsTab = document.querySelector('[data-tab="previsions"]');
+            const gestionTab = document.querySelector('[data-tab="gestion"]');
             if (!isManager) {
                 creationTab.style.display = 'none';
                 previsionsTab.style.display = 'none';
+                if (gestionTab) gestionTab.style.display = 'none';
             }
         }
 
@@ -654,6 +662,7 @@
             else if (tabName === 'creation') loadCreation();
             else if (tabName === 'previsions') loadPrevisions();
             else if (tabName === 'historique') loadHistorique();
+            else if (tabName === 'gestion') loadGestion();
         }
 
         function autoSelectService() {
@@ -1183,23 +1192,84 @@
                 }
 
                 if (!briefing) {
-                    // Load previsions data if available
+                    // Load previsions data for the selected service
                     let prevData = {};
                     if (!isDemo) {
+                        const svcFilter = service || 'midi';
                         const { data } = await supabaseClient
                             .from('briefing_previsions')
                             .select('*')
                             .eq('date', consultDate)
                             .eq('etablissement', currentEstablishment)
+                            .eq('service', svcFilter)
                             .limit(1);
                         if (data && data.length > 0) {
                             const p = data[0];
                             prevData = {
                                 ca_veille: p.ca_veille, couverts_veille: p.couverts_veille,
                                 ticket_moyen_veille: p.ticket_moyen_veille, ca_n1: p.ca_n1,
-                                couverts_n1: p.couverts_n1, reservations: p.reservations,
+                                couverts_n1: p.couverts_n1, ticket_moyen_n1: p.ticket_moyen_n1,
+                                reservations: p.reservations,
                                 couverts_attendus: p.couverts_attendus, ca_prevu: p.ca_prevu
                             };
+                        }
+
+                        // Also load veille data from caisse_controle if available
+                        const veille = new Date(consultDate + 'T12:00:00');
+                        veille.setDate(veille.getDate() - 1);
+                        const veilleStr = veille.toISOString().split('T')[0];
+                        const { data: caisseData } = await supabaseClient
+                            .from('caisse_controle')
+                            .select('ca')
+                            .eq('date', veilleStr)
+                            .eq('etablissement', currentEstablishment)
+                            .limit(1);
+                        if (caisseData && caisseData.length > 0 && caisseData[0].ca > 0) {
+                            prevData.ca_veille = caisseData[0].ca;
+                        }
+                    }
+
+                    // Load recent open incidents from history
+                    let recentIncidents = [];
+                    if (!isDemo) {
+                        const { data: incData } = await supabaseClient
+                            .from('briefing_incidents')
+                            .select('*')
+                            .eq('etablissement', currentEstablishment)
+                            .in('statut', ['ouvert', 'en_cours'])
+                            .order('date', { ascending: false })
+                            .limit(5);
+                        if (incData) {
+                            recentIncidents = incData.map(i => ({
+                                description: i.description,
+                                mesure_corrective: i.mesure_corrective || '',
+                                priorite: i.priorite || 'moyenne'
+                            }));
+                        }
+                    }
+
+                    // Load 1 random rappel from database
+                    let randomRappels = [];
+                    if (!isDemo) {
+                        const today = new Date().toISOString().split('T')[0];
+                        const { data: rapData } = await supabaseClient
+                            .from('briefing_rappels')
+                            .select('*')
+                            .eq('etablissement', currentEstablishment)
+                            .eq('actif', true)
+                            .or(`equipe.eq.tous,equipe.is.null`)
+                            .limit(20);
+                        if (rapData && rapData.length > 0) {
+                            // Pick 1 random + all haute priorite
+                            const haute = rapData.filter(r => r.priorite === 'haute');
+                            const normale = rapData.filter(r => r.priorite !== 'haute');
+                            if (normale.length > 0) {
+                                const rand = normale[Math.floor(Math.random() * normale.length)];
+                                randomRappels.push({ message: rand.message, categorie: rand.categorie || 'service' });
+                            }
+                            haute.forEach(r => {
+                                randomRappels.push({ message: r.message, categorie: r.categorie || 'service' });
+                            });
                         }
                     }
 
@@ -1207,7 +1277,9 @@
                         date: consultDate, etablissement: currentEstablishment,
                         type: type, service: service, statut: 'brouillon',
                         equipes: [], chiffres: prevData, produits_limites: [],
-                        produits_dates_courtes: [], incidents: [], rappels: [],
+                        produits_dates_courtes: [],
+                        incidents: recentIncidents,
+                        rappels: randomRappels,
                         evenements: [], plats_suggestions: [], objectifs: [],
                         notes_libres: '', cree_par_id: currentUser.id, cree_par_nom: currentUser.nom
                     };
@@ -1570,6 +1642,24 @@
                     editingBriefing = result.data[0];
                 }
 
+                // Persist incidents to briefing_incidents table
+                const incidents = record.incidents || [];
+                for (const inc of incidents) {
+                    if (inc.description) {
+                        await supabaseClient.from('briefing_incidents').upsert({
+                            date: record.date,
+                            etablissement: currentEstablishment,
+                            service: record.service,
+                            description: inc.description,
+                            mesure_corrective: inc.mesure_corrective || '',
+                            priorite: inc.priorite || 'moyenne',
+                            statut: inc.mesure_corrective ? 'en_cours' : 'ouvert',
+                            cree_par_id: currentUser.id,
+                            cree_par_nom: currentUser.nom
+                        }, { onConflict: 'id', ignoreDuplicates: true });
+                    }
+                }
+
                 showToast(statut === 'publie' ? 'Briefing publie !' : 'Brouillon sauvegarde', 'success');
 
                 // Reload form to reflect saved state
@@ -1790,6 +1880,219 @@
                 btn.classList.toggle('active', btn.dataset.service === consultService);
             });
             switchTab('consultation');
+        }
+
+        // ============ GESTION TAB (Rappels + Incidents) ============
+        async function loadGestion() {
+            const container = document.getElementById('gestion-container');
+
+            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div></div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9203;</div><div class="empty-state-title">Chargement...</div></div>';
+
+            let rappelsHtml = '';
+            let incidentsHtml = '';
+
+            try {
+                // Load rappels
+                let rappels = [];
+                if (!isDemo) {
+                    const { data } = await supabaseClient
+                        .from('briefing_rappels')
+                        .select('*')
+                        .eq('etablissement', currentEstablishment)
+                        .order('created_at', { ascending: false });
+                    rappels = data || [];
+                }
+
+                rappelsHtml = `
+                    <div style="font-size:13px; font-weight:700; color:var(--gray-500); text-transform:uppercase; margin:0 0 8px;">Base de rappels (${rappels.length})</div>
+                    <button class="btn-primary" style="width:100%; margin-bottom:12px;" onclick="openAddRappelModal()">+ Nouveau rappel</button>`;
+
+                if (rappels.length === 0) {
+                    rappelsHtml += '<div style="text-align:center; padding:20px; color:var(--gray-400); font-size:13px;">Aucun rappel. Ajoutez-en pour qu\'ils apparaissent dans les briefings.</div>';
+                } else {
+                    rappels.forEach(r => {
+                        const statusColor = r.actif ? 'var(--green)' : 'var(--gray-400)';
+                        const prioColor = r.priorite === 'haute' ? 'var(--red)' : 'var(--gray-500)';
+                        rappelsHtml += `
+                            <div class="history-card" style="cursor:default;">
+                                <div style="display:flex; align-items:start; gap:10px;">
+                                    <div style="flex:1;">
+                                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">${escapeHtml(r.message)}</div>
+                                        <div style="font-size:12px; color:var(--gray-500); margin-top:4px;">
+                                            ${escapeHtml(r.categorie || '—')} | ${escapeHtml(r.equipe || 'tous')} | Affiche ${r.nb_affichages || 0}x
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; gap:4px; flex-shrink:0;">
+                                        <span style="font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; background:${r.actif ? 'var(--green-light)' : 'var(--gray-100)'}; color:${statusColor};">${r.actif ? 'Actif' : 'Inactif'}</span>
+                                        <button class="btn-icon" onclick="toggleRappel('${r.id}', ${!r.actif})" title="${r.actif ? 'Desactiver' : 'Activer'}">${r.actif ? '&#9724;' : '&#9654;'}</button>
+                                        <button class="btn-icon" onclick="deleteRappel('${r.id}')" title="Supprimer" style="color:var(--red);">&#10005;</button>
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                }
+
+                // Load incidents ouverts
+                let incidents = [];
+                if (!isDemo) {
+                    const { data } = await supabaseClient
+                        .from('briefing_incidents')
+                        .select('*')
+                        .eq('etablissement', currentEstablishment)
+                        .in('statut', ['ouvert', 'en_cours'])
+                        .order('date', { ascending: false })
+                        .limit(20);
+                    incidents = data || [];
+                }
+
+                incidentsHtml = `
+                    <div style="font-size:13px; font-weight:700; color:var(--gray-500); text-transform:uppercase; margin:16px 0 8px;">Incidents ouverts (${incidents.length})</div>`;
+
+                if (incidents.length === 0) {
+                    incidentsHtml += '<div style="text-align:center; padding:20px; color:var(--gray-400); font-size:13px;">Aucun incident ouvert.</div>';
+                } else {
+                    incidents.forEach(inc => {
+                        const prioClass = inc.priorite === 'haute' ? 'badge-urgent' : (inc.priorite === 'moyenne' ? 'badge-warning' : 'badge-info');
+                        const statutColor = inc.statut === 'ouvert' ? 'var(--red)' : 'var(--amber)';
+                        incidentsHtml += `
+                            <div class="history-card" style="cursor:default;">
+                                <div style="display:flex; align-items:start; gap:10px;">
+                                    <div style="flex:1;">
+                                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">${escapeHtml(inc.description)}</div>
+                                        ${inc.mesure_corrective ? `<div style="font-size:13px; color:var(--green); margin-top:4px;">&#10132; ${escapeHtml(inc.mesure_corrective)}</div>` : ''}
+                                        <div style="font-size:12px; color:var(--gray-500); margin-top:4px;">${formatDateFr(inc.date)} | ${escapeHtml(inc.categorie || '—')}</div>
+                                    </div>
+                                    <div style="display:flex; gap:4px; flex-shrink:0; align-items:center;">
+                                        <span class="brief-item-badge ${prioClass}">${escapeHtml(inc.priorite || '—')}</span>
+                                        <button class="btn-icon" onclick="resolveIncident('${inc.id}')" title="Marquer resolu" style="color:var(--green);">&#10003;</button>
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                }
+
+                container.innerHTML = rappelsHtml + incidentsHtml;
+
+            } catch (err) {
+                console.error('Error loading gestion:', err);
+                showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        // Add rappel modal
+        function openAddRappelModal() {
+            const html = `
+                <div class="modal-overlay active" id="rappel-modal" onclick="if(event.target===this)this.classList.remove('active')">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Nouveau rappel</h2>
+                            <button class="modal-close" onclick="document.getElementById('rappel-modal').classList.remove('active')">&#10005;</button>
+                        </div>
+                        <div class="modal-content">
+                            <div class="form-group">
+                                <label class="form-label">Message *</label>
+                                <textarea class="form-textarea" id="rappel-message" placeholder="Ex: Pensez a debarrasser sel et poivre avant de proposer les desserts"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Categorie</label>
+                                    <select class="form-select" id="rappel-categorie">
+                                        <option value="service">Service</option>
+                                        <option value="hygiene">Hygiene</option>
+                                        <option value="securite">Securite</option>
+                                        <option value="pratique">Pratique</option>
+                                        <option value="autre">Autre</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Equipe</label>
+                                    <select class="form-select" id="rappel-equipe">
+                                        <option value="tous">Tous</option>
+                                        <option value="salle">Salle</option>
+                                        <option value="cuisine">Cuisine</option>
+                                        <option value="plonge">Plonge</option>
+                                        <option value="autre">Autre</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Priorite</label>
+                                <select class="form-select" id="rappel-priorite">
+                                    <option value="normale">Normale (affichage aleatoire)</option>
+                                    <option value="haute">Haute (toujours affiche)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" onclick="document.getElementById('rappel-modal').classList.remove('active')">Annuler</button>
+                            <button class="btn-primary" onclick="saveRappel()">Enregistrer</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        async function saveRappel() {
+            const message = document.getElementById('rappel-message')?.value?.trim();
+            if (!message) { showToast('Message obligatoire', 'error'); return; }
+
+            if (isDemo) { showToast('Rappel ajoute (demo)', 'success'); return; }
+
+            try {
+                const { error } = await supabaseClient.from('briefing_rappels').insert({
+                    etablissement: currentEstablishment,
+                    message: message,
+                    categorie: document.getElementById('rappel-categorie')?.value || 'service',
+                    equipe: document.getElementById('rappel-equipe')?.value || 'tous',
+                    priorite: document.getElementById('rappel-priorite')?.value || 'normale',
+                    actif: true,
+                    cree_par_id: currentUser.id,
+                    cree_par_nom: currentUser.nom
+                });
+                if (error) throw error;
+                document.getElementById('rappel-modal')?.remove();
+                showToast('Rappel ajoute', 'success');
+                loadGestion();
+            } catch (err) {
+                console.error('Error saving rappel:', err);
+                showToast('Erreur', 'error');
+            }
+        }
+
+        async function toggleRappel(id, actif) {
+            if (isDemo) return;
+            try {
+                await supabaseClient.from('briefing_rappels').update({ actif }).eq('id', id);
+                loadGestion();
+            } catch (err) { showToast('Erreur', 'error'); }
+        }
+
+        async function deleteRappel(id) {
+            if (isDemo) return;
+            if (!confirm('Supprimer ce rappel ?')) return;
+            try {
+                await supabaseClient.from('briefing_rappels').delete().eq('id', id);
+                showToast('Rappel supprime', 'success');
+                loadGestion();
+            } catch (err) { showToast('Erreur', 'error'); }
+        }
+
+        async function resolveIncident(id) {
+            if (isDemo) return;
+            try {
+                await supabaseClient.from('briefing_incidents').update({
+                    statut: 'resolu',
+                    resolu_at: new Date().toISOString(),
+                    resolu_par_nom: currentUser.nom
+                }).eq('id', id);
+                showToast('Incident resolu', 'success');
+                loadGestion();
+            } catch (err) { showToast('Erreur', 'error'); }
         }
 
         // ============ UTILITIES ============

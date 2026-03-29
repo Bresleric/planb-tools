@@ -861,14 +861,6 @@
                 url: './caisse/'
             },
             {
-                id: 'checklist',
-                name: 'Check-Lists',
-                icon: '✅',
-                description: 'Validations récurrentes',
-                minRole: 'collaborateur',
-                url: './checklist/'
-            },
-            {
                 id: 'briefings',
                 name: 'Briefings',
                 icon: '📋',
@@ -949,7 +941,6 @@
                 nom: user.nom,
                 initiales: user.initiales,
                 role: user.role,
-                equipe: user.equipe || 'tous',
                 etablissement: establishment,
                 device_id: currentDevice ? currentDevice.id : null,
                 device_nom: currentDevice ? currentDevice.nom : null,
