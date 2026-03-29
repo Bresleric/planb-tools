@@ -928,11 +928,24 @@
             modalOverlay.classList.remove('active');
         }
 
-        function canAccessModule(minRole) {
+        function canAccessModule(moduleId, minRole) {
             const roleHierarchy = { collaborateur: 1, responsable: 2, admin: 3 };
             const userLevel = roleHierarchy[currentUser.role] || 0;
             const requiredLevel = roleHierarchy[minRole] || 0;
-            return userLevel >= requiredLevel;
+
+            // Vérifier le niveau de rôle
+            if (userLevel < requiredLevel) return false;
+
+            // Les admins voient tout
+            if (currentUser.role === 'admin') return true;
+
+            // Si acces_modules est défini, vérifier que le module est autorisé
+            if (currentUser.acces_modules && Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.length > 0) {
+                return currentUser.acces_modules.includes(moduleId);
+            }
+
+            // Si pas de restriction définie, accès par défaut selon le rôle
+            return true;
         }
 
         function getEstablishmentDisplayName(code) {
@@ -949,6 +962,7 @@
                 nom: user.nom,
                 initiales: user.initiales,
                 role: user.role,
+                acces_modules: user.acces_modules || null,
                 etablissement: establishment,
                 device_id: currentDevice ? currentDevice.id : null,
                 device_nom: currentDevice ? currentDevice.nom : null,
@@ -991,7 +1005,7 @@
         function renderModules() {
             modulesGrid.innerHTML = '';
 
-            const filteredModules = MODULES.filter(module => canAccessModule(module.minRole));
+            const filteredModules = MODULES.filter(module => canAccessModule(module.id, module.minRole));
 
             filteredModules.forEach(module => {
                 const card = document.createElement('div');
