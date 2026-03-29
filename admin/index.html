@@ -1139,7 +1139,7 @@
             const list = document.getElementById('devices-list');
             const count = document.getElementById('device-count');
             try {
-                const { data } = await supabase.from('devices').select('*').order('nom');
+                const { data } = await supabaseClient.from('devices').select('*').order('nom');
                 devices = data || [];
                 count.textContent = devices.length + ' appareil(s)';
                 renderDevices();
@@ -1197,7 +1197,7 @@
             
             const code = String(Math.floor(100000 + Math.random() * 900000));
             try {
-                await supabase.from('devices').insert({ nom, etablissement, code_activation: code, actif: true });
+                await supabaseClient.from('devices').insert({ nom, etablissement, code_activation: code, actif: true });
                 closeDeviceModal();
                 showToast('Appareil cr\u00e9\u00e9 ! Code d\'activation : ' + code);
                 loadDevices();
@@ -1207,13 +1207,13 @@
         }
 
         async function toggleDeviceActive(id, currentState) {
-            await supabase.from('devices').update({ actif: !currentState }).eq('id', id);
+            await supabaseClient.from('devices').update({ actif: !currentState }).eq('id', id);
             loadDevices();
         }
 
         async function deleteDevice(id) {
             if (!confirm('Supprimer cet appareil ? Il ne pourra plus acc\u00e9der \u00e0 PlanB Tools.')) return;
-            await supabase.from('devices').delete().eq('id', id);
+            await supabaseClient.from('devices').delete().eq('id', id);
             showToast('Appareil supprim\u00e9');
             loadDevices();
         }
