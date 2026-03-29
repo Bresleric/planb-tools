@@ -72,7 +72,7 @@ INSERT INTO planning_equipes ("date", etablissement, employe_nom, employe_initia
 ('2026-04-01', 'liesel', 'Camille BRESLER', 'CB', 'salle', 'Continue salle Midi', '10:00', '15:00', 'midi', 'Premier jour'),
 ('2026-04-02', 'liesel', 'Camille BRESLER', 'CB', 'salle', 'Continue salle Midi', '10:00', '15:00', 'midi', NULL),
 ('2026-03-30', 'liesel', 'Camille BRESLER', 'CB', 'salle', 'Continue salle Midi', '10:00', '13:30', 'midi', NULL),
-('2026-03-31', 'liesel', 'Camille BRESLER', 'CB', 'salle', NULL, NULL, NULL, NULL, 'Dernier jour'),
+-- Camille BRESLER Dernier jour 31/03 (annotation sans horaire, pas de shift)
 ('2026-03-31', 'liesel', 'Valerie BRESLER', 'VB', 'salle', 'Continue salle Midi', '10:00', '15:00', 'midi', NULL),
 ('2026-04-04', 'liesel', 'Valerie BRESLER', 'VB', 'salle', 'Continue salle Midi', '10:00', '15:00', 'midi', NULL),
 
@@ -89,7 +89,7 @@ INSERT INTO planning_equipes ("date", etablissement, employe_nom, employe_initia
 ('2026-04-05', 'freddy', 'Alemoujrodo Koffi NOUSSOUKPOE', 'AN', 'aide_cuisine_plonge', 'Plonge soir', '17:00', '23:30', 'soir', NULL),
 
 -- FREDDY S.14 - CUISINE
-('2026-04-01', 'freddy', 'Camille BRESLER', 'CB', 'cuisine', NULL, NULL, NULL, NULL, 'Premier jour'),
+-- Camille BRESLER Premier jour 01/04 cuisine (annotation sans horaire, pas de shift)
 ('2026-03-30', 'freddy', 'Eve LHOPITEAU', 'EL', 'cuisine', 'Poste Soir', '15:00', '23:00', 'soir', NULL),
 ('2026-03-31', 'freddy', 'Eve LHOPITEAU', 'EL', 'cuisine', 'Poste Soir', '15:00', '23:00', 'soir', NULL),
 ('2026-04-03', 'freddy', 'Eve LHOPITEAU', 'EL', 'cuisine', 'Poste Matin', '07:00', '15:00', 'midi', NULL),
