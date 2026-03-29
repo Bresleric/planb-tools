@@ -1128,24 +1128,6 @@
                     </div>
                     <input type="date" id="create-date-picker" value="${consultDate}" onchange="navCreateToDate(this.value)" style="width:100%; padding:8px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; margin-bottom:8px;">
                     <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;" id="create-quick-dates"></div>
-                    <script>
-                    (function() {
-                        const container = document.getElementById('create-quick-dates');
-                        const today = new Date();
-                        const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-                        for (let i = 0; i < 7; i++) {
-                            const d = new Date(today);
-                            d.setDate(d.getDate() + i);
-                            const dateStr = d.toISOString().split('T')[0];
-                            const label = i === 0 ? "Auj." : jours[d.getDay()] + ' ' + d.getDate();
-                            const btn = document.createElement('button');
-                            btn.style.cssText = 'padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid var(--gray-200); background:white; cursor:pointer;';
-                            btn.textContent = label;
-                            btn.onclick = function() { navCreateToDate(dateStr); };
-                            container.appendChild(btn);
-                        }
-                    })();
-                    </script>
                     <div class="form-row" style="margin-bottom:12px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <select class="form-select" id="create-type" onchange="onCreateTypeChange()">
@@ -1167,6 +1149,24 @@
                 </div>`;
 
             container.innerHTML = headerHtml;
+
+            // Generate quick date buttons (7 jours a partir d'aujourd'hui)
+            const quickContainer = document.getElementById('create-quick-dates');
+            if (quickContainer) {
+                const today = new Date();
+                const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() + i);
+                    const dateStr = d.toISOString().split('T')[0];
+                    const label = i === 0 ? 'Auj.' : jours[d.getDay()] + ' ' + d.getDate();
+                    const btn = document.createElement('button');
+                    btn.style.cssText = 'padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid var(--gray-200); background:white; cursor:pointer;';
+                    btn.textContent = label;
+                    btn.onclick = function() { navCreateToDate(dateStr); };
+                    quickContainer.appendChild(btn);
+                }
+            }
         }
 
         function navCreateDate(offset) {
