@@ -801,29 +801,30 @@
                 `, true);
             }
 
-            // Section: Equipes
+            // Section: Equipes (tableau compact)
             if (b.equipes && b.equipes.length > 0) {
                 const equipesByType = {};
                 b.equipes.forEach(e => {
-                    if (!equipesByType[e.equipe]) equipesByType[e.equipe] = [];
-                    equipesByType[e.equipe].push(e);
+                    const g = e.equipe || 'autre';
+                    if (!equipesByType[g]) equipesByType[g] = [];
+                    equipesByType[g].push(e);
                 });
+                const grpLabels = { cuisine: '👨‍🍳 Cuisine', salle: '🍽️ Salle', plonge: '🧹 Plonge', autre: '📋 Autre' };
+                const grpColors = { cuisine: '#ef4444', salle: '#f97316', plonge: '#8b5cf6', autre: '#6b7280' };
                 let equipesHtml = '';
                 for (const [equipe, members] of Object.entries(equipesByType)) {
-                    equipesHtml += `<div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; margin: 8px 0 6px;">${equipe}</div>`;
-                    equipesHtml += '<div class="team-grid">';
+                    const color = grpColors[equipe] || '#6b7280';
+                    equipesHtml += `<div style="font-size:11px; font-weight:700; color:${color}; text-transform:uppercase; margin:8px 0 3px;">${grpLabels[equipe] || equipe} (${members.length})</div>`;
+                    equipesHtml += `<table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:6px;">`;
                     members.forEach(m => {
-                        const colors = { salle: 'var(--orange)', cuisine: 'var(--green)', plonge: 'var(--blue)', autre: 'var(--purple)' };
-                        equipesHtml += `
-                            <div class="team-member">
-                                <div class="team-avatar" style="background:${colors[m.equipe] || 'var(--gray-400)'}">${escapeHtml(m.initiales || '?')}</div>
-                                <div class="team-info">
-                                    <div class="team-name">${escapeHtml(m.nom)}</div>
-                                    <div class="team-role">${escapeHtml(m.poste || '')} ${escapeHtml(m.horaire || '')}</div>
-                                </div>
-                            </div>`;
+                        equipesHtml += `<tr style="border-bottom:1px solid var(--gray-100);">
+                            <td style="padding:3px 6px; font-weight:700; color:${color}; width:32px;">${escapeHtml(m.initiales || '?')}</td>
+                            <td style="padding:3px 6px;">${escapeHtml(m.nom || '')}</td>
+                            <td style="padding:3px 6px; color:var(--gray-500); font-size:12px; width:100px;">${escapeHtml(m.poste || '')}</td>
+                            <td style="padding:3px 6px; color:var(--gray-600); font-size:12px; width:80px; text-align:right;">${escapeHtml(m.horaire || '')}</td>
+                        </tr>`;
                     });
-                    equipesHtml += '</div>';
+                    equipesHtml += `</table>`;
                 }
                 html += renderSection('&#128101;', 'Equipes', b.equipes.length, equipesHtml, true);
             }
@@ -1430,14 +1431,8 @@
                 </div>
             </div>`;
 
-            // Equipes section
-            html += renderListEditorSection('&#128101;', 'Equipes', 'equipes', b.equipes || [], [
-                { key: 'nom', label: 'Nom', type: 'text', placeholder: 'Nom du collaborateur' },
-                { key: 'initiales', label: 'Init.', type: 'text', placeholder: 'AB', width: '60px' },
-                { key: 'equipe', label: 'Equipe', type: 'select', options: ['salle','cuisine','plonge','autre'] },
-                { key: 'poste', label: 'Poste', type: 'text', placeholder: 'Ex: Rang 1' },
-                { key: 'horaire', label: 'Horaire', type: 'text', placeholder: 'Ex: 10h-15h' }
-            ]);
+            // Equipes section - tableau compact
+            html += renderEquipesTable(b.equipes || []);
 
             // Evenements / VIP
             html += renderListEditorSection('&#11088;', 'Evenements / VIP', 'evenements', b.evenements || [], [
@@ -1508,6 +1503,58 @@
             </div>`;
 
             container.innerHTML = html;
+        }
+
+        function renderEquipesTable(equipes) {
+            const groups = { cuisine: [], salle: [], plonge: [], autre: [] };
+            equipes.forEach((e, idx) => {
+                const g = groups[e.equipe] ? e.equipe : 'autre';
+                groups[g].push({ ...e, _idx: idx });
+            });
+
+            const groupLabels = { cuisine: '👨‍🍳 Cuisine', salle: '🍽️ Salle', plonge: '🧹 Plonge', autre: '📋 Autre' };
+            const groupColors = { cuisine: '#ef4444', salle: '#f97316', plonge: '#8b5cf6', autre: '#6b7280' };
+
+            let html = `<div class="form-section">
+                <div class="form-section-header" onclick="toggleFormSection(this)">
+                    <div class="section-icon">&#128101;</div>
+                    <div class="section-title">Equipes</div>
+                    ${equipes.length > 0 ? '<span class="section-count">' + equipes.length + '</span>' : ''}
+                    <div class="section-chevron">&#9654;</div>
+                </div>
+                <div class="form-section-body">`;
+
+            for (const [grp, members] of Object.entries(groups)) {
+                if (members.length === 0) continue;
+                html += `<div style="margin-bottom:10px;">
+                    <div style="font-size:12px; font-weight:700; color:${groupColors[grp]}; margin-bottom:4px; text-transform:uppercase;">${groupLabels[grp]} (${members.length})</div>
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead><tr style="background:var(--gray-100); text-align:left;">
+                            <th style="padding:4px 6px; font-weight:600; width:30px;">Init</th>
+                            <th style="padding:4px 6px; font-weight:600;">Nom</th>
+                            <th style="padding:4px 6px; font-weight:600; width:120px;">Poste</th>
+                            <th style="padding:4px 6px; font-weight:600; width:90px;">Horaire</th>
+                            <th style="padding:4px 2px; width:24px;"></th>
+                        </tr></thead><tbody>`;
+
+                members.forEach(m => {
+                    html += `<tr style="border-bottom:1px solid var(--gray-100);" data-equipe-idx="${m._idx}">
+                        <td style="padding:3px 6px; font-weight:700; color:${groupColors[grp]};">${escapeHtml(m.initiales || '')}</td>
+                        <td style="padding:3px 6px;">${escapeHtml(m.nom || '')}</td>
+                        <td style="padding:3px 6px;"><input type="text" class="form-input" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="Poste" style="padding:2px 6px; font-size:12px; height:26px;"></td>
+                        <td style="padding:3px 6px; font-size:12px; color:var(--gray-600);">${escapeHtml(m.horaire || '')}</td>
+                        <td style="padding:3px 2px;"><button onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-400); cursor:pointer; font-size:14px; padding:0;">&#10005;</button></td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div>`;
+            }
+
+            html += `<button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
+                </div>
+            </div>`;
+
+            return html;
         }
 
         function renderListEditorSection(icon, title, key, items, fields) {
