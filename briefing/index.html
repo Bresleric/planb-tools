@@ -1120,12 +1120,32 @@
             // Date & service selection for creation
             const headerHtml = `
                 <div style="padding:16px;">
-                    <div class="date-nav" style="margin-bottom:12px;">
+                    <div class="date-nav" style="margin-bottom:8px;">
                         <button class="date-nav-btn" onclick="navCreateDate(-1)">&#9664;</button>
-                        <div class="date-nav-label" id="create-date-label">${formatDateFr(consultDate)}</div>
+                        <div class="date-nav-label" id="create-date-label" onclick="document.getElementById('create-date-picker').showPicker()" style="cursor:pointer;">${formatDateFr(consultDate)}</div>
                         <button class="date-nav-today" onclick="navCreateToday()">Aujourd'hui</button>
                         <button class="date-nav-btn" onclick="navCreateDate(1)">&#9654;</button>
                     </div>
+                    <input type="date" id="create-date-picker" value="${consultDate}" onchange="navCreateToDate(this.value)" style="width:100%; padding:8px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; margin-bottom:8px;">
+                    <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;" id="create-quick-dates"></div>
+                    <script>
+                    (function() {
+                        const container = document.getElementById('create-quick-dates');
+                        const today = new Date();
+                        const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+                        for (let i = 0; i < 7; i++) {
+                            const d = new Date(today);
+                            d.setDate(d.getDate() + i);
+                            const dateStr = d.toISOString().split('T')[0];
+                            const label = i === 0 ? "Auj." : jours[d.getDay()] + ' ' + d.getDate();
+                            const btn = document.createElement('button');
+                            btn.style.cssText = 'padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid var(--gray-200); background:white; cursor:pointer;';
+                            btn.textContent = label;
+                            btn.onclick = function() { navCreateToDate(dateStr); };
+                            container.appendChild(btn);
+                        }
+                    })();
+                    </script>
                     <div class="form-row" style="margin-bottom:12px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <select class="form-select" id="create-type" onchange="onCreateTypeChange()">
@@ -1150,15 +1170,24 @@
         }
 
         function navCreateDate(offset) {
-            const d = new Date(consultDate);
+            const d = new Date(consultDate + 'T12:00:00');
             d.setDate(d.getDate() + offset);
             consultDate = d.toISOString().split('T')[0];
             document.getElementById('create-date-label').textContent = formatDateFr(consultDate);
+            const picker = document.getElementById('create-date-picker');
+            if (picker) picker.value = consultDate;
         }
 
         function navCreateToday() {
             consultDate = new Date().toISOString().split('T')[0];
             document.getElementById('create-date-label').textContent = formatDateFr(consultDate);
+            document.getElementById('create-date-picker').value = consultDate;
+        }
+
+        function navCreateToDate(dateStr) {
+            consultDate = dateStr;
+            document.getElementById('create-date-label').textContent = formatDateFr(consultDate);
+            document.getElementById('create-date-picker').value = consultDate;
         }
 
         function onCreateTypeChange() {
@@ -1189,6 +1218,38 @@
                     const { data, error } = await query.limit(1);
                     if (error) throw error;
                     briefing = data && data.length > 0 ? data[0] : null;
+                }
+
+                // === TOUJOURS charger le planning equipes (meme si briefing existant) ===
+                let planningEquipes = [];
+                if (!isDemo) {
+                    const { data: planData } = await supabaseClient
+                        .from('planning_equipes')
+                        .select('*')
+                        .eq('date', consultDate)
+                        .eq('etablissement', currentEstablishment)
+                        .order('equipe', { ascending: true })
+                        .order('heure_debut', { ascending: true });
+                    if (planData && planData.length > 0) {
+                        const filtered = planData.filter(s => {
+                            if (!service || service === 'jour') return true;
+                            if (service === 'midi') return s.service === 'midi' || s.service === 'journee';
+                            if (service === 'soir') return s.service === 'soir' || s.service === 'journee';
+                            return true;
+                        });
+                        planningEquipes = filtered.map(s => ({
+                            nom: s.employe_nom,
+                            initiales: s.employe_initiales,
+                            equipe: s.equipe === 'aide_cuisine_plonge' ? 'plonge' : s.equipe,
+                            poste: s.poste || '',
+                            horaire: s.heure_debut.substring(0,5) + '-' + s.heure_fin.substring(0,5)
+                        }));
+                    }
+                }
+
+                // Si briefing existant mais equipes vides, injecter le planning
+                if (briefing && (!briefing.equipes || briefing.equipes.length === 0) && planningEquipes.length > 0) {
+                    briefing.equipes = planningEquipes;
                 }
 
                 if (!briefing) {
@@ -1232,35 +1293,6 @@
                             .limit(1);
                         if (caisseData && caisseData.length > 0 && caisseData[0].ca > 0) {
                             prevData.ca_veille = caisseData[0].ca;
-                        }
-                    }
-
-                    // === CHARGEMENT PLANNING EQUIPES ===
-                    let planningEquipes = [];
-                    if (!isDemo) {
-                        const svcFilter = service || 'midi';
-                        const { data: planData } = await supabaseClient
-                            .from('planning_equipes')
-                            .select('*')
-                            .eq('date', consultDate)
-                            .eq('etablissement', currentEstablishment)
-                            .order('equipe', { ascending: true })
-                            .order('heure_debut', { ascending: true });
-                        if (planData && planData.length > 0) {
-                            // Filter by service: midi shifts for midi briefing, soir for soir, all for jour
-                            const filtered = planData.filter(s => {
-                                if (!service || service === 'jour') return true;
-                                if (service === 'midi') return s.service === 'midi' || s.service === 'journee';
-                                if (service === 'soir') return s.service === 'soir' || s.service === 'journee';
-                                return true;
-                            });
-                            planningEquipes = filtered.map(s => ({
-                                nom: s.employe_nom,
-                                initiales: s.employe_initiales,
-                                equipe: s.equipe === 'aide_cuisine_plonge' ? 'plonge' : s.equipe,
-                                poste: s.poste || '',
-                                horaire: s.heure_debut.substring(0,5) + '-' + s.heure_fin.substring(0,5)
-                            }));
                         }
                     }
 
