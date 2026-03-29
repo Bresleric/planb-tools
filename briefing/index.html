@@ -814,14 +814,14 @@
                 let equipesHtml = '';
                 for (const [equipe, members] of Object.entries(equipesByType)) {
                     const color = grpColors[equipe] || '#6b7280';
-                    equipesHtml += `<div style="font-size:11px; font-weight:700; color:${color}; text-transform:uppercase; margin:8px 0 3px;">${grpLabels[equipe] || equipe} (${members.length})</div>`;
-                    equipesHtml += `<table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:6px;">`;
+                    equipesHtml += `<div style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; margin:6px 0 2px; letter-spacing:0.5px;">${grpLabels[equipe] || equipe} (${members.length})</div>`;
+                    equipesHtml += `<table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
                     members.forEach(m => {
-                        equipesHtml += `<tr style="border-bottom:1px solid var(--gray-100);">
-                            <td style="padding:3px 6px; font-weight:700; color:${color}; width:32px;">${escapeHtml(m.initiales || '?')}</td>
-                            <td style="padding:3px 6px;">${escapeHtml(m.nom || '')}</td>
-                            <td style="padding:3px 6px; color:var(--gray-500); font-size:12px; width:100px;">${escapeHtml(m.poste || '')}</td>
-                            <td style="padding:3px 6px; color:var(--gray-600); font-size:12px; width:80px; text-align:right;">${escapeHtml(m.horaire || '')}</td>
+                        equipesHtml += `<tr style="border-bottom:1px solid var(--gray-50);">
+                            <td style="padding:1px 3px; font-weight:700; color:${color}; width:22px;">${escapeHtml(m.initiales || '?')}</td>
+                            <td style="padding:1px 3px; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
+                            <td style="padding:1px 3px; color:var(--gray-500); width:80px; font-size:10px;">${escapeHtml(m.poste || '')}</td>
+                            <td style="padding:1px 3px; color:var(--gray-500); width:70px; text-align:right; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
                         </tr>`;
                     });
                     equipesHtml += `</table>`;
@@ -1526,28 +1526,21 @@
 
             for (const [grp, members] of Object.entries(groups)) {
                 if (members.length === 0) continue;
-                html += `<div style="margin-bottom:10px;">
-                    <div style="font-size:12px; font-weight:700; color:${groupColors[grp]}; margin-bottom:4px; text-transform:uppercase;">${groupLabels[grp]} (${members.length})</div>
-                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                        <thead><tr style="background:var(--gray-100); text-align:left;">
-                            <th style="padding:4px 6px; font-weight:600; width:30px;">Init</th>
-                            <th style="padding:4px 6px; font-weight:600;">Nom</th>
-                            <th style="padding:4px 6px; font-weight:600; width:120px;">Poste</th>
-                            <th style="padding:4px 6px; font-weight:600; width:90px;">Horaire</th>
-                            <th style="padding:4px 2px; width:24px;"></th>
-                        </tr></thead><tbody>`;
+                html += `<div style="margin-bottom:6px;">
+                    <div style="font-size:10px; font-weight:700; color:${groupColors[grp]}; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">${groupLabels[grp]} (${members.length})</div>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
 
                 members.forEach(m => {
-                    html += `<tr style="border-bottom:1px solid var(--gray-100);" data-equipe-idx="${m._idx}">
-                        <td style="padding:3px 6px; font-weight:700; color:${groupColors[grp]};">${escapeHtml(m.initiales || '')}</td>
-                        <td style="padding:3px 6px;">${escapeHtml(m.nom || '')}</td>
-                        <td style="padding:3px 6px;"><input type="text" class="form-input" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="Poste" style="padding:2px 6px; font-size:12px; height:26px;"></td>
-                        <td style="padding:3px 6px; font-size:12px; color:var(--gray-600);">${escapeHtml(m.horaire || '')}</td>
-                        <td style="padding:3px 2px;"><button onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-400); cursor:pointer; font-size:14px; padding:0;">&#10005;</button></td>
+                    html += `<tr style="border-bottom:1px solid var(--gray-50);">
+                        <td style="padding:1px 3px; font-weight:700; color:${groupColors[grp]}; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}</td>
+                        <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
+                        <td style="padding:1px 2px; width:80px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
+                        <td style="padding:1px 3px; color:var(--gray-500); width:70px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
+                        <td style="padding:1px 0; width:16px;"><button onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:11px; padding:0; line-height:1;">&#10005;</button></td>
                     </tr>`;
                 });
 
-                html += `</tbody></table></div>`;
+                html += `</table></div>`;
             }
 
             html += `<button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
