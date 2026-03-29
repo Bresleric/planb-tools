@@ -520,7 +520,52 @@
             .admin-tab-btn.active {
                 background: var(--orange); color: white;
             }
-            .admin-section { display: none; }
+            
+        /* Droits tab styles */
+        .droits-container { padding: 0; }
+        .droits-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .droits-filter-btn {
+            padding: 6px 14px; border: 1px solid var(--gray-200); border-radius: 20px;
+            font-size: 12px; font-weight: 600; cursor: pointer;
+            background: white; color: var(--gray-500); transition: all 0.2s;
+        }
+        .droits-filter-btn.active { background: var(--orange); color: white; border-color: var(--orange); }
+        .droits-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; border: 1px solid var(--gray-200); }
+        .droits-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+        .droits-table thead { position: sticky; top: 0; z-index: 2; }
+        .droits-table th {
+            background: var(--gray-100); padding: 10px 6px; text-align: center;
+            font-weight: 700; font-size: 11px; color: var(--gray-600);
+            border-bottom: 2px solid var(--gray-200); white-space: nowrap;
+        }
+        .droits-table th:first-child { text-align: left; padding-left: 14px; min-width: 140px; position: sticky; left: 0; background: var(--gray-100); z-index: 3; }
+        .droits-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--gray-100); }
+        .droits-table td:first-child { text-align: left; padding-left: 14px; position: sticky; left: 0; background: white; z-index: 1; }
+        .droits-table tr:hover td { background: #fff8f0; }
+        .droits-table tr:hover td:first-child { background: #fff8f0; }
+        .droits-table tr.inactive td { opacity: 0.4; }
+        .droits-user-cell { display: flex; align-items: center; gap: 8px; }
+        .droits-avatar {
+            width: 28px; height: 28px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-size: 10px;
+            font-weight: 700; color: white; flex-shrink: 0;
+        }
+        .droits-avatar.admin { background: var(--orange); }
+        .droits-avatar.responsable { background: #3b82f6; }
+        .droits-avatar.collaborateur { background: #8b5cf6; }
+        .droits-user-name { font-weight: 600; font-size: 13px; line-height: 1.2; }
+        .droits-user-meta { font-size: 10px; color: var(--gray-400); }
+        .droits-check { font-size: 16px; }
+        .droits-check.granted { color: #22c55e; }
+        .droits-check.denied { color: var(--gray-200); }
+        .droits-check.role-default { color: #22c55e; opacity: 0.5; }
+        .droits-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 11px; color: var(--gray-500); flex-wrap: wrap; }
+        .droits-legend-item { display: flex; align-items: center; gap: 4px; }
+        .droits-etab-badges { display: flex; gap: 3px; margin-left: 4px; }
+        .droits-etab-badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 600; }
+        .droits-etab-badge.freddy { background: #fef3c7; color: #92400e; }
+        .droits-etab-badge.liesel { background: #dbeafe; color: #1e40af; }
+        .admin-section { display: none; }
             .admin-section.active { display: block; }
 
             /* Device cards */
@@ -564,6 +609,8 @@
                         <span id="connection-info" style="font-size: 12px; color: var(--gray-500);"></span>
                         <div class="admin-tabs" style="display: flex; gap: 4px;">
                             <button class="admin-tab-btn active" data-admin-tab="users" onclick="switchAdminTab('users')">Utilisateurs</button>
+
+                        <button class="admin-tab-btn" data-admin-tab="droits" onclick="switchAdminTab('droits')">Droits</button>
                             <button class="admin-tab-btn" data-admin-tab="devices" onclick="switchAdminTab('devices')">Appareils</button>
                         </div>
                     </div>
@@ -591,6 +638,26 @@
             </div>
         </div>
 
+
+            
+            <div id="droits-section" class="admin-section">
+                <div class="droits-container">
+                    <div class="droits-filters">
+                        <button class="droits-filter-btn active" data-droits-filter="all" onclick="filterDroits('all')">Tous</button>
+                        <button class="droits-filter-btn" data-droits-filter="freddy" onclick="filterDroits('freddy')">Freddy</button>
+                        <button class="droits-filter-btn" data-droits-filter="liesel" onclick="filterDroits('liesel')">Liesel</button>
+                        <button class="droits-filter-btn" data-droits-filter="actifs" onclick="filterDroits('actifs')">Actifs seul.</button>
+                    </div>
+                    <div id="droits-table-container">
+                        <div class="loading-spinner">Chargement...</div>
+                    </div>
+                    <div class="droits-legend">
+                        <div class="droits-legend-item"><span class="droits-check granted">&#10003;</span> Acc\u00e8s accord\u00e9 (personnalis\u00e9)</div>
+                        <div class="droits-legend-item"><span class="droits-check role-default">&#10003;</span> Acc\u00e8s par d\u00e9faut (r\u00f4le)</div>
+                        <div class="droits-legend-item"><span class="droits-check denied">&#10007;</span> Pas d'acc\u00e8s</div>
+                    </div>
+                </div>
+            </div>
 
             <div id="devices-section" class="admin-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -1118,6 +1185,78 @@
         });
 
         // ============= Init =============
+        
+
+        // ============= Droits Tab =============
+        let droitsFilter = 'all';
+
+        function filterDroits(filter) {
+            droitsFilter = filter;
+            document.querySelectorAll('.droits-filter-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.droitsFilter === filter)
+            );
+            renderDroits();
+        }
+
+        function renderDroits() {
+            const container = document.getElementById('droits-table-container');
+            if (!container) return;
+
+            let filtered = users.filter(u => {
+                if (droitsFilter === 'actifs') return u.actif;
+                if (droitsFilter === 'all') return true;
+                const etabs = (u.acces_etablissements && u.acces_etablissements.length > 0) ? u.acces_etablissements : [u.etablissement];
+                return etabs.includes(droitsFilter);
+            });
+
+            const rolePrio = { admin: 0, responsable: 1, collaborateur: 2 };
+            filtered.sort((a, b) => (rolePrio[a.role] ?? 3) - (rolePrio[b.role] ?? 3) || a.nom.localeCompare(b.nom));
+
+            const modules = ALL_MODULES.filter(m => m.id !== 'admin');
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun utilisateur trouv\u00e9</p>';
+                return;
+            }
+
+            let html = '<div class="droits-table-wrap"><table class="droits-table"><thead><tr>';
+            html += '<th>Utilisateur</th>';
+            modules.forEach(m => { html += '<th>' + m.icon + '<br>' + m.name + '</th>'; });
+            html += '</tr></thead><tbody>';
+
+            filtered.forEach(user => {
+                const defaultMods = getDefaultModules(user.role);
+                const userMods = (user.acces_modules && user.acces_modules.length > 0) ? user.acces_modules : defaultMods;
+                const isCustom = user.acces_modules && user.acces_modules.length > 0;
+                const etabs = (user.acces_etablissements && user.acces_etablissements.length > 0) ? user.acces_etablissements : [user.etablissement];
+
+                html += '<tr class="' + (!user.actif ? 'inactive' : '') + '">';
+                html += '<td><div class="droits-user-cell">';
+                html += '<div class="droits-avatar ' + user.role + '">' + (user.initiales || '?') + '</div>';
+                html += '<div><div class="droits-user-name">' + user.nom + '</div>';
+                html += '<div class="droits-user-meta">' + user.role;
+                html += ' <span class="droits-etab-badges">';
+                etabs.forEach(e => { html += '<span class="droits-etab-badge ' + e + '">' + (e === 'freddy' ? 'F' : 'L') + '</span>'; });
+                html += '</span>';
+                if (!user.actif) html += ' <em>(inactif)</em>';
+                html += '</div></div></div></td>';
+
+                modules.forEach(m => {
+                    const hasAccess = user.role === 'admin' || userMods.includes(m.id);
+                    const isRoleDefault = !isCustom && defaultMods.includes(m.id);
+                    let cls = 'denied', icon = '\u2717';
+                    if (hasAccess && user.role === 'admin') { cls = 'granted'; icon = '\u2713'; }
+                    else if (hasAccess && isRoleDefault && !isCustom) { cls = 'role-default'; icon = '\u2713'; }
+                    else if (hasAccess) { cls = 'granted'; icon = '\u2713'; }
+                    html += '<td><span class="droits-check ' + cls + '">' + icon + '</span></td>';
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
         // ========== DEVICE MANAGEMENT ==========
 
         let devices = [];
@@ -1134,6 +1273,7 @@
             if (addUserBtn) addUserBtn.style.display = tab === 'users' ? '' : 'none';
             
             if (tab === 'devices') loadDevices();
+            if (tab === 'droits') renderDroits();
         }
 
         async function loadDevices() {
