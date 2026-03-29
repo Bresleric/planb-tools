@@ -1253,31 +1253,41 @@
                 }
 
                 if (!briefing) {
-                    // === N-1 PAR JOUR DE SEMAINE ===
+                    // === N-1 PAR JOUR DE SEMAINE (TOTAL JOUR = midi + soir) ===
                     // Les previsions sont stockees avec date = date_originale_2025 + 365 jours
                     // Pour comparer le meme jour de semaine, il faut chercher a date + 1 jour
                     // (car 365 - 364 = 1, et 364 jours = 52 semaines exactes)
                     let prevData = {};
                     if (!isDemo) {
-                        const svcFilter = service || 'midi';
                         const lookupDate = new Date(consultDate + 'T12:00:00');
                         lookupDate.setDate(lookupDate.getDate() + 1);
                         const lookupDateStr = lookupDate.toISOString().split('T')[0];
-                        const { data } = await supabaseClient
+
+                        // Charger TOUTES les previsions du jour (midi + soir) pour avoir le total
+                        const { data: allPrev } = await supabaseClient
                             .from('briefing_previsions')
                             .select('*')
                             .eq('date', lookupDateStr)
-                            .eq('etablissement', currentEstablishment)
-                            .eq('service', svcFilter)
-                            .limit(1);
-                        if (data && data.length > 0) {
-                            const p = data[0];
+                            .eq('etablissement', currentEstablishment);
+
+                        if (allPrev && allPrev.length > 0) {
+                            // Sommer midi + soir pour CA N-1 et couverts N-1
+                            let totalCaN1 = 0, totalCouvN1 = 0;
+                            let totalCaPrevu = 0, totalCouvPrevu = 0;
+                            allPrev.forEach(p => {
+                                totalCaN1 += (p.ca_n1 || 0);
+                                totalCouvN1 += (p.couverts_n1 || 0);
+                                totalCaPrevu += (p.ca_prevu || 0);
+                                totalCouvPrevu += (p.couverts_attendus || 0);
+                            });
+                            const tmN1 = totalCouvN1 > 0 ? (totalCaN1 / totalCouvN1) : 0;
+
                             prevData = {
-                                ca_veille: p.ca_veille, couverts_veille: p.couverts_veille,
-                                ticket_moyen_veille: p.ticket_moyen_veille, ca_n1: p.ca_n1,
-                                couverts_n1: p.couverts_n1, ticket_moyen_n1: p.ticket_moyen_n1,
-                                reservations: p.reservations,
-                                couverts_attendus: p.couverts_attendus, ca_prevu: p.ca_prevu
+                                ca_n1: Math.round(totalCaN1 * 100) / 100,
+                                couverts_n1: totalCouvN1,
+                                ticket_moyen_n1: Math.round(tmN1 * 100) / 100,
+                                ca_prevu: Math.round(totalCaPrevu * 100) / 100,
+                                couverts_attendus: totalCouvPrevu
                             };
                         }
 
@@ -1355,20 +1365,21 @@
                         }
                     }
 
-                    // === CONSTRUCTION DU BRIEFING avec continuite ===
+                    // === CONSTRUCTION DU BRIEFING avec continuite selective ===
+                    // On reporte UNIQUEMENT les produits limites et dates courtes (infos persistantes)
+                    // Les evenements, plats, objectifs sont specifiques a chaque service => pas de report
                     briefing = {
                         date: consultDate, etablissement: currentEstablishment,
                         type: type, service: service, statut: 'brouillon',
                         equipes: planningEquipes.length > 0 ? planningEquipes : [],
                         chiffres: prevData,
-                        // Continuite : reporter produits limites et dates courtes du briefing precedent
                         produits_limites: prevBriefing?.produits_limites || [],
                         produits_dates_courtes: prevBriefing?.produits_dates_courtes || [],
                         incidents: recentIncidents,
                         rappels: randomRappels,
-                        evenements: prevBriefing?.evenements || [],
-                        plats_suggestions: prevBriefing?.plats_suggestions || [],
-                        objectifs: prevBriefing?.objectifs || [],
+                        evenements: [],
+                        plats_suggestions: [],
+                        objectifs: [],
                         notes_libres: '', cree_par_id: currentUser.id, cree_par_nom: currentUser.nom
                     };
                 }
