@@ -7,7 +7,7 @@
 -- Permet de stocker les chiffres historiques et attendus par date/service
 CREATE TABLE IF NOT EXISTS briefing_previsions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    date DATE NOT NULL,
+    "date" DATE NOT NULL,
     etablissement TEXT NOT NULL CHECK (etablissement IN ('freddy', 'liesel')),
     service TEXT CHECK (service IN ('midi', 'soir')),
 
@@ -33,13 +33,13 @@ CREATE TABLE IF NOT EXISTS briefing_previsions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
 
-    UNIQUE(date, etablissement, service)
+    UNIQUE("date", etablissement, service)
 );
 
 -- Table principale : le briefing
 CREATE TABLE IF NOT EXISTS briefings (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    date DATE NOT NULL,
+    "date" DATE NOT NULL,
     etablissement TEXT NOT NULL CHECK (etablissement IN ('freddy', 'liesel')),
     type TEXT NOT NULL CHECK (type IN ('jour', 'service')),
     service TEXT CHECK (service IN ('midi', 'soir')),
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS briefings (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
 
-    UNIQUE(date, etablissement, type, service)
+    UNIQUE("date", etablissement, type, service)
 );
 
 -- Table des accusés de lecture
@@ -111,8 +111,8 @@ CREATE TABLE IF NOT EXISTS briefing_lectures (
 );
 
 -- Index pour recherches fréquentes
-CREATE INDEX IF NOT EXISTS idx_briefings_date_etab ON briefings(date, etablissement);
-CREATE INDEX IF NOT EXISTS idx_briefing_previsions_date_etab ON briefing_previsions(date, etablissement);
+CREATE INDEX IF NOT EXISTS idx_briefings_date_etab ON briefings("date", etablissement);
+CREATE INDEX IF NOT EXISTS idx_briefing_previsions_date_etab ON briefing_previsions("date", etablissement);
 CREATE INDEX IF NOT EXISTS idx_briefing_lectures_briefing ON briefing_lectures(briefing_id);
 
 -- RLS (Row Level Security) - à activer si nécessaire
