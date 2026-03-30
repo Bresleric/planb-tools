@@ -640,15 +640,27 @@
         }
 
         function updateTabVisibility() {
-            const isManager = currentUser && (currentUser.role === 'responsable' || currentUser.role === 'admin');
-            const creationTab = document.querySelector('[data-tab="creation"]');
-            const previsionsTab = document.querySelector('[data-tab="previsions"]');
-            const gestionTab = document.querySelector('[data-tab="gestion"]');
-            if (!isManager) {
-                creationTab.style.display = 'none';
-                previsionsTab.style.display = 'none';
-                if (gestionTab) gestionTab.style.display = 'none';
-            }
+            const role = currentUser ? currentUser.role : 'collaborateur';
+            // Matrice d'accès aux onglets :
+            // Briefing (consultation) : tous
+            // Rédaction : responsable, manager, admin
+            // Prévisions : admin uniquement
+            // Historique : manager, admin
+            // Gestion : manager, admin
+            const tabAccess = {
+                consultation: ['collaborateur', 'responsable', 'manager', 'admin'],
+                creation: ['responsable', 'manager', 'admin'],
+                previsions: ['admin'],
+                historique: ['manager', 'admin'],
+                gestion: ['manager', 'admin']
+            };
+
+            Object.entries(tabAccess).forEach(([tab, roles]) => {
+                const el = document.querySelector(`[data-tab="${tab}"]`);
+                if (el) {
+                    el.style.display = roles.includes(role) ? '' : 'none';
+                }
+            });
         }
 
         function switchTab(tabName) {
@@ -1041,7 +1053,7 @@
 
         // ============ MANDATORY BRIEFING CHECK ============
         async function checkMandatoryBriefing() {
-            if (currentUser.role === 'responsable' || currentUser.role === 'admin') return;
+            if (['responsable', 'manager', 'admin'].includes(currentUser.role)) return;
 
             const today = new Date().toISOString().split('T')[0];
             const hour = new Date().getHours();
@@ -1111,8 +1123,8 @@
         async function loadCreation() {
             const container = document.getElementById('tab-creation');
 
-            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Seuls les responsables et admins peuvent creer des briefings</div></div>';
+            if (!['responsable', 'manager', 'admin'].includes(currentUser.role)) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Acces reserve aux responsables, managers et admins</div></div>';
                 return;
             }
 
@@ -1814,8 +1826,8 @@
         async function loadPrevisions() {
             const container = document.getElementById('previsions-container');
 
-            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div></div>';
+            if (currentUser.role !== 'admin') {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Acces reserve aux administrateurs</div></div>';
                 return;
             }
 
@@ -1948,6 +1960,12 @@
         // ============ HISTORIQUE TAB ============
         async function loadHistorique() {
             const container = document.getElementById('historique-container');
+
+            if (!['manager', 'admin'].includes(currentUser.role)) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Acces reserve aux managers et administrateurs</div></div>';
+                return;
+            }
+
             container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9203;</div><div class="empty-state-title">Chargement...</div></div>';
 
             try {
@@ -2025,8 +2043,8 @@
         async function loadGestion() {
             const container = document.getElementById('gestion-container');
 
-            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div></div>';
+            if (!['manager', 'admin'].includes(currentUser.role)) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Acces reserve aux managers et administrateurs</div></div>';
                 return;
             }
 
