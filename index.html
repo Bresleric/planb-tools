@@ -726,9 +726,10 @@
                         nom: u.nom,
                         initiales: u.initiales,
                         role: u.role,
+                        equipe: u.equipe || 'tous',
+                        acces_modules: u.acces_modules || null,
                         etablissements: u.acces_etablissements && u.acces_etablissements.length > 0
-                            ? u.acces_etablissements
-                            : [u.etablissement]
+                            ? u.acces_etablissements : [u.etablissement]
                     };
                 } catch (e) {
                     console.error('Erreur Supabase:', e);
@@ -889,7 +890,7 @@
                 name: 'Cartons JVR',
                 icon: '🟡',
                 description: 'Journal de suivi RH',
-                minRole: 'responsable',
+                minRole: 'manager',
                 url: './cartons-jvr/'
             },
             {
@@ -936,12 +937,21 @@
             modalOverlay.classList.remove('active');
         }
 
-        function canAccessModule(minRole) {
-            const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
-            const userLevel = roleHierarchy[currentUser.role] || 0;
-            const requiredLevel = roleHierarchy[minRole] || 0;
-            return userLevel >= requiredLevel;
-        }
+        function canAccessModule(moduleId, minRole) {
+      const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+      const userLevel = roleHierarchy[currentUser.role] || 0;
+      const requiredLevel = roleHierarchy[minRole] || 0;
+      // Vérifier le rôle minimum
+      if (userLevel < requiredLevel) return false;
+      // Les admins ont accès à tout
+      if (currentUser.role === 'admin') return true;
+      // Vérifier acces_modules si défini
+      if (currentUser.acces_modules && currentUser.acces_modules.length > 0) {
+        return currentUser.acces_modules.includes(moduleId);
+      }
+      // Si pas de restriction de modules, accès par rôle uniquement
+      return true;
+    }
 
         function getEstablishmentDisplayName(code) {
             const names = {
@@ -999,7 +1009,7 @@
         function renderModules() {
             modulesGrid.innerHTML = '';
 
-            const filteredModules = MODULES.filter(module => canAccessModule(module.minRole));
+            const filteredModules = MODULES.filter(module => canAccessModule(module.id, module.minRole));
 
             filteredModules.forEach(module => {
                 const card = document.createElement('div');
