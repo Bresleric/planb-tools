@@ -546,9 +546,13 @@
 
     async getTasks(dateFilter) {
       const ds = dateStr(dateFilter);
+      const nextDay = new Date(dateFilter);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const dsNext = dateStr(nextDay);
       const { data } = await supabaseClient.from('tasks').select('*')
         .eq('etablissement', currentEtablissement)
-        .eq('echeance', ds)
+        .gte('echeance', ds)
+        .lt('echeance', dsNext)
         .order('priorite', { ascending: false });
       return data || [];
     },
