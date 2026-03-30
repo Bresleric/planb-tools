@@ -1111,12 +1111,28 @@
     renderPredefinedList('');
   }
 
+  function getSelectedCreateEquipe() {
+    return document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
+  }
+
   function renderPredefinedList(search) {
     const list = document.getElementById('predef-list');
     if (!list) return;
     const s = (search || '').toLowerCase();
+    const selectedEquipe = getSelectedCreateEquipe();
+
+    // Filtrer par équipe : cuisine et plonge partagent la même base
+    const equipeMatch = (taskEquipe) => {
+      if (!taskEquipe) return true; // pas d'équipe = disponible pour tous
+      if (selectedEquipe === 'cuisine' || selectedEquipe === 'plonge') {
+        return taskEquipe === 'cuisine' || taskEquipe === 'plonge';
+      }
+      return taskEquipe === selectedEquipe;
+    };
+
     const filtered = predefinedTasks.filter(p =>
-      !s || p.nom.toLowerCase().includes(s) || (p.categorie || '').toLowerCase().includes(s)
+      equipeMatch(p.equipe) &&
+      (!s || p.nom.toLowerCase().includes(s) || (p.categorie || '').toLowerCase().includes(s))
     );
     list.innerHTML = filtered.slice(0, 20).map(p =>
       `<div class="predef-item ${selectedPredefined?.id === p.id ? 'selected' : ''}"
@@ -1177,6 +1193,12 @@
   function selectChip(el, groupId) {
     document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('active'));
     el.classList.add('active');
+    // Si on change d'équipe, rafraîchir la liste des tâches prédéfinies
+    if (groupId === 'create-equipe') {
+      clearPredefined();
+      const searchVal = document.getElementById('search-predef')?.value || '';
+      renderPredefinedList(searchVal);
+    }
   }
 
   function filterUsersForAssign(search) {
