@@ -726,8 +726,6 @@
                         nom: u.nom,
                         initiales: u.initiales,
                         role: u.role,
-                equipe: u.equipe,
-                acces_modules: u.acces_modules,
                         etablissements: u.acces_etablissements && u.acces_etablissements.length > 0
                             ? u.acces_etablissements
                             : [u.etablissement]
@@ -887,6 +885,14 @@
                 url: './approvisionnement/'
             },
             {
+                id: 'cartons-jvr',
+                name: 'Cartons JVR',
+                icon: '🟡',
+                description: 'Journal de suivi RH',
+                minRole: 'responsable',
+                url: './cartons-jvr/'
+            },
+            {
                 id: 'receptions',
                 name: 'Réceptions',
                 icon: '🚛',
@@ -930,16 +936,11 @@
             modalOverlay.classList.remove('active');
         }
 
-        function canAccessModule(moduleId, minRole) {
+        function canAccessModule(minRole) {
             const roleHierarchy = { collaborateur: 1, responsable: 2, admin: 3 };
             const userLevel = roleHierarchy[currentUser.role] || 0;
             const requiredLevel = roleHierarchy[minRole] || 0;
-            if (userLevel < requiredLevel) return false;
-            if (currentUser.role === 'admin') return true;
-            if (currentUser.acces_modules && Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.length > 0) {
-                return currentUser.acces_modules.includes(moduleId);
-            }
-            return true;
+            return userLevel >= requiredLevel;
         }
 
         function getEstablishmentDisplayName(code) {
@@ -956,8 +957,6 @@
                 nom: user.nom,
                 initiales: user.initiales,
                 role: user.role,
-                equipe: user.equipe || 'tous',
-                acces_modules: user.acces_modules || null,
                 etablissement: establishment,
                 device_id: currentDevice ? currentDevice.id : null,
                 device_nom: currentDevice ? currentDevice.nom : null,
@@ -1000,7 +999,7 @@
         function renderModules() {
             modulesGrid.innerHTML = '';
 
-            const filteredModules = MODULES.filter(module => canAccessModule(module.id, module.minRole));
+            const filteredModules = MODULES.filter(module => canAccessModule(module.minRole));
 
             filteredModules.forEach(module => {
                 const card = document.createElement('div');
