@@ -173,6 +173,7 @@
         .user-role-badge.collaborateur { background: #dbeafe; color: #1d4ed8; }
         .user-role-badge.responsable { background: #fed7aa; color: #c2410c; }
         .user-role-badge.admin { background: #fecaca; color: #b91c1c; }
+        .user-role-badge.manager { color: #059669; background: #ecfdf5; }
 
         .user-inactive {
             opacity: 0.5;
@@ -551,6 +552,7 @@
             font-weight: 700; color: white; flex-shrink: 0;
         }
         .droits-avatar.admin { background: var(--orange); }
+        .droits-avatar.manager { background: #059669; }
         .droits-avatar.responsable { background: #3b82f6; }
         .droits-avatar.collaborateur { background: #8b5cf6; }
         .droits-user-name { font-weight: 600; font-size: 13px; line-height: 1.2; }
@@ -691,13 +693,14 @@
                 <div class="form-group">
                     <label for="user-code">Code PIN</label>
                     <input type="text" id="user-code" placeholder="4-6 chiffres" maxlength="6" inputmode="numeric">
-                    <div class="hint">4 chiffres = collaborateur, 5 = responsable, 6 = admin</div>
+                    <div class="hint">4 à 6 chiffres (le rôle est défini séparément)</div>
                 </div>
                 <div class="form-group">
                     <label for="user-role">Rôle</label>
                     <select id="user-role">
                         <option value="collaborateur">Collaborateur</option>
                         <option value="responsable">Responsable</option>
+                            <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
@@ -790,10 +793,11 @@
             { id: 'approvisionnement', name: 'Appro.', icon: '📦', minRole: 'responsable' },
             { id: 'receptions', name: 'Réceptions', icon: '🚛', minRole: 'responsable' },
             { id: 'checklist', name: 'Check-Lists', icon: '✅', minRole: 'collaborateur' },
-            { id: 'admin', name: 'Admin', icon: '⚙️', minRole: 'admin' }
+            { id: 'cartons-jvr', name: 'Cartons JVR', icon: '🟡', minRole: 'manager' },
+        { id: 'admin', name: 'Admin', icon: '⚙️', minRole: 'admin' }
         ];
 
-        const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, admin: 3 };
+        const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
 
         function getDefaultModules(role) {
             const level = ROLE_HIERARCHY[role] || 0;

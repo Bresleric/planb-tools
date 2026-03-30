@@ -617,12 +617,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Vérifier accès : responsable ou admin uniquement
-    const roleHierarchy = { collaborateur: 1, responsable: 2, admin: 3 };
-    if ((roleHierarchy[currentUser.role] || 0) < 2) {
+    const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+    if ((roleHierarchy[currentUser.role] || 0) < 3) {
         document.querySelector('.content').innerHTML = `
             <div class="empty-state" style="padding-top: 80px;">
                 <div class="empty-icon">🔒</div>
-                <div class="empty-text">Accès réservé aux responsables et administrateurs.</div>
+                <div class="empty-text">Accès réservé aux managers et administrateurs.</div>
             </div>`;
         document.getElementById('fab-add').style.display = 'none';
         return;
