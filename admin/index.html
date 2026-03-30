@@ -653,16 +653,16 @@
                         </div>
                         <div style="display:flex; gap:4px;">
                             <button class="droits-filter-btn active" id="vue-modules-btn" onclick="setDroitsVue('modules')">Modules</button>
-                            <button class="droits-filter-btn" id="vue-detail-btn" onclick="setDroitsVue('detail')">D\u00e9taill\u00e9</button>
+                            <button class="droits-filter-btn" id="vue-detail-btn" onclick="setDroitsVue('detail')">Détaillé</button>
                         </div>
                     </div>
                     <div id="droits-table-container">
                         <div class="loading-spinner">Chargement...</div>
                     </div>
                     <div class="droits-legend">
-                        <div class="droits-legend-item"><span class="droits-check granted">&#10003;</span> Acc\u00e8s accord\u00e9 (personnalis\u00e9)</div>
-                        <div class="droits-legend-item"><span class="droits-check role-default">&#10003;</span> Acc\u00e8s par d\u00e9faut (r\u00f4le)</div>
-                        <div class="droits-legend-item"><span class="droits-check denied">&#10007;</span> Pas d'acc\u00e8s</div>
+                        <div class="droits-legend-item"><span class="droits-check granted">&#10003;</span> Accès accordé (personnalisé)</div>
+                        <div class="droits-legend-item"><span class="droits-check role-default">&#10003;</span> Accès par défaut (rôle)</div>
+                        <div class="droits-legend-item"><span class="droits-check denied">&#10007;</span> Pas d'accès</div>
                     </div>
                 </div>
             </div>
@@ -1264,7 +1264,7 @@
             const modules = ALL_MODULES.filter(m => m.id !== 'admin');
 
             if (filtered.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun utilisateur trouv\u00e9</p>';
+                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun utilisateur trouvé</p>';
                 return;
             }
 
@@ -1294,10 +1294,10 @@
                 modules.forEach(m => {
                     const hasAccess = user.role === 'admin' || userMods.includes(m.id);
                     const isRoleDefault = !isCustom && defaultMods.includes(m.id);
-                    let cls = 'denied', icon = '\u2717';
-                    if (hasAccess && user.role === 'admin') { cls = 'granted'; icon = '\u2713'; }
-                    else if (hasAccess && isRoleDefault && !isCustom) { cls = 'role-default'; icon = '\u2713'; }
-                    else if (hasAccess) { cls = 'granted'; icon = '\u2713'; }
+                    let cls = 'denied', icon = '✗';
+                    if (hasAccess && user.role === 'admin') { cls = 'granted'; icon = '✓'; }
+                    else if (hasAccess && isRoleDefault && !isCustom) { cls = 'role-default'; icon = '✓'; }
+                    else if (hasAccess) { cls = 'granted'; icon = '✓'; }
                     html += '<td><span class="droits-check ' + cls + '">' + icon + '</span></td>';
                 });
                 html += '</tr>';
@@ -1367,7 +1367,7 @@
                     // First check module-level access
                     const hasModuleAccess = user.role === 'admin' || userMods.includes(col.moduleId);
                     if (!hasModuleAccess) {
-                        html += '<td><span class="droits-check denied">\u2717</span></td>';
+                        html += '<td><span class="droits-check denied">✗</span></td>';
                         return;
                     }
 
@@ -1377,15 +1377,15 @@
                         if (hasTabAccess) {
                             const isRoleDefault = !isCustom && defaultMods.includes(col.moduleId);
                             let cls = (user.role === 'admin') ? 'granted' : (isRoleDefault && !isCustom) ? 'role-default' : 'granted';
-                            html += '<td><span class="droits-check ' + cls + '">\u2713</span></td>';
+                            html += '<td><span class="droits-check ' + cls + '">✓</span></td>';
                         } else {
-                            html += '<td><span class="droits-check denied">\u2717</span></td>';
+                            html += '<td><span class="droits-check denied">✗</span></td>';
                         }
                     } else {
                         // No tabs defined - just show module access
                         const isRoleDefault = !isCustom && defaultMods.includes(col.moduleId);
                         let cls = (user.role === 'admin') ? 'granted' : (isRoleDefault && !isCustom) ? 'role-default' : 'granted';
-                        html += '<td><span class="droits-check ' + cls + '">\u2713</span></td>';
+                        html += '<td><span class="droits-check ' + cls + '">✓</span></td>';
                     }
                 });
                 html += '</tr>';
@@ -1443,23 +1443,23 @@
         function renderDevices() {
             const list = document.getElementById('devices-list');
             if (devices.length === 0) {
-                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun appareil enregistr\u00e9.<br>Cliquez sur "+ Ajouter" pour enregistrer un iPad.</p>';
+                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun appareil enregistré.<br>Cliquez sur "+ Ajouter" pour enregistrer un iPad.</p>';
                 return;
             }
             list.innerHTML = devices.map(d => {
                 const status = d.date_enregistrement ? (d.actif ? 'active' : 'inactive') : 'pending';
                 const statusLabel = d.date_enregistrement ? (d.actif ? 'Actif' : 'Inactif') : 'En attente';
                 const lastConn = d.derniere_connexion ? new Date(d.derniere_connexion).toLocaleDateString('fr-FR') : '-';
-                const registered = d.date_enregistrement ? new Date(d.date_enregistrement).toLocaleDateString('fr-FR') : 'Non activ\u00e9';
+                const registered = d.date_enregistrement ? new Date(d.date_enregistrement).toLocaleDateString('fr-FR') : 'Non activé';
                 const estab = d.etablissement ? (d.etablissement === 'freddy' ? 'Freddy' : 'Liesel') : 'Tous';
                 return '<div class="device-card">' +
                     '<div class="device-info">' +
                         '<div class="device-name"><span class="device-status ' + status + '"></span>' + escapeHtml(d.nom) + '</div>' +
-                        '<div class="device-meta">' + estab + ' | ' + statusLabel + ' | Derni\u00e8re connexion: ' + lastConn + ' | Enregistr\u00e9: ' + registered + '</div>' +
+                        '<div class="device-meta">' + estab + ' | ' + statusLabel + ' | Dernière connexion: ' + lastConn + ' | Enregistré: ' + registered + '</div>' +
                     '</div>' +
                     (!d.date_enregistrement ? '<div class="device-code">' + d.code_activation + '</div>' : '') +
                     '<div class="device-actions">' +
-                        '<button onclick="toggleDeviceActive(\'' + d.id + '\', ' + d.actif + ')">' + (d.actif ? 'D\u00e9sactiver' : 'Activer') + '</button>' +
+                        '<button onclick="toggleDeviceActive(\'' + d.id + '\', ' + d.actif + ')">' + (d.actif ? 'Désactiver' : 'Activer') + '</button>' +
                         '<button class="delete-btn" onclick="deleteDevice(\'' + d.id + '\')">Supprimer</button>' +
                     '</div>' +
                 '</div>';
@@ -1491,7 +1491,7 @@
             try {
                 await supabaseClient.from('devices').insert({ nom, etablissement, code_activation: code, actif: true });
                 closeDeviceModal();
-                showToast('Appareil cr\u00e9\u00e9 ! Code d\'activation : ' + code);
+                showToast('Appareil créé ! Code d\'activation : ' + code);
                 loadDevices();
             } catch (e) {
                 alert('Erreur: ' + e.message);
@@ -1504,9 +1504,9 @@
         }
 
         async function deleteDevice(id) {
-            if (!confirm('Supprimer cet appareil ? Il ne pourra plus acc\u00e9der \u00e0 PlanB Tools.')) return;
+            if (!confirm('Supprimer cet appareil ? Il ne pourra plus accéder à PlanB Tools.')) return;
             await supabaseClient.from('devices').delete().eq('id', id);
-            showToast('Appareil supprim\u00e9');
+            showToast('Appareil supprimé');
             loadDevices();
         }
 
