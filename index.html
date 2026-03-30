@@ -726,9 +726,10 @@
                         nom: u.nom,
                         initiales: u.initiales,
                         role: u.role,
+                        equipe: u.equipe || 'tous',
+                        acces_modules: u.acces_modules || null,
                         etablissements: u.acces_etablissements && u.acces_etablissements.length > 0
-                            ? u.acces_etablissements
-                            : [u.etablissement]
+                            ? u.acces_etablissements : [u.etablissement]
                     };
                 } catch (e) {
                     console.error('Erreur Supabase:', e);
@@ -889,7 +890,7 @@
                 name: 'Cartons JVR',
                 icon: '🟡',
                 description: 'Journal de suivi RH',
-                minRole: 'responsable',
+                minRole: 'manager',
                 url: './cartons-jvr/'
             },
             {
