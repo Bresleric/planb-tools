@@ -559,8 +559,9 @@ const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 }
 // ============= AUTH =============
 function getSession() {
   try {
-    const s = localStorage.getItem('planb_session');
-    return s ? JSON.parse(s) : null;
+    const user = sessionStorage.getItem('planb_user');
+    const etablissement = sessionStorage.getItem('planb_etablissement');
+    return user && etablissement ? { user: JSON.parse(user), etablissement } : null;
   } catch { return null; }
 }
 
@@ -590,7 +591,7 @@ function init() {
 }
 
 function logout() {
-  localStorage.removeItem('planb_session');
+  sessionStorage.clear();
   window.location.href = '../';
 }
 
