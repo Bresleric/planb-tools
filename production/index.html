@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Production">
+  <meta name="theme-color" content="#f97316">
+  <title>Production - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏭</text></svg>">
+  <style>
+    :root {
+      --orange: #f97316; --orange-light: #fff7ed; --orange-dark: #ea580c;
+      --green: #22c55e; --green-bg: #f0fdf4;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --blue: #3b82f6; --blue-bg: #eff6ff;
+      --purple: #8b5cf6; --purple-bg: #f5f3ff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* ====== HEADER ====== */
+    .header {
+      background: white; border-bottom: 2px solid var(--purple);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--purple); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back, .btn-logout {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-back:active, .btn-logout:active { background: var(--gray-100); }
+
+    /* ====== TABS ====== */
+    .tabs-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      display: flex; padding: 0 16px; overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 10px 16px; border: none; background: none;
+      font-size: 0.85rem; color: var(--gray-400); cursor: pointer;
+      border-bottom: 2px solid transparent; font-weight: 500;
+      white-space: nowrap;
+    }
+    .tab-btn.active { color: var(--purple); border-bottom-color: var(--purple); font-weight: 600; }
+    .tab-btn:active { background: var(--gray-50); }
+
+    /* ====== FILTER BAR ====== */
+    .filters-section {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 8px 16px;
+    }
+    .filter-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .filter-label {
+      font-size: 0.7rem; color: var(--gray-400); text-transform: uppercase;
+      letter-spacing: 0.5px; font-weight: 600; min-width: 65px;
+    }
+    .filter-chip {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-600); cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-chip:active { transform: scale(0.95); }
+    .filter-chip.active { background: var(--purple); color: white; border-color: var(--purple); }
+
+    .search-bar {
+      display: flex; gap: 8px; align-items: center; margin-top: 6px;
+    }
+    .search-input {
+      flex: 1; padding: 6px 12px 6px 32px;
+      border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      font-size: 0.85rem; background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%239ca3af' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z'/%3E%3C/svg%3E") 8px center/16px no-repeat;
+    }
+
+    /* ====== CONTENT ====== */
+    .content { flex: 1; overflow-y: auto; padding: 8px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ====== FICHE CARD (liste) ====== */
+    .fiche-card {
+      background: white; border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 12px; margin-bottom: 8px; cursor: pointer;
+      border-left: 4px solid var(--purple);
+      display: flex; align-items: center; gap: 10px;
+      transition: box-shadow .15s;
+    }
+    .fiche-card:active { box-shadow: var(--shadow-md); }
+    .fiche-card.cat-mise_en_place { border-left-color: var(--blue); }
+    .fiche-card.cat-produit_intermediaire { border-left-color: var(--orange); }
+    .fiche-card.cat-produit_fini { border-left-color: var(--green); }
+    .fiche-card.inactive { opacity: 0.5; }
+
+    .fiche-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .fiche-info { flex: 1; min-width: 0; }
+    .fiche-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fiche-meta { font-size: 0.75rem; color: var(--gray-500); display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+    .fiche-meta span { display: flex; align-items: center; gap: 2px; }
+    .fiche-badges { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .badge {
+      padding: 2px 6px; border-radius: 8px; font-size: 0.65rem;
+      font-weight: 600; white-space: nowrap;
+    }
+    .badge-cat { background: var(--purple-bg); color: var(--purple); }
+    .badge-cat.mise_en_place { background: var(--blue-bg); color: var(--blue); }
+    .badge-cat.produit_intermediaire { background: var(--orange-light); color: var(--orange-dark); }
+    .badge-cat.produit_fini { background: var(--green-bg); color: var(--green); }
+    .badge-dlc { background: #fef3c7; color: #92400e; }
+    .badge-allergene { background: var(--red-bg); color: var(--red); }
+    .badge-cost { background: var(--green-bg); color: #15803d; }
+
+    /* ====== FICHE DETAIL ====== */
+    .fiche-detail { padding: 12px; }
+    .detail-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--gray-200);
+    }
+    .detail-header h2 { font-size: 1.1rem; flex: 1; }
+    .detail-actions { display: flex; gap: 6px; }
+    .btn-icon {
+      width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: white; cursor: pointer; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-icon:active { background: var(--gray-100); }
+    .btn-icon.delete { border-color: var(--red); color: var(--red); }
+
+    .detail-section {
+      margin-bottom: 16px;
+    }
+    .detail-section h3 {
+      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-400); margin-bottom: 8px; font-weight: 600;
+    }
+
+    .info-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .info-item {
+      padding: 8px; background: var(--gray-50); border-radius: var(--radius-sm);
+    }
+    .info-item .label { font-size: 0.7rem; color: var(--gray-400); text-transform: uppercase; }
+    .info-item .value { font-size: 0.9rem; font-weight: 600; margin-top: 2px; }
+    .info-item.full { grid-column: 1 / -1; }
+
+    /* Ingredients table */
+    .ingredients-table {
+      width: 100%; border-collapse: collapse; font-size: 0.85rem;
+    }
+    .ingredients-table th {
+      text-align: left; padding: 6px 8px; background: var(--gray-100);
+      font-size: 0.7rem; text-transform: uppercase; color: var(--gray-500);
+      font-weight: 600; border-bottom: 1px solid var(--gray-200);
+    }
+    .ingredients-table td {
+      padding: 6px 8px; border-bottom: 1px solid var(--gray-100);
+    }
+    .ingredients-table tr:last-child td { border-bottom: none; }
+    .ingredients-table .total-row td {
+      font-weight: 700; border-top: 2px solid var(--gray-300);
+      background: var(--gray-50);
+    }
+
+    .allergene-chip {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 0.7rem; background: var(--red-bg); color: var(--red);
+      font-weight: 600; margin: 2px;
+    }
+
+    .instructions-text {
+      font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap;
+      padding: 10px; background: var(--gray-50); border-radius: var(--radius-sm);
+      border-left: 3px solid var(--purple);
+    }
+
+    /* ====== CREATE / EDIT FORM ====== */
+    .create-form { padding: 12px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block; font-size: 0.75rem; font-weight: 600;
+      color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase;
+    }
+    .form-row { display: flex; gap: 8px; }
+    .form-row .form-group { flex: 1; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.9rem;
+      background: white; color: var(--gray-800);
+    }
+    .form-textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-bg);
+    }
+
+    .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      padding: 6px 14px; border-radius: 16px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.8rem; color: var(--gray-600); cursor: pointer;
+    }
+    .chip.active { background: var(--purple); color: white; border-color: var(--purple); }
+    .chip:active { transform: scale(0.95); }
+
+    /* Allergen chips */
+    .allergen-chip {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-600); cursor: pointer;
+    }
+    .allergen-chip.active { background: var(--red); color: white; border-color: var(--red); }
+    .allergen-chip:active { transform: scale(0.95); }
+
+    /* Ingredient rows in form */
+    .ingredient-rows { margin-top: 8px; }
+    .ingredient-row {
+      display: flex; gap: 6px; align-items: center; margin-bottom: 6px;
+      padding: 6px; background: var(--gray-50); border-radius: var(--radius-sm);
+    }
+    .ingredient-row input, .ingredient-row select {
+      padding: 6px 8px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.8rem;
+    }
+    .ingredient-row .ing-nom { flex: 2; min-width: 80px; }
+    .ingredient-row .ing-qty { width: 60px; text-align: right; }
+    .ingredient-row .ing-unite { width: 60px; }
+    .ingredient-row .ing-prix { width: 70px; text-align: right; }
+    .ingredient-row .ing-total { width: 65px; text-align: right; font-weight: 600; font-size: 0.8rem; color: var(--gray-600); }
+    .btn-remove-ing {
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: var(--red-bg); color: var(--red); cursor: pointer;
+      font-size: 0.8rem; flex-shrink: 0;
+    }
+    .btn-add-ing {
+      padding: 6px 14px; border-radius: 16px; border: 1px dashed var(--gray-300);
+      background: white; font-size: 0.8rem; color: var(--gray-500); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-add-ing:active { background: var(--gray-50); }
+
+    .cost-summary {
+      margin-top: 8px; padding: 10px; background: var(--green-bg);
+      border-radius: var(--radius-sm); border: 1px solid #bbf7d0;
+      display: flex; justify-content: space-between; font-size: 0.85rem;
+    }
+    .cost-summary .label { color: var(--gray-600); }
+    .cost-summary .amount { font-weight: 700; color: #15803d; }
+
+    .btn-submit {
+      width: 100%; padding: 12px; border: none; border-radius: var(--radius);
+      background: var(--purple); color: white; font-size: 1rem; font-weight: 600;
+      cursor: pointer; margin-top: 12px;
+    }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-submit:active:not(:disabled) { background: #7c3aed; }
+
+    /* ====== EMPTY STATE ====== */
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--gray-400);
+    }
+    .empty-state .emoji { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 1rem; margin-bottom: 4px; color: var(--gray-500); }
+    .empty-state p { font-size: 0.85rem; }
+
+    /* ====== MODAL ====== */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.5); justify-content: center; align-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: white; border-radius: 12px; padding: 24px;
+      max-width: 400px; width: 100%; text-align: center;
+    }
+    .modal-box h3 { margin-bottom: 8px; }
+    .modal-box p { color: var(--gray-500); font-size: 0.9rem; margin-bottom: 16px; }
+    .modal-btn {
+      padding: 10px 24px; border: none; border-radius: var(--radius);
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; margin: 0 4px;
+    }
+    .modal-btn.primary { background: var(--purple); color: white; }
+    .modal-btn.danger { background: var(--red); color: white; }
+    .modal-btn.secondary { background: var(--gray-100); color: var(--gray-600); }
+
+    /* ====== TOAST ====== */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: 500;
+      color: white; z-index: 300; opacity: 0; transition: opacity .3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    /* ====== LOADING ====== */
+    .loading-overlay {
+      position: fixed; inset: 0; z-index: 250;
+      background: rgba(255,255,255,.8);
+      display: none; justify-content: center; align-items: center;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid var(--gray-200);
+      border-top-color: var(--purple); border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <a href="../" class="btn-back">← Accueil</a>
+      <h1>🏭 Production</h1>
+    </div>
+    <div class="header-right">
+      <span id="user-info"></span>
+      <button class="btn-logout" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar" id="tabs-bar">
+    <button class="tab-btn active" data-tab="fiches">📖 Fiches</button>
+    <button class="tab-btn" data-tab="create" id="tab-create-btn">➕ Créer</button>
+  </div>
+
+  <!-- FILTERS (fiches list) -->
+  <div class="filters-section" id="filters-section">
+    <div class="filter-row">
+      <span class="filter-label">Catégorie</span>
+      <button class="filter-chip active" data-cat="all">Toutes</button>
+      <button class="filter-chip" data-cat="mise_en_place">Mise en place</button>
+      <button class="filter-chip" data-cat="produit_intermediaire">Prod. interméd.</button>
+      <button class="filter-chip" data-cat="produit_fini">Prod. fini</button>
+    </div>
+    <div class="search-bar">
+      <input type="text" class="search-input" id="search-input" placeholder="Rechercher une fiche...">
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <!-- TAB: Liste des fiches -->
+    <div class="tab-content active" id="tab-fiches"></div>
+
+    <!-- TAB: Créer / Éditer -->
+    <div class="tab-content" id="tab-create">
+      <div class="create-form">
+        <input type="hidden" id="edit-id" value="">
+
+        <div class="form-group">
+          <label>Nom de la fiche *</label>
+          <input type="text" class="form-input" id="f-nom" placeholder="Ex: Sauce béchamel">
+        </div>
+
+        <div class="form-group">
+          <label>Catégorie *</label>
+          <div class="chip-group" id="f-categorie">
+            <button class="chip active" data-val="produit_fini">Produit fini</button>
+            <button class="chip" data-val="produit_intermediaire">Produit intermédiaire</button>
+            <button class="chip" data-val="mise_en_place">Mise en place</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Sous-catégorie</label>
+          <input type="text" class="form-input" id="f-sous-cat" placeholder="Ex: sauces, garnitures, desserts...">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rendement (quantité)</label>
+            <input type="number" class="form-input" id="f-rendement-qty" min="0" step="0.1" placeholder="Ex: 10">
+          </div>
+          <div class="form-group">
+            <label>Unité rendement</label>
+            <select class="form-select" id="f-rendement-unite">
+              <option value="portions">portions</option>
+              <option value="kg">kg</option>
+              <option value="litres">litres</option>
+              <option value="pieces">pièces</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Préparation (min)</label>
+            <input type="number" class="form-input" id="f-temps-prep" min="0" placeholder="30">
+          </div>
+          <div class="form-group">
+            <label>Cuisson (min)</label>
+            <input type="number" class="form-input" id="f-temps-cuisson" min="0" placeholder="15">
+          </div>
+          <div class="form-group">
+            <label>Repos (min)</label>
+            <input type="number" class="form-input" id="f-temps-repos" min="0" placeholder="0">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>DLC (jours)</label>
+            <input type="number" class="form-input" id="f-dlc-jours" min="0" placeholder="3">
+          </div>
+          <div class="form-group">
+            <label>ou DLC (heures)</label>
+            <input type="number" class="form-input" id="f-dlc-heures" min="0" placeholder="">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Température stockage</label>
+            <select class="form-select" id="f-temperature">
+              <option value="0-4°C">0-4°C (réfrigéré)</option>
+              <option value="-18°C">-18°C (congelé)</option>
+              <option value="ambiant">Ambiant</option>
+              <option value="chaud">Chaud (>63°C)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Conditionnement</label>
+            <input type="text" class="form-input" id="f-conditionnement" placeholder="Ex: bac GN 1/1, sous-vide...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Allergènes</label>
+          <div class="chip-group" id="f-allergenes">
+            <button class="allergen-chip" data-val="gluten">Gluten</button>
+            <button class="allergen-chip" data-val="crustaces">Crustacés</button>
+            <button class="allergen-chip" data-val="oeufs">Oeufs</button>
+            <button class="allergen-chip" data-val="poissons">Poissons</button>
+            <button class="allergen-chip" data-val="arachides">Arachides</button>
+            <button class="allergen-chip" data-val="soja">Soja</button>
+            <button class="allergen-chip" data-val="lait">Lait</button>
+            <button class="allergen-chip" data-val="fruits_a_coque">Fruits à coque</button>
+            <button class="allergen-chip" data-val="celeri">Céleri</button>
+            <button class="allergen-chip" data-val="moutarde">Moutarde</button>
+            <button class="allergen-chip" data-val="sesame">Sésame</button>
+            <button class="allergen-chip" data-val="sulfites">Sulfites</button>
+            <button class="allergen-chip" data-val="lupin">Lupin</button>
+            <button class="allergen-chip" data-val="mollusques">Mollusques</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Ingrédients</label>
+          <div class="ingredient-rows" id="ingredient-rows"></div>
+          <button class="btn-add-ing" id="btn-add-ingredient">+ Ajouter un ingrédient</button>
+          <div class="cost-summary" id="cost-summary" style="display:none;">
+            <span class="label">Coût total matière :</span>
+            <span class="amount" id="cost-total">0.00 €</span>
+          </div>
+          <div class="cost-summary" id="cost-portion-summary" style="display:none; margin-top: 4px;">
+            <span class="label">Coût par portion :</span>
+            <span class="amount" id="cost-portion">0.00 €</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Instructions de préparation</label>
+          <textarea class="form-textarea" id="f-instructions" rows="6" placeholder="Étapes de préparation..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Notes complémentaires</label>
+          <textarea class="form-textarea" id="f-notes" rows="3" placeholder="Remarques, astuces..."></textarea>
+        </div>
+
+        <button class="btn-submit" id="btn-save-fiche" onclick="saveFiche()">
+          Enregistrer la fiche
+        </button>
+      </div>
+    </div>
+
+    <!-- DETAIL VIEW (hidden by default, shown when clicking a fiche) -->
+    <div class="tab-content" id="tab-detail"></div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-box">
+      <h3 id="modal-title">Confirmation</h3>
+      <p id="modal-message"></p>
+      <div id="modal-buttons"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+  </div>
+
+<script>
+// ============= CONFIG =============
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentUser = null;
+let currentEtablissement = null;
+let allFiches = [];
+let allIngredients = {}; // ficheId → [ingredients]
+let currentFilter = 'all';
+let searchTerm = '';
+let editingFicheId = null;
+
+const CATEGORIES = {
+  mise_en_place: 'Mise en place',
+  produit_intermediaire: 'Produit intermédiaire',
+  produit_fini: 'Produit fini'
+};
+
+const CAT_ICONS = {
+  mise_en_place: '🔪',
+  produit_intermediaire: '🥘',
+  produit_fini: '✨'
+};
+
+const ALLERGENES_LABELS = {
+  gluten: 'Gluten', crustaces: 'Crustacés', oeufs: 'Oeufs', poissons: 'Poissons',
+  arachides: 'Arachides', soja: 'Soja', lait: 'Lait', fruits_a_coque: 'Fruits à coque',
+  celeri: 'Céleri', moutarde: 'Moutarde', sesame: 'Sésame', sulfites: 'Sulfites',
+  lupin: 'Lupin', mollusques: 'Mollusques'
+};
+
+const UNITES = ['kg', 'g', 'l', 'cl', 'ml', 'pièce', 'botte', 'sachet', 'boîte', 'tranche'];
+
+const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+
+// ============= AUTH =============
+function getSession() {
+  try {
+    const s = localStorage.getItem('planb_session');
+    return s ? JSON.parse(s) : null;
+  } catch { return null; }
+}
+
+function init() {
+  const session = getSession();
+  if (!session || !session.user || !session.etablissement) {
+    window.location.href = '../';
+    return;
+  }
+  currentUser = session.user;
+  currentEtablissement = session.etablissement;
+
+  const userInfo = document.getElementById('user-info');
+  userInfo.textContent = `${currentUser.initiales || currentUser.nom} · ${currentEtablissement}`;
+
+  // Hide create tab if not manager+
+  const userLevel = roleHierarchy[currentUser.role] || 0;
+  if (userLevel < roleHierarchy.manager) {
+    document.getElementById('tab-create-btn').style.display = 'none';
+  }
+
+  setupTabs();
+  setupFilters();
+  setupAllergens();
+  setupIngredientForm();
+  loadFiches();
+}
+
+function logout() {
+  localStorage.removeItem('planb_session');
+  window.location.href = '../';
+}
+
+function canEdit() {
+  return (roleHierarchy[currentUser.role] || 0) >= roleHierarchy.manager;
+}
+
+// ============= TABS =============
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      switchTab(tab);
+    });
+  });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`)?.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`tab-${tab}`)?.classList.add('active');
+
+  // Show/hide filters
+  const filtersSection = document.getElementById('filters-section');
+  filtersSection.style.display = (tab === 'fiches') ? '' : 'none';
+
+  if (tab === 'create' && !editingFicheId) {
+    resetForm();
+  }
+}
+
+// ============= FILTERS =============
+function setupFilters() {
+  document.querySelectorAll('.filter-chip[data-cat]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip[data-cat]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.dataset.cat;
+      renderFiches();
+    });
+  });
+
+  document.getElementById('search-input').addEventListener('input', (e) => {
+    searchTerm = e.target.value.toLowerCase().trim();
+    renderFiches();
+  });
+}
+
+// ============= ALLERGENS =============
+function setupAllergens() {
+  document.querySelectorAll('.allergen-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+    });
+  });
+}
+
+// ============= INGREDIENTS FORM =============
+let ingredientCounter = 0;
+
+function setupIngredientForm() {
+  document.getElementById('btn-add-ingredient').addEventListener('click', () => {
+    addIngredientRow();
+  });
+}
+
+function addIngredientRow(data = {}) {
+  ingredientCounter++;
+  const id = ingredientCounter;
+  const container = document.getElementById('ingredient-rows');
+
+  const row = document.createElement('div');
+  row.className = 'ingredient-row';
+  row.dataset.id = id;
+  row.innerHTML = `
+    <input type="text" class="ing-nom" placeholder="Ingrédient" value="${data.nom || ''}">
+    <input type="number" class="ing-qty" placeholder="Qté" min="0" step="0.01" value="${data.quantite || ''}">
+    <select class="ing-unite">
+      ${UNITES.map(u => `<option value="${u}" ${u === (data.unite || 'kg') ? 'selected' : ''}>${u}</option>`).join('')}
+    </select>
+    <input type="number" class="ing-prix" placeholder="P.U. €" min="0" step="0.01" value="${data.prix_unitaire || ''}">
+    <span class="ing-total">${((data.quantite || 0) * (data.prix_unitaire || 0)).toFixed(2)} €</span>
+    <button class="btn-remove-ing" onclick="removeIngredientRow(${id})">×</button>
+  `;
+
+  // Auto-calc on qty/price change
+  const qtyInput = row.querySelector('.ing-qty');
+  const prixInput = row.querySelector('.ing-prix');
+  const totalSpan = row.querySelector('.ing-total');
+
+  const recalc = () => {
+    const q = parseFloat(qtyInput.value) || 0;
+    const p = parseFloat(prixInput.value) || 0;
+    totalSpan.textContent = (q * p).toFixed(2) + ' €';
+    updateCostSummary();
+  };
+  qtyInput.addEventListener('input', recalc);
+  prixInput.addEventListener('input', recalc);
+
+  container.appendChild(row);
+  updateCostSummary();
+}
+
+function removeIngredientRow(id) {
+  const row = document.querySelector(`.ingredient-row[data-id="${id}"]`);
+  if (row) row.remove();
+  updateCostSummary();
+}
+
+function updateCostSummary() {
+  const rows = document.querySelectorAll('.ingredient-row');
+  let total = 0;
+  rows.forEach(row => {
+    const q = parseFloat(row.querySelector('.ing-qty')?.value) || 0;
+    const p = parseFloat(row.querySelector('.ing-prix')?.value) || 0;
+    total += q * p;
+  });
+
+  const costDiv = document.getElementById('cost-summary');
+  const portionDiv = document.getElementById('cost-portion-summary');
+  const rendement = parseFloat(document.getElementById('f-rendement-qty')?.value) || 0;
+
+  if (rows.length > 0) {
+    costDiv.style.display = 'flex';
+    document.getElementById('cost-total').textContent = total.toFixed(2) + ' €';
+
+    if (rendement > 0) {
+      portionDiv.style.display = 'flex';
+      document.getElementById('cost-portion').textContent = (total / rendement).toFixed(2) + ' €';
+    } else {
+      portionDiv.style.display = 'none';
+    }
+  } else {
+    costDiv.style.display = 'none';
+    portionDiv.style.display = 'none';
+  }
+}
+
+// ============= DB OPERATIONS =============
+const DB = {
+  async getFiches() {
+    const { data, error } = await sb
+      .from('fiches_techniques')
+      .select('*')
+      .eq('etablissement', currentEtablissement)
+      .order('nom');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getIngredients(ficheId) {
+    const { data, error } = await sb
+      .from('fiche_ingredients')
+      .select('*')
+      .eq('fiche_id', ficheId)
+      .order('ordre');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async saveFiche(fiche) {
+    if (fiche.id) {
+      const { data, error } = await sb.from('fiches_techniques').update(fiche).eq('id', fiche.id).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await sb.from('fiches_techniques').insert(fiche).select().single();
+      if (error) throw error;
+      return data;
+    }
+  },
+
+  async saveIngredients(ficheId, ingredients) {
+    // Delete existing, then insert new
+    await sb.from('fiche_ingredients').delete().eq('fiche_id', ficheId);
+    if (ingredients.length > 0) {
+      const rows = ingredients.map((ing, i) => ({
+        fiche_id: ficheId,
+        nom: ing.nom,
+        quantite: ing.quantite,
+        unite: ing.unite,
+        prix_unitaire: ing.prix_unitaire,
+        cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
+        ordre: i
+      }));
+      const { error } = await sb.from('fiche_ingredients').insert(rows);
+      if (error) throw error;
+    }
+  },
+
+  async deleteFiche(id) {
+    // Ingredients cascade-deleted via FK
+    const { error } = await sb.from('fiches_techniques').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async toggleFicheActive(id, actif) {
+    const { error } = await sb.from('fiches_techniques').update({ actif }).eq('id', id);
+    if (error) throw error;
+  }
+};
+
+// ============= LOAD & RENDER =============
+async function loadFiches() {
+  showLoading(true);
+  try {
+    allFiches = await DB.getFiches();
+    renderFiches();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur de chargement', 'error');
+  }
+  showLoading(false);
+}
+
+function renderFiches() {
+  const container = document.getElementById('tab-fiches');
+  let fiches = [...allFiches];
+
+  // Filter by category
+  if (currentFilter !== 'all') {
+    fiches = fiches.filter(f => f.categorie === currentFilter);
+  }
+
+  // Filter by search
+  if (searchTerm) {
+    fiches = fiches.filter(f =>
+      f.nom.toLowerCase().includes(searchTerm) ||
+      (f.sous_categorie || '').toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter out inactive for non-managers
+  if (!canEdit()) {
+    fiches = fiches.filter(f => f.actif !== false);
+  }
+
+  if (fiches.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="emoji">📖</div>
+        <h3>${searchTerm || currentFilter !== 'all' ? 'Aucune fiche trouvée' : 'Aucune fiche technique'}</h3>
+        <p>${canEdit() ? 'Créez votre première fiche dans l\'onglet Créer' : 'Les fiches seront ajoutées par les managers'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = fiches.map(f => {
+    const catClass = `cat-${f.categorie}`;
+    const inactiveClass = f.actif === false ? 'inactive' : '';
+    const icon = CAT_ICONS[f.categorie] || '📖';
+    const catLabel = CATEGORIES[f.categorie] || f.categorie;
+
+    const metaParts = [];
+    if (f.rendement_quantite) metaParts.push(`<span>📦 ${f.rendement_quantite} ${f.rendement_unite || 'portions'}</span>`);
+    if (f.dlc_jours) metaParts.push(`<span>⏱️ DLC ${f.dlc_jours}j</span>`);
+    else if (f.dlc_heures) metaParts.push(`<span>⏱️ DLC ${f.dlc_heures}h</span>`);
+    if (f.temps_preparation) metaParts.push(`<span>👨‍🍳 ${f.temps_preparation}min</span>`);
+    if (f.cout_portion > 0) metaParts.push(`<span>💶 ${parseFloat(f.cout_portion).toFixed(2)}€/p</span>`);
+
+    const badges = [];
+    badges.push(`<span class="badge badge-cat ${f.categorie}">${catLabel}</span>`);
+    if (f.allergenes && f.allergenes.length > 0) {
+      badges.push(`<span class="badge badge-allergene">⚠️ ${f.allergenes.length} allerg.</span>`);
+    }
+
+    return `
+      <div class="fiche-card ${catClass} ${inactiveClass}" onclick="viewFiche('${f.id}')">
+        <div class="fiche-icon">${icon}</div>
+        <div class="fiche-info">
+          <div class="fiche-name">${f.nom}${f.actif === false ? ' (inactive)' : ''}</div>
+          <div class="fiche-meta">${metaParts.join('')}</div>
+        </div>
+        <div class="fiche-badges">${badges.join('')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============= VIEW FICHE DETAIL =============
+async function viewFiche(id) {
+  const fiche = allFiches.find(f => f.id === id);
+  if (!fiche) return;
+
+  showLoading(true);
+  let ingredients = [];
+  try {
+    ingredients = await DB.getIngredients(id);
+    allIngredients[id] = ingredients;
+  } catch (e) {
+    console.error(e);
+  }
+  showLoading(false);
+
+  const container = document.getElementById('tab-detail');
+  const catLabel = CATEGORIES[fiche.categorie] || fiche.categorie;
+  const icon = CAT_ICONS[fiche.categorie] || '📖';
+
+  // Build info grid
+  let infoHTML = '<div class="info-grid">';
+  infoHTML += `<div class="info-item"><div class="label">Catégorie</div><div class="value">${icon} ${catLabel}</div></div>`;
+  if (fiche.sous_categorie) infoHTML += `<div class="info-item"><div class="label">Sous-catégorie</div><div class="value">${fiche.sous_categorie}</div></div>`;
+  if (fiche.rendement_quantite) infoHTML += `<div class="info-item"><div class="label">Rendement</div><div class="value">${fiche.rendement_quantite} ${fiche.rendement_unite || 'portions'}</div></div>`;
+  if (fiche.temperature_stockage) infoHTML += `<div class="info-item"><div class="label">Température</div><div class="value">${fiche.temperature_stockage}</div></div>`;
+  if (fiche.dlc_jours) infoHTML += `<div class="info-item"><div class="label">DLC</div><div class="value">${fiche.dlc_jours} jours</div></div>`;
+  else if (fiche.dlc_heures) infoHTML += `<div class="info-item"><div class="label">DLC</div><div class="value">${fiche.dlc_heures} heures</div></div>`;
+  if (fiche.conditionnement) infoHTML += `<div class="info-item"><div class="label">Conditionnement</div><div class="value">${fiche.conditionnement}</div></div>`;
+
+  // Temps
+  const temps = [];
+  if (fiche.temps_preparation) temps.push(`Prépa: ${fiche.temps_preparation}min`);
+  if (fiche.temps_cuisson) temps.push(`Cuisson: ${fiche.temps_cuisson}min`);
+  if (fiche.temps_repos) temps.push(`Repos: ${fiche.temps_repos}min`);
+  if (temps.length) {
+    const totalMin = (fiche.temps_preparation || 0) + (fiche.temps_cuisson || 0) + (fiche.temps_repos || 0);
+    infoHTML += `<div class="info-item full"><div class="label">Temps total</div><div class="value">${temps.join(' · ')} = ${totalMin}min</div></div>`;
+  }
+  infoHTML += '</div>';
+
+  // Allergènes
+  let allergenesHTML = '';
+  if (fiche.allergenes && fiche.allergenes.length > 0) {
+    allergenesHTML = `
+      <div class="detail-section">
+        <h3>⚠️ Allergènes</h3>
+        <div>${fiche.allergenes.map(a => `<span class="allergene-chip">${ALLERGENES_LABELS[a] || a}</span>`).join('')}</div>
+      </div>
+    `;
+  }
+
+  // Ingredients table
+  let ingredientsHTML = '';
+  if (ingredients.length > 0) {
+    let totalCost = 0;
+    const rows = ingredients.map(ing => {
+      const cost = (ing.quantite || 0) * (ing.prix_unitaire || 0);
+      totalCost += cost;
+      return `
+        <tr>
+          <td>${ing.nom}</td>
+          <td style="text-align:right">${ing.quantite}</td>
+          <td>${ing.unite}</td>
+          <td style="text-align:right">${ing.prix_unitaire > 0 ? parseFloat(ing.prix_unitaire).toFixed(2) + ' €' : '-'}</td>
+          <td style="text-align:right">${cost > 0 ? cost.toFixed(2) + ' €' : '-'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const portionCost = fiche.rendement_quantite > 0 ? (totalCost / fiche.rendement_quantite) : 0;
+
+    ingredientsHTML = `
+      <div class="detail-section">
+        <h3>🥗 Ingrédients</h3>
+        <table class="ingredients-table">
+          <thead>
+            <tr><th>Ingrédient</th><th style="text-align:right">Qté</th><th>Unité</th><th style="text-align:right">P.U.</th><th style="text-align:right">Total</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="4">Coût total matière</td>
+              <td style="text-align:right">${totalCost.toFixed(2)} €</td>
+            </tr>
+            ${portionCost > 0 ? `<tr class="total-row"><td colspan="4">Coût par portion (${fiche.rendement_quantite} ${fiche.rendement_unite || 'portions'})</td><td style="text-align:right">${portionCost.toFixed(2)} €</td></tr>` : ''}
+          </tfoot>
+        </table>
+      </div>
+    `;
+  }
+
+  // Instructions
+  let instructionsHTML = '';
+  if (fiche.instructions) {
+    instructionsHTML = `
+      <div class="detail-section">
+        <h3>📝 Instructions</h3>
+        <div class="instructions-text">${escapeHtml(fiche.instructions)}</div>
+      </div>
+    `;
+  }
+
+  // Notes
+  let notesHTML = '';
+  if (fiche.notes) {
+    notesHTML = `
+      <div class="detail-section">
+        <h3>💡 Notes</h3>
+        <div class="instructions-text" style="border-left-color: var(--orange);">${escapeHtml(fiche.notes)}</div>
+      </div>
+    `;
+  }
+
+  // Actions for managers
+  let actionsHTML = '';
+  if (canEdit()) {
+    actionsHTML = `
+      <button class="btn-icon" onclick="editFiche('${fiche.id}')" title="Modifier">✏️</button>
+      <button class="btn-icon" onclick="toggleActive('${fiche.id}', ${!fiche.actif})" title="${fiche.actif !== false ? 'Désactiver' : 'Activer'}">${fiche.actif !== false ? '🚫' : '✅'}</button>
+      <button class="btn-icon delete" onclick="confirmDeleteFiche('${fiche.id}')" title="Supprimer">🗑️</button>
+    `;
+  }
+
+  // Metadata
+  const createdDate = fiche.created_at ? new Date(fiche.created_at).toLocaleDateString('fr-FR') : '-';
+  const updatedDate = fiche.updated_at ? new Date(fiche.updated_at).toLocaleDateString('fr-FR') : '-';
+
+  container.innerHTML = `
+    <div class="fiche-detail">
+      <div class="detail-header">
+        <button class="btn-icon" onclick="backToList()" title="Retour">←</button>
+        <h2>${icon} ${fiche.nom}</h2>
+        <div class="detail-actions">${actionsHTML}</div>
+      </div>
+
+      <div class="detail-section">
+        <h3>ℹ️ Informations générales</h3>
+        ${infoHTML}
+      </div>
+
+      ${allergenesHTML}
+      ${ingredientsHTML}
+      ${instructionsHTML}
+      ${notesHTML}
+
+      <div class="detail-section" style="margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--gray-200);">
+        <div style="font-size: 0.7rem; color: var(--gray-400);">
+          Créée le ${createdDate}${fiche.cree_par_nom ? ` par ${fiche.cree_par_nom}` : ''}
+          ${fiche.modifie_par_nom ? ` · Modifiée le ${updatedDate} par ${fiche.modifie_par_nom}` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Show detail, hide other tabs
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-detail').classList.add('active');
+  document.getElementById('filters-section').style.display = 'none';
+}
+
+function backToList() {
+  editingFicheId = null;
+  switchTab('fiches');
+}
+
+// ============= EDIT FICHE =============
+async function editFiche(id) {
+  if (!canEdit()) return;
+
+  const fiche = allFiches.find(f => f.id === id);
+  if (!fiche) return;
+
+  editingFicheId = id;
+  document.getElementById('edit-id').value = id;
+
+  // Populate form
+  document.getElementById('f-nom').value = fiche.nom || '';
+  document.getElementById('f-sous-cat').value = fiche.sous_categorie || '';
+  document.getElementById('f-rendement-qty').value = fiche.rendement_quantite || '';
+  document.getElementById('f-rendement-unite').value = fiche.rendement_unite || 'portions';
+  document.getElementById('f-temps-prep').value = fiche.temps_preparation || '';
+  document.getElementById('f-temps-cuisson').value = fiche.temps_cuisson || '';
+  document.getElementById('f-temps-repos').value = fiche.temps_repos || '';
+  document.getElementById('f-dlc-jours').value = fiche.dlc_jours || '';
+  document.getElementById('f-dlc-heures').value = fiche.dlc_heures || '';
+  document.getElementById('f-temperature').value = fiche.temperature_stockage || '0-4°C';
+  document.getElementById('f-conditionnement').value = fiche.conditionnement || '';
+  document.getElementById('f-instructions').value = fiche.instructions || '';
+  document.getElementById('f-notes').value = fiche.notes || '';
+
+  // Category chips
+  document.querySelectorAll('#f-categorie .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.val === fiche.categorie);
+  });
+
+  // Allergens
+  const allergens = fiche.allergenes || [];
+  document.querySelectorAll('.allergen-chip').forEach(c => {
+    c.classList.toggle('active', allergens.includes(c.dataset.val));
+  });
+
+  // Load & populate ingredients
+  const container = document.getElementById('ingredient-rows');
+  container.innerHTML = '';
+  ingredientCounter = 0;
+
+  try {
+    const ingredients = allIngredients[id] || await DB.getIngredients(id);
+    ingredients.forEach(ing => addIngredientRow(ing));
+  } catch (e) {
+    console.error(e);
+  }
+
+  // Update button text
+  document.getElementById('btn-save-fiche').textContent = 'Mettre à jour la fiche';
+
+  switchTab('create');
+}
+
+// ============= SAVE FICHE =============
+async function saveFiche() {
+  if (!canEdit()) return;
+
+  const nom = document.getElementById('f-nom').value.trim();
+  if (!nom) {
+    showToast('Le nom est obligatoire', 'error');
+    return;
+  }
+
+  const categorie = document.querySelector('#f-categorie .chip.active')?.dataset.val || 'produit_fini';
+  const allergenes = Array.from(document.querySelectorAll('.allergen-chip.active')).map(c => c.dataset.val);
+
+  // Gather ingredients
+  const ingredientRows = document.querySelectorAll('.ingredient-row');
+  const ingredients = [];
+  let coutTotal = 0;
+
+  ingredientRows.forEach(row => {
+    const ingNom = row.querySelector('.ing-nom').value.trim();
+    if (!ingNom) return;
+    const qty = parseFloat(row.querySelector('.ing-qty').value) || 0;
+    const unite = row.querySelector('.ing-unite').value;
+    const prix = parseFloat(row.querySelector('.ing-prix').value) || 0;
+    const cost = qty * prix;
+    coutTotal += cost;
+    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix });
+  });
+
+  const rendement = parseFloat(document.getElementById('f-rendement-qty').value) || 0;
+  const coutPortion = rendement > 0 ? coutTotal / rendement : 0;
+
+  const fiche = {
+    nom,
+    categorie,
+    sous_categorie: document.getElementById('f-sous-cat').value.trim() || null,
+    rendement_quantite: rendement || null,
+    rendement_unite: document.getElementById('f-rendement-unite').value,
+    temps_preparation: parseInt(document.getElementById('f-temps-prep').value) || null,
+    temps_cuisson: parseInt(document.getElementById('f-temps-cuisson').value) || null,
+    temps_repos: parseInt(document.getElementById('f-temps-repos').value) || null,
+    dlc_jours: parseInt(document.getElementById('f-dlc-jours').value) || null,
+    dlc_heures: parseInt(document.getElementById('f-dlc-heures').value) || null,
+    temperature_stockage: document.getElementById('f-temperature').value,
+    conditionnement: document.getElementById('f-conditionnement').value.trim() || null,
+    allergenes,
+    instructions: document.getElementById('f-instructions').value.trim() || null,
+    notes: document.getElementById('f-notes').value.trim() || null,
+    cout_total: coutTotal,
+    cout_portion: coutPortion,
+    etablissement: currentEtablissement,
+    updated_at: new Date().toISOString()
+  };
+
+  const editId = document.getElementById('edit-id').value;
+  if (editId) {
+    fiche.id = editId;
+    fiche.modifie_par_id = currentUser.id;
+    fiche.modifie_par_nom = currentUser.nom;
+  } else {
+    fiche.cree_par_id = currentUser.id;
+    fiche.cree_par_nom = currentUser.nom;
+  }
+
+  showLoading(true);
+  try {
+    const saved = await DB.saveFiche(fiche);
+    await DB.saveIngredients(saved.id, ingredients);
+    showToast(editId ? 'Fiche mise à jour' : 'Fiche créée', 'success');
+    editingFicheId = null;
+    document.getElementById('edit-id').value = '';
+    document.getElementById('btn-save-fiche').textContent = 'Enregistrer la fiche';
+    await loadFiches();
+    switchTab('fiches');
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function resetForm() {
+  editingFicheId = null;
+  document.getElementById('edit-id').value = '';
+  document.getElementById('f-nom').value = '';
+  document.getElementById('f-sous-cat').value = '';
+  document.getElementById('f-rendement-qty').value = '';
+  document.getElementById('f-rendement-unite').value = 'portions';
+  document.getElementById('f-temps-prep').value = '';
+  document.getElementById('f-temps-cuisson').value = '';
+  document.getElementById('f-temps-repos').value = '';
+  document.getElementById('f-dlc-jours').value = '';
+  document.getElementById('f-dlc-heures').value = '';
+  document.getElementById('f-temperature').value = '0-4°C';
+  document.getElementById('f-conditionnement').value = '';
+  document.getElementById('f-instructions').value = '';
+  document.getElementById('f-notes').value = '';
+
+  document.querySelectorAll('#f-categorie .chip').forEach((c, i) => c.classList.toggle('active', i === 0));
+  document.querySelectorAll('.allergen-chip').forEach(c => c.classList.remove('active'));
+
+  document.getElementById('ingredient-rows').innerHTML = '';
+  ingredientCounter = 0;
+  document.getElementById('cost-summary').style.display = 'none';
+  document.getElementById('cost-portion-summary').style.display = 'none';
+  document.getElementById('btn-save-fiche').textContent = 'Enregistrer la fiche';
+}
+
+// ============= DELETE / TOGGLE =============
+function confirmDeleteFiche(id) {
+  const fiche = allFiches.find(f => f.id === id);
+  if (!fiche) return;
+
+  showConfirmModal(
+    'Supprimer la fiche',
+    `Êtes-vous sûr de vouloir supprimer "${fiche.nom}" ? Cette action est irréversible.`,
+    async () => {
+      showLoading(true);
+      try {
+        await DB.deleteFiche(id);
+        showToast('Fiche supprimée', 'success');
+        await loadFiches();
+        backToList();
+      } catch (e) {
+        showToast('Erreur: ' + e.message, 'error');
+      }
+      showLoading(false);
+    }
+  );
+}
+
+async function toggleActive(id, newState) {
+  showLoading(true);
+  try {
+    await DB.toggleFicheActive(id, newState);
+    showToast(newState ? 'Fiche réactivée' : 'Fiche désactivée', 'success');
+    await loadFiches();
+    viewFiche(id);
+  } catch (e) {
+    showToast('Erreur: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+// ============= UTILITIES =============
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function showToast(msg, type = 'success') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = `toast ${type} show`;
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function showLoading(on) {
+  document.getElementById('loading').classList.toggle('active', on);
+}
+
+function showConfirmModal(title, message, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-message').textContent = message;
+  document.getElementById('modal-buttons').innerHTML = `
+    <button class="modal-btn secondary" onclick="closeModal()">Annuler</button>
+    <button class="modal-btn danger" id="modal-confirm">Supprimer</button>
+  `;
+  document.getElementById('modal').classList.add('active');
+  document.getElementById('modal-confirm').onclick = () => {
+    closeModal();
+    onConfirm();
+  };
+}
+
+function showModal(message) {
+  document.getElementById('modal-title').textContent = 'Information';
+  document.getElementById('modal-message').textContent = message;
+  document.getElementById('modal-buttons').innerHTML = `
+    <button class="modal-btn primary" onclick="closeModal()">OK</button>
+  `;
+  document.getElementById('modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+// Listen for rendement changes to recalculate cost per portion
+document.getElementById('f-rendement-qty')?.addEventListener('input', updateCostSummary);
+
+// ============= INIT =============
+init();
+</script>
+</body>
+</html>
