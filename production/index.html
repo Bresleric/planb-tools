@@ -327,6 +327,67 @@
       animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ====== PRODUCTIONS ====== */
+    .productions-container { padding: 12px; }
+    .productions-by-lot { margin-bottom: 16px; }
+    .lot-header {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-400); font-weight: 700; padding: 12px 8px 8px;
+      border-top: 1px solid var(--gray-200); margin-top: 8px;
+    }
+    .productions-by-lot:first-child .lot-header { border-top: none; margin-top: 0; }
+
+    .production-card {
+      background: white; border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 12px; margin-bottom: 8px; cursor: pointer;
+      border-left: 4px solid var(--purple);
+      display: flex; align-items: center; gap: 10px;
+      transition: box-shadow .15s;
+    }
+    .production-card:active { box-shadow: var(--shadow-md); }
+    .production-card.cat-mise_en_place { border-left-color: var(--blue); }
+    .production-card.cat-produit_intermediaire { border-left-color: var(--orange); }
+    .production-card.cat-produit_fini { border-left-color: var(--green); }
+
+    .production-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .production-info { flex: 1; min-width: 0; }
+    .production-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .production-meta { font-size: 0.75rem; color: var(--gray-500); display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+    .production-meta span { display: flex; align-items: center; gap: 2px; }
+
+    .production-form { padding: 0; }
+    .production-form .form-group { margin-bottom: 12px; }
+
+    .fab-button {
+      position: fixed; bottom: 20px; right: 20px; z-index: 150;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--purple); color: white; border: none;
+      font-size: 1.5rem; cursor: pointer; box-shadow: var(--shadow-md);
+      display: none; align-items: center; justify-content: center;
+    }
+    .fab-button.active { display: flex; }
+    .fab-button:active { background: #7c3aed; }
+
+    .etiquette-modal {
+      position: fixed; inset: 0; z-index: 250;
+      background: rgba(0,0,0,.5); display: none;
+      justify-content: center; align-items: center; padding: 20px;
+    }
+    .etiquette-modal.active { display: flex; }
+    .etiquette-card {
+      background: white; border-radius: 12px; padding: 24px;
+      max-width: 400px; width: 100%;
+      border: 2px solid var(--purple); text-align: center;
+    }
+    .etiquette-title { font-size: 1.3rem; font-weight: 700; color: var(--gray-800); margin-bottom: 12px; }
+    .etiquette-section { margin-bottom: 12px; font-size: 0.9rem; }
+    .etiquette-label { color: var(--gray-500); font-size: 0.7rem; text-transform: uppercase; }
+    .etiquette-value { font-weight: 600; color: var(--gray-800); margin-top: 2px; }
+    .etiquette-close { width: 100%; padding: 10px; margin-top: 12px; border: none;
+      background: var(--purple); color: white; border-radius: var(--radius);
+      font-weight: 600; cursor: pointer; }
+    .etiquette-close:active { background: #7c3aed; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -347,6 +408,7 @@
   <!-- TABS -->
   <div class="tabs-bar" id="tabs-bar">
     <button class="tab-btn active" data-tab="fiches">📖 Fiches</button>
+    <button class="tab-btn" data-tab="productions">📦 Productions</button>
     <button class="tab-btn" data-tab="create" id="tab-create-btn">➕ Créer</button>
   </div>
 
@@ -364,10 +426,21 @@
     </div>
   </div>
 
+  <!-- FILTERS (productions list) -->
+  <div class="filters-section" id="filters-productions" style="display:none;">
+    <div class="filter-row">
+      <span class="filter-label">Date</span>
+      <input type="date" id="productions-date" class="search-input" style="flex:1; padding:6px 12px; margin-top:0;">
+    </div>
+  </div>
+
   <!-- CONTENT -->
   <div class="content">
     <!-- TAB: Liste des fiches -->
     <div class="tab-content active" id="tab-fiches"></div>
+
+    <!-- TAB: Productions -->
+    <div class="tab-content" id="tab-productions"></div>
 
     <!-- TAB: Créer / Éditer -->
     <div class="tab-content" id="tab-create">
@@ -505,6 +578,65 @@
     <div class="tab-content" id="tab-detail"></div>
   </div>
 
+  <!-- FAB BUTTON (for new productions) -->
+  <button class="fab-button" id="fab-button" onclick="openProductionModal()">+</button>
+
+  <!-- PRODUCTION MODAL (New Production) -->
+  <div class="modal-overlay" id="production-modal" style="display:none;">
+    <div class="modal-box" style="max-width:500px; text-align:left;">
+      <h3 style="text-align:center;">Nouvelle production</h3>
+      <div class="production-form">
+        <div class="form-group">
+          <label>Fiche technique (optionnel)</label>
+          <select class="form-select" id="p-fiche-select">
+            <option value="">Sélectionner une fiche...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nom du produit *</label>
+          <input type="text" class="form-input" id="p-nom" placeholder="Nom du produit">
+        </div>
+        <div class="form-group">
+          <label>Catégorie *</label>
+          <div class="chip-group" id="p-categorie">
+            <button class="chip" data-val="mise_en_place">🔪 Mise en place</button>
+            <button class="chip" data-val="produit_intermediaire">🥘 Produit intermédiaire</button>
+            <button class="chip" data-val="produit_fini">✨ Produit fini</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantité *</label>
+            <input type="number" class="form-input" id="p-quantite" min="0" step="0.1" placeholder="10">
+          </div>
+          <div class="form-group">
+            <label>Unité *</label>
+            <select class="form-select" id="p-unite">
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+              <option value="l">l</option>
+              <option value="cl">cl</option>
+              <option value="ml">ml</option>
+              <option value="pièce">pièce</option>
+              <option value="botte">botte</option>
+              <option value="sachet">sachet</option>
+              <option value="boîte">boîte</option>
+              <option value="tranche">tranche</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observation</label>
+          <textarea class="form-textarea" id="p-observation" rows="2" placeholder="Notes..."></textarea>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:16px;">
+          <button class="btn-submit" style="flex:1; background:var(--gray-400);" onclick="closeProductionModal()">Annuler</button>
+          <button class="btn-submit" style="flex:1;" onclick="saveProduction()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL -->
   <div class="modal-overlay" id="modal">
     <div class="modal-box">
@@ -532,9 +664,13 @@ let currentUser = null;
 let currentEtablissement = null;
 let allFiches = [];
 let allIngredients = {}; // ficheId → [ingredients]
+let allProductions = [];
+let allLots = [];
 let currentFilter = 'all';
 let searchTerm = '';
 let editingFicheId = null;
+let selectedProductionDate = null;
+let selectedProductionCategory = 'all';
 
 const CATEGORIES = {
   mise_en_place: 'Mise en place',
@@ -588,6 +724,7 @@ function init() {
 
   setupTabs();
   setupFilters();
+  setupProductionsFilters();
   setupAllergens();
   setupIngredientForm();
   loadFiches();
@@ -620,9 +757,17 @@ function switchTab(tab) {
 
   // Show/hide filters
   const filtersSection = document.getElementById('filters-section');
+  const filtersProductions = document.getElementById('filters-productions');
   filtersSection.style.display = (tab === 'fiches') ? '' : 'none';
+  filtersProductions.style.display = (tab === 'productions') ? '' : 'none';
 
-  if (tab === 'create' && !editingFicheId) {
+  // Show/hide FAB button
+  const fab = document.getElementById('fab-button');
+  if (fab) fab.classList.toggle('active', tab === 'productions');
+
+  if (tab === 'productions') {
+    loadProductions();
+  } else if (tab === 'create' && !editingFicheId) {
     resetForm();
   }
 }
@@ -642,6 +787,26 @@ function setupFilters() {
     searchTerm = e.target.value.toLowerCase().trim();
     renderFiches();
   });
+}
+
+// ============= PRODUCTIONS FILTERS =============
+function setupProductionsFilters() {
+  const dateInput = document.getElementById('productions-date');
+  const today = formatDateForInput(new Date());
+  dateInput.value = today;
+  selectedProductionDate = today;
+
+  dateInput.addEventListener('change', (e) => {
+    selectedProductionDate = e.target.value;
+    loadProductions();
+  });
+}
+
+function formatDateForInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // ============= ALLERGENS =============
@@ -795,6 +960,85 @@ const DB = {
   async toggleFicheActive(id, actif) {
     const { error } = await sb.from('fiches_techniques').update({ actif }).eq('id', id);
     if (error) throw error;
+  },
+
+  // ====== PRODUCTIONS ======
+  async getProductions(date) {
+    const startOfDay = `${date}T00:00:00`;
+    const endOfDay = `${date}T23:59:59`;
+    const { data, error } = await sb
+      .from('productions')
+      .select('*')
+      .eq('etablissement', currentEtablissement)
+      .gte('date_production', startOfDay)
+      .lte('date_production', endOfDay)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getLots(date) {
+    const { data, error } = await sb
+      .from('lots_production')
+      .select('*')
+      .eq('etablissement', currentEtablissement)
+      .eq('date_production', date)
+      .order('numero_lot');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getNextLotNumber(date) {
+    const { data, error } = await sb
+      .from('lots_production')
+      .select('numero_lot')
+      .eq('etablissement', currentEtablissement)
+      .eq('date_production', date);
+    if (error) throw error;
+
+    const lots = data || [];
+    const numbers = lots
+      .map(lot => {
+        const match = lot.numero_lot.match(/-(\d{3})$/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .sort((a, b) => b - a);
+
+    const nextNum = (numbers[0] || 0) + 1;
+    return `${date.replace(/-/g, '')}-${String(nextNum).padStart(3, '0')}`;
+  },
+
+  async createLot(date, responsableId, responsableNom, responsableInitiales) {
+    const numero = await this.getNextLotNumber(date);
+    const now = new Date();
+    const heure = now.toTimeString().substring(0, 8); // HH:MM:SS
+    const { data, error } = await sb
+      .from('lots_production')
+      .insert({
+        numero_lot: numero,
+        date_production: date,
+        heure_debut: heure,
+        responsable_id: responsableId,
+        responsable_nom: responsableNom,
+        responsable_initiales: responsableInitiales,
+        nb_productions: 0,
+        statut: 'ouvert',
+        etablissement: currentEtablissement
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createProduction(production) {
+    const { data, error } = await sb
+      .from('productions')
+      .insert(production)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   }
 };
 
@@ -874,6 +1118,251 @@ function renderFiches() {
       </div>
     `;
   }).join('');
+}
+
+// ============= PRODUCTIONS =============
+async function loadProductions() {
+  showLoading(true);
+  try {
+    const dateStr = selectedProductionDate || formatDateForInput(new Date());
+    allProductions = await DB.getProductions(dateStr);
+    allLots = await DB.getLots(dateStr);
+    renderProductions();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur de chargement', 'error');
+  }
+  showLoading(false);
+}
+
+function renderProductions() {
+  const container = document.getElementById('tab-productions');
+  const dateStr = selectedProductionDate || formatDateForInput(new Date());
+
+  let productions = [...allProductions];
+
+  // Filter by category if needed
+  if (selectedProductionCategory !== 'all') {
+    productions = productions.filter(p => p.categorie === selectedProductionCategory);
+  }
+
+  if (productions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="emoji">📦</div>
+        <h3>Aucune production</h3>
+        <p>Créez une nouvelle production avec le bouton + ci-dessous</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Group by lot
+  const byLot = {};
+  productions.forEach(p => {
+    const lotId = p.lot_id || 'sans_lot';
+    if (!byLot[lotId]) byLot[lotId] = [];
+    byLot[lotId].push(p);
+  });
+
+  let html = '<div class="productions-container">';
+  Object.entries(byLot).forEach(([lotId, prods]) => {
+    const lot = allLots.find(l => l.id === lotId);
+    const lotNum = lot?.numero_lot || 'Lot en attente';
+
+    html += `<div class="productions-by-lot">
+      <div class="lot-header">📍 ${lotNum}</div>`;
+
+    prods.forEach(p => {
+      const icon = CAT_ICONS[p.categorie] || '📦';
+      const catClass = `cat-${p.categorie}`;
+      const metaParts = [];
+      if (p.quantite_produite) metaParts.push(`<span>📊 ${p.quantite_produite} ${p.unite}</span>`);
+      if (p.dlc) metaParts.push(`<span>⏱️ DLC ${p.dlc}</span>`);
+      if (p.producteur_initiales) metaParts.push(`<span>👨‍🍳 ${p.producteur_initiales}</span>`);
+
+      html += `
+        <div class="production-card ${catClass}">
+          <div class="production-icon">${icon}</div>
+          <div class="production-info">
+            <div class="production-name">${p.nom_produit}</div>
+            <div class="production-meta">${metaParts.join('')}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function openProductionModal() {
+  // Populate fiche select with current fiches
+  const ficheSelect = document.getElementById('p-fiche-select');
+  ficheSelect.innerHTML = '<option value="">Sélectionner une fiche...</option>';
+  allFiches.forEach(f => {
+    ficheSelect.innerHTML += `<option value="${f.id}">${f.nom}</option>`;
+  });
+
+  // Setup category chips
+  document.querySelectorAll('#p-categorie .chip').forEach(chip => {
+    chip.classList.remove('active');
+  });
+
+  // Reset form
+  document.getElementById('p-nom').value = '';
+  document.getElementById('p-quantite').value = '';
+  document.getElementById('p-unite').value = 'kg';
+  document.getElementById('p-observation').value = '';
+
+  // Setup fiche change handler
+  ficheSelect.onchange = () => {
+    const ficheId = ficheSelect.value;
+    if (ficheId) {
+      const fiche = allFiches.find(f => f.id === ficheId);
+      if (fiche) {
+        document.getElementById('p-nom').value = fiche.nom;
+        document.getElementById('p-quantite').value = fiche.rendement_quantite || '';
+        document.getElementById('p-unite').value = fiche.rendement_unite || 'kg';
+
+        // Set category
+        document.querySelectorAll('#p-categorie .chip').forEach(chip => {
+          chip.classList.toggle('active', chip.dataset.val === fiche.categorie);
+        });
+      }
+    }
+  };
+
+  // Setup category selection
+  document.querySelectorAll('#p-categorie .chip').forEach(chip => {
+    chip.onclick = () => {
+      document.querySelectorAll('#p-categorie .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    };
+  });
+
+  document.getElementById('production-modal').style.display = 'flex';
+}
+
+function closeProductionModal() {
+  document.getElementById('production-modal').style.display = 'none';
+}
+
+async function saveProduction() {
+  const nom = document.getElementById('p-nom').value.trim();
+  const quantite = parseFloat(document.getElementById('p-quantite').value);
+  const unite = document.getElementById('p-unite').value;
+  const observation = document.getElementById('p-observation').value.trim();
+
+  const categoryChip = document.querySelector('#p-categorie .chip.active');
+  const categorie = categoryChip?.dataset.val;
+
+  if (!nom || !quantite || !categorie) {
+    showToast('Veuillez remplir tous les champs obligatoires', 'error');
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const dateStr = selectedProductionDate || formatDateForInput(new Date());
+
+    // Get or create lot
+    let lot = allLots.find(l => l.statut === 'ouvert');
+    if (!lot) {
+      lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales);
+      allLots.push(lot);
+    }
+
+    // Get fiche if selected
+    const ficheSelect = document.getElementById('p-fiche-select');
+    const ficheId = ficheSelect.value || null;
+    let fiche = ficheId ? allFiches.find(f => f.id === ficheId) : null;
+
+    // Calculate DLC
+    const now = new Date();
+    let dlc = null;
+    if (fiche) {
+      if (fiche.dlc_jours) {
+        dlc = new Date(now.getTime() + fiche.dlc_jours * 24 * 60 * 60 * 1000).toISOString();
+      } else if (fiche.dlc_heures) {
+        dlc = new Date(now.getTime() + fiche.dlc_heures * 60 * 60 * 1000).toISOString();
+      }
+    }
+
+    const production = {
+      fiche_id: ficheId,
+      lot_id: lot.id,
+      nom_produit: nom,
+      categorie: categorie,
+      quantite_produite: quantite,
+      unite: unite,
+      date_production: now.toISOString(),
+      dlc: dlc,
+      temperature_stockage: fiche?.temperature_stockage || null,
+      producteur_id: currentUser.id,
+      producteur_nom: currentUser.nom,
+      producteur_initiales: currentUser.initiales || null,
+      statut: 'termine',
+      observation: observation || null,
+      etablissement: currentEtablissement
+    };
+
+    const saved = await DB.createProduction(production);
+    showToast('Production enregistrée', 'success');
+    closeProductionModal();
+
+    // Reload and show etiquette
+    await loadProductions();
+    showEtiquette(saved);
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function showEtiquette(production) {
+  const html = `
+    <div class="etiquette-modal active" id="etiquette">
+      <div class="etiquette-card">
+        <div class="etiquette-title">${production.nom_produit}</div>
+        <div class="etiquette-section">
+          <div class="etiquette-label">Date & Heure</div>
+          <div class="etiquette-value">${new Date(production.created_at).toLocaleString('fr-FR')}</div>
+        </div>
+        ${production.dlc ? `<div class="etiquette-section">
+          <div class="etiquette-label">DLC</div>
+          <div class="etiquette-value" style="color:var(--red);font-size:1.1rem;">${new Date(production.dlc).toLocaleDateString('fr-FR', {weekday:'short', day:'numeric', month:'short', year:'numeric'})}</div>
+        </div>` : ''}
+        <div class="etiquette-section">
+          <div class="etiquette-label">Lot</div>
+          <div class="etiquette-value">${allLots.find(l => l.id === production.lot_id)?.numero_lot || 'N/A'}</div>
+        </div>
+        <div class="etiquette-section">
+          <div class="etiquette-label">Producteur</div>
+          <div class="etiquette-value">${production.producteur_initiales}</div>
+        </div>
+        <div class="etiquette-section">
+          <div class="etiquette-label">Quantité</div>
+          <div class="etiquette-value">${production.quantite_produite} ${production.unite}</div>
+        </div>
+        ${production.temperature_stockage ? `<div class="etiquette-section">
+          <div class="etiquette-label">Température</div>
+          <div class="etiquette-value">${production.temperature_stockage}</div>
+        </div>` : ''}
+        <button class="etiquette-close" onclick="closeEtiquette()">Fermer</button>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeEtiquette() {
+  const etiquette = document.getElementById('etiquette');
+  if (etiquette) etiquette.remove();
 }
 
 // ============= VIEW FICHE DETAIL =============

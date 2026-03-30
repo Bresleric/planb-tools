@@ -146,12 +146,19 @@
     .task-check.checked { background: var(--green); border-color: var(--green); }
     .task-check:active { transform: scale(0.9); }
 
+    .task-main {
+      flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+    }
     .task-name {
-      flex: 1; font-size: 0.85rem; font-weight: 500;
+      font-size: 0.85rem; font-weight: 500;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      min-width: 0;
     }
     .task-row.done .task-name { text-decoration: line-through; color: var(--gray-400); }
+    .task-note {
+      font-size: 0.72rem; color: var(--gray-500); font-style: italic;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .task-row.done .task-note { color: var(--gray-400); }
 
     .task-badges { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
@@ -343,6 +350,59 @@
     .btn-modal.primary { background: var(--orange); color: white; border-color: var(--orange); }
     .btn-modal.danger { background: var(--red); color: white; border-color: var(--red); }
 
+    /* ====== PRODUCTION MODAL (TAF integration) ====== */
+    .production-overlay {
+      display: none; position: fixed; inset: 0; z-index: 250;
+      background: rgba(0,0,0,.5); align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .production-overlay.show { display: flex; }
+    .production-box {
+      background: white; border-radius: 12px; width: 100%; max-width: 500px;
+      max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .production-header {
+      padding: 14px 16px; border-bottom: 2px solid #8b5cf6;
+      background: linear-gradient(135deg, #f3e8ff, white);
+      display: flex; align-items: center; justify-content: space-between;
+      border-radius: 12px 12px 0 0;
+    }
+    .production-header h2 { font-size: 0.95rem; color: #7c3aed; }
+    .production-body { padding: 16px; }
+    .production-footer {
+      padding: 12px 16px; border-top: 1px solid var(--gray-200);
+      display: flex; gap: 8px;
+    }
+    .btn-production {
+      flex: 1; padding: 10px; border-radius: var(--radius-sm); border: none;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-production.cancel { background: var(--gray-200); color: var(--gray-600); }
+    .btn-production.save { background: #8b5cf6; color: white; }
+    .btn-production.save:active { background: #7c3aed; }
+    .btn-production.skip { background: var(--orange); color: white; }
+    .production-form-row { display: flex; gap: 10px; }
+    .production-form-row .form-group { flex: 1; }
+    .badge-production {
+      background: #f3e8ff; color: #7c3aed; border: 1px solid #ddd6fe;
+      font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 600;
+    }
+    .etiquette-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,.5); display: flex;
+      justify-content: center; align-items: center; padding: 20px;
+    }
+    .etiquette-card-taf {
+      background: white; border-radius: 12px; padding: 24px;
+      max-width: 380px; width: 100%;
+      border: 2px solid #8b5cf6; text-align: center;
+    }
+    .etiquette-card-taf h3 { font-size: 1.2rem; font-weight: 700; color: var(--gray-800); margin-bottom: 12px; }
+    .etiquette-row { margin-bottom: 10px; font-size: 0.85rem; }
+    .etiquette-row .lbl { color: var(--gray-500); font-size: 0.7rem; text-transform: uppercase; }
+    .etiquette-row .val { font-weight: 600; color: var(--gray-800); margin-top: 2px; }
+    .etiquette-row .val.dlc { color: var(--red); font-size: 1.05rem; }
+
     /* ====== TOAST ====== */
     .toast {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -481,6 +541,64 @@
   </div>
 </div>
 
+<!-- PRODUCTION MODAL (TAF integration) -->
+<div class="production-overlay" id="production-overlay" onclick="event.target===this&&closeProductionModal()">
+  <div class="production-box">
+    <div class="production-header">
+      <h2>🏭 Saisie Production</h2>
+      <button class="modal-close" onclick="closeProductionModal()">✕</button>
+    </div>
+    <div class="production-body">
+      <p id="prod-task-name" style="font-weight:600;margin-bottom:12px;color:var(--gray-700);"></p>
+      <input type="hidden" id="prod-task-id">
+      <input type="hidden" id="prod-fiche-id">
+      <input type="hidden" id="prod-categorie">
+
+      <div class="form-group">
+        <label>Nom du produit *</label>
+        <input type="text" class="form-input" id="prod-nom" placeholder="Nom du produit">
+      </div>
+      <div class="form-group">
+        <label>Catégorie</label>
+        <div class="chip-group" id="prod-cat-chips">
+          <button class="chip" data-val="mise_en_place" onclick="selectProdCat(this)">🔪 Mise en place</button>
+          <button class="chip" data-val="produit_intermediaire" onclick="selectProdCat(this)">🥘 Intermédiaire</button>
+          <button class="chip" data-val="produit_fini" onclick="selectProdCat(this)">✨ Produit fini</button>
+        </div>
+      </div>
+      <div class="production-form-row">
+        <div class="form-group">
+          <label>Quantité *</label>
+          <input type="number" class="form-input" id="prod-quantite" min="0" step="0.1" placeholder="10">
+        </div>
+        <div class="form-group">
+          <label>Unité *</label>
+          <select class="form-select" id="prod-unite">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="l">l</option>
+            <option value="cl">cl</option>
+            <option value="ml">ml</option>
+            <option value="pièce">pièce</option>
+            <option value="botte">botte</option>
+            <option value="sachet">sachet</option>
+            <option value="boîte">boîte</option>
+            <option value="tranche">tranche</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observation</label>
+        <textarea class="form-textarea" id="prod-observation" rows="2" placeholder="Notes..."></textarea>
+      </div>
+    </div>
+    <div class="production-footer">
+      <button class="btn-production skip" onclick="skipProduction()">Valider sans saisie</button>
+      <button class="btn-production save" onclick="saveProductionFromTaf()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -510,6 +628,8 @@
   let recurrences = [];
   let selectedPredefined = null;
   let selectedAssignee = null;
+  let productionLots = []; // lots du jour en cache
+  let productionFiches = []; // fiches techniques en cache
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -607,6 +727,57 @@
 
     async deleteRecurrence(id) {
       await supabaseClient.from('taches_recurrentes').update({ actif: false }).eq('id', id);
+    },
+
+    // ====== PRODUCTION (TAF integration) ======
+    async getFiches(etab) {
+      const { data, error } = await supabaseClient.from('fiches_techniques').select('*')
+        .eq('etablissement', etab).eq('actif', true).order('nom');
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getLots(date, etab) {
+      const { data, error } = await supabaseClient.from('lots_production').select('*')
+        .eq('etablissement', etab).eq('date_production', date).order('numero_lot');
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getNextLotNumber(date, etab) {
+      const { data, error } = await supabaseClient.from('lots_production').select('numero_lot')
+        .eq('etablissement', etab).eq('date_production', date);
+      if (error) throw error;
+      const lots = data || [];
+      const numbers = lots.map(l => {
+        const m = l.numero_lot.match(/-(\d{3})$/);
+        return m ? parseInt(m[1]) : 0;
+      }).sort((a, b) => b - a);
+      return `${date.replace(/-/g, '')}-${String((numbers[0] || 0) + 1).padStart(3, '0')}`;
+    },
+
+    async createLot(date, etab, userId, userNom, userInitiales) {
+      const numero = await this.getNextLotNumber(date, etab);
+      const now = new Date();
+      const { data, error } = await supabaseClient.from('lots_production').insert({
+        numero_lot: numero,
+        date_production: date,
+        heure_debut: now.toTimeString().substring(0, 8),
+        responsable_id: userId,
+        responsable_nom: userNom,
+        responsable_initiales: userInitiales,
+        nb_productions: 0,
+        statut: 'ouvert',
+        etablissement: etab
+      }).select().single();
+      if (error) throw error;
+      return data;
+    },
+
+    async createProduction(production) {
+      const { data, error } = await supabaseClient.from('productions').insert(production).select().single();
+      if (error) throw error;
+      return data;
     }
   };
 
@@ -931,11 +1102,15 @@
 
       return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}">
         <button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>
-        <span class="task-name" title="${esc(t.tache)}">${esc(t.tache)}</span>
+        <div class="task-main">
+          <span class="task-name" title="${esc(t.tache)}">${esc(t.tache)}</span>
+          ${t.observation ? `<span class="task-note">${esc(t.observation)}</span>` : ''}
+        </div>
         <div class="task-badges">
           <span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span>
           <span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span>
           <span class="badge badge-equipe ${(t.equipe || '').toLowerCase()}">${eIcons[t.equipe] || ''} ${(t.equipe || '').charAt(0).toUpperCase() + (t.equipe || '').slice(1)}</span>
+          ${t.is_production ? '<span class="badge badge-production">🏭 Prod</span>' : ''}
           ${assignee
             ? `<span class="task-assignee">→ ${esc(assignee)}</span>`
             : `<span class="task-assignee unassigned">→ ?</span>`}
@@ -955,17 +1130,29 @@
   async function toggleTask(id, isDone) {
     try {
       if (isDone) {
+        // Réouverture : supprimer validation (et production_id si existait)
         await DB.updateTask(id, { fait_par_id: null, fait_par_initiales: null, date_validation: null });
+        tasks = await DB.getTasks(filterDate);
+        renderFiltered();
+        showToast('Tâche réouverte', 'success');
       } else {
-        await DB.updateTask(id, {
-          fait_par_id: currentUser.id,
-          fait_par_initiales: currentUser.initiales,
-          date_validation: new Date().toISOString()
-        });
+        // Vérifier si c'est une tâche production
+        const task = tasks.find(t => t.id === id);
+        if (task && task.is_production) {
+          // Ouvrir la modale de saisie production
+          openProductionModal(task);
+        } else {
+          // Tâche normale : valider directement
+          await DB.updateTask(id, {
+            fait_par_id: currentUser.id,
+            fait_par_initiales: currentUser.initiales,
+            date_validation: new Date().toISOString()
+          });
+          tasks = await DB.getTasks(filterDate);
+          renderFiltered();
+          showToast('Tâche terminée ✓', 'success');
+        }
       }
-      tasks = await DB.getTasks(filterDate);
-      renderFiltered();
-      showToast(isDone ? 'Tâche réouverte' : 'Tâche terminée ✓', 'success');
     } catch (e) {
       console.error(e);
       showToast('Erreur', 'error');
@@ -1137,7 +1324,7 @@
     list.innerHTML = filtered.slice(0, 20).map(p =>
       `<div class="predef-item ${selectedPredefined?.id === p.id ? 'selected' : ''}"
             onclick="selectPredefined('${p.id}')">
-        ${esc(p.nom)} ${p.categorie ? `<span style="color:var(--gray-400);font-size:0.75rem">(${esc(p.categorie)})</span>` : ''}
+        ${p.is_production ? '<span class="badge-production" style="margin-right:4px">🏭</span>' : ''}${esc(p.nom)} ${p.categorie ? `<span style="color:var(--gray-400);font-size:0.75rem">(${esc(p.categorie)})</span>` : ''}
       </div>`
     ).join('');
 
@@ -1249,7 +1436,7 @@
       const obs = document.getElementById('create-obs').value.trim();
       const echeance = document.getElementById('create-date').value;
 
-      await DB.insertTask({
+      const taskData = {
         tache: selectedPredefined.nom,
         creneau,
         equipe,
@@ -1263,7 +1450,16 @@
         attribue_a_id: selectedAssignee?.id || null,
         attribue_a_nom: selectedAssignee?.nom || null,
         attribue_a_initiales: selectedAssignee?.initiales || null
-      });
+      };
+
+      // Propager les champs production depuis predefined_task
+      if (selectedPredefined.is_production) {
+        taskData.is_production = true;
+        taskData.fiche_id = selectedPredefined.fiche_id || null;
+        taskData.categorie_production = selectedPredefined.categorie_production || null;
+      }
+
+      await DB.insertTask(taskData);
 
       showToast('Tâche créée ✓', 'success');
       tasks = await DB.getTasks(filterDate);
@@ -1274,6 +1470,189 @@
     } finally {
       btn.disabled = false; btn.textContent = 'Créer la tâche';
     }
+  }
+
+  // ====== PRODUCTION MODAL (TAF integration) ======
+  async function openProductionModal(task) {
+    // Pré-remplir la modale avec les infos de la tâche
+    document.getElementById('prod-task-id').value = task.id;
+    document.getElementById('prod-task-name').textContent = `Tâche : ${task.tache}`;
+    document.getElementById('prod-nom').value = task.tache;
+    document.getElementById('prod-fiche-id').value = task.fiche_id || '';
+    document.getElementById('prod-categorie').value = task.categorie_production || '';
+    document.getElementById('prod-quantite').value = '';
+    document.getElementById('prod-unite').value = 'kg';
+    document.getElementById('prod-observation').value = '';
+
+    // Activer le chip de catégorie correspondant
+    document.querySelectorAll('#prod-cat-chips .chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.val === task.categorie_production);
+    });
+
+    // Charger la fiche technique pour pré-remplir rendement/unité
+    if (task.fiche_id) {
+      try {
+        if (productionFiches.length === 0) {
+          productionFiches = await DB.getFiches(currentEtablissement);
+        }
+        const fiche = productionFiches.find(f => f.id === task.fiche_id);
+        if (fiche) {
+          if (fiche.rendement_quantite) document.getElementById('prod-quantite').value = fiche.rendement_quantite;
+          if (fiche.rendement_unite) document.getElementById('prod-unite').value = fiche.rendement_unite;
+        }
+      } catch (e) {
+        console.error('Erreur chargement fiche:', e);
+      }
+    }
+
+    document.getElementById('production-overlay').classList.add('show');
+  }
+
+  function selectProdCat(el) {
+    document.querySelectorAll('#prod-cat-chips .chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('prod-categorie').value = el.dataset.val;
+  }
+
+  function closeProductionModal() {
+    document.getElementById('production-overlay').classList.remove('show');
+  }
+
+  // Valider la tâche SANS saisie production
+  async function skipProduction() {
+    const taskId = document.getElementById('prod-task-id').value;
+    try {
+      await DB.updateTask(taskId, {
+        fait_par_id: currentUser.id,
+        fait_par_initiales: currentUser.initiales,
+        date_validation: new Date().toISOString()
+      });
+      closeProductionModal();
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+      showToast('Tâche terminée ✓', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur validation', 'error');
+    }
+  }
+
+  // Valider la tâche AVEC saisie production
+  async function saveProductionFromTaf() {
+    const taskId = document.getElementById('prod-task-id').value;
+    const nom = document.getElementById('prod-nom').value.trim();
+    const quantite = parseFloat(document.getElementById('prod-quantite').value);
+    const unite = document.getElementById('prod-unite').value;
+    const observation = document.getElementById('prod-observation').value.trim();
+    const ficheId = document.getElementById('prod-fiche-id').value || null;
+    const categorie = document.getElementById('prod-categorie').value ||
+      document.querySelector('#prod-cat-chips .chip.active')?.dataset.val;
+
+    if (!nom || !quantite || !categorie) {
+      showToast('Remplissez nom, quantité et catégorie', 'error');
+      return;
+    }
+
+    try {
+      const today = dateStr(filterDate);
+
+      // Charger les lots du jour si pas en cache
+      if (productionLots.length === 0 || productionLots[0]?.date_production !== today) {
+        productionLots = await DB.getLots(today, currentEtablissement);
+      }
+
+      // Trouver ou créer un lot ouvert
+      let lot = productionLots.find(l => l.statut === 'ouvert');
+      if (!lot) {
+        lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales);
+        productionLots.push(lot);
+      }
+
+      // Calculer DLC si fiche liée
+      let dlc = null;
+      let tempStock = null;
+      if (ficheId && productionFiches.length > 0) {
+        const fiche = productionFiches.find(f => f.id === ficheId);
+        if (fiche) {
+          const now = new Date();
+          if (fiche.dlc_jours) dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
+          else if (fiche.dlc_heures) dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
+          tempStock = fiche.temperature_stockage || null;
+        }
+      }
+
+      const now = new Date();
+      const production = {
+        fiche_id: ficheId,
+        lot_id: lot.id,
+        nom_produit: nom,
+        categorie: categorie,
+        quantite_produite: quantite,
+        unite: unite,
+        date_production: now.toISOString(),
+        dlc: dlc,
+        temperature_stockage: tempStock,
+        producteur_id: currentUser.id,
+        producteur_nom: currentUser.nom,
+        producteur_initiales: currentUser.initiales || null,
+        tache_id: taskId,
+        statut: 'termine',
+        observation: observation || null,
+        etablissement: currentEtablissement
+      };
+
+      const saved = await DB.createProduction(production);
+
+      // Marquer la tâche comme terminée et lier la production
+      await DB.updateTask(taskId, {
+        fait_par_id: currentUser.id,
+        fait_par_initiales: currentUser.initiales,
+        date_validation: now.toISOString(),
+        production_id: saved.id
+      });
+
+      closeProductionModal();
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+      showToast('Production enregistrée ✓', 'success');
+
+      // Afficher l'étiquette
+      showEtiquetteTaf(saved, lot);
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur: ' + e.message, 'error');
+    }
+  }
+
+  function showEtiquetteTaf(production, lot) {
+    const dlcStr = production.dlc
+      ? new Date(production.dlc).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+      : null;
+    const dateStr2 = new Date(production.date_production).toLocaleString('fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const html = `
+      <div class="etiquette-overlay" id="etiquette-taf" onclick="event.target===this&&closeEtiquetteTaf()">
+        <div class="etiquette-card-taf">
+          <h3>${esc(production.nom_produit)}</h3>
+          <div class="etiquette-row"><div class="lbl">Date & Heure</div><div class="val">${dateStr2}</div></div>
+          ${dlcStr ? `<div class="etiquette-row"><div class="lbl">DLC</div><div class="val dlc">${dlcStr}</div></div>` : ''}
+          <div class="etiquette-row"><div class="lbl">Lot</div><div class="val">${esc(lot?.numero_lot || 'N/A')}</div></div>
+          <div class="etiquette-row"><div class="lbl">Producteur</div><div class="val">${esc(production.producteur_initiales || production.producteur_nom)}</div></div>
+          <div class="etiquette-row"><div class="lbl">Quantité</div><div class="val">${production.quantite_produite} ${production.unite}</div></div>
+          ${production.temperature_stockage ? `<div class="etiquette-row"><div class="lbl">Température</div><div class="val">${production.temperature_stockage}</div></div>` : ''}
+          <button style="width:100%;padding:10px;margin-top:12px;border:none;background:#8b5cf6;color:white;border-radius:8px;font-weight:600;cursor:pointer;"
+                  onclick="closeEtiquetteTaf()">Fermer</button>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+
+  function closeEtiquetteTaf() {
+    const el = document.getElementById('etiquette-taf');
+    if (el) el.remove();
   }
 
   // ====== RECURRENCES TAB ======
