@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Temperatures">
+  <meta name="theme-color" content="#0ea5e9">
+  <title>Temperatures Frigos - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌡️</text></svg>">
+  <style>
+    :root {
+      --cyan: #0ea5e9; --cyan-light: #f0f9ff; --cyan-dark: #0284c7;
+      --orange: #f97316; --orange-light: #fff7ed;
+      --green: #22c55e; --green-bg: #f0fdf4;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --blue: #3b82f6; --blue-bg: #eff6ff;
+      --amber: #f59e0b; --amber-bg: #fffbeb;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px; --radius-lg: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* HEADER */
+    .header {
+      background: white; border-bottom: 2px solid var(--cyan);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--cyan); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-back:active { background: var(--gray-100); }
+
+    /* DATE BAR */
+    .date-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 8px 16px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .date-nav-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: white; color: var(--cyan); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .date-nav-btn:active { background: var(--cyan-light); }
+    .date-display {
+      font-size: 1rem; font-weight: 600; color: var(--gray-800);
+      min-width: 200px; text-align: center;
+    }
+    .date-display .day-name { color: var(--cyan); text-transform: capitalize; }
+    .btn-today {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-500); cursor: pointer;
+    }
+    .btn-today:active { background: var(--cyan-light); }
+
+    /* PROGRESS BAR */
+    .progress-section {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 10px 16px;
+    }
+    .progress-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 6px;
+    }
+    .progress-label { font-size: 0.8rem; font-weight: 600; color: var(--gray-600); }
+    .progress-count { font-size: 0.8rem; font-weight: 700; }
+    .progress-bar {
+      height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 4px; transition: width .3s ease;
+    }
+    .progress-fill.complete { background: var(--green); }
+    .progress-fill.partial { background: var(--cyan); }
+    .progress-fill.alert { background: var(--red); }
+
+    /* TABS */
+    .tabs-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      display: flex; padding: 0 16px;
+    }
+    .tab-btn {
+      padding: 10px 16px; border: none; background: none;
+      font-size: 0.85rem; color: var(--gray-400); cursor: pointer;
+      border-bottom: 2px solid transparent; font-weight: 500;
+    }
+    .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); font-weight: 600; }
+    .tab-btn:active { background: var(--gray-50); }
+
+    /* CONTENT */
+    .content { flex: 1; overflow-y: auto; padding: 8px; }
+
+    /* FRIGO CARD */
+    .frigo-card {
+      background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow);
+      margin-bottom: 8px; overflow: hidden;
+      border-left: 4px solid var(--gray-300);
+    }
+    .frigo-card.done { border-left-color: var(--green); }
+    .frigo-card.hors-norme { border-left-color: var(--red); }
+    .frigo-card.attente-controle { border-left-color: var(--amber); }
+
+    .frigo-header {
+      padding: 10px 12px;
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer;
+    }
+    .frigo-header:active { background: var(--gray-50); }
+
+    .frigo-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; flex-shrink: 0;
+    }
+    .frigo-icon.cave { background: #fae8ff; }
+    .frigo-icon.cuisine { background: #fef3c7; }
+    .frigo-icon.labo { background: #dbeafe; }
+
+    .frigo-info { flex: 1; min-width: 0; }
+    .frigo-name { font-size: 0.9rem; font-weight: 600; }
+    .frigo-detail { font-size: 0.7rem; color: var(--gray-400); margin-top: 1px; }
+
+    .frigo-status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+    .badge-temp {
+      padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 700;
+    }
+    .badge-temp.ok { background: var(--green-bg); color: var(--green); }
+    .badge-temp.warning { background: var(--amber-bg); color: var(--amber); }
+    .badge-temp.danger { background: var(--red-bg); color: var(--red); }
+    .badge-temp.pending { background: var(--gray-100); color: var(--gray-400); }
+
+    .badge-photo {
+      padding: 2px 6px; border-radius: 8px; font-size: 0.65rem; font-weight: 600;
+      background: #fce7f3; color: #db2777;
+    }
+
+    .check-icon {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; flex-shrink: 0;
+    }
+    .check-icon.done { background: var(--green); color: white; }
+    .check-icon.pending { border: 2px solid var(--gray-300); }
+
+    /* SAISIE FORM (expanded) */
+    .frigo-form {
+      display: none; padding: 0 12px 12px;
+      border-top: 1px solid var(--gray-100);
+    }
+    .frigo-form.show { display: block; }
+
+    .temp-input-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    }
+    .temp-input {
+      width: 100px; padding: 10px; border: 2px solid var(--gray-200);
+      border-radius: var(--radius); font-size: 1.3rem; font-weight: 700;
+      text-align: center; background: white; color: var(--gray-800);
+    }
+    .temp-input:focus { outline: none; border-color: var(--cyan); }
+    .temp-input.hors-norme { border-color: var(--red); background: var(--red-bg); color: var(--red); }
+    .temp-unit { font-size: 1.1rem; color: var(--gray-400); font-weight: 600; }
+    .temp-range { font-size: 0.75rem; color: var(--gray-400); }
+
+    .photo-section {
+      margin-top: 10px; padding: 10px;
+      border-radius: var(--radius); border: 2px dashed var(--gray-200);
+      text-align: center;
+    }
+    .photo-section.required {
+      border-color: #db2777; background: #fdf2f8;
+    }
+    .photo-section.captured {
+      border-style: solid; border-color: var(--green);
+    }
+    .photo-label {
+      font-size: 0.8rem; font-weight: 600; color: var(--gray-500);
+      margin-bottom: 6px;
+    }
+    .photo-label.required { color: #db2777; }
+    .btn-photo {
+      padding: 8px 16px; border-radius: var(--radius); border: none;
+      background: var(--cyan); color: white; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-photo:active { background: var(--cyan-dark); }
+    .photo-preview {
+      max-width: 100%; max-height: 120px; border-radius: var(--radius-sm);
+      margin-top: 6px;
+    }
+
+    .obs-input {
+      width: 100%; padding: 8px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.85rem; margin-top: 8px;
+      font-family: inherit; resize: none; min-height: 36px;
+    }
+    .obs-input:focus { outline: none; border-color: var(--cyan); }
+
+    .btn-validate {
+      width: 100%; padding: 10px; border: none; border-radius: var(--radius);
+      background: var(--cyan); color: white; font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; margin-top: 10px;
+    }
+    .btn-validate:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-validate:active:not(:disabled) { background: var(--cyan-dark); }
+    .btn-validate.danger { background: var(--red); }
+
+    /* CATEGORY HEADER */
+    .category-header {
+      padding: 6px 12px; margin-top: 8px; margin-bottom: 4px;
+      font-size: 0.75rem; font-weight: 700; color: var(--gray-400);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* HISTORIQUE */
+    .histo-card {
+      background: white; border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 10px 12px; margin-bottom: 6px;
+    }
+    .histo-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 0; border-bottom: 1px solid var(--gray-100);
+    }
+    .histo-row:last-child { border-bottom: none; }
+
+    /* ADMIN - FRIGO LIST */
+    .admin-frigo-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: white; border-radius: var(--radius-sm);
+      margin-bottom: 4px; box-shadow: var(--shadow);
+    }
+    .admin-frigo-item .order-badge {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--cyan-light); color: var(--cyan);
+      font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.4); align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: white; border-radius: 12px; width: 100%; max-width: 500px;
+      max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal-header {
+      padding: 16px; border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h2 { font-size: 1rem; }
+    .modal-close { border: none; background: none; font-size: 1.2rem; cursor: pointer; color: var(--gray-400); }
+    .modal-body { padding: 16px; }
+    .modal-footer {
+      padding: 12px 16px; border-top: 1px solid var(--gray-200);
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .btn-modal {
+      padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-modal.primary { background: var(--cyan); color: white; border-color: var(--cyan); }
+    .btn-modal.danger { background: var(--red); color: white; border-color: var(--red); }
+
+    /* FORM ELEMENTS */
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block; font-size: 0.75rem; font-weight: 600;
+      color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase;
+    }
+    .form-input, .form-select {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.9rem;
+      background: white; color: var(--gray-800);
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan-light);
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px; border-radius: 20px; background: var(--gray-800);
+      color: white; font-size: 0.85rem; z-index: 300;
+      opacity: 0; transition: opacity .3s;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+    .toast.warning { background: var(--amber); }
+
+    /* CONTROLE 1H BANNER */
+    .controle-banner {
+      background: var(--amber-bg); border: 1px solid var(--amber);
+      border-radius: var(--radius); padding: 10px 12px; margin: 8px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .controle-banner .icon { font-size: 1.5rem; }
+    .controle-banner .text { flex: 1; }
+    .controle-banner .title { font-weight: 700; font-size: 0.85rem; color: #92400e; }
+    .controle-banner .detail { font-size: 0.75rem; color: #a16207; margin-top: 2px; }
+    .btn-controle {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: none;
+      background: var(--amber); color: white; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--gray-400);
+    }
+    .empty-state .emoji { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 1rem; margin-bottom: 4px; color: var(--gray-500); }
+
+    /* LOGIN */
+    .login-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 20px;
+      background: linear-gradient(135deg, var(--cyan-light), white);
+    }
+    .login-card {
+      background: white; border-radius: 16px; padding: 32px;
+      box-shadow: var(--shadow-md); text-align: center; width: 100%; max-width: 320px;
+    }
+    .login-card h1 { color: var(--cyan); font-size: 1.5rem; margin-bottom: 4px; }
+    .login-card p { color: var(--gray-400); font-size: 0.85rem; margin-bottom: 20px; }
+    .pin-dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--gray-300); background: white;
+    }
+    .pin-dot.filled { background: var(--cyan); border-color: var(--cyan); }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 240px; margin: 0 auto; }
+    .pin-key {
+      padding: 14px; border-radius: var(--radius); border: 1px solid var(--gray-200);
+      background: white; font-size: 1.2rem; font-weight: 600; cursor: pointer;
+    }
+    .pin-key:active { background: var(--cyan-light); }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .frigo-name { font-size: 0.82rem; }
+      .temp-input { width: 80px; font-size: 1.1rem; }
+    }
+
+    /* Hidden file input */
+    .hidden-input { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <h1>🌡️ Temperatures</h1>
+    <p>Saisissez votre code</p>
+    <div class="pin-dots" id="pin-dots"></div>
+    <div class="pin-pad" id="pin-pad"></div>
+    <p id="login-error" style="color:var(--red);font-size:0.8rem;margin-top:12px;display:none"></p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-screen" style="display:none">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>🌡️ Temperatures Frigos</h1>
+    </div>
+    <div class="header-right">
+      <span id="header-etab"></span>
+      <span>—</span>
+      <span id="header-user"></span>
+      <a class="btn-back" onclick="goBackToPortal()">← Portail</a>
+    </div>
+  </div>
+
+  <!-- DATE BAR -->
+  <div class="date-bar">
+    <button class="date-nav-btn" onclick="changeDate(-1)">◀</button>
+    <div class="date-display" id="date-display"></div>
+    <button class="date-nav-btn" onclick="changeDate(1)">▶</button>
+    <button class="btn-today" onclick="goToday()">Aujourd'hui</button>
+  </div>
+
+  <!-- PROGRESS BAR -->
+  <div class="progress-section" id="progress-section">
+    <div class="progress-header">
+      <span class="progress-label">Releve du jour</span>
+      <span class="progress-count" id="progress-count">0/0</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill partial" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="releve" onclick="switchTab('releve')">Releve</button>
+    <button class="tab-btn" data-tab="historique" onclick="switchTab('historique')">Historique</button>
+    <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="tab-admin" style="display:none">Admin</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="main-content"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="event.target===this&&closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- Hidden file input for camera -->
+<input type="file" id="camera-input" class="hidden-input" accept="image/*" capture="environment">
+
+<script>
+  // ====== CONFIG ======
+  const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+  const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+  const CATEGORIES = ['CAVE', 'CUISINE', 'LABO'];
+  const CAT_ICONS = { CAVE: '🍷', CUISINE: '🍳', LABO: '🧪' };
+
+  // Probability of requiring a photo on any given fridge (20%)
+  const PHOTO_RANDOM_CHANCE = 0.20;
+
+  // ====== STATE ======
+  let currentUser = null;
+  let currentEtablissement = null;
+  let supabaseClient = null;
+  let filterDate = new Date();
+  let currentTab = 'releve';
+  let frigos = [];
+  let releves = [];
+  let photoRandomSeed = null; // seed for today's random photo selection
+  let expandedFrigoId = null;
+  let capturedPhotos = {}; // frigoId -> base64
+  let pendingPhotoFrigoId = null;
+
+  // ====== UTILITIES ======
+  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function dateStr(d) { return d.toISOString().split('T')[0]; }
+  function formatDateDisplay(d) {
+    const str = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const parts = str.split(' ');
+    return `<span class="day-name">${parts[0]}</span> ${parts.slice(1).join(' ')}`;
+  }
+  function userRole() { return ROLE_HIERARCHY[currentUser?.role] || 0; }
+  function isAdmin() { return userRole() >= 4; }
+  function isToday(d) { return dateStr(d) === dateStr(new Date()); }
+
+  // Generate deterministic "random" photo requirement based on date + frigo id
+  function shouldRequirePhoto(frigoId) {
+    const seed = dateStr(filterDate) + frigoId;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      const ch = seed.charCodeAt(i);
+      hash = ((hash << 5) - hash) + ch;
+      hash |= 0;
+    }
+    return (Math.abs(hash) % 100) < (PHOTO_RANDOM_CHANCE * 100);
+  }
+
+  // Check if temperature is within norms
+  function checkTemp(temp, frigo) {
+    const t = parseFloat(temp);
+    if (isNaN(t)) return 'pending';
+    // For freezers (temp_max < 0), check differently
+    if (frigo.temp_max < 0) {
+      // Temperature should be <= temp_max (e.g., -18 or lower)
+      if (t > frigo.temp_limite) return 'danger';
+      if (t > frigo.temp_max) return 'warning';
+      return 'ok';
+    } else {
+      // Positive temp fridge: should be between min and max, limit is upper danger
+      if (t > frigo.temp_limite || t < frigo.temp_min - 2) return 'danger';
+      if (t > frigo.temp_max) return 'warning';
+      return 'ok';
+    }
+  }
+
+  // ====== SUPABASE ======
+  function initSupabase() {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+  }
+
+  const DB = {
+    async getFrigos(etab) {
+      const { data } = await supabaseClient.from('temp_frigos').select('*')
+        .eq('etablissement', etab).eq('actif', true).order('ordre');
+      return data || [];
+    },
+
+    async getAllFrigos(etab) {
+      const { data } = await supabaseClient.from('temp_frigos').select('*')
+        .eq('etablissement', etab).order('ordre');
+      return data || [];
+    },
+
+    async getReleves(etab, date) {
+      const { data } = await supabaseClient.from('temp_releves').select('*')
+        .eq('etablissement', etab).eq('date', date).order('created_at');
+      return data || [];
+    },
+
+    async getRelevesRange(etab, dateFrom, dateTo) {
+      const { data } = await supabaseClient.from('temp_releves').select('*')
+        .eq('etablissement', etab)
+        .gte('date', dateFrom).lte('date', dateTo)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+
+    async insertReleve(releve) {
+      const { data, error } = await supabaseClient.from('temp_releves').insert(releve).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+
+    async insertFrigo(frigo) {
+      const { data, error } = await supabaseClient.from('temp_frigos').insert(frigo).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+
+    async updateFrigo(id, updates) {
+      const { error } = await supabaseClient.from('temp_frigos').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+
+    async deleteFrigo(id) {
+      await supabaseClient.from('temp_frigos').update({ actif: false }).eq('id', id);
+    },
+
+    // Create a TAF task for 1h re-check
+    async createTafRecheck(frigoNom, temperature, frigoId, releveId) {
+      const now = new Date();
+      const echeance = dateStr(now);
+      const { error } = await supabaseClient.from('tasks').insert({
+        tache: `🌡️ RE-CONTROLE TEMP: ${frigoNom} (${temperature}° hors norme) - Verifier dans 1h`,
+        creneau: 'Matin',
+        equipe: 'cuisine',
+        priorite: 5,
+        observation: `Temperature ${temperature}° relevee a ${now.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})} hors norme. Un nouveau releve est necessaire 1h apres.`,
+        echeance,
+        date_creation: now.toISOString(),
+        etablissement: currentEtablissement,
+        createur_id: currentUser.id,
+        createur_nom: 'Systeme Temperatures'
+      });
+      if (error) console.error('Erreur creation TAF re-controle:', error);
+    }
+  };
+
+  // ====== SESSION ======
+  function checkPortalSession() {
+    const user = sessionStorage.getItem('planb_user');
+    const etablissement = sessionStorage.getItem('planb_etablissement');
+    return user && etablissement ? { user: JSON.parse(user), etablissement } : null;
+  }
+
+  function goBackToPortal() { window.location.href = '../'; }
+
+  // ====== LOGIN (fallback) ======
+  let pinCode = '';
+  function renderPinDots() {
+    const c = document.getElementById('pin-dots');
+    c.innerHTML = Array.from({ length: 6 }, (_, i) =>
+      `<div class="pin-dot ${i < pinCode.length ? 'filled' : ''}"></div>`
+    ).join('');
+  }
+  function pinAdd(n) {
+    if (pinCode.length >= 6) return;
+    pinCode += n;
+    renderPinDots();
+    if (pinCode.length >= 4) attemptLogin();
+  }
+  function pinDelete() { pinCode = pinCode.slice(0, -1); renderPinDots(); }
+  function pinClear() { pinCode = ''; renderPinDots(); }
+
+  async function attemptLogin() {
+    try {
+      const { data } = await supabaseClient.from('users').select('*')
+        .eq('code', pinCode).eq('actif', true);
+      if (!data?.length) {
+        if (pinCode.length >= 6) {
+          document.getElementById('login-error').textContent = 'Code incorrect';
+          document.getElementById('login-error').style.display = 'block';
+          pinClear();
+        }
+        return;
+      }
+      const u = data[0];
+      currentUser = {
+        id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
+        equipe: u.equipe || 'cuisine',
+        etablissements: u.acces_etablissements?.length > 0
+          ? u.acces_etablissements : [u.etablissement]
+      };
+      if (currentUser.etablissements.length === 1) {
+        currentEtablissement = currentUser.etablissements[0];
+        showApp();
+      } else {
+        // Simple establishment selector
+        const names = { freddy: 'Freddy', liesel: 'Chez Tante Liesel' };
+        const choice = currentUser.etablissements.map(e => names[e] || e);
+        // For simplicity, pick first - or could add selector
+        currentEtablissement = currentUser.etablissements[0];
+        showApp();
+      }
+    } catch (e) {
+      console.error(e);
+      document.getElementById('login-error').textContent = 'Erreur de connexion';
+      document.getElementById('login-error').style.display = 'block';
+      pinClear();
+    }
+  }
+
+  // ====== SHOW APP ======
+  async function showApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.flexDirection = 'column';
+    document.getElementById('app-screen').style.height = '100vh';
+
+    const etabNames = { freddy: 'Freddy', liesel: 'Chez Tante Liesel' };
+    document.getElementById('header-etab').textContent = etabNames[currentEtablissement] || currentEtablissement;
+    document.getElementById('header-user').textContent = currentUser.nom;
+
+    // Show admin tab only for admin
+    document.getElementById('tab-admin').style.display = isAdmin() ? '' : 'none';
+
+    updateDateDisplay();
+    await refreshData();
+  }
+
+  // ====== DATE ======
+  function updateDateDisplay() {
+    document.getElementById('date-display').innerHTML = formatDateDisplay(filterDate);
+  }
+
+  function changeDate(delta) {
+    filterDate.setDate(filterDate.getDate() + delta);
+    updateDateDisplay();
+    refreshData();
+  }
+
+  function goToday() {
+    filterDate = new Date();
+    updateDateDisplay();
+    refreshData();
+  }
+
+  // ====== DATA ======
+  async function refreshData() {
+    try {
+      [frigos, releves] = await Promise.all([
+        DB.getFrigos(currentEtablissement),
+        DB.getReleves(currentEtablissement, dateStr(filterDate))
+      ]);
+      expandedFrigoId = null;
+      capturedPhotos = {};
+      updateProgress();
+      renderCurrentTab();
+    } catch (e) {
+      console.error('Erreur chargement:', e);
+      showToast('Erreur de chargement', 'error');
+    }
+  }
+
+  function updateProgress() {
+    const total = frigos.length;
+    const done = frigos.filter(f => releves.some(r => r.frigo_id === f.id && !r.est_controle_1h)).length;
+    const horsNorme = releves.filter(r => r.hors_norme && !r.est_controle_1h).length;
+
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('progress-count').textContent = `${done}/${total}`;
+    document.getElementById('progress-count').style.color =
+      horsNorme > 0 ? 'var(--red)' : (done === total ? 'var(--green)' : 'var(--cyan)');
+
+    const fill = document.getElementById('progress-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'progress-fill ' + (horsNorme > 0 ? 'alert' : (done === total ? 'complete' : 'partial'));
+  }
+
+  // ====== TABS ======
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.getElementById('progress-section').style.display = tab === 'releve' ? '' : 'none';
+    renderCurrentTab();
+  }
+
+  function renderCurrentTab() {
+    switch (currentTab) {
+      case 'releve': renderReleveTab(); break;
+      case 'historique': renderHistoriqueTab(); break;
+      case 'admin': renderAdminTab(); break;
+    }
+  }
+
+  // ====== RELEVE TAB ======
+  function renderReleveTab() {
+    const mc = document.getElementById('main-content');
+
+    if (!frigos.length) {
+      mc.innerHTML = `<div class="empty-state"><div class="emoji">🌡️</div>
+        <h3>Aucun frigo configure</h3><p>L'administrateur doit configurer la liste des frigos</p></div>`;
+      return;
+    }
+
+    // Check for pending 1h re-controls
+    const pendingControles = releves.filter(r => r.hors_norme && !r.est_controle_1h &&
+      !releves.some(rc => rc.est_controle_1h && rc.releve_parent_id === r.id));
+
+    let html = '';
+
+    // Banner for pending 1h re-controls
+    if (pendingControles.length > 0 && isToday(filterDate)) {
+      html += pendingControles.map(r => {
+        const createdAt = new Date(r.created_at);
+        const recheckTime = new Date(createdAt.getTime() + 60 * 60 * 1000);
+        const now = new Date();
+        const isReady = now >= recheckTime;
+        const timeStr = recheckTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+        return `<div class="controle-banner">
+          <div class="icon">⚠️</div>
+          <div class="text">
+            <div class="title">Re-controle requis : ${esc(r.frigo_nom)}</div>
+            <div class="detail">${r.temperature}° releve - ${isReady ? 'A faire maintenant !' : `A verifier a ${timeStr}`}</div>
+          </div>
+          ${isReady ? `<button class="btn-controle" onclick="startRecontrole('${r.id}', '${r.frigo_id}')">Controler</button>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    // Group frigos by category
+    const byCategory = {};
+    frigos.forEach(f => {
+      const cat = f.categorie || 'AUTRE';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(f);
+    });
+
+    for (const cat of CATEGORIES) {
+      if (!byCategory[cat]?.length) continue;
+
+      html += `<div class="category-header">${CAT_ICONS[cat] || ''} ${cat}</div>`;
+
+      for (const frigo of byCategory[cat]) {
+        const releve = releves.find(r => r.frigo_id === frigo.id && !r.est_controle_1h);
+        const isDone = !!releve;
+        const isHorsNorme = releve?.hors_norme;
+        const hasRecontrole = releves.some(r => r.est_controle_1h && r.releve_parent_id === releve?.id);
+        const needsPhoto = shouldRequirePhoto(frigo.id);
+        const isExpanded = expandedFrigoId === frigo.id;
+
+        let cardClass = 'frigo-card';
+        if (isDone && isHorsNorme && !hasRecontrole) cardClass += ' attente-controle';
+        else if (isDone && isHorsNorme) cardClass += ' hors-norme';
+        else if (isDone) cardClass += ' done';
+
+        let tempBadge = '';
+        if (isDone) {
+          const status = checkTemp(releve.temperature, frigo);
+          tempBadge = `<span class="badge-temp ${status}">${releve.temperature}°</span>`;
+        } else {
+          tempBadge = `<span class="badge-temp pending">—</span>`;
+        }
+
+        html += `<div class="${cardClass}">
+          <div class="frigo-header" onclick="toggleFrigo('${frigo.id}')">
+            <div class="frigo-icon ${cat.toLowerCase()}">${CAT_ICONS[cat] || '❄️'}</div>
+            <div class="frigo-info">
+              <div class="frigo-name">${esc(frigo.nom)}</div>
+              <div class="frigo-detail">${frigo.temp_min}° / ${frigo.temp_max}° — Limite : ${frigo.temp_limite}°</div>
+            </div>
+            <div class="frigo-status">
+              ${tempBadge}
+              ${needsPhoto && !isDone ? '<span class="badge-photo">📷 Photo</span>' : ''}
+              ${isDone && releve.photo_data ? '<span class="badge-photo">📷</span>' : ''}
+            </div>
+            <div class="check-icon ${isDone ? 'done' : 'pending'}">${isDone ? '✓' : ''}</div>
+          </div>
+
+          <div class="frigo-form ${isExpanded && !isDone && isToday(filterDate) ? 'show' : ''}" id="form-${frigo.id}">
+            ${renderFrigoForm(frigo, needsPhoto)}
+          </div>
+
+          ${isExpanded && isDone ? `<div class="frigo-form show" style="padding:8px 12px 12px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--green);font-size:0.85rem">
+              <span>✓</span> <span>Releve par <strong>${esc(releve.user_initiales || releve.user_nom)}</strong>
+              a ${new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            ${releve.observation ? `<div style="font-size:0.8rem;color:var(--gray-500);margin-top:4px">${esc(releve.observation)}</div>` : ''}
+            ${releve.photo_data ? `<img src="${releve.photo_data}" class="photo-preview" style="margin-top:6px" alt="Photo">` : ''}
+          </div>` : ''}
+        </div>`;
+      }
+    }
+
+    mc.innerHTML = html;
+  }
+
+  function renderFrigoForm(frigo, needsPhoto) {
+    const photoRequired = needsPhoto;
+    return `
+      <div class="temp-input-row">
+        <input type="number" step="0.5" class="temp-input" id="temp-${frigo.id}"
+               placeholder="—" oninput="onTempInput('${frigo.id}', this)"
+               min="${frigo.temp_min - 10}" max="${frigo.temp_max + 20}">
+        <span class="temp-unit">°C</span>
+        <span class="temp-range">Norme : ${frigo.temp_min}° a ${frigo.temp_max}° — Limite : ${frigo.temp_limite}°</span>
+      </div>
+
+      <div class="photo-section ${photoRequired ? 'required' : ''}" id="photo-section-${frigo.id}">
+        <div class="photo-label ${photoRequired ? 'required' : ''}">
+          ${photoRequired ? '📷 Photo de verification obligatoire' : '📷 Photo (optionnelle)'}
+        </div>
+        <button class="btn-photo" onclick="takePhoto('${frigo.id}')">Prendre une photo</button>
+        <div id="photo-preview-${frigo.id}"></div>
+      </div>
+
+      <textarea class="obs-input" id="obs-${frigo.id}" placeholder="Observation (optionnelle)..."></textarea>
+
+      <button class="btn-validate" id="btn-validate-${frigo.id}"
+              onclick="submitReleve('${frigo.id}')"
+              ${!isToday(filterDate) ? 'disabled' : ''}>
+        Valider le releve
+      </button>
+    `;
+  }
+
+  function toggleFrigo(frigoId) {
+    expandedFrigoId = expandedFrigoId === frigoId ? null : frigoId;
+    renderReleveTab();
+  }
+
+  function onTempInput(frigoId, input) {
+    const frigo = frigos.find(f => f.id === frigoId);
+    if (!frigo) return;
+    const val = parseFloat(input.value);
+    const status = checkTemp(val, frigo);
+
+    input.classList.toggle('hors-norme', status === 'danger');
+
+    // If out of range, make photo mandatory
+    if (status === 'danger') {
+      const section = document.getElementById(`photo-section-${frigoId}`);
+      if (section) {
+        section.classList.add('required');
+        section.querySelector('.photo-label').textContent = '📷 Photo OBLIGATOIRE - Temperature hors norme !';
+        section.querySelector('.photo-label').classList.add('required');
+      }
+    }
+  }
+
+  // ====== PHOTO ======
+  function takePhoto(frigoId) {
+    pendingPhotoFrigoId = frigoId;
+    const input = document.getElementById('camera-input');
+    input.value = '';
+    input.click();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('camera-input')?.addEventListener('change', function(e) {
+      if (!this.files?.length || !pendingPhotoFrigoId) return;
+      const file = this.files[0];
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        // Compress image
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxSize = 800;
+          let w = img.width, h = img.height;
+          if (w > maxSize || h > maxSize) {
+            if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+            else { w = Math.round(w * maxSize / h); h = maxSize; }
+          }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const base64 = canvas.toDataURL('image/jpeg', 0.6);
+          capturedPhotos[pendingPhotoFrigoId] = base64;
+
+          // Show preview
+          const preview = document.getElementById(`photo-preview-${pendingPhotoFrigoId}`);
+          if (preview) {
+            preview.innerHTML = `<img src="${base64}" class="photo-preview" alt="Photo">`;
+          }
+          const section = document.getElementById(`photo-section-${pendingPhotoFrigoId}`);
+          if (section) section.classList.add('captured');
+
+          showToast('Photo capturee', 'success');
+          pendingPhotoFrigoId = null;
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // ====== SUBMIT RELEVE ======
+  async function submitReleve(frigoId, isRecontrole = false, parentReleveId = null) {
+    const frigo = frigos.find(f => f.id === frigoId);
+    if (!frigo) return;
+
+    const tempInput = document.getElementById(`temp-${frigoId}`);
+    const temp = parseFloat(tempInput?.value);
+    if (isNaN(temp)) {
+      showToast('Saisissez une temperature', 'error');
+      return;
+    }
+
+    const status = checkTemp(temp, frigo);
+    const horsNorme = status === 'danger';
+    const photoRequired = shouldRequirePhoto(frigoId) || horsNorme;
+    const hasPhoto = !!capturedPhotos[frigoId];
+
+    // Check photo requirement
+    if (photoRequired && !hasPhoto) {
+      showToast('Photo obligatoire pour ce frigo !', 'error');
+      return;
+    }
+
+    const btn = document.getElementById(`btn-validate-${frigoId}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
+
+    try {
+      const releve = await DB.insertReleve({
+        frigo_id: frigoId,
+        frigo_nom: frigo.nom,
+        date: dateStr(filterDate),
+        temperature: temp,
+        hors_norme: horsNorme,
+        photo_requise: photoRequired,
+        photo_data: capturedPhotos[frigoId] || null,
+        est_controle_1h: isRecontrole,
+        releve_parent_id: parentReleveId,
+        observation: document.getElementById(`obs-${frigoId}`)?.value?.trim() || null,
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+
+      // If hors norme and NOT a re-control, create a TAF task for 1h re-check
+      if (horsNorme && !isRecontrole) {
+        await DB.createTafRecheck(frigo.nom, temp, frigoId, releve.id);
+        showToast(`⚠️ ${frigo.nom} hors norme ! Re-controle dans 1h`, 'warning');
+      } else if (horsNorme && isRecontrole) {
+        showToast(`Re-controle enregistre (${temp}°)`, 'warning');
+      } else {
+        showToast(`${frigo.nom} : ${temp}° ✓`, 'success');
+      }
+
+      // Refresh
+      releves = await DB.getReleves(currentEtablissement, dateStr(filterDate));
+      expandedFrigoId = null;
+      delete capturedPhotos[frigoId];
+      updateProgress();
+      renderReleveTab();
+
+    } catch (e) {
+      console.error('Erreur enregistrement:', e);
+      showToast('Erreur d\'enregistrement', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Valider le releve'; }
+    }
+  }
+
+  // ====== RE-CONTROLE 1H ======
+  function startRecontrole(parentReleveId, frigoId) {
+    const frigo = frigos.find(f => f.id === frigoId);
+    if (!frigo) return;
+
+    openModal(`Re-controle : ${frigo.nom}`, `
+      <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:12px">
+        Verifiez la temperature apres correction.
+        Norme : ${frigo.temp_min}° a ${frigo.temp_max}° — Limite : ${frigo.temp_limite}°
+      </p>
+      <div class="temp-input-row" style="justify-content:center">
+        <input type="number" step="0.5" class="temp-input" id="recontrole-temp"
+               placeholder="—" style="width:120px;font-size:1.5rem">
+        <span class="temp-unit" style="font-size:1.3rem">°C</span>
+      </div>
+      <div class="photo-section required" style="margin-top:12px">
+        <div class="photo-label required">📷 Photo obligatoire pour le re-controle</div>
+        <button class="btn-photo" onclick="takePhotoRecontrole('${frigoId}')">Prendre une photo</button>
+        <div id="photo-preview-recontrole"></div>
+      </div>
+      <textarea class="obs-input" id="obs-recontrole" placeholder="Observation..." style="margin-top:8px"></textarea>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Valider', cls: 'primary', action: `submitRecontrole('${parentReleveId}', '${frigoId}')` }
+    ]);
+  }
+
+  function takePhotoRecontrole(frigoId) {
+    pendingPhotoFrigoId = '_recontrole_' + frigoId;
+    const input = document.getElementById('camera-input');
+    input.value = '';
+    input.click();
+
+    // Override handler for recontrole
+    const origHandler = input.onchange;
+    input.onchange = function(e) {
+      if (!this.files?.length) return;
+      const file = this.files[0];
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxSize = 800;
+          let w = img.width, h = img.height;
+          if (w > maxSize || h > maxSize) {
+            if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+            else { w = Math.round(w * maxSize / h); h = maxSize; }
+          }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const base64 = canvas.toDataURL('image/jpeg', 0.6);
+          capturedPhotos['_recontrole_' + frigoId] = base64;
+          const preview = document.getElementById('photo-preview-recontrole');
+          if (preview) preview.innerHTML = `<img src="${base64}" class="photo-preview" alt="Photo">`;
+          showToast('Photo capturee', 'success');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+      input.onchange = null; // reset
+    };
+  }
+
+  async function submitRecontrole(parentReleveId, frigoId) {
+    const temp = parseFloat(document.getElementById('recontrole-temp')?.value);
+    if (isNaN(temp)) { showToast('Saisissez une temperature', 'error'); return; }
+
+    const photoKey = '_recontrole_' + frigoId;
+    if (!capturedPhotos[photoKey]) {
+      showToast('Photo obligatoire pour le re-controle', 'error');
+      return;
+    }
+
+    const frigo = frigos.find(f => f.id === frigoId);
+    const status = checkTemp(temp, frigo);
+
+    try {
+      await DB.insertReleve({
+        frigo_id: frigoId,
+        frigo_nom: frigo.nom,
+        date: dateStr(filterDate),
+        temperature: temp,
+        hors_norme: status === 'danger',
+        photo_requise: true,
+        photo_data: capturedPhotos[photoKey],
+        est_controle_1h: true,
+        releve_parent_id: parentReleveId,
+        observation: document.getElementById('obs-recontrole')?.value?.trim() || null,
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+
+      closeModal();
+      delete capturedPhotos[photoKey];
+
+      if (status === 'danger') {
+        showToast(`⚠️ Toujours hors norme (${temp}°) !`, 'error');
+      } else {
+        showToast(`Re-controle OK : ${temp}° ✓`, 'success');
+      }
+
+      releves = await DB.getReleves(currentEtablissement, dateStr(filterDate));
+      updateProgress();
+      renderReleveTab();
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur enregistrement', 'error');
+    }
+  }
+
+  // ====== HISTORIQUE TAB ======
+  async function renderHistoriqueTab() {
+    const mc = document.getElementById('main-content');
+    mc.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400)">Chargement...</div>';
+
+    const dateTo = dateStr(filterDate);
+    const dateFrom = dateStr(new Date(filterDate.getTime() - 7 * 24 * 60 * 60 * 1000));
+
+    try {
+      const histReleves = await DB.getRelevesRange(currentEtablissement, dateFrom, dateTo);
+
+      if (!histReleves.length) {
+        mc.innerHTML = `<div class="empty-state"><div class="emoji">📊</div>
+          <h3>Aucun historique</h3><p>Pas de releves sur les 7 derniers jours</p></div>`;
+        return;
+      }
+
+      // Group by date
+      const byDate = {};
+      histReleves.forEach(r => {
+        if (!byDate[r.date]) byDate[r.date] = [];
+        byDate[r.date].push(r);
+      });
+
+      let html = '';
+      for (const date of Object.keys(byDate).sort().reverse()) {
+        const dayReleves = byDate[date].filter(r => !r.est_controle_1h);
+        const horsNormeCount = dayReleves.filter(r => r.hors_norme).length;
+        const totalFrigos = frigos.length;
+        const dateObj = new Date(date + 'T12:00:00');
+        const dateLabel = dateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+
+        html += `<div class="histo-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-weight:700;font-size:0.9rem">${dateLabel}</span>
+            <span style="font-size:0.8rem;color:${horsNormeCount > 0 ? 'var(--red)' : 'var(--green)'}">
+              ${dayReleves.length}/${totalFrigos} releves ${horsNormeCount > 0 ? `· ${horsNormeCount} hors norme` : '· OK'}
+            </span>
+          </div>
+          ${dayReleves.map(r => {
+            const frigo = frigos.find(f => f.id === r.frigo_id);
+            const status = frigo ? checkTemp(r.temperature, frigo) : 'pending';
+            return `<div class="histo-row">
+              <span style="flex:1;font-size:0.8rem">${esc(r.frigo_nom)}</span>
+              <span class="badge-temp ${status}" style="font-size:0.75rem;padding:2px 8px">${r.temperature}°</span>
+              ${r.photo_data ? '<span style="font-size:0.7rem">📷</span>' : ''}
+              <span style="font-size:0.7rem;color:var(--gray-400)">${esc(r.user_initiales || '')}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+
+      mc.innerHTML = html;
+    } catch (e) {
+      console.error(e);
+      mc.innerHTML = '<div class="empty-state"><div class="emoji">❌</div><h3>Erreur</h3></div>';
+    }
+  }
+
+  // ====== ADMIN TAB ======
+  async function renderAdminTab() {
+    const mc = document.getElementById('main-content');
+
+    try {
+      const allFrigos = await DB.getAllFrigos(currentEtablissement);
+
+      mc.innerHTML = `
+        <div style="padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="font-size:0.9rem;color:var(--gray-600)">Frigos (${allFrigos.filter(f => f.actif).length} actifs)</h3>
+            <button class="btn-validate" style="width:auto;padding:8px 16px;font-size:0.85rem"
+                    onclick="showAddFrigoModal()">+ Ajouter</button>
+          </div>
+
+          ${allFrigos.filter(f => f.actif).map(f => `
+            <div class="admin-frigo-item">
+              <div class="order-badge">${f.ordre || 0}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:0.85rem">${esc(f.nom)}</div>
+                <div style="font-size:0.7rem;color:var(--gray-400)">${esc(f.categorie)} — ${f.temp_min}°/${f.temp_max}° — Limite ${f.temp_limite}°</div>
+              </div>
+              <button style="border:none;background:none;cursor:pointer;font-size:0.9rem"
+                      onclick="showEditFrigoModal('${f.id}')">✏️</button>
+              <button style="border:none;background:none;cursor:pointer;color:var(--red);font-size:0.9rem"
+                      onclick="confirmDeleteFrigo('${f.id}', '${esc(f.nom)}')">✕</button>
+            </div>
+          `).join('')}
+
+          ${allFrigos.filter(f => !f.actif).length > 0 ? `
+            <h3 style="font-size:0.8rem;color:var(--gray-400);margin-top:16px;margin-bottom:8px">Inactifs</h3>
+            ${allFrigos.filter(f => !f.actif).map(f => `
+              <div class="admin-frigo-item" style="opacity:0.5">
+                <div style="flex:1"><span style="font-size:0.85rem">${esc(f.nom)}</span></div>
+                <button style="border:none;background:none;cursor:pointer;color:var(--green);font-size:0.8rem"
+                        onclick="reactivateFrigo('${f.id}')">Reactiver</button>
+              </div>
+            `).join('')}
+          ` : ''}
+        </div>
+      `;
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur chargement admin', 'error');
+    }
+  }
+
+  function showAddFrigoModal() {
+    openModal('Ajouter un frigo', `
+      <div class="form-group">
+        <label>Nom</label>
+        <input class="form-input" id="frigo-nom" placeholder="Ex: CONGELATEUR BAR">
+      </div>
+      <div class="form-group">
+        <label>Categorie</label>
+        <select class="form-select" id="frigo-categorie">
+          ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Temp. Min (°C)</label>
+        <input class="form-input" type="number" step="0.5" id="frigo-min" value="0">
+      </div>
+      <div class="form-group">
+        <label>Temp. Max (°C)</label>
+        <input class="form-input" type="number" step="0.5" id="frigo-max" value="5">
+      </div>
+      <div class="form-group">
+        <label>Temp. Limite HACCP (°C)</label>
+        <input class="form-input" type="number" step="0.5" id="frigo-limite" value="7">
+      </div>
+      <div class="form-group">
+        <label>Ordre d'affichage</label>
+        <input class="form-input" type="number" id="frigo-ordre" value="${frigos.length + 1}">
+      </div>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Ajouter', cls: 'primary', action: 'doAddFrigo()' }
+    ]);
+  }
+
+  async function doAddFrigo() {
+    const nom = document.getElementById('frigo-nom').value.trim();
+    if (!nom) { showToast('Saisissez un nom', 'error'); return; }
+
+    try {
+      await DB.insertFrigo({
+        nom,
+        categorie: document.getElementById('frigo-categorie').value,
+        temp_min: parseFloat(document.getElementById('frigo-min').value) || 0,
+        temp_max: parseFloat(document.getElementById('frigo-max').value) || 5,
+        temp_limite: parseFloat(document.getElementById('frigo-limite').value) || 7,
+        etablissement: currentEtablissement,
+        ordre: parseInt(document.getElementById('frigo-ordre').value) || 0,
+        actif: true
+      });
+      frigos = await DB.getFrigos(currentEtablissement);
+      closeModal();
+      renderAdminTab();
+      showToast('Frigo ajoute ✓', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur ajout', 'error');
+    }
+  }
+
+  async function showEditFrigoModal(id) {
+    const allFrigos = await DB.getAllFrigos(currentEtablissement);
+    const f = allFrigos.find(fr => fr.id === id);
+    if (!f) return;
+
+    openModal('Modifier le frigo', `
+      <div class="form-group">
+        <label>Nom</label>
+        <input class="form-input" id="edit-frigo-nom" value="${esc(f.nom)}">
+      </div>
+      <div class="form-group">
+        <label>Categorie</label>
+        <select class="form-select" id="edit-frigo-categorie">
+          ${CATEGORIES.map(c => `<option value="${c}" ${c === f.categorie ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Temp. Min (°C)</label>
+        <input class="form-input" type="number" step="0.5" id="edit-frigo-min" value="${f.temp_min}">
+      </div>
+      <div class="form-group">
+        <label>Temp. Max (°C)</label>
+        <input class="form-input" type="number" step="0.5" id="edit-frigo-max" value="${f.temp_max}">
+      </div>
+      <div class="form-group">
+        <label>Temp. Limite HACCP (°C)</label>
+        <input class="form-input" type="number" step="0.5" id="edit-frigo-limite" value="${f.temp_limite}">
+      </div>
+      <div class="form-group">
+        <label>Ordre</label>
+        <input class="form-input" type="number" id="edit-frigo-ordre" value="${f.ordre || 0}">
+      </div>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Enregistrer', cls: 'primary', action: `doEditFrigo('${id}')` }
+    ]);
+  }
+
+  async function doEditFrigo(id) {
+    try {
+      await DB.updateFrigo(id, {
+        nom: document.getElementById('edit-frigo-nom').value.trim(),
+        categorie: document.getElementById('edit-frigo-categorie').value,
+        temp_min: parseFloat(document.getElementById('edit-frigo-min').value) || 0,
+        temp_max: parseFloat(document.getElementById('edit-frigo-max').value) || 5,
+        temp_limite: parseFloat(document.getElementById('edit-frigo-limite').value) || 7,
+        ordre: parseInt(document.getElementById('edit-frigo-ordre').value) || 0
+      });
+      frigos = await DB.getFrigos(currentEtablissement);
+      closeModal();
+      renderAdminTab();
+      showToast('Frigo modifie ✓', 'success');
+    } catch (e) { showToast('Erreur modification', 'error'); }
+  }
+
+  function confirmDeleteFrigo(id, nom) {
+    openModal('Supprimer le frigo ?', `
+      <p>Desactiver « <strong>${nom}</strong> » ?</p>
+      <p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">Les releves existants seront conserves.</p>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Supprimer', cls: 'danger', action: `doDeleteFrigo('${id}')` }
+    ]);
+  }
+
+  async function doDeleteFrigo(id) {
+    try {
+      await DB.deleteFrigo(id);
+      frigos = await DB.getFrigos(currentEtablissement);
+      closeModal();
+      renderAdminTab();
+      showToast('Frigo desactive', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  async function reactivateFrigo(id) {
+    try {
+      await DB.updateFrigo(id, { actif: true });
+      frigos = await DB.getFrigos(currentEtablissement);
+      renderAdminTab();
+      showToast('Frigo reactive ✓', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  // ====== MODAL ======
+  function openModal(title, body, buttons) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = body;
+    document.getElementById('modal-footer').innerHTML = (buttons || []).map(b =>
+      `<button class="btn-modal ${b.cls || ''}" onclick="${b.action}">${b.label}</button>`
+    ).join('');
+    document.getElementById('modal-overlay').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('show');
+  }
+
+  // ====== TOAST ======
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type ? ` ${type}` : '');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // ====== INIT ======
+  async function init() {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    script.onload = () => {
+      initSupabase();
+      const session = checkPortalSession();
+      if (session) {
+        currentUser = session.user;
+        currentEtablissement = session.etablissement;
+        showApp();
+      } else {
+        document.getElementById('login-screen').style.display = 'flex';
+        renderPinDots();
+        const pad = document.getElementById('pin-pad');
+        for (let i = 1; i <= 9; i++) pad.innerHTML += `<button class="pin-key" onclick="pinAdd('${i}')">${i}</button>`;
+        pad.innerHTML += `<button class="pin-key" onclick="pinClear()">C</button>`;
+        pad.innerHTML += `<button class="pin-key" onclick="pinAdd('0')">0</button>`;
+        pad.innerHTML += `<button class="pin-key" onclick="pinDelete()">⌫</button>`;
+      }
+    };
+    document.head.appendChild(script);
+  }
+
+  init();
+</script>
+</body>
+</html>
