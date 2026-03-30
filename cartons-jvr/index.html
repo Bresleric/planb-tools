@@ -52,6 +52,39 @@
             padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
         }
 
+        
+        /* Manager restricted view */
+        .manager-only { display: none; }
+        body.is-manager .manager-only { display: block; }
+        body.is-manager .admin-only { display: none !important; }
+        body.is-manager .view-tabs { display: none !important; }
+        .my-cartons-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+        .my-cartons-header h3 {
+            font-size: 16px; font-weight: 700; color: var(--gray-700);
+        }
+        .my-cartons-count {
+            font-size: 12px; color: var(--gray-400); font-weight: 600;
+        }
+        .carton-actions { display: flex; gap: 6px; margin-top: 6px; }
+        .carton-action-btn {
+            background: none; border: 1px solid var(--gray-200); border-radius: 6px;
+            padding: 4px 10px; font-size: 11px; cursor: pointer; color: var(--gray-500);
+            transition: all 0.2s;
+        }
+        .carton-action-btn:hover { background: var(--gray-50); }
+        .carton-action-btn.edit { color: var(--blue); border-color: var(--blue); }
+        .carton-action-btn.delete { color: var(--red); border-color: var(--red); }
+        .carton-locked { opacity: 0.6; }
+        .carton-locked .carton-actions { display: none; }
+        .carton-validated-badge {
+            display: inline-block; font-size: 10px; color: var(--gray-400);
+            background: var(--gray-100); padding: 2px 8px; border-radius: 10px;
+            margin-left: 6px;
+        }
+
         /* Demo banner */
         .demo-banner {
             display: none; background: #fbbf24; color: #92400e;
@@ -375,15 +408,15 @@
 
     <!-- View tabs -->
     <div class="view-tabs">
-        <button class="view-tab active" data-view="salaries" onclick="switchView('salaries')">Salariés</button>
-        <button class="view-tab" data-view="journal" onclick="switchView('journal')">Journal</button>
+        <button class="view-tab active admin-only" data-view="salaries" onclick="switchView('salaries')">Salariés</button>
+        <button class="view-tab admin-only" data-view="journal" onclick="switchView('journal')">Journal</button>
     </div>
 
     <!-- Content -->
     <div class="content">
 
         <!-- Vue Salariés -->
-        <div class="view-content active" id="view-salaries">
+        <div class="view-content active admin-only" id="view-salaries">
             <div class="search-bar">
                 <input type="text" id="search-salarie" placeholder="Rechercher un salarié..." oninput="renderSalaries()">
                 <select id="filter-equipe" onchange="renderSalaries()">
@@ -397,7 +430,17 @@
             <div id="salaries-list"></div>
         </div>
 
-        <!-- Vue Fiche salarié -->
+        
+    <!-- Vue Manager : Mes cartons du jour -->
+    <div class="view-content manager-only" id="view-manager">
+        <div class="my-cartons-header">
+            <h3>Mes cartons du jour</h3>
+            <span class="my-cartons-count" id="my-cartons-count"></span>
+        </div>
+        <div id="my-cartons-list"></div>
+    </div>
+
+    <!-- Vue Fiche salarié -->
         <div class="view-content" id="view-fiche">
             <div class="print-header">
                 <h1 id="print-title">Journal de suivi RH</h1>
@@ -438,7 +481,7 @@
         </div>
 
         <!-- Vue Journal global -->
-        <div class="view-content" id="view-journal">
+        <div class="view-content admin-only" id="view-journal">
             <div class="search-bar">
                 <input type="text" id="search-journal" placeholder="Rechercher..." oninput="renderJournal()">
                 <select id="filter-type-journal" onchange="renderJournal()">
@@ -589,6 +632,17 @@ document.addEventListener('DOMContentLoaded', () => {
         currentEtab === 'freddy' ? 'Freddy' : 'Liesel';
     document.getElementById('user-badge').textContent = currentUser.initiales || '—';
 
+    // Déterminer admin vs manager
+    const isAdmin = currentUser.role === 'admin';
+    window._isAdmin = isAdmin;
+
+    if (!isAdmin) {
+        document.body.classList.add('is-manager');
+        // Activer la vue manager au lieu de salariés
+        document.getElementById('view-salaries').classList.remove('active');
+        document.getElementById('view-manager').classList.add('active');
+    }
+
     // Date par défaut
     document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
 
@@ -602,6 +656,7 @@ async function loadData() {
     await Promise.all([loadSalaries(), loadCartons()]);
     renderSalaries();
     renderJournal();
+    renderMyCartons();
     populateSalarieSelect();
 }
 
@@ -815,7 +870,10 @@ function renderFicheTimeline() {
                 <div class="carton-description">${escHtml(c.description)}</div>
                 <div class="carton-meta">
                     <span>${formatDateFr(new Date(c.date_evenement))} · par ${escHtml(c.auteur_nom)}</span>
-                    <button class="carton-delete" onclick="confirmDelete('${c.id}')" title="Supprimer">✕</button>
+                    <span class="carton-entry-actions">
+                        <button class="carton-action-btn edit" onclick="editCarton('${c.id}')" title="Modifier" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:12px;">✏️</button>
+                        <button class="carton-delete" onclick="confirmDelete('${c.id}')" title="Supprimer">✕</button>
+                    </span>
                 </div>
             </div>
         </div>
@@ -876,7 +934,10 @@ function renderJournal() {
                         <div class="carton-description">${escHtml(c.description)}</div>
                         <div class="carton-meta">
                             <span>par ${escHtml(c.auteur_nom)}</span>
-                            <button class="carton-delete" onclick="confirmDelete('${c.id}')" title="Supprimer">✕</button>
+                            <span class="carton-entry-actions">
+                        <button class="carton-action-btn edit" onclick="editCarton('${c.id}')" title="Modifier" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:12px;">✏️</button>
+                        <button class="carton-delete" onclick="confirmDelete('${c.id}')" title="Supprimer">✕</button>
+                    </span>
                         </div>
                     </div>
                 </div>
@@ -897,6 +958,7 @@ function populateSalarieSelect() {
 }
 
 function openAddModal() {
+    editingCartonId = null;
     // Pre-select salarié if on fiche view
     if (currentFicheSalarie) {
         document.getElementById('form-salarie').value = currentFicheSalarie.id;
@@ -913,6 +975,8 @@ function openAddModal() {
 
 function closeAddModal() {
     document.getElementById('modal-add').classList.remove('active');
+    editingCartonId = null;
+    document.getElementById('form-submit').textContent = 'Enregistrer le carton';
 }
 
 function selectType(type) {
@@ -988,6 +1052,7 @@ async function submitCarton() {
 
     closeAddModal();
     document.getElementById('form-submit').textContent = 'Enregistrer le carton';
+    editingCartonId = null;
 
     const typeLabels = { vert: 'Vert', jaune: 'Jaune', rouge: 'Rouge' };
     showToast(`Carton ${typeLabels[selectedType]} enregistré`, 'success');
@@ -995,10 +1060,90 @@ async function submitCarton() {
     // Refresh views
     renderSalaries();
     renderJournal();
+    renderMyCartons();
     if (currentFicheSalarie) {
         updateFicheStats();
         renderFicheTimeline();
     }
+}
+
+
+
+// ============================================
+// MANAGER: MES CARTONS DU JOUR
+// ============================================
+function renderMyCartons() {
+    const container = document.getElementById('my-cartons-list');
+    const countEl = document.getElementById('my-cartons-count');
+    if (!container) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const mine = cartons.filter(c =>
+        c.auteur_id === currentUser.id && c.date_evenement === today
+    );
+
+    if (countEl) countEl.textContent = mine.length + ' carton(s) aujourd\'hui';
+
+    if (mine.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <div class="empty-text">Aucun carton aujourd'hui.<br>Appuyez sur + pour en ajouter.</div>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = mine.map(c => `
+        <div class="carton-entry">
+            <div class="carton-bar ${c.type}"></div>
+            <div class="carton-body">
+                <div class="journal-entry-name">${escHtml(c.salarie_nom)}</div>
+                <span class="carton-type-badge ${c.type}">${typeLabel(c.type)}</span>
+                <div class="carton-description">${escHtml(c.description)}</div>
+                <div class="carton-meta">
+                    <span>${formatDateFr(new Date(c.date_evenement))}</span>
+                </div>
+                <div class="carton-actions">
+                    <button class="carton-action-btn edit" onclick="editCarton('${c.id}')">✏️ Modifier</button>
+                    <button class="carton-action-btn delete" onclick="confirmDelete('${c.id}')">✕ Supprimer</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ============================================
+// EDIT CARTON
+// ============================================
+let editingCartonId = null;
+
+function editCarton(cartonId) {
+    const c = cartons.find(x => x.id === cartonId);
+    if (!c) return;
+
+    // Vérifier que c'est un carton du jour (sécurité)
+    const today = new Date().toISOString().split('T')[0];
+    if (!window._isAdmin && c.date_evenement !== today) {
+        showToast('Ce carton ne peut plus être modifié', 'error');
+        return;
+    }
+
+    editingCartonId = cartonId;
+
+    // Pré-remplir le formulaire
+    document.getElementById('form-salarie').value = c.salarie_id;
+    selectedType = c.type;
+    document.querySelectorAll('.type-option').forEach(o => {
+        o.classList.toggle('selected', o.dataset.type === c.type);
+    });
+    document.getElementById('form-description').value = c.description;
+    document.getElementById('form-date').value = c.date_evenement;
+
+    // Changer le bouton
+    document.getElementById('form-submit').textContent = 'Modifier le carton';
+    document.getElementById('form-submit').disabled = false;
+
+    document.getElementById('modal-add').classList.add('active');
 }
 
 // ============================================
@@ -1045,6 +1190,7 @@ async function executeDelete() {
 
     renderSalaries();
     renderJournal();
+    renderMyCartons();
     if (currentFicheSalarie) {
         updateFicheStats();
         renderFicheTimeline();
