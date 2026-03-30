@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cartons JVR">
+    <meta name="theme-color" content="#f97316">
+    <title>Cartons JVR - PlanB Tools</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed; --orange-dark: #ea580c;
+            --green: #22c55e; --green-light: #f0fdf4; --green-dark: #16a34a;
+            --yellow: #eab308; --yellow-light: #fefce8; --yellow-dark: #ca8a04;
+            --red: #ef4444; --red-light: #fef2f2; --red-dark: #dc2626;
+            --blue: #3b82f6;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+            --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+            --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--gray-50); color: var(--gray-800);
+            height: 100vh; display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: white; border-bottom: 1px solid var(--gray-200);
+            padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+            flex-shrink: 0; z-index: 100;
+        }
+        .header .back-btn {
+            background: none; border: none; font-size: 20px; cursor: pointer;
+            padding: 4px 8px; color: var(--orange);
+        }
+        .header .title { font-size: 17px; font-weight: 700; flex: 1; }
+        .header .etab-badge {
+            background: var(--orange-light); color: var(--orange-dark);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        }
+        .header .user-badge {
+            background: var(--gray-100); color: var(--gray-600);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        }
+
+        /* Demo banner */
+        .demo-banner {
+            display: none; background: #fbbf24; color: #92400e;
+            text-align: center; padding: 6px; font-size: 12px; font-weight: 600;
+        }
+
+        /* Tabs salariés / journal */
+        .view-tabs {
+            display: flex; background: white; border-bottom: 1px solid var(--gray-200);
+            flex-shrink: 0;
+        }
+        .view-tab {
+            flex: 1; padding: 12px; text-align: center; font-size: 13px; font-weight: 600;
+            color: var(--gray-400); border-bottom: 2px solid transparent;
+            cursor: pointer; transition: all 0.2s; background: none; border-top: none;
+            border-left: none; border-right: none;
+        }
+        .view-tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+        /* Content */
+        .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .view-content { display: none; padding: 16px; padding-bottom: 120px; }
+        .view-content.active { display: block; }
+
+        /* Search bar */
+        .search-bar {
+            display: flex; gap: 8px; margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1; padding: 10px 14px; border: 1px solid var(--gray-300);
+            border-radius: var(--radius); font-size: 15px; outline: none;
+            background: white;
+        }
+        .search-bar input:focus { border-color: var(--orange); }
+        .search-bar select {
+            padding: 10px 12px; border: 1px solid var(--gray-300);
+            border-radius: var(--radius); font-size: 14px; background: white;
+            color: var(--gray-700); outline: none;
+        }
+
+        /* Salarié card */
+        .salarie-card {
+            background: white; border-radius: var(--radius); padding: 14px 16px;
+            margin-bottom: 10px; box-shadow: var(--shadow); cursor: pointer;
+            transition: transform 0.1s;
+            display: flex; align-items: center; gap: 14px;
+        }
+        .salarie-card:active { transform: scale(0.98); }
+        .salarie-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--orange-light); color: var(--orange-dark);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px; flex-shrink: 0;
+        }
+        .salarie-info { flex: 1; }
+        .salarie-name { font-weight: 600; font-size: 15px; }
+        .salarie-meta { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        .salarie-counters { display: flex; gap: 6px; }
+        .counter-badge {
+            min-width: 26px; height: 26px; border-radius: 13px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; color: white;
+        }
+        .counter-badge.vert { background: var(--green); }
+        .counter-badge.jaune { background: var(--yellow); color: #713f12; }
+        .counter-badge.rouge { background: var(--red); }
+
+        /* Fiche salarié */
+        .fiche-header {
+            display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+        }
+        .fiche-avatar {
+            width: 56px; height: 56px; border-radius: 50%;
+            background: var(--orange-light); color: var(--orange-dark);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 18px; flex-shrink: 0;
+        }
+        .fiche-name { font-size: 20px; font-weight: 700; }
+        .fiche-detail { font-size: 13px; color: var(--gray-500); }
+
+        .fiche-stats {
+            display: flex; gap: 10px; margin-bottom: 16px;
+        }
+        .stat-card {
+            flex: 1; padding: 12px; border-radius: var(--radius);
+            text-align: center;
+        }
+        .stat-card.vert { background: var(--green-light); }
+        .stat-card.jaune { background: var(--yellow-light); }
+        .stat-card.rouge { background: var(--red-light); }
+        .stat-count { font-size: 28px; font-weight: 800; }
+        .stat-card.vert .stat-count { color: var(--green-dark); }
+        .stat-card.jaune .stat-count { color: var(--yellow-dark); }
+        .stat-card.rouge .stat-count { color: var(--red-dark); }
+        .stat-label { font-size: 11px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; }
+
+        .filter-chips {
+            display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+        }
+        .filter-chip {
+            padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+            cursor: pointer; border: 2px solid var(--gray-200); background: white;
+            color: var(--gray-600); transition: all 0.2s;
+        }
+        .filter-chip.active { border-color: var(--orange); background: var(--orange-light); color: var(--orange-dark); }
+        .filter-chip.vert.active { border-color: var(--green); background: var(--green-light); color: var(--green-dark); }
+        .filter-chip.jaune.active { border-color: var(--yellow); background: var(--yellow-light); color: var(--yellow-dark); }
+        .filter-chip.rouge.active { border-color: var(--red); background: var(--red-light); color: var(--red-dark); }
+
+        /* Timeline carton entry */
+        .carton-entry {
+            display: flex; gap: 12px; margin-bottom: 14px;
+        }
+        .carton-bar {
+            width: 4px; border-radius: 2px; flex-shrink: 0;
+        }
+        .carton-bar.vert { background: var(--green); }
+        .carton-bar.jaune { background: var(--yellow); }
+        .carton-bar.rouge { background: var(--red); }
+        .carton-body {
+            flex: 1; background: white; border-radius: var(--radius);
+            padding: 12px 14px; box-shadow: var(--shadow);
+        }
+        .carton-type-badge {
+            display: inline-block; padding: 2px 10px; border-radius: 10px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;
+        }
+        .carton-type-badge.vert { background: var(--green-light); color: var(--green-dark); }
+        .carton-type-badge.jaune { background: var(--yellow-light); color: var(--yellow-dark); }
+        .carton-type-badge.rouge { background: var(--red-light); color: var(--red-dark); }
+        .carton-description { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+        .carton-meta {
+            font-size: 12px; color: var(--gray-400);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .carton-delete {
+            background: none; border: none; color: var(--gray-400); font-size: 16px;
+            cursor: pointer; padding: 4px;
+        }
+        .carton-delete:hover { color: var(--red); }
+
+        .empty-state {
+            text-align: center; padding: 40px 20px; color: var(--gray-400);
+        }
+        .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state .empty-text { font-size: 15px; }
+
+        /* Journal global view */
+        .journal-date-group { margin-bottom: 20px; }
+        .journal-date-label {
+            font-size: 12px; font-weight: 700; color: var(--gray-500);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 8px; padding-bottom: 4px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .journal-entry-name {
+            font-size: 12px; font-weight: 600; color: var(--orange-dark); margin-bottom: 4px;
+        }
+
+        /* FAB (floating action button) */
+        .fab {
+            position: fixed; bottom: 24px; right: 24px;
+            width: 56px; height: 56px; border-radius: 28px;
+            background: var(--orange); color: white; border: none;
+            font-size: 28px; cursor: pointer; box-shadow: var(--shadow-md);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 90; transition: transform 0.1s;
+        }
+        .fab:active { transform: scale(0.9); }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 200;
+            justify-content: center; align-items: flex-end;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-sheet {
+            background: white; border-radius: 20px 20px 0 0;
+            width: 100%; max-width: 500px; max-height: 90vh;
+            overflow-y: auto; padding: 24px 20px 40px;
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .modal-handle {
+            width: 36px; height: 4px; background: var(--gray-300);
+            border-radius: 2px; margin: 0 auto 20px;
+        }
+        .modal-title {
+            font-size: 18px; font-weight: 700; margin-bottom: 20px;
+        }
+
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block; font-size: 13px; font-weight: 600;
+            color: var(--gray-600); margin-bottom: 6px;
+        }
+        .form-select, .form-input, .form-textarea {
+            width: 100%; padding: 10px 14px; border: 1px solid var(--gray-300);
+            border-radius: var(--radius); font-size: 15px; outline: none;
+            background: white; font-family: inherit;
+        }
+        .form-select:focus, .form-input:focus, .form-textarea:focus {
+            border-color: var(--orange);
+        }
+        .form-textarea { resize: vertical; min-height: 80px; }
+
+        /* Type selector (radio visual) */
+        .type-selector { display: flex; gap: 10px; }
+        .type-option {
+            flex: 1; padding: 12px 8px; border-radius: var(--radius);
+            text-align: center; cursor: pointer; border: 2px solid var(--gray-200);
+            transition: all 0.2s; background: white;
+        }
+        .type-option .type-emoji { font-size: 24px; display: block; margin-bottom: 4px; }
+        .type-option .type-label { font-size: 12px; font-weight: 700; }
+        .type-option.vert.selected { border-color: var(--green); background: var(--green-light); }
+        .type-option.jaune.selected { border-color: var(--yellow); background: var(--yellow-light); }
+        .type-option.rouge.selected { border-color: var(--red); background: var(--red-light); }
+        .type-option .type-hint {
+            font-size: 10px; color: var(--gray-500); margin-top: 2px;
+            line-height: 1.3;
+        }
+
+        .form-btn {
+            width: 100%; padding: 14px; border: none; border-radius: var(--radius);
+            font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+        }
+        .form-btn.primary {
+            background: var(--orange); color: white;
+        }
+        .form-btn.primary:disabled {
+            background: var(--gray-300); color: var(--gray-500); cursor: not-allowed;
+        }
+        .form-btn.secondary {
+            background: var(--gray-100); color: var(--gray-600); margin-top: 8px;
+        }
+
+        .rgpd-note {
+            background: var(--gray-100); border-radius: 8px; padding: 10px 12px;
+            font-size: 11px; color: var(--gray-500); line-height: 1.5;
+            margin-top: 16px;
+        }
+        .rgpd-note strong { color: var(--gray-700); }
+
+        /* Toast */
+        .toast-container {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 300; display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            background: var(--gray-800); color: white; padding: 10px 20px;
+            border-radius: 8px; font-size: 14px; font-weight: 500;
+            animation: fadeInOut 3s ease forwards;
+            white-space: nowrap;
+        }
+        .toast.success { background: var(--green-dark); }
+        .toast.error { background: var(--red-dark); }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* Print styles */
+        @media print {
+            .header, .view-tabs, .fab, .search-bar, .filter-chips, .carton-delete,
+            .toast-container, .modal-overlay { display: none !important; }
+            body { overflow: visible; height: auto; }
+            .content { overflow: visible; }
+            .view-content { padding: 0; padding-bottom: 0; }
+            .carton-body { box-shadow: none; border: 1px solid #ddd; }
+            .salarie-card { box-shadow: none; border: 1px solid #ddd; }
+            .print-header {
+                display: block !important; text-align: center;
+                margin-bottom: 20px; padding-bottom: 10px;
+                border-bottom: 2px solid #333;
+            }
+            .print-header h1 { font-size: 18px; }
+            .print-header p { font-size: 12px; color: #666; }
+        }
+        .print-header { display: none; }
+
+        /* Confirm dialog */
+        .confirm-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 250;
+            justify-content: center; align-items: center;
+        }
+        .confirm-overlay.active { display: flex; }
+        .confirm-box {
+            background: white; border-radius: var(--radius); padding: 24px;
+            width: 90%; max-width: 340px; text-align: center;
+        }
+        .confirm-box p { font-size: 15px; margin-bottom: 20px; line-height: 1.5; }
+        .confirm-actions { display: flex; gap: 10px; }
+        .confirm-actions button {
+            flex: 1; padding: 12px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .confirm-cancel { background: var(--gray-100); color: var(--gray-700); }
+        .confirm-ok { background: var(--red); color: white; }
+    </style>
+</head>
+<body>
+
+    <!-- Demo banner -->
+    <div class="demo-banner" id="demo-banner">Mode démonstration — données non sauvegardées</div>
+
+    <!-- Header -->
+    <div class="header">
+        <button class="back-btn" onclick="goBack()">‹</button>
+        <div class="title">Cartons JVR</div>
+        <span class="etab-badge" id="etab-badge">—</span>
+        <span class="user-badge" id="user-badge">—</span>
+    </div>
+
+    <!-- View tabs -->
+    <div class="view-tabs">
+        <button class="view-tab active" data-view="salaries" onclick="switchView('salaries')">Salariés</button>
+        <button class="view-tab" data-view="journal" onclick="switchView('journal')">Journal</button>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+        <!-- Vue Salariés -->
+        <div class="view-content active" id="view-salaries">
+            <div class="search-bar">
+                <input type="text" id="search-salarie" placeholder="Rechercher un salarié..." oninput="renderSalaries()">
+                <select id="filter-equipe" onchange="renderSalaries()">
+                    <option value="">Tous</option>
+                    <option value="salle">Salle</option>
+                    <option value="cuisine">Cuisine</option>
+                    <option value="plonge">Plonge</option>
+                    <option value="autre">Autre</option>
+                </select>
+            </div>
+            <div id="salaries-list"></div>
+        </div>
+
+        <!-- Vue Fiche salarié -->
+        <div class="view-content" id="view-fiche">
+            <div class="print-header">
+                <h1 id="print-title">Journal de suivi RH</h1>
+                <p id="print-subtitle"></p>
+            </div>
+            <div class="fiche-header">
+                <div class="fiche-avatar" id="fiche-avatar">—</div>
+                <div>
+                    <div class="fiche-name" id="fiche-name">—</div>
+                    <div class="fiche-detail" id="fiche-detail">—</div>
+                </div>
+            </div>
+            <div class="fiche-stats">
+                <div class="stat-card vert">
+                    <div class="stat-count" id="stat-vert">0</div>
+                    <div class="stat-label">Verts</div>
+                </div>
+                <div class="stat-card jaune">
+                    <div class="stat-count" id="stat-jaune">0</div>
+                    <div class="stat-label">Jaunes</div>
+                </div>
+                <div class="stat-card rouge">
+                    <div class="stat-count" id="stat-rouge">0</div>
+                    <div class="stat-label">Rouges</div>
+                </div>
+            </div>
+            <div class="filter-chips">
+                <button class="filter-chip active" data-filter="tous" onclick="setFicheFilter('tous')">Tous</button>
+                <button class="filter-chip vert" data-filter="vert" onclick="setFicheFilter('vert')">Verts</button>
+                <button class="filter-chip jaune" data-filter="jaune" onclick="setFicheFilter('jaune')">Jaunes</button>
+                <button class="filter-chip rouge" data-filter="rouge" onclick="setFicheFilter('rouge')">Rouges</button>
+            </div>
+            <div id="fiche-timeline"></div>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button class="form-btn secondary" onclick="printFiche()" style="flex:1;">Imprimer</button>
+                <button class="form-btn secondary" onclick="closeFiche()" style="flex:1;">← Retour</button>
+            </div>
+        </div>
+
+        <!-- Vue Journal global -->
+        <div class="view-content" id="view-journal">
+            <div class="search-bar">
+                <input type="text" id="search-journal" placeholder="Rechercher..." oninput="renderJournal()">
+                <select id="filter-type-journal" onchange="renderJournal()">
+                    <option value="">Tous types</option>
+                    <option value="vert">Verts</option>
+                    <option value="jaune">Jaunes</option>
+                    <option value="rouge">Rouges</option>
+                </select>
+            </div>
+            <div id="journal-list"></div>
+        </div>
+
+    </div>
+
+    <!-- FAB -->
+    <button class="fab" id="fab-add" onclick="openAddModal()">+</button>
+
+    <!-- Modal ajout carton -->
+    <div class="modal-overlay" id="modal-add">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-title">Nouveau carton</div>
+
+            <div class="form-group">
+                <label class="form-label">Salarié</label>
+                <select class="form-select" id="form-salarie">
+                    <option value="">Sélectionner...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Type de carton</label>
+                <div class="type-selector">
+                    <div class="type-option vert" data-type="vert" onclick="selectType('vert')">
+                        <span class="type-emoji">🟢</span>
+                        <span class="type-label">Vert</span>
+                        <span class="type-hint">Valorisation</span>
+                    </div>
+                    <div class="type-option jaune" data-type="jaune" onclick="selectType('jaune')">
+                        <span class="type-emoji">🟡</span>
+                        <span class="type-label">Jaune</span>
+                        <span class="type-hint">Alerte informelle</span>
+                    </div>
+                    <div class="type-option rouge" data-type="rouge" onclick="selectType('rouge')">
+                        <span class="type-emoji">🔴</span>
+                        <span class="type-label">Rouge</span>
+                        <span class="type-hint">Proc. formelle</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Date de l'événement</label>
+                <input type="date" class="form-input" id="form-date">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description factuelle</label>
+                <textarea class="form-textarea" id="form-description" placeholder="Décrire les faits observés de manière objective (date, heure, lieu, circonstances)..."></textarea>
+            </div>
+
+            <button class="form-btn primary" id="form-submit" onclick="submitCarton()" disabled>Enregistrer le carton</button>
+            <button class="form-btn secondary" onclick="closeAddModal()">Annuler</button>
+
+            <div class="rgpd-note">
+                <strong>Rappel RGPD :</strong> Ce journal constitue un traitement de données personnelles.
+                Les commentaires doivent rester factuels et objectifs.
+                Chaque salarié dispose d'un droit d'accès sur demande (art. 15 RGPD).
+                Le carton rouge ne se substitue pas à un avertissement écrit formel.
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm dialog -->
+    <div class="confirm-overlay" id="confirm-overlay">
+        <div class="confirm-box">
+            <p id="confirm-message">Confirmer la suppression ?</p>
+            <div class="confirm-actions">
+                <button class="confirm-cancel" onclick="closeConfirm()">Annuler</button>
+                <button class="confirm-ok" id="confirm-ok-btn">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toasts -->
+    <div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================
+// CONFIG
+// ============================================
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+let DEMO_MODE = false;
+let supabaseClient = null;
+
+try {
+    if (SUPABASE_URL.includes('VOTRE-PROJET')) { DEMO_MODE = true; }
+    else { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
+} catch(e) { DEMO_MODE = true; }
+
+if (DEMO_MODE) document.getElementById('demo-banner').style.display = 'block';
+
+// ============================================
+// STATE
+// ============================================
+let currentUser = null;
+let currentEtab = null;
+let salaries = [];
+let cartons = [];
+let currentFicheSalarie = null;
+let ficheFilter = 'tous';
+let selectedType = null;
+
+// ============================================
+// INIT
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    const session = sessionStorage.getItem('planb_user');
+    const etab = sessionStorage.getItem('planb_etablissement');
+
+    if (session) {
+        try { currentUser = JSON.parse(session); } catch(e) {}
+    }
+    currentEtab = etab || 'freddy';
+
+    if (!currentUser) {
+        DEMO_MODE = true;
+        document.getElementById('demo-banner').style.display = 'block';
+        currentUser = { id: 'demo', nom: 'Démo', initiales: 'DM', role: 'admin' };
+        currentEtab = 'freddy';
+    }
+
+    // Vérifier accès : responsable ou admin uniquement
+    const roleHierarchy = { collaborateur: 1, responsable: 2, admin: 3 };
+    if ((roleHierarchy[currentUser.role] || 0) < 2) {
+        document.querySelector('.content').innerHTML = `
+            <div class="empty-state" style="padding-top: 80px;">
+                <div class="empty-icon">🔒</div>
+                <div class="empty-text">Accès réservé aux responsables et administrateurs.</div>
+            </div>`;
+        document.getElementById('fab-add').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('etab-badge').textContent =
+        currentEtab === 'freddy' ? 'Freddy' : 'Liesel';
+    document.getElementById('user-badge').textContent = currentUser.initiales || '—';
+
+    // Date par défaut
+    document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+
+    loadData();
+});
+
+// ============================================
+// DATA
+// ============================================
+async function loadData() {
+    await Promise.all([loadSalaries(), loadCartons()]);
+    renderSalaries();
+    renderJournal();
+    populateSalarieSelect();
+}
+
+async function loadSalaries() {
+    if (DEMO_MODE) {
+        salaries = [
+            { id: '1', nom: 'Martin Dupont', initiales: 'MD', equipe: 'cuisine', role: 'collaborateur', actif: true },
+            { id: '2', nom: 'Sophie Leroy', initiales: 'SL', equipe: 'salle', role: 'collaborateur', actif: true },
+            { id: '3', nom: 'Karim Bouzid', initiales: 'KB', equipe: 'cuisine', role: 'collaborateur', actif: true },
+        ];
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('users')
+            .select('id, nom, initiales, equipe, role, actif')
+            .eq('etablissement', currentEtab)
+            .eq('actif', true)
+            .order('nom');
+
+        if (error) throw error;
+        salaries = data || [];
+    } catch(e) {
+        console.error('Erreur chargement salariés:', e);
+        showToast('Erreur chargement salariés', 'error');
+    }
+}
+
+async function loadCartons() {
+    if (DEMO_MODE) {
+        cartons = [
+            { id: 'd1', salarie_id: '1', salarie_nom: 'Martin Dupont', type: 'vert', description: 'Excellente gestion du rush du samedi soir. A pris l\'initiative de réorganiser le poste chaud.', date_evenement: '2026-03-28', auteur_nom: 'Eric', auteur_role: 'admin', created_at: '2026-03-28T18:00:00' },
+            { id: 'd2', salarie_id: '2', salarie_nom: 'Sophie Leroy', type: 'jaune', description: 'Retard de 15 minutes à la prise de service du midi sans prévenir. Rappel des horaires effectué.', date_evenement: '2026-03-27', auteur_nom: 'Eric', auteur_role: 'admin', created_at: '2026-03-27T12:30:00' },
+            { id: 'd3', salarie_id: '1', salarie_nom: 'Martin Dupont', type: 'jaune', description: 'Oubli du nettoyage du poste froid en fin de service. Rappelé à l\'ordre par le chef.', date_evenement: '2026-03-25', auteur_nom: 'Eric', auteur_role: 'admin', created_at: '2026-03-25T22:00:00' },
+            { id: 'd4', salarie_id: '3', salarie_nom: 'Karim Bouzid', type: 'vert', description: 'Formation spontanée du nouveau commis sur les découpes. Très bonne pédagogie.', date_evenement: '2026-03-24', auteur_nom: 'Eric', auteur_role: 'admin', created_at: '2026-03-24T15:00:00' },
+        ];
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('cartons_jvr')
+            .select('*')
+            .eq('etablissement', currentEtab)
+            .order('date_evenement', { ascending: false });
+
+        if (error) throw error;
+        cartons = data || [];
+    } catch(e) {
+        console.error('Erreur chargement cartons:', e);
+        showToast('Erreur chargement cartons', 'error');
+    }
+}
+
+// ============================================
+// VIEWS
+// ============================================
+function switchView(view) {
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-view="${view}"]`).classList.add('active');
+
+    document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active'));
+
+    if (view === 'salaries') {
+        document.getElementById('view-salaries').classList.add('active');
+    } else if (view === 'journal') {
+        document.getElementById('view-journal').classList.add('active');
+        renderJournal();
+    }
+
+    // Cacher fiche si on change de vue
+    document.getElementById('view-fiche').classList.remove('active');
+    document.getElementById('fab-add').style.display = 'flex';
+}
+
+function goBack() {
+    window.location.href = '../';
+}
+
+// ============================================
+// SALARIÉS LIST
+// ============================================
+function renderSalaries() {
+    const container = document.getElementById('salaries-list');
+    const search = document.getElementById('search-salarie').value.toLowerCase().trim();
+    const equipeFilter = document.getElementById('filter-equipe').value;
+
+    let filtered = salaries.filter(s => {
+        if (search && !s.nom.toLowerCase().includes(search)) return false;
+        if (equipeFilter && s.equipe !== equipeFilter) return false;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">👥</div>
+                <div class="empty-text">Aucun salarié trouvé</div>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(s => {
+        const counts = getCountsForSalarie(s.id);
+        const equipeLabel = { salle: 'Salle', cuisine: 'Cuisine', plonge: 'Plonge', autre: 'Autre' };
+        return `
+            <div class="salarie-card" onclick="openFiche('${s.id}')">
+                <div class="salarie-avatar">${s.initiales || '?'}</div>
+                <div class="salarie-info">
+                    <div class="salarie-name">${escHtml(s.nom)}</div>
+                    <div class="salarie-meta">${equipeLabel[s.equipe] || s.equipe || '—'}</div>
+                </div>
+                <div class="salarie-counters">
+                    ${counts.vert > 0 ? `<span class="counter-badge vert">${counts.vert}</span>` : ''}
+                    ${counts.jaune > 0 ? `<span class="counter-badge jaune">${counts.jaune}</span>` : ''}
+                    ${counts.rouge > 0 ? `<span class="counter-badge rouge">${counts.rouge}</span>` : ''}
+                    ${(counts.vert + counts.jaune + counts.rouge === 0) ? '<span style="font-size:12px;color:var(--gray-400);">Aucun</span>' : ''}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function getCountsForSalarie(salarieId) {
+    const mine = cartons.filter(c => c.salarie_id === salarieId);
+    return {
+        vert: mine.filter(c => c.type === 'vert').length,
+        jaune: mine.filter(c => c.type === 'jaune').length,
+        rouge: mine.filter(c => c.type === 'rouge').length
+    };
+}
+
+// ============================================
+// FICHE SALARIÉ
+// ============================================
+function openFiche(salarieId) {
+    const s = salaries.find(x => x.id === salarieId);
+    if (!s) return;
+
+    currentFicheSalarie = s;
+    ficheFilter = 'tous';
+
+    document.getElementById('fiche-avatar').textContent = s.initiales || '?';
+    document.getElementById('fiche-name').textContent = s.nom;
+    const equipeLabel = { salle: 'Salle', cuisine: 'Cuisine', plonge: 'Plonge', autre: 'Autre' };
+    document.getElementById('fiche-detail').textContent =
+        `${equipeLabel[s.equipe] || s.equipe || '—'} · ${currentEtab === 'freddy' ? 'Freddy' : 'Liesel'}`;
+
+    // Print header
+    document.getElementById('print-title').textContent = `Journal de suivi — ${s.nom}`;
+    document.getElementById('print-subtitle').textContent =
+        `${equipeLabel[s.equipe] || ''} · ${currentEtab === 'freddy' ? 'Freddy' : 'Liesel'} · Imprimé le ${formatDateFr(new Date())}`;
+
+    updateFicheStats();
+    renderFicheTimeline();
+
+    // Reset filter chips
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-filter="tous"]').classList.add('active');
+
+    // Show fiche, hide others
+    document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('view-fiche').classList.add('active');
+    document.getElementById('fab-add').style.display = 'flex';
+}
+
+function closeFiche() {
+    currentFicheSalarie = null;
+    document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('view-salaries').classList.add('active');
+}
+
+function updateFicheStats() {
+    if (!currentFicheSalarie) return;
+    const counts = getCountsForSalarie(currentFicheSalarie.id);
+    document.getElementById('stat-vert').textContent = counts.vert;
+    document.getElementById('stat-jaune').textContent = counts.jaune;
+    document.getElementById('stat-rouge').textContent = counts.rouge;
+}
+
+function setFicheFilter(filter) {
+    ficheFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+    renderFicheTimeline();
+}
+
+function renderFicheTimeline() {
+    if (!currentFicheSalarie) return;
+    const container = document.getElementById('fiche-timeline');
+
+    let mine = cartons.filter(c => c.salarie_id === currentFicheSalarie.id);
+    if (ficheFilter !== 'tous') {
+        mine = mine.filter(c => c.type === ficheFilter);
+    }
+
+    if (mine.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <div class="empty-text">Aucun carton enregistré</div>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = mine.map(c => `
+        <div class="carton-entry">
+            <div class="carton-bar ${c.type}"></div>
+            <div class="carton-body">
+                <span class="carton-type-badge ${c.type}">${typeLabel(c.type)}</span>
+                <div class="carton-description">${escHtml(c.description)}</div>
+                <div class="carton-meta">
+                    <span>${formatDateFr(new Date(c.date_evenement))} · par ${escHtml(c.auteur_nom)}</span>
+                    <button class="carton-delete" onclick="confirmDelete('${c.id}')" title="Supprimer">✕</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function printFiche() {
+    window.print();
+}
+
+// ============================================
+// JOURNAL GLOBAL
+// ============================================
+function renderJournal() {
+    const container = document.getElementById('journal-list');
+    const search = document.getElementById('search-journal').value.toLowerCase().trim();
+    const typeFilter = document.getElementById('filter-type-journal').value;
+
+    let filtered = [...cartons];
+    if (search) {
+        filtered = filtered.filter(c =>
+            c.salarie_nom.toLowerCase().includes(search) ||
+            c.description.toLowerCase().includes(search)
+        );
+    }
+    if (typeFilter) {
+        filtered = filtered.filter(c => c.type === typeFilter);
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <div class="empty-text">Aucun carton trouvé</div>
+            </div>`;
+        return;
+    }
+
+    // Grouper par date
+    const groups = {};
+    filtered.forEach(c => {
+        const d = c.date_evenement;
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(c);
+    });
+
+    const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+    container.innerHTML = sortedDates.map(date => `
+        <div class="journal-date-group">
+            <div class="journal-date-label">${formatDateFr(new Date(date))}</div>
+            ${groups[date].map(c => `
+                <div class="carton-entry">
+                    <div class="carton-bar ${c.type}"></div>
+                    <div class="carton-body">
+                        <div class="journal-entry-name">${escHtml(c.salarie_nom)}</div>
+                        <span class="carton-type-badge ${c.type}">${typeLabel(c.type)}</span>
+                        <div class="carton-description">${escHtml(c.description)}</div>
+                        <div class="carton-meta">
+                            <span>par ${escHtml(c.auteur_nom)}</span>
+                            <button class="carton-delete" onclick="confirmDelete('${c.id}')" title="Supprimer">✕</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
+}
+
+// ============================================
+// ADD CARTON
+// ============================================
+function populateSalarieSelect() {
+    const sel = document.getElementById('form-salarie');
+    sel.innerHTML = '<option value="">Sélectionner un salarié...</option>';
+    salaries.forEach(s => {
+        sel.innerHTML += `<option value="${s.id}">${escHtml(s.nom)} (${s.initiales || '?'})</option>`;
+    });
+}
+
+function openAddModal() {
+    // Pre-select salarié if on fiche view
+    if (currentFicheSalarie) {
+        document.getElementById('form-salarie').value = currentFicheSalarie.id;
+    } else {
+        document.getElementById('form-salarie').value = '';
+    }
+    selectedType = null;
+    document.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
+    document.getElementById('form-description').value = '';
+    document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('form-submit').disabled = true;
+    document.getElementById('modal-add').classList.add('active');
+}
+
+function closeAddModal() {
+    document.getElementById('modal-add').classList.remove('active');
+}
+
+function selectType(type) {
+    selectedType = type;
+    document.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
+    document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+    validateForm();
+}
+
+function validateForm() {
+    const salarie = document.getElementById('form-salarie').value;
+    const desc = document.getElementById('form-description').value.trim();
+    const date = document.getElementById('form-date').value;
+    document.getElementById('form-submit').disabled = !(salarie && selectedType && desc && date);
+}
+
+// Attach validation listeners
+document.getElementById('form-salarie').addEventListener('change', validateForm);
+document.getElementById('form-description').addEventListener('input', validateForm);
+document.getElementById('form-date').addEventListener('change', validateForm);
+
+async function submitCarton() {
+    const salarieId = document.getElementById('form-salarie').value;
+    const salarie = salaries.find(s => s.id === salarieId);
+    if (!salarie || !selectedType) return;
+
+    const description = document.getElementById('form-description').value.trim();
+    const dateEvenement = document.getElementById('form-date').value;
+
+    if (!description) {
+        showToast('Description requise', 'error');
+        return;
+    }
+
+    const carton = {
+        salarie_id: salarieId,
+        salarie_nom: salarie.nom,
+        salarie_initiales: salarie.initiales,
+        type: selectedType,
+        description: description,
+        date_evenement: dateEvenement,
+        auteur_id: currentUser.id,
+        auteur_nom: currentUser.nom,
+        auteur_role: currentUser.role,
+        etablissement: currentEtab
+    };
+
+    if (DEMO_MODE) {
+        carton.id = 'd' + Date.now();
+        carton.created_at = new Date().toISOString();
+        cartons.unshift(carton);
+    } else {
+        try {
+            document.getElementById('form-submit').disabled = true;
+            document.getElementById('form-submit').textContent = 'Enregistrement...';
+
+            const { data, error } = await supabaseClient
+                .from('cartons_jvr')
+                .insert(carton)
+                .select()
+                .single();
+
+            if (error) throw error;
+            cartons.unshift(data);
+        } catch(e) {
+            console.error('Erreur enregistrement:', e);
+            showToast('Erreur lors de l\'enregistrement', 'error');
+            document.getElementById('form-submit').disabled = false;
+            document.getElementById('form-submit').textContent = 'Enregistrer le carton';
+            return;
+        }
+    }
+
+    closeAddModal();
+    document.getElementById('form-submit').textContent = 'Enregistrer le carton';
+
+    const typeLabels = { vert: 'Vert', jaune: 'Jaune', rouge: 'Rouge' };
+    showToast(`Carton ${typeLabels[selectedType]} enregistré`, 'success');
+
+    // Refresh views
+    renderSalaries();
+    renderJournal();
+    if (currentFicheSalarie) {
+        updateFicheStats();
+        renderFicheTimeline();
+    }
+}
+
+// ============================================
+// DELETE CARTON
+// ============================================
+let pendingDeleteId = null;
+
+function confirmDelete(cartonId) {
+    pendingDeleteId = cartonId;
+    document.getElementById('confirm-message').textContent = 'Supprimer ce carton ?';
+    document.getElementById('confirm-overlay').classList.add('active');
+    document.getElementById('confirm-ok-btn').onclick = executeDelete;
+}
+
+function closeConfirm() {
+    pendingDeleteId = null;
+    document.getElementById('confirm-overlay').classList.remove('active');
+}
+
+async function executeDelete() {
+    if (!pendingDeleteId) return;
+
+    if (DEMO_MODE) {
+        cartons = cartons.filter(c => c.id !== pendingDeleteId);
+    } else {
+        try {
+            const { error } = await supabaseClient
+                .from('cartons_jvr')
+                .delete()
+                .eq('id', pendingDeleteId);
+
+            if (error) throw error;
+            cartons = cartons.filter(c => c.id !== pendingDeleteId);
+        } catch(e) {
+            console.error('Erreur suppression:', e);
+            showToast('Erreur lors de la suppression', 'error');
+            closeConfirm();
+            return;
+        }
+    }
+
+    closeConfirm();
+    showToast('Carton supprimé', 'success');
+
+    renderSalaries();
+    renderJournal();
+    if (currentFicheSalarie) {
+        updateFicheStats();
+        renderFicheTimeline();
+    }
+}
+
+// ============================================
+// UTILITIES
+// ============================================
+function typeLabel(type) {
+    return { vert: 'Vert', jaune: 'Jaune', rouge: 'Rouge' }[type] || type;
+}
+
+function formatDateFr(d) {
+    if (!(d instanceof Date) || isNaN(d)) return '—';
+    const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'default') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.getElementById('toast-container').appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// Close modal on overlay click
+document.getElementById('modal-add').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modal-add')) closeAddModal();
+});
+document.getElementById('confirm-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('confirm-overlay')) closeConfirm();
+});
+</script>
+</body>
+</html>
