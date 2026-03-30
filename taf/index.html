@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TAF">
+  <meta name="theme-color" content="#f97316">
+  <title>TAF - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <style>
+    :root {
+      --orange: #f97316; --orange-light: #fff7ed; --orange-dark: #ea580c;
+      --green: #22c55e; --green-bg: #f0fdf4;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --blue: #3b82f6; --blue-bg: #eff6ff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* ====== HEADER ====== */
+    .header {
+      background: white; border-bottom: 2px solid var(--orange);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--orange); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back, .btn-logout {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-back:active, .btn-logout:active { background: var(--gray-100); }
+
+    /* ====== DATE BAR ====== */
+    .date-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 8px 16px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .date-nav-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: white; color: var(--orange); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .date-nav-btn:active { background: var(--orange-light); }
+    .date-display {
+      font-size: 1rem; font-weight: 600; color: var(--gray-800);
+      min-width: 200px; text-align: center;
+    }
+    .date-display .day-name { color: var(--orange); text-transform: capitalize; }
+    .btn-today {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-500); cursor: pointer;
+    }
+    .btn-today:active { background: var(--orange-light); }
+    .btn-refresh {
+      width: 28px; height: 28px; border-radius: 50%; border: none;
+      background: none; color: var(--gray-400); font-size: 1rem; cursor: pointer;
+    }
+
+    /* ====== FILTER BARS ====== */
+    .filters-section {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 8px 16px;
+    }
+    .filter-row {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .filter-row + .filter-row { margin-top: 6px; }
+    .filter-label {
+      font-size: 0.7rem; color: var(--gray-400); text-transform: uppercase;
+      letter-spacing: 0.5px; font-weight: 600; min-width: 55px;
+    }
+    .filter-chip {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-600); cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-chip:active { transform: scale(0.95); }
+    .filter-chip.active { background: var(--orange); color: white; border-color: var(--orange); }
+    .filter-chip.active-equipe { background: var(--blue); color: white; border-color: var(--blue); }
+    .filter-right {
+      margin-left: auto; display: flex; align-items: center; gap: 6px;
+    }
+    .toggle-completed {
+      font-size: 0.75rem; color: var(--gray-400); cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .toggle-completed input { accent-color: var(--orange); }
+
+    /* ====== TABS ====== */
+    .tabs-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      display: flex; padding: 0 16px;
+    }
+    .tab-btn {
+      padding: 10px 16px; border: none; background: none;
+      font-size: 0.85rem; color: var(--gray-400); cursor: pointer;
+      border-bottom: 2px solid transparent; font-weight: 500;
+    }
+    .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); font-weight: 600; }
+    .tab-btn:active { background: var(--gray-50); }
+
+    /* ====== TASK LIST ====== */
+    .content { flex: 1; overflow-y: auto; padding: 8px; }
+    .task-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; margin-bottom: 4px;
+      background: white; border-radius: var(--radius-sm);
+      box-shadow: var(--shadow); border-left: 3px solid transparent;
+      min-height: 42px;
+    }
+    .task-row.done { opacity: 0.5; background: var(--gray-50); }
+    .task-row.overdue { border-left-color: var(--red); }
+    .task-row.priority-5 { border-left-color: var(--red); }
+    .task-row.priority-4 { border-left-color: #f59e0b; }
+    .task-row.priority-3 { border-left-color: var(--orange); }
+    .task-row.priority-2 { border-left-color: var(--blue); }
+    .task-row.priority-1 { border-left-color: var(--gray-300); }
+
+    .task-check {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2px solid var(--gray-300); background: white;
+      cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; color: white;
+    }
+    .task-check.checked { background: var(--green); border-color: var(--green); }
+    .task-check:active { transform: scale(0.9); }
+
+    .task-name {
+      flex: 1; font-size: 0.85rem; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .task-row.done .task-name { text-decoration: line-through; color: var(--gray-400); }
+
+    .task-badges { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+    .badge {
+      padding: 2px 6px; border-radius: 8px; font-size: 0.65rem;
+      font-weight: 600; white-space: nowrap;
+    }
+    .badge-creneau { background: #fef3c7; color: #92400e; }
+    .badge-creneau.soir { background: #ede9fe; color: #5b21b6; }
+    .badge-creneau.midi { background: #fef9c3; color: #854d0e; }
+    .badge-equipe { background: var(--blue-bg); color: var(--blue); }
+    .badge-equipe.salle { background: #ecfdf5; color: #059669; }
+    .badge-equipe.plonge { background: #f0f9ff; color: #0369a1; }
+    .badge-equipe.autre { background: var(--gray-100); color: var(--gray-500); }
+
+    .badge-priority { font-weight: 700; font-size: 0.7rem; }
+    .badge-priority.p5 { color: var(--red); }
+    .badge-priority.p4 { color: #f59e0b; }
+    .badge-priority.p3 { color: var(--orange); }
+    .badge-priority.p2 { color: var(--blue); }
+    .badge-priority.p1 { color: var(--gray-400); }
+
+    .task-assignee {
+      font-size: 0.7rem; color: var(--gray-500);
+      display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+    }
+    .task-assignee.unassigned { color: var(--red); font-style: italic; }
+
+    .task-done-info {
+      font-size: 0.65rem; color: var(--green); white-space: nowrap;
+    }
+
+    .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .btn-action {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: none; background: none; cursor: pointer;
+      font-size: 0.8rem; display: flex; align-items: center; justify-content: center;
+    }
+    .btn-action:active { background: var(--gray-100); }
+    .btn-action.delete { color: var(--red); }
+
+    /* ====== EMPTY STATE ====== */
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--gray-400);
+    }
+    .empty-state .emoji { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 1rem; margin-bottom: 4px; color: var(--gray-500); }
+    .empty-state p { font-size: 0.85rem; }
+
+    /* ====== CREATE TAB ====== */
+    .create-form { padding: 12px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block; font-size: 0.75rem; font-weight: 600;
+      color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.9rem;
+      background: white; color: var(--gray-800);
+    }
+    .form-textarea { min-height: 60px; resize: vertical; font-family: inherit; }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--orange); box-shadow: 0 0 0 2px var(--orange-light);
+    }
+
+    .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      padding: 6px 14px; border-radius: 16px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.8rem; color: var(--gray-600); cursor: pointer;
+    }
+    .chip.active { background: var(--orange); color: white; border-color: var(--orange); }
+    .chip:active { transform: scale(0.95); }
+
+    .search-input {
+      width: 100%; padding: 8px 12px 8px 32px;
+      border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      font-size: 0.85rem; background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%239ca3af' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z'/%3E%3C/svg%3E") 8px center/16px no-repeat;
+    }
+
+    .predef-list { max-height: 200px; overflow-y: auto; margin-top: 6px; }
+    .predef-item {
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 0.85rem; border: 1px solid transparent;
+    }
+    .predef-item:hover, .predef-item:active { background: var(--orange-light); }
+    .predef-item.selected { background: var(--orange-light); border-color: var(--orange); }
+
+    .selected-task-display {
+      padding: 10px; background: var(--orange-light); border-radius: var(--radius-sm);
+      border: 1px solid var(--orange); margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .selected-task-display .name { font-weight: 600; color: var(--orange-dark); }
+    .btn-clear { border: none; background: none; color: var(--gray-400); cursor: pointer; font-size: 1rem; }
+
+    .user-list-picker { max-height: 150px; overflow-y: auto; margin-top: 4px; }
+    .user-pick-item {
+      padding: 6px 10px; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .user-pick-item:active { background: var(--blue-bg); }
+    .user-pick-item.selected { background: var(--blue-bg); border: 1px solid var(--blue); }
+    .user-initials-sm {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--blue); color: white; font-size: 0.6rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .btn-submit {
+      width: 100%; padding: 12px; border: none; border-radius: var(--radius);
+      background: var(--orange); color: white; font-size: 1rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-submit:active:not(:disabled) { background: var(--orange-dark); }
+
+    /* ====== RECURRING TAB ====== */
+    .recurrence-card {
+      background: white; border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 12px; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .recurrence-info { flex: 1; min-width: 0; }
+    .recurrence-name { font-weight: 600; font-size: 0.9rem; }
+    .recurrence-detail { font-size: 0.75rem; color: var(--gray-500); margin-top: 2px; }
+    .recurrence-toggle {
+      width: 40px; height: 22px; border-radius: 11px;
+      border: none; cursor: pointer; position: relative;
+      background: var(--gray-300); transition: background .2s;
+    }
+    .recurrence-toggle.active { background: var(--green); }
+    .recurrence-toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: white; transition: transform .2s;
+    }
+    .recurrence-toggle.active::after { transform: translateX(18px); }
+
+    /* ====== ADMIN TAB ====== */
+    .stat-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .stat-card {
+      flex: 1; padding: 10px; border-radius: var(--radius-sm); text-align: center;
+    }
+    .stat-card .value { font-size: 1.3rem; font-weight: 700; }
+    .stat-card .label { font-size: 0.7rem; color: var(--gray-500); }
+    .stat-blue { background: var(--blue-bg); }
+    .stat-blue .value { color: var(--blue); }
+    .stat-green { background: var(--green-bg); }
+    .stat-green .value { color: var(--green); }
+    .stat-orange { background: var(--orange-light); }
+    .stat-orange .value { color: var(--orange); }
+    .stat-red { background: var(--red-bg); }
+    .stat-red .value { color: var(--red); }
+
+    .admin-section { padding: 12px; }
+    .admin-section h3 {
+      font-size: 0.85rem; color: var(--gray-500); margin-bottom: 8px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* ====== MODAL ====== */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.4); align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: white; border-radius: 12px; width: 100%; max-width: 500px;
+      max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal-header {
+      padding: 16px; border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h2 { font-size: 1rem; }
+    .modal-close { border: none; background: none; font-size: 1.2rem; cursor: pointer; color: var(--gray-400); }
+    .modal-body { padding: 16px; }
+    .modal-footer {
+      padding: 12px 16px; border-top: 1px solid var(--gray-200);
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .btn-modal {
+      padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-modal.primary { background: var(--orange); color: white; border-color: var(--orange); }
+    .btn-modal.danger { background: var(--red); color: white; border-color: var(--red); }
+
+    /* ====== TOAST ====== */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px; border-radius: 20px; background: var(--gray-800);
+      color: white; font-size: 0.85rem; z-index: 300;
+      opacity: 0; transition: opacity .3s;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    /* ====== LOGIN ====== */
+    .login-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 20px;
+      background: linear-gradient(135deg, var(--orange-light), white);
+    }
+    .login-card {
+      background: white; border-radius: 16px; padding: 32px;
+      box-shadow: var(--shadow-md); text-align: center; width: 100%; max-width: 320px;
+    }
+    .login-card h1 { color: var(--orange); font-size: 1.5rem; margin-bottom: 4px; }
+    .login-card p { color: var(--gray-400); font-size: 0.85rem; margin-bottom: 20px; }
+    .pin-dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--gray-300); background: white;
+    }
+    .pin-dot.filled { background: var(--orange); border-color: var(--orange); }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 240px; margin: 0 auto; }
+    .pin-key {
+      padding: 14px; border-radius: var(--radius); border: 1px solid var(--gray-200);
+      background: white; font-size: 1.2rem; font-weight: 600; cursor: pointer;
+    }
+    .pin-key:active { background: var(--orange-light); }
+
+    /* ====== RESPONSIVE ====== */
+    @media (max-width: 600px) {
+      .task-badges { gap: 2px; }
+      .badge { font-size: 0.6rem; padding: 1px 4px; }
+      .task-name { font-size: 0.8rem; }
+      .header h1 { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <h1>📋 TAF</h1>
+    <p>Saisissez votre code</p>
+    <div class="pin-dots" id="pin-dots"></div>
+    <div class="pin-pad" id="pin-pad"></div>
+    <p id="login-error" style="color:var(--red);font-size:0.8rem;margin-top:12px;display:none"></p>
+  </div>
+</div>
+
+<!-- ESTABLISHMENT SELECTOR -->
+<div id="estab-screen" style="display:none">
+  <div class="login-screen">
+    <div class="login-card">
+      <h1>📋 TAF</h1>
+      <p>Choisir l'établissement</p>
+      <div id="estab-buttons" style="display:flex;flex-direction:column;gap:8px;margin-top:16px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-screen" style="display:none">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>📋 TAF</h1>
+    </div>
+    <div class="header-right">
+      <span id="header-etab"></span>
+      <span>—</span>
+      <span id="header-user"></span>
+      <a class="btn-back" onclick="goBackToPortal()">← Portail</a>
+      <button class="btn-logout" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <!-- DATE BAR -->
+  <div class="date-bar">
+    <button class="date-nav-btn" onclick="changeDate(-1)">◀</button>
+    <div class="date-display" id="date-display"></div>
+    <button class="date-nav-btn" onclick="changeDate(1)">▶</button>
+    <button class="btn-today" onclick="goToday()">Aujourd'hui</button>
+    <button class="btn-refresh" onclick="refreshData()">↻</button>
+  </div>
+
+  <!-- FILTER BARS -->
+  <div class="filters-section" id="filters-section">
+    <div class="filter-row">
+      <span class="filter-label">Créneau</span>
+      <button class="filter-chip active" data-creneau="all" onclick="setFilterCreneau('all')">Tous</button>
+      <button class="filter-chip" data-creneau="Matin" onclick="setFilterCreneau('Matin')">☀️ Matin</button>
+      <button class="filter-chip" data-creneau="Midi" onclick="setFilterCreneau('Midi')">🌤 Midi</button>
+      <button class="filter-chip" data-creneau="Soir" onclick="setFilterCreneau('Soir')">🌙 Soir</button>
+      <div class="filter-right">
+        <label class="toggle-completed">
+          <input type="checkbox" id="chk-completed" onchange="toggleShowCompleted()"> Terminées
+        </label>
+      </div>
+    </div>
+    <div class="filter-row" id="equipe-filter-row">
+      <span class="filter-label">Équipe</span>
+      <!-- Generated dynamically -->
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar" id="tabs-bar">
+    <button class="tab-btn active" data-tab="taches" onclick="switchTab('taches')">Tâches</button>
+    <button class="tab-btn" data-tab="creer" onclick="switchTab('creer')">+ Créer</button>
+    <button class="tab-btn" data-tab="recurrences" onclick="switchTab('recurrences')" id="tab-recurrences" style="display:none">Récurrences</button>
+    <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="tab-admin" style="display:none">Admin</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="main-content"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="event.target===this&&closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ====== CONFIG ======
+  const DEMO_MODE = false;
+  const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+  const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+  const EQUIPES = ['cuisine', 'salle', 'plonge', 'autre'];
+  const CRENEAUX = ['Matin', 'Midi', 'Soir'];
+  const JOURS_SEMAINE = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+  // ====== STATE ======
+  let currentUser = null;
+  let currentEtablissement = null;
+  let supabaseClient = null;
+  let filterDate = new Date();
+  let filterCreneau = 'all';
+  let filterEquipe = null; // null = user's team
+  let showCompleted = false;
+  let currentTab = 'taches';
+  let tasks = [];
+  let users = [];
+  let predefinedTasks = [];
+  let recurrences = [];
+  let selectedPredefined = null;
+  let selectedAssignee = null;
+
+  // ====== UTILITIES ======
+  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function dateStr(d) { return d.toISOString().split('T')[0]; }
+  function formatDateDisplay(d) {
+    const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    const str = d.toLocaleDateString('fr-FR', opts);
+    const parts = str.split(' ');
+    return `<span class="day-name">${parts[0]}</span> ${parts.slice(1).join(' ')}`;
+  }
+  function userRole() { return ROLE_HIERARCHY[currentUser?.role] || 0; }
+  function canAssign() { return userRole() >= 2; } // responsable+
+  function canManageRecurrences() { return userRole() >= 3; } // manager+
+  function isAdmin() { return userRole() >= 4; }
+
+  // ====== SUPABASE INIT ======
+  function initSupabase() {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+  }
+
+  // ====== DB LAYER ======
+  const DB = {
+    async getUsers(etab) {
+      const { data } = await supabaseClient.from('users').select('*')
+        .eq('actif', true).order('nom');
+      // Filter by establishment access
+      return (data || []).filter(u =>
+        u.etablissement === etab ||
+        (u.acces_etablissements && u.acces_etablissements.includes(etab))
+      );
+    },
+
+    async getTasks(dateFilter) {
+      const ds = dateStr(dateFilter);
+      const { data } = await supabaseClient.from('tasks').select('*')
+        .eq('etablissement', currentEtablissement)
+        .eq('echeance', ds)
+        .order('priorite', { ascending: false });
+      return data || [];
+    },
+
+    async insertTask(task) {
+      const { data, error } = await supabaseClient.from('tasks').insert(task).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+
+    async updateTask(id, updates) {
+      const { error } = await supabaseClient.from('tasks').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+
+    async deleteTask(id) {
+      const { error } = await supabaseClient.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+    },
+
+    async getPredefined(etab) {
+      const { data } = await supabaseClient.from('predefined_tasks').select('*')
+        .eq('actif', true).order('nom');
+      return (data || []).filter(t => !t.etablissement || t.etablissement === etab);
+    },
+
+    async insertPredefined(item) {
+      const { error } = await supabaseClient.from('predefined_tasks').insert(item);
+      if (error) throw error;
+    },
+
+    async deletePredefined(id) {
+      await supabaseClient.from('predefined_tasks').update({ actif: false }).eq('id', id);
+    },
+
+    async getRecurrences(etab) {
+      const { data } = await supabaseClient.from('taches_recurrentes').select('*')
+        .eq('etablissement', etab).order('nom');
+      return data || [];
+    },
+
+    async insertRecurrence(rec) {
+      const { data, error } = await supabaseClient.from('taches_recurrentes').insert(rec).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+
+    async updateRecurrence(id, updates) {
+      const { error } = await supabaseClient.from('taches_recurrentes').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+
+    async deleteRecurrence(id) {
+      await supabaseClient.from('taches_recurrentes').update({ actif: false }).eq('id', id);
+    }
+  };
+
+  // ====== SESSION ======
+  function checkPortalSession() {
+    const user = sessionStorage.getItem('planb_user');
+    const etablissement = sessionStorage.getItem('planb_etablissement');
+    return user && etablissement ? { user: JSON.parse(user), etablissement } : null;
+  }
+
+  function initializeFromSession(data) {
+    currentUser = data.user;
+    currentEtablissement = data.etablissement;
+    showApp();
+  }
+
+  function goBackToPortal() { window.location.href = '../'; }
+  function logout() { sessionStorage.clear(); window.location.href = '../'; }
+
+  // ====== LOGIN (fallback if no session) ======
+  let pinCode = '';
+  function renderPinDots() {
+    const c = document.getElementById('pin-dots');
+    c.innerHTML = Array.from({ length: 6 }, (_, i) =>
+      `<div class="pin-dot ${i < pinCode.length ? 'filled' : ''}"></div>`
+    ).join('');
+  }
+  function pinAdd(n) {
+    if (pinCode.length >= 6) return;
+    pinCode += n;
+    renderPinDots();
+    if (pinCode.length >= 4) attemptLogin();
+  }
+  function pinDelete() { pinCode = pinCode.slice(0, -1); renderPinDots(); }
+  function pinClear() { pinCode = ''; renderPinDots(); }
+
+  async function attemptLogin() {
+    try {
+      const { data } = await supabaseClient.from('users').select('*')
+        .eq('code', pinCode).eq('actif', true);
+      if (!data?.length) {
+        if (pinCode.length >= 6) {
+          document.getElementById('login-error').textContent = 'Code incorrect';
+          document.getElementById('login-error').style.display = 'block';
+          pinClear();
+        }
+        return;
+      }
+      const u = data[0];
+      currentUser = {
+        id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
+        equipe: u.equipe || 'cuisine',
+        acces_modules: u.acces_modules || null,
+        etablissements: u.acces_etablissements?.length > 0
+          ? u.acces_etablissements : [u.etablissement]
+      };
+      if (currentUser.etablissements.length === 1) {
+        currentEtablissement = currentUser.etablissements[0];
+        showApp();
+      } else {
+        showEstabSelector();
+      }
+    } catch (e) {
+      console.error(e);
+      document.getElementById('login-error').textContent = 'Erreur de connexion';
+      document.getElementById('login-error').style.display = 'block';
+      pinClear();
+    }
+  }
+
+  function showEstabSelector() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('estab-screen').style.display = 'block';
+    const c = document.getElementById('estab-buttons');
+    const names = { freddy: 'Freddy', liesel: 'Chez Tante Liesel' };
+    c.innerHTML = currentUser.etablissements.map(e =>
+      `<button class="btn-submit" style="margin-bottom:4px" onclick="selectEstab('${e}')">${names[e] || e}</button>`
+    ).join('');
+  }
+
+  function selectEstab(id) {
+    currentEtablissement = id;
+    document.getElementById('estab-screen').style.display = 'none';
+    showApp();
+  }
+
+  // ====== SHOW APP ======
+  async function showApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('estab-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.flexDirection = 'column';
+    document.getElementById('app-screen').style.height = '100vh';
+
+    // Header
+    const etabNames = { freddy: 'Freddy', liesel: 'Chez Tante Liesel' };
+    document.getElementById('header-etab').textContent = etabNames[currentEtablissement] || currentEtablissement;
+    document.getElementById('header-user').textContent = currentUser.nom;
+
+    // Show/hide tabs based on role
+    document.getElementById('tab-recurrences').style.display = canManageRecurrences() ? '' : 'none';
+    document.getElementById('tab-admin').style.display = isAdmin() ? '' : 'none';
+
+    // Set default equipe filter
+    filterEquipe = (userRole() >= 3) ? 'all' : (currentUser.equipe || 'cuisine');
+
+    // Render equipe filters
+    renderEquipeFilters();
+    updateDateDisplay();
+
+    // Load data
+    await refreshData();
+  }
+
+  function renderEquipeFilters() {
+    const row = document.getElementById('equipe-filter-row');
+    const isManagerPlus = userRole() >= 3;
+    let html = '<span class="filter-label">Équipe</span>';
+
+    if (isManagerPlus) {
+      html += `<button class="filter-chip active-equipe ${filterEquipe === 'all' ? 'active-equipe' : ''}"
+                data-equipe="all" onclick="setFilterEquipe('all')">Toutes</button>`;
+    }
+
+    EQUIPES.forEach(eq => {
+      const icons = { cuisine: '🍴', salle: '🍽', plonge: '🫧', autre: '📦' };
+      const isActive = filterEquipe === eq;
+      const cls = isActive ? (isManagerPlus ? 'active-equipe' : 'active-equipe') : '';
+      html += `<button class="filter-chip ${cls}" data-equipe="${eq}"
+               onclick="setFilterEquipe('${eq}')">${icons[eq] || ''} ${eq.charAt(0).toUpperCase() + eq.slice(1)}</button>`;
+    });
+
+    row.innerHTML = html;
+  }
+
+  // ====== DATE ======
+  function updateDateDisplay() {
+    document.getElementById('date-display').innerHTML = formatDateDisplay(filterDate);
+  }
+
+  function changeDate(delta) {
+    filterDate.setDate(filterDate.getDate() + delta);
+    updateDateDisplay();
+    refreshData();
+  }
+
+  function goToday() {
+    filterDate = new Date();
+    updateDateDisplay();
+    refreshData();
+  }
+
+  // ====== FILTERS ======
+  function setFilterCreneau(c) {
+    filterCreneau = c;
+    document.querySelectorAll('[data-creneau]').forEach(el => {
+      el.classList.toggle('active', el.dataset.creneau === c);
+    });
+    renderFiltered();
+  }
+
+  function setFilterEquipe(eq) {
+    filterEquipe = eq;
+    document.querySelectorAll('[data-equipe]').forEach(el => {
+      el.classList.remove('active-equipe');
+      if (el.dataset.equipe === eq) el.classList.add('active-equipe');
+    });
+    renderFiltered();
+  }
+
+  function toggleShowCompleted() {
+    showCompleted = document.getElementById('chk-completed').checked;
+    renderFiltered();
+  }
+
+  // ====== DATA LOADING ======
+  async function refreshData() {
+    try {
+      [tasks, users, predefinedTasks, recurrences] = await Promise.all([
+        DB.getTasks(filterDate),
+        DB.getUsers(currentEtablissement),
+        DB.getPredefined(currentEtablissement),
+        DB.getRecurrences(currentEtablissement)
+      ]);
+      // Generate recurring tasks for today
+      await generateRecurringTasks();
+      // Reload tasks after generation
+      tasks = await DB.getTasks(filterDate);
+      renderCurrentTab();
+    } catch (e) {
+      console.error('Erreur chargement:', e);
+      showToast('Erreur de chargement', 'error');
+    }
+  }
+
+  // ====== RECURRING TASK GENERATION ======
+  async function generateRecurringTasks() {
+    const today = dateStr(filterDate);
+    const activeRecurrences = recurrences.filter(r => r.actif);
+
+    for (const rec of activeRecurrences) {
+      // Check if already generated for this date
+      if (rec.derniere_generation === today) continue;
+
+      // Check if date is within range
+      if (rec.date_debut && today < rec.date_debut) continue;
+      if (rec.date_fin && today > rec.date_fin) continue;
+
+      // Check if this date matches the recurrence pattern
+      if (!matchesRecurrence(rec, filterDate)) continue;
+
+      // Check if task already exists for this date + recurrence
+      const existing = tasks.find(t => t.recurrence_id === rec.id && t.echeance === today);
+      if (existing) continue;
+
+      // Generate the task
+      try {
+        await DB.insertTask({
+          tache: rec.nom,
+          equipe: rec.equipe,
+          creneau: rec.creneau,
+          priorite: rec.priorite || 3,
+          observation: rec.observation || '',
+          echeance: today,
+          date_creation: new Date().toISOString(),
+          etablissement: currentEtablissement,
+          createur_id: rec.cree_par_id,
+          createur_nom: rec.cree_par_nom || 'Récurrence',
+          recurrence_id: rec.id
+        });
+        // Update last generation date
+        await DB.updateRecurrence(rec.id, { derniere_generation: today });
+      } catch (e) {
+        console.error('Erreur génération récurrence:', rec.nom, e);
+      }
+    }
+  }
+
+  function matchesRecurrence(rec, date) {
+    const type = rec.frequence_type;
+    if (type === 'quotidien') return true;
+
+    const val = rec.frequence_valeur;
+    if (!val) return type === 'quotidien';
+
+    if (type === 'tous_x_jours') {
+      const start = new Date(rec.date_debut);
+      const diff = Math.floor((date - start) / (1000 * 60 * 60 * 24));
+      return diff >= 0 && diff % (val || 1) === 0;
+    }
+
+    if (type === 'jours_semaine') {
+      // JS: 0=dimanche, we store 1=lundi..7=dimanche
+      let jsDay = date.getDay(); // 0=dim
+      let ourDay = jsDay === 0 ? 7 : jsDay; // 7=dim
+      return Array.isArray(val) && val.includes(ourDay);
+    }
+
+    if (type === 'jours_mois') {
+      return Array.isArray(val) && val.includes(date.getDate());
+    }
+
+    return false;
+  }
+
+  // ====== FILTERED TASKS ======
+  function getFilteredTasks() {
+    return tasks
+      .filter(t => {
+        if (filterCreneau !== 'all' && t.creneau !== filterCreneau) return false;
+        if (filterEquipe !== 'all' && t.equipe !== filterEquipe) return false;
+        if (!showCompleted && t.fait_par_id) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ad = !!a.fait_par_id, bd = !!b.fait_par_id;
+        if (ad !== bd) return ad ? 1 : -1;
+        if (a.priorite !== b.priorite) return b.priorite - a.priorite;
+        return (a.tache || '').localeCompare(b.tache || '');
+      });
+  }
+
+  // ====== TAB SWITCHING ======
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+
+    // Show/hide filters (only for taches tab)
+    document.getElementById('filters-section').style.display = tab === 'taches' ? '' : 'none';
+    document.querySelector('.date-bar').style.display = (tab === 'taches' || tab === 'admin') ? '' : 'none';
+
+    renderCurrentTab();
+  }
+
+  function renderCurrentTab() {
+    switch (currentTab) {
+      case 'taches': renderTasksTab(); break;
+      case 'creer': renderCreateTab(); break;
+      case 'recurrences': renderRecurrencesTab(); break;
+      case 'admin': renderAdminTab(); break;
+    }
+  }
+
+  // ====== RENDER TASKS TAB ======
+  function renderTasksTab() {
+    const mc = document.getElementById('main-content');
+    const filtered = getFilteredTasks();
+    const pLabels = ['', '!', '!!', '!!!', '!!!!', '!!!!!'];
+    const cIcons = { Matin: '☀️', Midi: '🌤', Soir: '🌙' };
+    const eIcons = { cuisine: '🍴', salle: '🍽', plonge: '🫧', autre: '📦' };
+
+    if (!filtered.length) {
+      mc.innerHTML = `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune tâche</h3><p>Pas de tâche pour cette date et ces filtres</p></div>`;
+      return;
+    }
+
+    mc.innerHTML = filtered.map(t => {
+      const done = !!t.fait_par_id;
+      const pClass = `p${t.priorite || 3}`;
+      const valTime = t.date_validation ? new Date(t.date_validation).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const assignee = t.attribue_a_initiales || t.attribue_a_nom;
+
+      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}">
+        <button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>
+        <span class="task-name" title="${esc(t.tache)}">${esc(t.tache)}</span>
+        <div class="task-badges">
+          <span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span>
+          <span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span>
+          <span class="badge badge-equipe ${(t.equipe || '').toLowerCase()}">${eIcons[t.equipe] || ''} ${(t.equipe || '').charAt(0).toUpperCase() + (t.equipe || '').slice(1)}</span>
+          ${assignee
+            ? `<span class="task-assignee">→ ${esc(assignee)}</span>`
+            : `<span class="task-assignee unassigned">→ ?</span>`}
+          ${done ? `<span class="task-done-info">✓ ${esc(t.fait_par_initiales)} ${valTime}</span>` : ''}
+        </div>
+        <div class="task-actions">
+          ${!done && canAssign() ? `<button class="btn-action" onclick="showAssignModal('${t.id}')" title="Attribuer">👤</button>` : ''}
+          ${canAssign() ? `<button class="btn-action delete" onclick="confirmDelete('${t.id}')" title="Supprimer">✕</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderFiltered() { if (currentTab === 'taches') renderTasksTab(); }
+
+  // ====== TASK ACTIONS ======
+  async function toggleTask(id, isDone) {
+    try {
+      if (isDone) {
+        await DB.updateTask(id, { fait_par_id: null, fait_par_initiales: null, date_validation: null });
+      } else {
+        await DB.updateTask(id, {
+          fait_par_id: currentUser.id,
+          fait_par_initiales: currentUser.initiales,
+          date_validation: new Date().toISOString()
+        });
+      }
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+      showToast(isDone ? 'Tâche réouverte' : 'Tâche terminée ✓', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur', 'error');
+    }
+  }
+
+  function confirmDelete(id) {
+    const task = tasks.find(t => t.id === id);
+    openModal('Supprimer la tâche ?', `
+      <p>Voulez-vous supprimer « <strong>${esc(task?.tache)}</strong> » ?</p>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Supprimer', cls: 'danger', action: `doDeleteTask('${id}')` }
+    ]);
+  }
+
+  async function doDeleteTask(id) {
+    try {
+      await DB.deleteTask(id);
+      tasks = tasks.filter(t => t.id !== id);
+      closeModal();
+      renderFiltered();
+      showToast('Tâche supprimée', 'success');
+    } catch (e) { showToast('Erreur suppression', 'error'); }
+  }
+
+  // ====== ASSIGN MODAL ======
+  function showAssignModal(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    const teamUsers = users.filter(u =>
+      u.equipe === task?.equipe || u.role === 'admin' || u.role === 'manager'
+    );
+
+    openModal('Attribuer la tâche', `
+      <p style="margin-bottom:8px;font-size:0.85rem;color:var(--gray-500)">
+        ${esc(task?.tache)} — ${esc((task?.equipe || '').charAt(0).toUpperCase() + (task?.equipe || '').slice(1))}
+      </p>
+      <div class="user-list-picker">
+        <div class="user-pick-item" onclick="doAssignTask('${taskId}', null, null, null)" style="color:var(--gray-400);font-style:italic">
+          Non attribuée
+        </div>
+        ${teamUsers.map(u => `
+          <div class="user-pick-item ${task?.attribue_a_id === u.id ? 'selected' : ''}"
+               onclick="doAssignTask('${taskId}', '${u.id}', '${esc(u.nom)}', '${esc(u.initiales)}')">
+            <span class="user-initials-sm">${esc(u.initiales)}</span>
+            <span>${esc(u.nom)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `, []);
+  }
+
+  async function doAssignTask(taskId, userId, nom, initiales) {
+    try {
+      await DB.updateTask(taskId, {
+        attribue_a_id: userId,
+        attribue_a_nom: nom,
+        attribue_a_initiales: initiales
+      });
+      tasks = await DB.getTasks(filterDate);
+      closeModal();
+      renderFiltered();
+      showToast(userId ? `Attribuée à ${nom}` : 'Attribution retirée', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  // ====== CREATE TAB ======
+  function renderCreateTab() {
+    const mc = document.getElementById('main-content');
+    selectedPredefined = null;
+    selectedAssignee = null;
+
+    mc.innerHTML = `
+      <div class="create-form">
+        <!-- Task selection -->
+        <div class="form-group">
+          <label>Tâche</label>
+          <div id="selected-task-area"></div>
+          <input class="search-input" type="text" id="search-predef"
+                 placeholder="Rechercher ou saisir une tâche..."
+                 oninput="filterPredefined(this.value)">
+          <div class="predef-list" id="predef-list"></div>
+        </div>
+
+        <!-- Créneau -->
+        <div class="form-group">
+          <label>Créneau</label>
+          <div class="chip-group" id="create-creneau">
+            ${CRENEAUX.map((c, i) => `<button class="chip ${i === 0 ? 'active' : ''}" data-val="${c}" onclick="selectChip(this, 'create-creneau')">${c}</button>`).join('')}
+          </div>
+        </div>
+
+        <!-- Équipe -->
+        <div class="form-group">
+          <label>Équipe</label>
+          <div class="chip-group" id="create-equipe">
+            ${EQUIPES.map(eq => `<button class="chip ${eq === (currentUser.equipe || 'cuisine') ? 'active' : ''}"
+              data-val="${eq}" onclick="selectChip(this, 'create-equipe')">${eq.charAt(0).toUpperCase() + eq.slice(1)}</button>`).join('')}
+          </div>
+        </div>
+
+        <!-- Priorité -->
+        <div class="form-group">
+          <label>Priorité</label>
+          <div class="chip-group" id="create-priority">
+            <button class="chip" data-val="1" onclick="selectChip(this, 'create-priority')">! Basse</button>
+            <button class="chip" data-val="2" onclick="selectChip(this, 'create-priority')">!! Normale</button>
+            <button class="chip active" data-val="3" onclick="selectChip(this, 'create-priority')">!!! Haute</button>
+            <button class="chip" data-val="4" onclick="selectChip(this, 'create-priority')">!!!! Urgente</button>
+          </div>
+        </div>
+
+        <!-- Attribution (responsable+ only) -->
+        ${canAssign() ? `
+        <div class="form-group">
+          <label>Attribuer à</label>
+          <div id="create-assignee-area">
+            <span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>
+          </div>
+          <input class="search-input" type="text" id="search-user"
+                 placeholder="Rechercher un collaborateur..."
+                 oninput="filterUsersForAssign(this.value)" onfocus="filterUsersForAssign('')">
+          <div class="user-list-picker" id="user-assign-list" style="display:none"></div>
+        </div>
+        ` : ''}
+
+        <!-- Observation -->
+        <div class="form-group">
+          <label>Observation</label>
+          <textarea class="form-textarea" id="create-obs" placeholder="Notes, quantités, détails..."></textarea>
+        </div>
+
+        <!-- Échéance -->
+        <div class="form-group">
+          <label>Échéance</label>
+          <input class="form-input" type="date" id="create-date" value="${dateStr(filterDate)}">
+        </div>
+
+        <button class="btn-submit" id="btn-create" onclick="submitCreate()">Créer la tâche</button>
+      </div>
+    `;
+
+    renderPredefinedList('');
+  }
+
+  function renderPredefinedList(search) {
+    const list = document.getElementById('predef-list');
+    if (!list) return;
+    const s = (search || '').toLowerCase();
+    const filtered = predefinedTasks.filter(p =>
+      !s || p.nom.toLowerCase().includes(s) || (p.categorie || '').toLowerCase().includes(s)
+    );
+    list.innerHTML = filtered.slice(0, 20).map(p =>
+      `<div class="predef-item ${selectedPredefined?.id === p.id ? 'selected' : ''}"
+            onclick="selectPredefined('${p.id}')">
+        ${esc(p.nom)} ${p.categorie ? `<span style="color:var(--gray-400);font-size:0.75rem">(${esc(p.categorie)})</span>` : ''}
+      </div>`
+    ).join('');
+
+    // Show "create custom" option if search has text
+    if (s && !filtered.some(p => p.nom.toLowerCase() === s)) {
+      list.innerHTML += `<div class="predef-item" onclick="selectCustomTask('${esc(search)}')"
+        style="color:var(--orange);font-weight:500">+ Créer « ${esc(search)} »</div>`;
+    }
+  }
+
+  function filterPredefined(val) { renderPredefinedList(val); }
+
+  function selectPredefined(id) {
+    selectedPredefined = predefinedTasks.find(p => p.id === id);
+    if (!selectedPredefined) return;
+    const area = document.getElementById('selected-task-area');
+    area.innerHTML = `<div class="selected-task-display">
+      <span class="name">${esc(selectedPredefined.nom)}</span>
+      <button class="btn-clear" onclick="clearPredefined()">✕</button>
+    </div>`;
+    document.getElementById('search-predef').style.display = 'none';
+    document.getElementById('predef-list').style.display = 'none';
+
+    // Auto-set equipe if predefined has one
+    if (selectedPredefined.equipe) {
+      document.querySelectorAll('#create-equipe .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.val === selectedPredefined.equipe);
+      });
+    }
+  }
+
+  function selectCustomTask(name) {
+    selectedPredefined = { id: null, nom: name };
+    const area = document.getElementById('selected-task-area');
+    area.innerHTML = `<div class="selected-task-display">
+      <span class="name">${esc(name)}</span>
+      <button class="btn-clear" onclick="clearPredefined()">✕</button>
+    </div>`;
+    document.getElementById('search-predef').style.display = 'none';
+    document.getElementById('predef-list').style.display = 'none';
+  }
+
+  function clearPredefined() {
+    selectedPredefined = null;
+    document.getElementById('selected-task-area').innerHTML = '';
+    const si = document.getElementById('search-predef');
+    si.style.display = '';
+    si.value = '';
+    document.getElementById('predef-list').style.display = '';
+    renderPredefinedList('');
+  }
+
+  function selectChip(el, groupId) {
+    document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function filterUsersForAssign(search) {
+    const list = document.getElementById('user-assign-list');
+    if (!list) return;
+    list.style.display = '';
+    const s = (search || '').toLowerCase();
+    const selectedEquipe = document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
+    const filtered = users.filter(u =>
+      (u.equipe === selectedEquipe || u.role === 'admin' || u.role === 'manager') &&
+      (!s || u.nom.toLowerCase().includes(s))
+    );
+
+    list.innerHTML = `<div class="user-pick-item" onclick="pickAssignee(null)"
+      style="color:var(--gray-400);font-style:italic">Non attribuée</div>` +
+      filtered.map(u => `
+        <div class="user-pick-item" onclick="pickAssignee({id:'${u.id}',nom:'${esc(u.nom)}',initiales:'${esc(u.initiales)}'})">
+          <span class="user-initials-sm">${esc(u.initiales)}</span>
+          <span>${esc(u.nom)}</span>
+        </div>
+      `).join('');
+  }
+
+  function pickAssignee(user) {
+    selectedAssignee = user;
+    const area = document.getElementById('create-assignee-area');
+    if (user) {
+      area.innerHTML = `<div class="selected-task-display" style="background:var(--blue-bg);border-color:var(--blue)">
+        <span style="color:var(--blue);font-weight:600">${esc(user.initiales)} — ${esc(user.nom)}</span>
+        <button class="btn-clear" onclick="pickAssignee(null)">✕</button>
+      </div>`;
+    } else {
+      area.innerHTML = `<span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>`;
+    }
+    document.getElementById('user-assign-list').style.display = 'none';
+    document.getElementById('search-user').value = '';
+  }
+
+  async function submitCreate() {
+    if (!selectedPredefined) { showToast('Choisissez une tâche', 'error'); return; }
+    const btn = document.getElementById('btn-create');
+    btn.disabled = true; btn.textContent = 'Création...';
+
+    try {
+      const creneau = document.querySelector('#create-creneau .chip.active')?.dataset.val || 'Matin';
+      const equipe = document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
+      const priorite = parseInt(document.querySelector('#create-priority .chip.active')?.dataset.val || '3');
+      const obs = document.getElementById('create-obs').value.trim();
+      const echeance = document.getElementById('create-date').value;
+
+      await DB.insertTask({
+        tache: selectedPredefined.nom,
+        creneau,
+        equipe,
+        priorite,
+        observation: obs || null,
+        echeance: echeance || dateStr(filterDate),
+        date_creation: new Date().toISOString(),
+        etablissement: currentEtablissement,
+        createur_id: currentUser.id,
+        createur_nom: currentUser.nom,
+        attribue_a_id: selectedAssignee?.id || null,
+        attribue_a_nom: selectedAssignee?.nom || null,
+        attribue_a_initiales: selectedAssignee?.initiales || null
+      });
+
+      showToast('Tâche créée ✓', 'success');
+      tasks = await DB.getTasks(filterDate);
+      switchTab('taches');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur création', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Créer la tâche';
+    }
+  }
+
+  // ====== RECURRENCES TAB ======
+  function renderRecurrencesTab() {
+    const mc = document.getElementById('main-content');
+    const active = recurrences.filter(r => r.actif);
+    const inactive = recurrences.filter(r => !r.actif);
+
+    mc.innerHTML = `
+      <div style="padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 style="font-size:0.9rem;color:var(--gray-600)">Tâches récurrentes (${active.length})</h3>
+          <button class="btn-submit" style="width:auto;padding:8px 16px;font-size:0.85rem"
+                  onclick="showAddRecurrenceModal()">+ Ajouter</button>
+        </div>
+        ${active.length === 0 ? '<p style="color:var(--gray-400);font-size:0.85rem">Aucune récurrence configurée</p>' : ''}
+        ${active.map(r => renderRecurrenceCard(r)).join('')}
+        ${inactive.length > 0 ? `
+          <h3 style="font-size:0.8rem;color:var(--gray-400);margin-top:16px;margin-bottom:8px">Inactives</h3>
+          ${inactive.map(r => renderRecurrenceCard(r)).join('')}
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function renderRecurrenceCard(r) {
+    const freqLabels = {
+      quotidien: 'Tous les jours',
+      tous_x_jours: `Tous les ${r.frequence_valeur} jours`,
+      jours_semaine: `${(r.frequence_valeur || []).map(d => JOURS_SEMAINE[d - 1]?.substring(0, 3)).join(', ')}`,
+      jours_mois: `Le ${(r.frequence_valeur || []).join(', ')} du mois`
+    };
+    return `<div class="recurrence-card" style="${r.actif ? '' : 'opacity:0.5'}">
+      <div class="recurrence-info">
+        <div class="recurrence-name">${esc(r.nom)}</div>
+        <div class="recurrence-detail">
+          ${freqLabels[r.frequence_type] || r.frequence_type} ·
+          ${(r.equipe || '').charAt(0).toUpperCase() + (r.equipe || '').slice(1)} ·
+          ${r.creneau || 'Matin'} ·
+          Priorité ${r.priorite || 3}
+        </div>
+      </div>
+      <button class="recurrence-toggle ${r.actif ? 'active' : ''}"
+              onclick="toggleRecurrence('${r.id}', ${!r.actif})"></button>
+      <button class="btn-action delete" onclick="confirmDeleteRecurrence('${r.id}')">✕</button>
+    </div>`;
+  }
+
+  async function toggleRecurrence(id, newState) {
+    try {
+      await DB.updateRecurrence(id, { actif: newState });
+      recurrences = await DB.getRecurrences(currentEtablissement);
+      renderRecurrencesTab();
+      showToast(newState ? 'Récurrence activée' : 'Récurrence désactivée', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  function confirmDeleteRecurrence(id) {
+    const rec = recurrences.find(r => r.id === id);
+    openModal('Supprimer la récurrence ?', `
+      <p>Supprimer « <strong>${esc(rec?.nom)}</strong> » ?</p>
+      <p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">Les tâches déjà générées ne seront pas supprimées.</p>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Supprimer', cls: 'danger', action: `doDeleteRecurrence('${id}')` }
+    ]);
+  }
+
+  async function doDeleteRecurrence(id) {
+    try {
+      await DB.deleteRecurrence(id);
+      recurrences = await DB.getRecurrences(currentEtablissement);
+      closeModal();
+      renderRecurrencesTab();
+      showToast('Récurrence supprimée', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  // ====== ADD RECURRENCE MODAL ======
+  function showAddRecurrenceModal() {
+    openModal('Nouvelle récurrence', `
+      <div class="form-group">
+        <label>Nom de la tâche</label>
+        <input class="form-input" id="rec-nom" placeholder="Ex: Nettoyer les plaques">
+      </div>
+      <div class="form-group">
+        <label>Équipe</label>
+        <select class="form-select" id="rec-equipe">
+          ${EQUIPES.map(e => `<option value="${e}">${e.charAt(0).toUpperCase() + e.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Créneau</label>
+        <select class="form-select" id="rec-creneau">
+          ${CRENEAUX.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Priorité (1-5)</label>
+        <select class="form-select" id="rec-priorite">
+          <option value="1">! Basse</option>
+          <option value="2">!! Normale</option>
+          <option value="3" selected>!!! Haute</option>
+          <option value="4">!!!! Urgente</option>
+          <option value="5">!!!!! Critique</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Fréquence</label>
+        <select class="form-select" id="rec-freq-type" onchange="recFreqChanged()">
+          <option value="quotidien">Tous les jours</option>
+          <option value="tous_x_jours">Tous les X jours</option>
+          <option value="jours_semaine">Certains jours de la semaine</option>
+          <option value="jours_mois">Certains jours du mois</option>
+        </select>
+      </div>
+      <div class="form-group" id="rec-freq-detail" style="display:none"></div>
+      <div class="form-group">
+        <label>Observation (optionnelle)</label>
+        <textarea class="form-textarea" id="rec-obs" placeholder="Notes..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Date de début</label>
+        <input class="form-input" type="date" id="rec-debut" value="${dateStr(new Date())}">
+      </div>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Créer', cls: 'primary', action: 'submitRecurrence()' }
+    ]);
+  }
+
+  function recFreqChanged() {
+    const type = document.getElementById('rec-freq-type').value;
+    const detail = document.getElementById('rec-freq-detail');
+
+    if (type === 'tous_x_jours') {
+      detail.style.display = '';
+      detail.innerHTML = `<label>Nombre de jours</label>
+        <input class="form-input" type="number" id="rec-x-days" min="2" max="365" value="2">`;
+    } else if (type === 'jours_semaine') {
+      detail.style.display = '';
+      detail.innerHTML = `<label>Jours de la semaine</label>
+        <div class="chip-group">${JOURS_SEMAINE.map((j, i) =>
+          `<button class="chip" data-day="${i + 1}" onclick="this.classList.toggle('active')">${j.substring(0, 3)}</button>`
+        ).join('')}</div>`;
+    } else if (type === 'jours_mois') {
+      detail.style.display = '';
+      detail.innerHTML = `<label>Jours du mois</label>
+        <div class="chip-group" style="max-width:320px">${Array.from({ length: 31 }, (_, i) =>
+          `<button class="chip" data-mday="${i + 1}" onclick="this.classList.toggle('active')" style="min-width:36px;padding:4px 6px">${i + 1}</button>`
+        ).join('')}</div>`;
+    } else {
+      detail.style.display = 'none';
+      detail.innerHTML = '';
+    }
+  }
+
+  async function submitRecurrence() {
+    const nom = document.getElementById('rec-nom').value.trim();
+    if (!nom) { showToast('Saisissez un nom', 'error'); return; }
+
+    const type = document.getElementById('rec-freq-type').value;
+    let valeur = null;
+
+    if (type === 'tous_x_jours') {
+      valeur = parseInt(document.getElementById('rec-x-days')?.value) || 2;
+    } else if (type === 'jours_semaine') {
+      valeur = [...document.querySelectorAll('#rec-freq-detail .chip.active')].map(c => parseInt(c.dataset.day));
+      if (!valeur.length) { showToast('Sélectionnez au moins un jour', 'error'); return; }
+    } else if (type === 'jours_mois') {
+      valeur = [...document.querySelectorAll('#rec-freq-detail .chip.active')].map(c => parseInt(c.dataset.mday));
+      if (!valeur.length) { showToast('Sélectionnez au moins un jour', 'error'); return; }
+    }
+
+    try {
+      await DB.insertRecurrence({
+        nom,
+        equipe: document.getElementById('rec-equipe').value,
+        creneau: document.getElementById('rec-creneau').value,
+        priorite: parseInt(document.getElementById('rec-priorite').value),
+        frequence_type: type,
+        frequence_valeur: valeur,
+        observation: document.getElementById('rec-obs').value.trim() || null,
+        date_debut: document.getElementById('rec-debut').value || dateStr(new Date()),
+        etablissement: currentEtablissement,
+        actif: true,
+        cree_par_id: currentUser.id,
+        cree_par_nom: currentUser.nom
+      });
+      recurrences = await DB.getRecurrences(currentEtablissement);
+      closeModal();
+      renderRecurrencesTab();
+      showToast('Récurrence créée ✓', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur création', 'error');
+    }
+  }
+
+  // ====== ADMIN TAB ======
+  function renderAdminTab() {
+    const mc = document.getElementById('main-content');
+    const total = tasks.length;
+    const done = tasks.filter(t => t.fait_par_id).length;
+    const unassigned = tasks.filter(t => !t.attribue_a_id && !t.fait_par_id).length;
+    const overdue = tasks.filter(t => !t.fait_par_id && t.echeance < dateStr(new Date())).length;
+
+    // Stats by equipe
+    const byEquipe = {};
+    EQUIPES.forEach(eq => {
+      const eqTasks = tasks.filter(t => t.equipe === eq);
+      byEquipe[eq] = { total: eqTasks.length, done: eqTasks.filter(t => t.fait_par_id).length };
+    });
+
+    mc.innerHTML = `
+      <div class="admin-section">
+        <div class="stat-row">
+          <div class="stat-card stat-blue"><div class="value">${total}</div><div class="label">Total</div></div>
+          <div class="stat-card stat-green"><div class="value">${done}</div><div class="label">Terminées</div></div>
+          <div class="stat-card stat-orange"><div class="value">${unassigned}</div><div class="label">Non attribuées</div></div>
+          <div class="stat-card stat-red"><div class="value">${overdue}</div><div class="label">En retard</div></div>
+        </div>
+
+        <h3>Par équipe</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px">
+          ${EQUIPES.map(eq => `
+            <div style="background:white;border-radius:var(--radius-sm);padding:10px;text-align:center;box-shadow:var(--shadow)">
+              <div style="font-weight:600;font-size:0.85rem">${eq.charAt(0).toUpperCase() + eq.slice(1)}</div>
+              <div style="font-size:1.2rem;font-weight:700;color:var(--blue)">${byEquipe[eq]?.done || 0}/${byEquipe[eq]?.total || 0}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <h3>Tâches prédéfinies</h3>
+        <div style="margin-bottom:8px">
+          <button class="btn-submit" style="width:auto;padding:6px 14px;font-size:0.8rem"
+                  onclick="showAddPredefinedModal()">+ Ajouter</button>
+        </div>
+        <div id="admin-predef-list">
+          ${predefinedTasks.map(p => `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray-100)">
+              <span style="flex:1;font-size:0.85rem">${esc(p.nom)}</span>
+              <span style="font-size:0.7rem;color:var(--gray-400)">${esc(p.categorie || '')}</span>
+              <span style="font-size:0.7rem;color:var(--gray-400)">${esc(p.equipe || 'cuisine')}</span>
+              <button class="btn-action delete" onclick="deletePredefined('${p.id}')">✕</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function showAddPredefinedModal() {
+    openModal('Ajouter tâche prédéfinie', `
+      <div class="form-group">
+        <label>Nom</label>
+        <input class="form-input" id="predef-nom" placeholder="Ex: Éplucher les oignons">
+      </div>
+      <div class="form-group">
+        <label>Catégorie</label>
+        <input class="form-input" id="predef-cat" placeholder="Ex: Préparation, Nettoyage...">
+      </div>
+      <div class="form-group">
+        <label>Équipe</label>
+        <select class="form-select" id="predef-equipe">
+          ${EQUIPES.map(e => `<option value="${e}">${e.charAt(0).toUpperCase() + e.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Ajouter', cls: 'primary', action: 'doAddPredefined()' }
+    ]);
+  }
+
+  async function doAddPredefined() {
+    const nom = document.getElementById('predef-nom').value.trim();
+    if (!nom) return;
+    try {
+      await DB.insertPredefined({
+        nom,
+        categorie: document.getElementById('predef-cat').value.trim() || null,
+        equipe: document.getElementById('predef-equipe').value,
+        etablissement: currentEtablissement,
+        actif: true
+      });
+      predefinedTasks = await DB.getPredefined(currentEtablissement);
+      closeModal();
+      renderAdminTab();
+      showToast('Tâche prédéfinie ajoutée ✓', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  async function deletePredefined(id) {
+    if (!confirm('Supprimer cette tâche prédéfinie ?')) return;
+    try {
+      await DB.deletePredefined(id);
+      predefinedTasks = await DB.getPredefined(currentEtablissement);
+      renderAdminTab();
+      showToast('Supprimée', 'success');
+    } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  // ====== MODAL ======
+  function openModal(title, body, buttons) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = body;
+    document.getElementById('modal-footer').innerHTML = (buttons || []).map(b =>
+      `<button class="btn-modal ${b.cls || ''}" onclick="${b.action}">${b.label}</button>`
+    ).join('');
+    document.getElementById('modal-overlay').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('show');
+  }
+
+  // ====== TOAST ======
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type ? ` ${type}` : '');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ====== INIT ======
+  async function init() {
+    // Load Supabase SDK
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    script.onload = () => {
+      initSupabase();
+      // Check for portal session
+      const session = checkPortalSession();
+      if (session) {
+        initializeFromSession(session);
+      } else {
+        // Show login
+        document.getElementById('login-screen').style.display = 'flex';
+        renderPinDots();
+        const pad = document.getElementById('pin-pad');
+        for (let i = 1; i <= 9; i++) pad.innerHTML += `<button class="pin-key" onclick="pinAdd('${i}')">${i}</button>`;
+        pad.innerHTML += `<button class="pin-key" onclick="pinClear()">C</button>`;
+        pad.innerHTML += `<button class="pin-key" onclick="pinAdd('0')">0</button>`;
+        pad.innerHTML += `<button class="pin-key" onclick="pinDelete()">⌫</button>`;
+      }
+    };
+    document.head.appendChild(script);
+  }
+
+  init();
+</script>
+</body>
+</html>
