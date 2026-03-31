@@ -541,7 +541,17 @@
 
         <div class="form-group">
           <label>Nom de la fiche *</label>
-          <input type="text" class="form-input" id="f-nom" placeholder="Ex: Sauce béchamel">
+          <input type="text" class="form-input" id="f-nom" placeholder="Ex: Sauce béchamel" oninput="autoGenerateCode()">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label>Code court (4 car.) *</label>
+            <input type="text" class="form-input" id="f-code-court" maxlength="4" style="text-transform:uppercase; font-weight:700; letter-spacing:2px; font-size:1.1rem;" placeholder="BOLO">
+          </div>
+          <div class="form-group" style="flex:2; display:flex; align-items:flex-end;">
+            <span id="code-court-status" style="font-size:0.75rem; color:var(--gray-400); padding-bottom:10px;"></span>
+          </div>
         </div>
 
         <div class="form-group">
@@ -1100,7 +1110,7 @@ const DB = {
     return data || [];
   },
 
-  async getNextLotNumber(date, dlcDate) {
+  async getNextLotNumber(date, dlcDate, codeProduct) {
     const { data, error } = await sb
       .from('lots_production')
       .select('numero_lot')
@@ -1117,19 +1127,18 @@ const DB = {
       .sort((a, b) => b - a);
 
     const nextNum = (numbers[0] || 0) + 1;
-    // Format : YYMMDD-DDMMYY-NNN (date prod - DLC - séquentiel)
-    const prodParts = date.split('-'); // YYYY-MM-DD
-    const prodCode = prodParts[0].substring(2) + prodParts[1] + prodParts[2]; // YYMMDD
-    let dlcCode = '000000';
+    // Format : MMJJ-CODE-NNN (DLC MMJJ - code produit 4 chars - séquentiel)
+    let dlcCode = '0000';
     if (dlcDate) {
       const d = new Date(dlcDate);
-      dlcCode = String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0') + String(d.getFullYear()).toString().substring(2);
+      dlcCode = String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
     }
-    return `${prodCode}-${dlcCode}-${String(nextNum).padStart(3, '0')}`;
+    const code = (codeProduct || 'XXXX').toUpperCase().substring(0, 4).padEnd(4, 'X');
+    return `${dlcCode}-${code}-${String(nextNum).padStart(3, '0')}`;
   },
 
-  async createLot(date, responsableId, responsableNom, responsableInitiales, dlcDate) {
-    const numero = await this.getNextLotNumber(date, dlcDate);
+  async createLot(date, responsableId, responsableNom, responsableInitiales, dlcDate, codeProduct) {
+    const numero = await this.getNextLotNumber(date, dlcDate, codeProduct);
     const now = new Date();
     const heure = now.toTimeString().substring(0, 8); // HH:MM:SS
     const { data, error } = await sb
@@ -1270,7 +1279,7 @@ function renderFiches() {
       <div class="fiche-card ${catClass} ${inactiveClass}" onclick="viewFiche('${f.id}')">
         <div class="fiche-icon">${icon}</div>
         <div class="fiche-info">
-          <div class="fiche-name">${f.nom}${f.actif === false ? ' (inactive)' : ''}</div>
+          <div class="fiche-name">${f.code_court ? `<span style="color:var(--purple); font-size:0.72rem; font-weight:700; letter-spacing:0.5px; margin-right:6px; padding:1px 5px; background:var(--purple-bg); border-radius:4px;">${f.code_court}</span>` : ''}${f.nom}${f.actif === false ? ' (inactive)' : ''}</div>
           <div class="fiche-meta">${metaParts.join('')}</div>
         </div>
         <div class="fiche-badges">${badges.join('')}</div>
@@ -1490,8 +1499,11 @@ async function saveProduction() {
       }
     }
 
-    // Créer un lot par production (numéro inclut la DLC)
-    const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc);
+    // Code produit : code_court de la fiche, ou généré depuis le nom
+    const codeProduct = fiche?.code_court || generateCodeFromName(nom.toUpperCase());
+
+    // Créer un lot par production (format MMJJ-CODE-NNN)
+    const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
     allLots.push(lot);
 
     const production = {
@@ -1548,6 +1560,7 @@ async function viewFiche(id) {
   // Build info grid
   let infoHTML = '<div class="info-grid">';
   infoHTML += `<div class="info-item"><div class="label">Catégorie</div><div class="value">${icon} ${catLabel}</div></div>`;
+  if (fiche.code_court) infoHTML += `<div class="info-item"><div class="label">Code</div><div class="value" style="font-weight:700; letter-spacing:1px; font-size:1.1rem;">${fiche.code_court}</div></div>`;
   if (fiche.sous_categorie) infoHTML += `<div class="info-item"><div class="label">Sous-catégorie</div><div class="value">${fiche.sous_categorie}</div></div>`;
   if (fiche.rendement_quantite) infoHTML += `<div class="info-item"><div class="label">Rendement</div><div class="value">${fiche.rendement_quantite} ${fiche.rendement_unite || 'portions'}</div></div>`;
   if (fiche.temperature_stockage) infoHTML += `<div class="info-item"><div class="label">Température</div><div class="value">${fiche.temperature_stockage}</div></div>`;
@@ -1704,6 +1717,8 @@ async function editFiche(id) {
 
   // Populate form
   document.getElementById('f-nom').value = fiche.nom || '';
+  document.getElementById('f-code-court').value = fiche.code_court || '';
+  document.getElementById('code-court-status').textContent = fiche.code_court ? '✓ Code existant' : '';
   document.getElementById('f-sous-cat').value = fiche.sous_categorie || '';
   document.getElementById('f-rendement-qty').value = fiche.rendement_quantite || '';
   document.getElementById('f-rendement-unite').value = fiche.rendement_unite || 'portions';
@@ -1747,6 +1762,88 @@ async function editFiche(id) {
 }
 
 // ============= SAVE FICHE =============
+function autoGenerateCode() {
+  // Ne pas écraser si l'utilisateur a déjà saisi un code
+  const codeField = document.getElementById('f-code-court');
+  if (codeField.dataset.manual === 'true') return;
+
+  const nom = document.getElementById('f-nom').value.trim().toUpperCase();
+  if (!nom) { codeField.value = ''; return; }
+
+  // Générer un code de 4 caractères à partir du nom
+  const code = generateCodeFromName(nom);
+
+  // Vérifier unicité et ajuster si besoin
+  const editId = document.getElementById('edit-id').value;
+  const existingCodes = allFiches
+    .filter(f => f.code_court && f.id !== editId && f.etablissement === currentEtablissement)
+    .map(f => f.code_court);
+
+  let finalCode = code;
+  let suffix = 2;
+  while (existingCodes.includes(finalCode) && suffix <= 9) {
+    finalCode = code.substring(0, 3) + suffix;
+    suffix++;
+  }
+
+  codeField.value = finalCode;
+  const statusEl = document.getElementById('code-court-status');
+  if (existingCodes.includes(finalCode)) {
+    statusEl.textContent = '⚠️ Code déjà utilisé';
+    statusEl.style.color = '#dc2626';
+  } else {
+    statusEl.textContent = '✓ Disponible';
+    statusEl.style.color = '#16a34a';
+  }
+}
+
+function generateCodeFromName(nom) {
+  // Nettoyage : retirer articles, mots courts
+  const stopWords = ['DE','DU','DES','LE','LA','LES','AU','AUX','EN','ET','À','A','UN','UNE','AVEC'];
+  const words = nom.split(/[\s\-_']+/).filter(w => w.length > 0 && !stopWords.includes(w));
+
+  if (words.length === 0) return 'XXXX';
+
+  if (words.length === 1) {
+    // Un seul mot : prendre les 4 premières consonnes/lettres significatives
+    const w = words[0];
+    const consonnes = w.replace(/[AEIOUYÉÈÊËÀÂÙÛÔÎÏ]/g, '');
+    if (consonnes.length >= 4) return consonnes.substring(0, 4);
+    return w.substring(0, 4);
+  }
+
+  if (words.length === 2) {
+    // Deux mots : 2 premières lettres de chaque
+    return (words[0].substring(0, 2) + words[1].substring(0, 2)).substring(0, 4);
+  }
+
+  // 3+ mots : première lettre des 4 premiers mots
+  return words.slice(0, 4).map(w => w[0]).join('').substring(0, 4);
+}
+
+// Marquer si l'utilisateur modifie manuellement le code
+document.addEventListener('DOMContentLoaded', () => {
+  const codeField = document.getElementById('f-code-court');
+  if (codeField) {
+    codeField.addEventListener('input', () => {
+      codeField.dataset.manual = 'true';
+      // Vérifier unicité
+      const val = codeField.value.trim().toUpperCase();
+      const editId = document.getElementById('edit-id').value;
+      const exists = allFiches.some(f => f.code_court === val && f.id !== editId && f.etablissement === currentEtablissement);
+      const statusEl = document.getElementById('code-court-status');
+      if (!val) { statusEl.textContent = ''; return; }
+      if (exists) {
+        statusEl.textContent = '⚠️ Code déjà utilisé';
+        statusEl.style.color = '#dc2626';
+      } else {
+        statusEl.textContent = '✓ Disponible';
+        statusEl.style.color = '#16a34a';
+      }
+    });
+  }
+});
+
 async function saveFiche() {
   if (!canEdit()) return;
 
@@ -1778,8 +1875,22 @@ async function saveFiche() {
   const rendement = parseFloat(document.getElementById('f-rendement-qty').value) || 0;
   const coutPortion = rendement > 0 ? coutTotal / rendement : 0;
 
+  const codeCourt = document.getElementById('f-code-court').value.trim().toUpperCase();
+  if (!codeCourt || codeCourt.length < 2 || codeCourt.length > 4) {
+    showToast('Le code court doit faire 2 à 4 caractères', 'error');
+    return;
+  }
+  // Vérifier unicité
+  const editId = document.getElementById('edit-id').value;
+  const codeExists = allFiches.some(f => f.code_court === codeCourt && f.id !== editId && f.etablissement === currentEtablissement);
+  if (codeExists) {
+    showToast(`Le code "${codeCourt}" est déjà utilisé`, 'error');
+    return;
+  }
+
   const fiche = {
     nom,
+    code_court: codeCourt,
     categorie,
     sous_categorie: document.getElementById('f-sous-cat').value.trim() || null,
     rendement_quantite: rendement || null,
@@ -1800,7 +1911,6 @@ async function saveFiche() {
     updated_at: new Date().toISOString()
   };
 
-  const editId = document.getElementById('edit-id').value;
   if (editId) {
     fiche.id = editId;
     fiche.modifie_par_id = currentUser.id;
@@ -1831,6 +1941,9 @@ function resetForm() {
   editingFicheId = null;
   document.getElementById('edit-id').value = '';
   document.getElementById('f-nom').value = '';
+  document.getElementById('f-code-court').value = '';
+  document.getElementById('f-code-court').dataset.manual = 'false';
+  document.getElementById('code-court-status').textContent = '';
   document.getElementById('f-sous-cat').value = '';
   document.getElementById('f-rendement-qty').value = '';
   document.getElementById('f-rendement-unite').value = 'portions';

@@ -783,7 +783,7 @@
       return data || [];
     },
 
-    async getNextLotNumber(date, etab, dlcDate) {
+    async getNextLotNumber(date, etab, dlcDate, codeProduct) {
       const { data, error } = await supabaseClient.from('lots_production').select('numero_lot')
         .eq('etablissement', etab).eq('date_production', date);
       if (error) throw error;
@@ -793,19 +793,18 @@
         return m ? parseInt(m[1]) : 0;
       }).sort((a, b) => b - a);
       const nextNum = (numbers[0] || 0) + 1;
-      // Format : YYMMDD-DDMMYY-NNN (date prod - DLC - séquentiel)
-      const prodParts = date.split('-');
-      const prodCode = prodParts[0].substring(2) + prodParts[1] + prodParts[2];
-      let dlcCode = '000000';
+      // Format : MMJJ-CODE-NNN (DLC MMJJ - code produit - séquentiel)
+      let dlcCode = '0000';
       if (dlcDate) {
         const d = new Date(dlcDate);
-        dlcCode = String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0') + String(d.getFullYear()).toString().substring(2);
+        dlcCode = String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
       }
-      return `${prodCode}-${dlcCode}-${String(nextNum).padStart(3, '0')}`;
+      const code = (codeProduct || 'XXXX').toUpperCase().substring(0, 4).padEnd(4, 'X');
+      return `${dlcCode}-${code}-${String(nextNum).padStart(3, '0')}`;
     },
 
-    async createLot(date, etab, userId, userNom, userInitiales, dlcDate) {
-      const numero = await this.getNextLotNumber(date, etab, dlcDate);
+    async createLot(date, etab, userId, userNom, userInitiales, dlcDate, codeProduct) {
+      const numero = await this.getNextLotNumber(date, etab, dlcDate, codeProduct);
       const now = new Date();
       const { data, error } = await supabaseClient.from('lots_production').insert({
         numero_lot: numero,
@@ -1655,6 +1654,19 @@
   }
 
   // Valider la tâche AVEC saisie production
+  function tafGenerateCode(nom) {
+    const stopWords = ['DE','DU','DES','LE','LA','LES','AU','AUX','EN','ET','À','A','UN','UNE','AVEC'];
+    const words = nom.split(/[\s\-_']+/).filter(w => w.length > 0 && !stopWords.includes(w));
+    if (words.length === 0) return 'XXXX';
+    if (words.length === 1) {
+      const consonnes = words[0].replace(/[AEIOUYÉÈÊËÀÂÙÛÔÎÏ]/g, '');
+      if (consonnes.length >= 4) return consonnes.substring(0, 4);
+      return words[0].substring(0, 4);
+    }
+    if (words.length === 2) return (words[0].substring(0, 2) + words[1].substring(0, 2)).substring(0, 4);
+    return words.slice(0, 4).map(w => w[0]).join('').substring(0, 4);
+  }
+
   async function saveProductionFromTaf() {
     const taskId = document.getElementById('prod-task-id').value;
     const nom = document.getElementById('prod-nom').value.trim();
@@ -1686,8 +1698,12 @@
         }
       }
 
-      // Créer un lot par production (numéro inclut la DLC)
-      const lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, dlc);
+      // Code produit : code_court de la fiche, ou généré depuis le nom
+      const ficheForCode = ficheId ? productionFiches.find(f => f.id === ficheId) : null;
+      const codeProduct = ficheForCode?.code_court || tafGenerateCode(nom.toUpperCase());
+
+      // Créer un lot par production (format MMJJ-CODE-NNN)
+      const lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
       productionLots.push(lot);
 
       const now = new Date();
