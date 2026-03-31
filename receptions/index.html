@@ -531,8 +531,9 @@
         <div class="photo-capture-area" onclick="triggerCamera()">
           <div class="icon">📋</div>
           <div class="label">Scanner un document</div>
-          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Numerisation + extraction texte automatique</div>
+          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Cadrage auto + N&B + OCR</div>
           <div class="count" id="photo-count">0 page(s)</div>
+          <div id="cv-status" style="font-size:.65rem;color:var(--amber);margin-top:4px;"></div>
         </div>
         <div class="photo-grid" id="photo-grid"></div>
       </div>
@@ -590,6 +591,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script async src="https://docs.opencv.org/4.9.0/opencv.js" onload="onOpenCvReady()"></script>
 <script>
   // ====== CONFIG ======
   const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
@@ -607,10 +609,17 @@
   let fournisseurs = [];
   let commandes = [];
   let documents = [];
-  let capturedPages = []; // array of { image: base64, ocr: string } for new document
+  let capturedPages = []; // array of { image, ocr, ocrData } for new document
   let viewerPages = [];
   let viewerIndex = 0;
-  let ocrWorker = null;
+  let cvReady = false;
+
+  function onOpenCvReady() {
+    cvReady = true;
+    console.log('OpenCV.js ready');
+    const st = document.getElementById('cv-status');
+    if (st) st.textContent = '';
+  }
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -923,6 +932,10 @@
     // Load fresh commandes
     loadCommandes();
 
+    // Show OpenCV loading status
+    const cvSt = document.getElementById('cv-status');
+    if (cvSt) cvSt.textContent = cvReady ? '' : 'Chargement moteur de cadrage...';
+
     document.getElementById('modal-new').classList.add('show');
   }
 
@@ -940,6 +953,137 @@
     const input = document.getElementById('camera-input');
     input.value = '';
     input.click();
+  }
+
+  // ====== DOCUMENT DETECTION (OpenCV.js) ======
+  function orderCorners(pts) {
+    // Order: top-left, top-right, bottom-right, bottom-left
+    const sorted = [...pts].sort((a, b) => a.y - b.y);
+    const top = sorted.slice(0, 2).sort((a, b) => a.x - b.x);
+    const bottom = sorted.slice(2, 4).sort((a, b) => a.x - b.x);
+    return [top[0], top[1], bottom[1], bottom[0]];
+  }
+
+  function ptDist(a, b) {
+    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+  }
+
+  function detectAndCropDocument(imgElement) {
+    if (!cvReady || typeof cv === 'undefined') return null;
+
+    try {
+      // Load image into OpenCV
+      const src = cv.imread(imgElement);
+      const origRows = src.rows, origCols = src.cols;
+
+      // Downscale for fast processing
+      const maxProc = 600;
+      const ratio = maxProc / Math.max(origRows, origCols);
+      const small = new cv.Mat();
+      const smallSize = new cv.Size(Math.round(origCols * ratio), Math.round(origRows * ratio));
+      cv.resize(src, small, smallSize);
+
+      // Grayscale
+      const gray = new cv.Mat();
+      cv.cvtColor(small, gray, cv.COLOR_RGBA2GRAY);
+
+      // Blur to reduce noise
+      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+
+      // Canny edge detection
+      const edges = new cv.Mat();
+      cv.Canny(gray, edges, 40, 120);
+
+      // Dilate to close gaps in edges
+      const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+      cv.dilate(edges, edges, kernel, new cv.Point(-1, -1), 2);
+
+      // Find contours
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      // Find largest 4-point contour (the document)
+      const imageArea = small.rows * small.cols;
+      let bestContour = null;
+      let bestArea = 0;
+
+      for (let i = 0; i < contours.size(); i++) {
+        const cnt = contours.get(i);
+        const area = cv.contourArea(cnt);
+
+        // Must be at least 10% of image area
+        if (area < imageArea * 0.10) continue;
+
+        const peri = cv.arcLength(cnt, true);
+        const approx = new cv.Mat();
+        cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+
+        if (approx.rows === 4 && area > bestArea) {
+          bestArea = area;
+          if (bestContour) bestContour.delete();
+          bestContour = approx;
+        } else {
+          approx.delete();
+        }
+      }
+
+      let resultCanvas = null;
+
+      if (bestContour) {
+        // Extract corners and scale back to original image size
+        const corners = [];
+        for (let i = 0; i < 4; i++) {
+          corners.push({
+            x: bestContour.data32S[i * 2] / ratio,
+            y: bestContour.data32S[i * 2 + 1] / ratio
+          });
+        }
+        const ordered = orderCorners(corners);
+
+        // Calculate output dimensions
+        const wTop = ptDist(ordered[0], ordered[1]);
+        const wBot = ptDist(ordered[3], ordered[2]);
+        const hLeft = ptDist(ordered[0], ordered[3]);
+        const hRight = ptDist(ordered[1], ordered[2]);
+        const outW = Math.round(Math.max(wTop, wBot));
+        const outH = Math.round(Math.max(hLeft, hRight));
+
+        // Ensure A4-like minimum (reasonable document size)
+        if (outW > 200 && outH > 200) {
+          // Perspective transform
+          const srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
+            ordered[0].x, ordered[0].y,
+            ordered[1].x, ordered[1].y,
+            ordered[2].x, ordered[2].y,
+            ordered[3].x, ordered[3].y
+          ]);
+          const dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
+            0, 0, outW, 0, outW, outH, 0, outH
+          ]);
+
+          const M = cv.getPerspectiveTransform(srcPts, dstPts);
+          const dst = new cv.Mat();
+          cv.warpPerspective(src, dst, M, new cv.Size(outW, outH), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255, 255, 255, 255));
+
+          // Write to canvas
+          resultCanvas = document.createElement('canvas');
+          cv.imshow(resultCanvas, dst);
+
+          M.delete(); srcPts.delete(); dstPts.delete(); dst.delete();
+        }
+        bestContour.delete();
+      }
+
+      // Cleanup
+      src.delete(); small.delete(); gray.delete(); edges.delete();
+      kernel.delete(); contours.delete(); hierarchy.delete();
+
+      return resultCanvas; // null if no document detected
+    } catch (e) {
+      console.error('Document detection error:', e);
+      return null;
+    }
   }
 
   // Scanner: clean black & white with Sauvola adaptive threshold
@@ -1143,20 +1287,41 @@
       reader.onload = async function(ev) {
         const img = new Image();
         img.onload = async function() {
-          // Step 1: Scanner processing
-          showOcrOverlay(true, 'Numerisation...', 10);
-          await new Promise(r => setTimeout(r, 50)); // let UI update
-          const scannedBase64 = scannerProcess(img);
+          // Step 1: Detect and crop document (OpenCV)
+          showOcrOverlay(true, 'Detection du document...', 5);
+          await new Promise(r => setTimeout(r, 50));
 
-          // Step 2: OCR
-          showOcrOverlay(true, 'Reconnaissance du texte (OCR)...', 30);
+          let sourceForScan = img;
+          const croppedCanvas = detectAndCropDocument(img);
+          if (croppedCanvas) {
+            // Use cropped document as source
+            const croppedImg = new Image();
+            await new Promise(resolve => {
+              croppedImg.onload = resolve;
+              croppedImg.src = croppedCanvas.toDataURL('image/png');
+            });
+            sourceForScan = croppedImg;
+            showOcrOverlay(true, 'Document detecte ! Numerisation...', 20);
+          } else {
+            showOcrOverlay(true, 'Numerisation (cadrage manuel)...', 20);
+          }
+          await new Promise(r => setTimeout(r, 50));
+
+          // Step 2: Sauvola B&W processing
+          const scannedBase64 = scannerProcess(sourceForScan);
+
+          // Step 3: OCR
+          showOcrOverlay(true, 'Reconnaissance du texte (OCR)...', 40);
           const ocrResult = await runOcr(scannedBase64);
 
           showOcrOverlay(false);
 
           capturedPages.push({ image: scannedBase64, ocr: ocrResult.text, ocrData: ocrResult });
           updatePhotoGrid();
-          const ocrMsg = ocrResult.text ? `Page ${capturedPages.length} scannee (${ocrResult.text.length} car.)` : `Page ${capturedPages.length} scannee`;
+          const detectMsg = croppedCanvas ? 'Cadrage auto + ' : '';
+          const ocrMsg = ocrResult.text
+            ? `${detectMsg}OCR ok (${ocrResult.text.length} car.)`
+            : `${detectMsg}Page scannee`;
           showToast(ocrMsg, 'success');
         };
         img.src = ev.target.result;
