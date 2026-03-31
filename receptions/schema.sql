@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS receptions_pages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES receptions_documents(id) ON DELETE CASCADE,
     page_num INTEGER NOT NULL DEFAULT 1,
-    photo_data TEXT NOT NULL,  -- base64 de la photo
+    photo_data TEXT NOT NULL,  -- base64 du scan (traite: contraste + binarisation)
+    texte_ocr TEXT,            -- texte extrait par OCR (Tesseract.js, langue: fra)
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(document_id, page_num)
 );
