@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Receptions">
+  <meta name="theme-color" content="#8b5cf6">
+  <title>Receptions - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚛</text></svg>">
+  <style>
+    :root {
+      --purple: #8b5cf6; --purple-light: #f5f3ff; --purple-dark: #7c3aed;
+      --orange: #f97316; --orange-light: #fff7ed;
+      --green: #22c55e; --green-bg: #f0fdf4; --green-dark: #16a34a;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --blue: #3b82f6; --blue-bg: #eff6ff;
+      --amber: #f59e0b; --amber-bg: #fffbeb;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px; --radius-lg: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* HEADER */
+    .header {
+      background: white; border-bottom: 2px solid var(--purple);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--purple); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-back:active { background: var(--gray-100); }
+
+    /* TABS */
+    .tabs-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      display: flex; padding: 0 8px; overflow-x: auto;
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 8px; border: none; background: none;
+      font-size: 0.85rem; font-weight: 500; color: var(--gray-400);
+      cursor: pointer; border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: all .2s;
+    }
+    .tab-btn.active { color: var(--purple); border-bottom-color: var(--purple); font-weight: 600; }
+    .tab-btn:active { background: var(--purple-light); }
+
+    /* SUB-TABS for factures/etiquettes sections */
+    .sub-tabs {
+      display: flex; gap: 6px; padding: 10px 16px;
+      background: white; border-bottom: 1px solid var(--gray-200);
+    }
+    .sub-tab {
+      padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--gray-200); background: white;
+      font-size: 0.8rem; color: var(--gray-500); cursor: pointer;
+    }
+    .sub-tab.active {
+      background: var(--purple); color: white; border-color: var(--purple);
+    }
+    .sub-tab:active { opacity: .8; }
+
+    /* DATE BAR */
+    .date-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 8px 16px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .date-nav-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: white; color: var(--purple); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .date-nav-btn:active { background: var(--purple-light); }
+    .date-display {
+      font-size: 1rem; font-weight: 600; color: var(--gray-800);
+      min-width: 200px; text-align: center;
+    }
+    .date-display .day-name { color: var(--purple); text-transform: capitalize; }
+    .btn-today {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-500); cursor: pointer;
+    }
+    .btn-today:active { background: var(--purple-light); }
+
+    /* CONTENT */
+    .content { flex: 1; padding: 12px 12px 100px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* CARD */
+    .card {
+      background: white; border-radius: var(--radius-lg); padding: 14px;
+      margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid var(--gray-200);
+    }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .card-title { font-weight: 600; font-size: 0.95rem; }
+    .card-meta { font-size: 0.75rem; color: var(--gray-400); }
+    .card-body { font-size: 0.85rem; color: var(--gray-600); }
+
+    /* BADGES */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-waiting { background: var(--amber-bg); color: var(--amber); }
+    .badge-valid { background: var(--green-bg); color: var(--green-dark); }
+    .badge-rejected { background: var(--red-bg); color: var(--red); }
+    .badge-facture { background: var(--blue-bg); color: var(--blue); }
+    .badge-etiquette { background: var(--purple-light); color: var(--purple); }
+
+    /* PHOTO THUMBNAILS */
+    .photo-thumbs {
+      display: flex; gap: 6px; margin-top: 8px; overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .photo-thumb {
+      width: 60px; height: 60px; border-radius: var(--radius-sm);
+      object-fit: cover; border: 1px solid var(--gray-200); cursor: pointer;
+      flex-shrink: 0;
+    }
+    .photo-thumb:active { opacity: .7; }
+    .photo-count {
+      font-size: 0.75rem; color: var(--gray-400); margin-top: 4px;
+    }
+
+    /* FORM */
+    .form-section { margin-bottom: 16px; }
+    .form-label {
+      font-size: 0.8rem; font-weight: 600; color: var(--gray-600);
+      margin-bottom: 6px; display: block;
+    }
+    .form-label.required::after { content: ' *'; color: var(--red); }
+    select, input[type="text"], textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); font-size: 0.9rem; background: white;
+      color: var(--gray-800); -webkit-appearance: none;
+    }
+    select:focus, input:focus, textarea:focus {
+      outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(139,92,246,.15);
+    }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* PHOTO CAPTURE */
+    .photo-capture-area {
+      border: 2px dashed var(--gray-300); border-radius: var(--radius-lg);
+      padding: 20px; text-align: center; background: var(--gray-50);
+      cursor: pointer; transition: all .2s;
+    }
+    .photo-capture-area:active { background: var(--purple-light); border-color: var(--purple); }
+    .photo-capture-area .icon { font-size: 2rem; margin-bottom: 6px; }
+    .photo-capture-area .label { font-size: 0.85rem; color: var(--gray-500); }
+    .photo-capture-area .count { font-size: 0.75rem; color: var(--purple); font-weight: 600; margin-top: 4px; }
+
+    /* PHOTO PREVIEW GRID */
+    .photo-grid {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    }
+    .photo-item {
+      position: relative; width: 80px; height: 80px;
+    }
+    .photo-item img {
+      width: 100%; height: 100%; border-radius: var(--radius-sm);
+      object-fit: cover; border: 1px solid var(--gray-200);
+    }
+    .photo-item .remove-btn {
+      position: absolute; top: -6px; right: -6px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--red); color: white; border: 2px solid white;
+      font-size: 0.7rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .photo-item .page-num {
+      position: absolute; bottom: 2px; left: 2px;
+      background: rgba(0,0,0,.6); color: white;
+      font-size: 0.65rem; padding: 1px 5px; border-radius: 4px;
+    }
+
+    /* BUTTONS */
+    .btn {
+      padding: 10px 18px; border-radius: var(--radius); border: none;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all .2s;
+    }
+    .btn:active { transform: scale(.96); }
+    .btn:disabled { opacity: .5; pointer-events: none; }
+    .btn-primary { background: var(--purple); color: white; }
+    .btn-primary:active { background: var(--purple-dark); }
+    .btn-success { background: var(--green); color: white; }
+    .btn-success:active { background: var(--green-dark); }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-outline {
+      background: white; color: var(--purple);
+      border: 1px solid var(--purple);
+    }
+    .btn-full { width: 100%; justify-content: center; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+    /* FAB */
+    .fab {
+      position: fixed; bottom: 24px; right: 16px;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--purple); color: white;
+      border: none; font-size: 1.5rem; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(139,92,246,.4);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    .fab:active { transform: scale(.9); background: var(--purple-dark); }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.4); z-index: 200;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white; border-radius: 16px 16px 0 0;
+      width: 100%; max-width: 500px; max-height: 90vh;
+      overflow-y: auto; padding: 0;
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-header {
+      padding: 16px; border-bottom: 1px solid var(--gray-200);
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; background: white; z-index: 1;
+    }
+    .modal-header h2 { font-size: 1.1rem; color: var(--gray-800); }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 50%; border: none;
+      background: var(--gray-100); font-size: 1.2rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-body { padding: 16px; }
+    .modal-footer {
+      padding: 12px 16px; border-top: 1px solid var(--gray-200);
+      display: flex; gap: 8px;
+    }
+
+    /* FULLSCREEN IMAGE VIEWER */
+    .viewer-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.9); z-index: 300;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    .viewer-overlay.show { display: flex; }
+    .viewer-overlay img {
+      max-width: 95%; max-height: 80vh; object-fit: contain;
+      border-radius: var(--radius);
+    }
+    .viewer-nav {
+      display: flex; gap: 16px; margin-top: 16px; align-items: center;
+    }
+    .viewer-nav button {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: none; background: rgba(255,255,255,.2); color: white;
+      font-size: 1.2rem; cursor: pointer;
+    }
+    .viewer-nav button:active { background: rgba(255,255,255,.4); }
+    .viewer-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: none; background: rgba(255,255,255,.2); color: white;
+      font-size: 1.3rem; cursor: pointer;
+    }
+    .viewer-page-info {
+      color: white; font-size: 0.9rem; font-weight: 600;
+    }
+
+    /* EMPTY STATE */
+    .empty {
+      text-align: center; padding: 40px 20px; color: var(--gray-400);
+    }
+    .empty .icon { font-size: 3rem; margin-bottom: 10px; }
+    .empty .text { font-size: 0.9rem; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      background: var(--gray-800); color: white; padding: 10px 20px;
+      border-radius: 20px; font-size: 0.85rem; z-index: 400;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    /* STAT CARDS */
+    .stats-row {
+      display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .stat-card {
+      flex: 1; min-width: 90px; background: white; border-radius: var(--radius);
+      padding: 10px; text-align: center; box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+    }
+    .stat-card .number { font-size: 1.4rem; font-weight: 700; }
+    .stat-card .label { font-size: 0.7rem; color: var(--gray-500); }
+    .stat-card.purple .number { color: var(--purple); }
+    .stat-card.green .number { color: var(--green); }
+    .stat-card.amber .number { color: var(--amber); }
+
+    /* HIDDEN */
+    .hidden { display: none !important; }
+    .hidden-input { position: absolute; left: -9999px; opacity: 0; }
+
+    /* LOGIN (fallback) */
+    .login-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 20px;
+    }
+    .login-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; color: var(--purple); }
+    .pin-dots { display: flex; gap: 10px; margin-bottom: 20px; }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--gray-300); background: white;
+    }
+    .pin-dot.filled { background: var(--purple); border-color: var(--purple); }
+    .pin-grid {
+      display: grid; grid-template-columns: repeat(3, 70px); gap: 10px;
+    }
+    .pin-btn {
+      height: 50px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+      background: white; font-size: 1.2rem; font-weight: 600; cursor: pointer;
+    }
+    .pin-btn:active { background: var(--purple-light); }
+    .login-error {
+      color: var(--red); font-size: 0.85rem; margin-top: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== LOGIN SCREEN (fallback) ====== -->
+<div id="login-screen" class="login-screen hidden">
+  <div class="login-title">🚛 Receptions</div>
+  <div class="pin-dots" id="pin-dots"></div>
+  <div class="pin-grid">
+    <button class="pin-btn" onclick="pinAdd('1')">1</button>
+    <button class="pin-btn" onclick="pinAdd('2')">2</button>
+    <button class="pin-btn" onclick="pinAdd('3')">3</button>
+    <button class="pin-btn" onclick="pinAdd('4')">4</button>
+    <button class="pin-btn" onclick="pinAdd('5')">5</button>
+    <button class="pin-btn" onclick="pinAdd('6')">6</button>
+    <button class="pin-btn" onclick="pinAdd('7')">7</button>
+    <button class="pin-btn" onclick="pinAdd('8')">8</button>
+    <button class="pin-btn" onclick="pinAdd('9')">9</button>
+    <button class="pin-btn" onclick="pinClear()">C</button>
+    <button class="pin-btn" onclick="pinAdd('0')">0</button>
+    <button class="pin-btn" onclick="pinDelete()">←</button>
+  </div>
+  <div class="login-error" id="login-error"></div>
+</div>
+
+<!-- ====== MAIN APP ====== -->
+<div id="app-screen" class="hidden" style="display:flex;flex-direction:column;min-height:100vh;">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <a class="btn-back" href="../">← Retour</a>
+      <h1>🚛 Receptions</h1>
+    </div>
+    <div class="header-right">
+      <span id="user-badge"></span>
+      <span id="etab-badge"></span>
+    </div>
+  </div>
+
+  <!-- MAIN TABS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="factures" onclick="switchMainTab('factures')">📄 Factures/BL</button>
+    <button class="tab-btn" data-tab="etiquettes" onclick="switchMainTab('etiquettes')">🏷️ Etiquettes</button>
+    <button class="tab-btn" data-tab="historique" onclick="switchMainTab('historique')">📊 Historique</button>
+  </div>
+
+  <!-- DATE BAR -->
+  <div class="date-bar">
+    <button class="date-nav-btn" onclick="changeDate(-1)">‹</button>
+    <div class="date-display" id="date-display"></div>
+    <button class="date-nav-btn" onclick="changeDate(1)">›</button>
+    <button class="btn-today" onclick="goToday()">Aujourd'hui</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- TAB: FACTURES/BL -->
+    <div class="tab-content active" id="tab-factures">
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-sub="all" onclick="filterDocs('factures','all')">Tous</button>
+        <button class="sub-tab" data-sub="en_attente" onclick="filterDocs('factures','en_attente')">En attente</button>
+        <button class="sub-tab" data-sub="valide" onclick="filterDocs('factures','valide')">Valides</button>
+      </div>
+      <div id="factures-list"></div>
+    </div>
+
+    <!-- TAB: ETIQUETTES -->
+    <div class="tab-content" id="tab-etiquettes">
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-sub="all" onclick="filterDocs('etiquettes','all')">Tous</button>
+        <button class="sub-tab" data-sub="en_attente" onclick="filterDocs('etiquettes','en_attente')">En attente</button>
+        <button class="sub-tab" data-sub="valide" onclick="filterDocs('etiquettes','valide')">Valides</button>
+      </div>
+      <div id="etiquettes-list"></div>
+    </div>
+
+    <!-- TAB: HISTORIQUE -->
+    <div class="tab-content" id="tab-historique">
+      <div id="stats-container"></div>
+      <div id="historique-list"></div>
+    </div>
+
+  </div>
+
+  <!-- FAB: New Document -->
+  <button class="fab" id="fab-add" onclick="openNewDocModal()">+</button>
+
+</div>
+
+<!-- ====== MODAL: NEW DOCUMENT ====== -->
+<div class="modal-overlay" id="modal-new">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-new-title">Nouveau document</h2>
+      <button class="modal-close" onclick="closeModal('modal-new')">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Type -->
+      <div class="form-section">
+        <label class="form-label required">Type de document</label>
+        <select id="form-type" onchange="onTypeChange()">
+          <option value="facture">📄 Facture / Bon de livraison</option>
+          <option value="etiquette">🏷️ Etiquette produit</option>
+        </select>
+      </div>
+
+      <!-- Fournisseur -->
+      <div class="form-section">
+        <label class="form-label required">Fournisseur</label>
+        <select id="form-fournisseur">
+          <option value="">-- Choisir un fournisseur --</option>
+        </select>
+      </div>
+
+      <!-- Référence (factures only) -->
+      <div class="form-section" id="form-ref-section">
+        <label class="form-label">Numero facture / BL</label>
+        <input type="text" id="form-reference" placeholder="Ex: FA-2026-0042">
+      </div>
+
+      <!-- Lien commande (factures only) -->
+      <div class="form-section" id="form-commande-section">
+        <label class="form-label">Rattacher a une commande</label>
+        <select id="form-commande">
+          <option value="">-- Aucune --</option>
+        </select>
+      </div>
+
+      <!-- Photos -->
+      <div class="form-section">
+        <label class="form-label required">Photos du document</label>
+        <div class="photo-capture-area" onclick="triggerCamera()">
+          <div class="icon">📷</div>
+          <div class="label">Appuyer pour scanner</div>
+          <div class="count" id="photo-count">0 page(s)</div>
+        </div>
+        <div class="photo-grid" id="photo-grid"></div>
+      </div>
+
+      <!-- Observation -->
+      <div class="form-section">
+        <label class="form-label">Observation</label>
+        <textarea id="form-observation" placeholder="Notes, remarques..."></textarea>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-new')" style="flex:1;">Annuler</button>
+      <button class="btn btn-primary" onclick="submitDocument()" id="btn-submit" style="flex:2;">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL: VIEW DOCUMENT ====== -->
+<div class="modal-overlay" id="modal-view">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-view-title">Document</h2>
+      <button class="modal-close" onclick="closeModal('modal-view')">×</button>
+    </div>
+    <div class="modal-body" id="modal-view-body"></div>
+    <div class="modal-footer" id="modal-view-footer"></div>
+  </div>
+</div>
+
+<!-- ====== FULLSCREEN IMAGE VIEWER ====== -->
+<div class="viewer-overlay" id="viewer">
+  <button class="viewer-close" onclick="closeViewer()">×</button>
+  <img id="viewer-img" src="" alt="Document">
+  <div class="viewer-nav">
+    <button onclick="viewerNav(-1)">‹</button>
+    <span class="viewer-page-info" id="viewer-info">1 / 1</span>
+    <button onclick="viewerNav(1)">›</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- Hidden file input for camera -->
+<input type="file" id="camera-input" class="hidden-input" accept="image/*" capture="environment">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
+<script>
+  // ====== CONFIG ======
+  const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+  const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+
+  // ====== STATE ======
+  let currentUser = null;
+  let currentEtablissement = null;
+  let supabaseClient = null;
+  let filterDate = new Date();
+  let currentMainTab = 'factures';
+  let currentSubFilter = { factures: 'all', etiquettes: 'all' };
+  let fournisseurs = [];
+  let commandes = [];
+  let documents = [];
+  let capturedPages = []; // array of base64 strings for new document
+  let viewerPages = [];
+  let viewerIndex = 0;
+
+  // ====== UTILITIES ======
+  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function dateStr(d) { return d.toISOString().split('T')[0]; }
+  function formatDateDisplay(d) {
+    const str = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const parts = str.split(' ');
+    return `<span class="day-name">${parts[0]}</span> ${parts.slice(1).join(' ')}`;
+  }
+  function formatDateShort(d) {
+    return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+  }
+  function formatTime(d) {
+    return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+  function userRole() { return ROLE_HIERARCHY[currentUser?.role] || 0; }
+  function isManager() { return userRole() >= 3; }
+  function isToday(d) { return dateStr(d) === dateStr(new Date()); }
+
+  // ====== SUPABASE ======
+  function initSupabase() {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+  }
+
+  const DB = {
+    // Fournisseurs (from appro module)
+    async getFournisseurs(etab) {
+      const { data } = await supabaseClient.from('appro_fournisseurs').select('id, nom')
+        .or(`etablissement.eq.${etab},etablissement.is.null`)
+        .eq('actif', true).order('nom');
+      return data || [];
+    },
+
+    // Commandes (from appro module, for linking)
+    async getCommandes(etab) {
+      const { data } = await supabaseClient.from('appro_commandes').select('id, fournisseur_nom, date_creation, statut')
+        .eq('etablissement', etab)
+        .in('statut', ['envoyee', 'validee'])
+        .order('date_creation', { ascending: false })
+        .limit(50);
+      return data || [];
+    },
+
+    // Documents
+    async getDocuments(etab, date, type) {
+      let query = supabaseClient.from('receptions_documents').select('*')
+        .eq('etablissement', etab).eq('date', date);
+      if (type) query = query.eq('type', type);
+      const { data } = await query.order('created_at', { ascending: false });
+      return data || [];
+    },
+
+    async getDocumentsRange(etab, dateFrom, dateTo) {
+      const { data } = await supabaseClient.from('receptions_documents').select('*')
+        .eq('etablissement', etab)
+        .gte('date', dateFrom).lte('date', dateTo)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+
+    async getPages(documentId) {
+      const { data } = await supabaseClient.from('receptions_pages').select('*')
+        .eq('document_id', documentId)
+        .order('page_num');
+      return data || [];
+    },
+
+    async insertDocument(doc) {
+      const { data, error } = await supabaseClient.from('receptions_documents')
+        .insert(doc).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+
+    async insertPages(pages) {
+      const { error } = await supabaseClient.from('receptions_pages').insert(pages);
+      if (error) throw error;
+    },
+
+    async updateDocument(id, updates) {
+      const { error } = await supabaseClient.from('receptions_documents')
+        .update(updates).eq('id', id);
+      if (error) throw error;
+    },
+
+    async getStats(etab, dateFrom, dateTo) {
+      const { data } = await supabaseClient.from('receptions_documents')
+        .select('type, statut')
+        .eq('etablissement', etab)
+        .gte('date', dateFrom).lte('date', dateTo);
+      return data || [];
+    }
+  };
+
+  // ====== SESSION ======
+  function checkPortalSession() {
+    const user = sessionStorage.getItem('planb_user');
+    const etablissement = sessionStorage.getItem('planb_etablissement');
+    return user && etablissement ? { user: JSON.parse(user), etablissement } : null;
+  }
+
+  function goBackToPortal() { window.location.href = '../'; }
+
+  // ====== LOGIN FALLBACK ======
+  let pinCode = '';
+  function renderPinDots() {
+    const c = document.getElementById('pin-dots');
+    if (!c) return;
+    c.innerHTML = Array.from({ length: 6 }, (_, i) =>
+      `<div class="pin-dot ${i < pinCode.length ? 'filled' : ''}"></div>`
+    ).join('');
+  }
+  function pinAdd(n) {
+    if (pinCode.length >= 6) return;
+    pinCode += n;
+    renderPinDots();
+    if (pinCode.length >= 4) attemptLogin();
+  }
+  function pinDelete() { pinCode = pinCode.slice(0, -1); renderPinDots(); }
+  function pinClear() { pinCode = ''; renderPinDots(); }
+
+  async function attemptLogin() {
+    try {
+      const { data } = await supabaseClient.from('users').select('*')
+        .eq('code', pinCode).eq('actif', true);
+      if (!data?.length) {
+        if (pinCode.length >= 6) {
+          document.getElementById('login-error').textContent = 'Code incorrect';
+          document.getElementById('login-error').style.display = 'block';
+          pinClear();
+        }
+        return;
+      }
+      const u = data[0];
+      currentUser = {
+        id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
+        equipe: u.equipe || 'cuisine',
+        etablissements: u.acces_etablissements?.length > 0
+          ? u.acces_etablissements : [u.etablissement]
+      };
+      if (currentUser.etablissements.length === 1) {
+        currentEtablissement = currentUser.etablissements[0];
+        showApp();
+      }
+    } catch (e) {
+      console.error('Login error:', e);
+    }
+  }
+
+  // ====== DATE NAVIGATION ======
+  function changeDate(delta) {
+    filterDate.setDate(filterDate.getDate() + delta);
+    updateDateDisplay();
+    loadDocuments();
+  }
+  function goToday() {
+    filterDate = new Date();
+    updateDateDisplay();
+    loadDocuments();
+  }
+  function updateDateDisplay() {
+    document.getElementById('date-display').innerHTML = formatDateDisplay(filterDate);
+  }
+
+  // ====== TAB NAVIGATION ======
+  function switchMainTab(tab) {
+    currentMainTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab)
+    );
+    document.querySelectorAll('.tab-content').forEach(c =>
+      c.classList.toggle('active', c.id === `tab-${tab}`)
+    );
+    // Show/hide FAB on historique tab
+    document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique');
+
+    if (tab === 'historique') {
+      loadHistorique();
+    } else {
+      renderDocuments();
+    }
+  }
+
+  function filterDocs(tabType, filter) {
+    currentSubFilter[tabType] = filter;
+    // Update sub-tab buttons
+    const container = document.getElementById(`tab-${tabType}`);
+    container.querySelectorAll('.sub-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.sub === filter)
+    );
+    renderDocuments();
+  }
+
+  // ====== LOAD DATA ======
+  async function loadFournisseurs() {
+    try {
+      fournisseurs = await DB.getFournisseurs(currentEtablissement);
+      const sel = document.getElementById('form-fournisseur');
+      sel.innerHTML = '<option value="">-- Choisir un fournisseur --</option>';
+      fournisseurs.forEach(f => {
+        sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`;
+      });
+    } catch (e) {
+      console.error('Erreur chargement fournisseurs:', e);
+    }
+  }
+
+  async function loadCommandes() {
+    try {
+      commandes = await DB.getCommandes(currentEtablissement);
+      const sel = document.getElementById('form-commande');
+      sel.innerHTML = '<option value="">-- Aucune --</option>';
+      commandes.forEach(c => {
+        const dt = formatDateShort(c.date_creation);
+        sel.innerHTML += `<option value="${c.id}">${esc(c.fournisseur_nom)} - ${dt} (${c.statut})</option>`;
+      });
+    } catch (e) {
+      console.error('Erreur chargement commandes:', e);
+    }
+  }
+
+  async function loadDocuments() {
+    try {
+      documents = await DB.getDocuments(currentEtablissement, dateStr(filterDate));
+      renderDocuments();
+    } catch (e) {
+      console.error('Erreur chargement documents:', e);
+      showToast('Erreur de chargement', 'error');
+    }
+  }
+
+  // ====== RENDER DOCUMENTS ======
+  function renderDocuments() {
+    renderDocList('factures', 'facture');
+    renderDocList('etiquettes', 'etiquette');
+  }
+
+  function renderDocList(tabType, docType) {
+    const container = document.getElementById(`${tabType}-list`);
+    const filter = currentSubFilter[tabType];
+    let docs = documents.filter(d => d.type === docType);
+    if (filter !== 'all') {
+      docs = docs.filter(d => d.statut === filter);
+    }
+
+    if (!docs.length) {
+      const emptyIcon = docType === 'facture' ? '📄' : '🏷️';
+      const emptyText = docType === 'facture' ? 'Aucune facture/BL ce jour' : 'Aucune etiquette ce jour';
+      container.innerHTML = `<div class="empty"><div class="icon">${emptyIcon}</div><div class="text">${emptyText}</div></div>`;
+      return;
+    }
+
+    container.innerHTML = docs.map(d => renderDocCard(d)).join('');
+  }
+
+  function renderDocCard(doc) {
+    const statusBadge = {
+      en_attente: '<span class="badge badge-waiting">En attente</span>',
+      valide: '<span class="badge badge-valid">Valide</span>',
+      rejete: '<span class="badge badge-rejected">Rejete</span>'
+    }[doc.statut] || '';
+
+    const typeBadge = doc.type === 'facture'
+      ? '<span class="badge badge-facture">Facture/BL</span>'
+      : '<span class="badge badge-etiquette">Etiquette</span>';
+
+    const ref = doc.reference ? `<div style="font-size:.8rem;color:var(--gray-500);">Ref: ${esc(doc.reference)}</div>` : '';
+    const obs = doc.observation ? `<div style="font-size:.8rem;color:var(--gray-500);margin-top:4px;">${esc(doc.observation)}</div>` : '';
+    const pages = doc.nb_pages > 0 ? `<span style="font-size:.75rem;color:var(--gray-400);">📷 ${doc.nb_pages} page(s)</span>` : '';
+
+    return `
+      <div class="card" onclick="viewDocument('${doc.id}')">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${esc(doc.fournisseur_nom)}</div>
+            ${ref}
+          </div>
+          <div style="text-align:right;">
+            ${typeBadge}
+            ${statusBadge}
+          </div>
+        </div>
+        <div class="card-body">
+          ${obs}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+            ${pages}
+            <span class="card-meta">${esc(doc.user_initiales || doc.user_nom)} - ${formatTime(doc.created_at)}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ====== NEW DOCUMENT ======
+  function openNewDocModal() {
+    // Set type based on current tab
+    const typeSelect = document.getElementById('form-type');
+    typeSelect.value = currentMainTab === 'etiquettes' ? 'etiquette' : 'facture';
+    onTypeChange();
+
+    // Reset form
+    document.getElementById('form-fournisseur').value = '';
+    document.getElementById('form-reference').value = '';
+    document.getElementById('form-commande').value = '';
+    document.getElementById('form-observation').value = '';
+    capturedPages = [];
+    updatePhotoGrid();
+
+    // Load fresh commandes
+    loadCommandes();
+
+    document.getElementById('modal-new').classList.add('show');
+  }
+
+  function onTypeChange() {
+    const type = document.getElementById('form-type').value;
+    const isFacture = type === 'facture';
+    document.getElementById('form-ref-section').classList.toggle('hidden', !isFacture);
+    document.getElementById('form-commande-section').classList.toggle('hidden', !isFacture);
+    document.getElementById('modal-new-title').textContent =
+      isFacture ? 'Nouvelle facture / BL' : 'Nouvelle etiquette';
+  }
+
+  // ====== CAMERA / PHOTO ======
+  function triggerCamera() {
+    const input = document.getElementById('camera-input');
+    input.value = '';
+    input.click();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('camera-input')?.addEventListener('change', function(e) {
+      if (!this.files?.length) return;
+      const file = this.files[0];
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxSize = 1200; // higher res for documents
+          let w = img.width, h = img.height;
+          if (w > maxSize || h > maxSize) {
+            if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+            else { w = Math.round(w * maxSize / h); h = maxSize; }
+          }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const base64 = canvas.toDataURL('image/jpeg', 0.7);
+          capturedPages.push(base64);
+          updatePhotoGrid();
+          showToast(`Page ${capturedPages.length} capturee`, 'success');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  function updatePhotoGrid() {
+    document.getElementById('photo-count').textContent = `${capturedPages.length} page(s)`;
+    const grid = document.getElementById('photo-grid');
+    grid.innerHTML = capturedPages.map((p, i) => `
+      <div class="photo-item">
+        <img src="${p}" alt="Page ${i + 1}" onclick="previewPage(${i})">
+        <button class="remove-btn" onclick="event.stopPropagation();removePage(${i})">×</button>
+        <span class="page-num">p.${i + 1}</span>
+      </div>
+    `).join('');
+  }
+
+  function removePage(index) {
+    capturedPages.splice(index, 1);
+    updatePhotoGrid();
+  }
+
+  function previewPage(index) {
+    viewerPages = capturedPages;
+    viewerIndex = index;
+    showViewer();
+  }
+
+  // ====== SUBMIT DOCUMENT ======
+  async function submitDocument() {
+    const type = document.getElementById('form-type').value;
+    const fournisseurId = document.getElementById('form-fournisseur').value;
+    const reference = document.getElementById('form-reference').value.trim();
+    const commandeId = document.getElementById('form-commande').value;
+    const observation = document.getElementById('form-observation').value.trim();
+
+    // Validation
+    if (!fournisseurId) { showToast('Selectionnez un fournisseur', 'error'); return; }
+    if (!capturedPages.length) { showToast('Prenez au moins une photo', 'error'); return; }
+
+    const fournisseur = fournisseurs.find(f => f.id === fournisseurId);
+    if (!fournisseur) { showToast('Fournisseur invalide', 'error'); return; }
+
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    btn.textContent = 'Enregistrement...';
+
+    try {
+      // Insert document
+      const doc = await DB.insertDocument({
+        type,
+        fournisseur_id: fournisseurId,
+        fournisseur_nom: fournisseur.nom,
+        date: dateStr(filterDate),
+        reference: type === 'facture' ? reference || null : null,
+        commande_id: type === 'facture' && commandeId ? commandeId : null,
+        statut: 'en_attente',
+        observation: observation || null,
+        nb_pages: capturedPages.length,
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+
+      // Insert pages
+      if (doc && capturedPages.length) {
+        const pages = capturedPages.map((photo, i) => ({
+          document_id: doc.id,
+          page_num: i + 1,
+          photo_data: photo
+        }));
+        await DB.insertPages(pages);
+      }
+
+      showToast('Document enregistre !', 'success');
+      closeModal('modal-new');
+      loadDocuments();
+    } catch (e) {
+      console.error('Erreur enregistrement:', e);
+      showToast('Erreur d\'enregistrement', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Enregistrer';
+    }
+  }
+
+  // ====== VIEW DOCUMENT ======
+  async function viewDocument(docId) {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc) return;
+
+    document.getElementById('modal-view-title').textContent =
+      doc.type === 'facture' ? `Facture/BL - ${esc(doc.fournisseur_nom)}` : `Etiquette - ${esc(doc.fournisseur_nom)}`;
+
+    // Load pages
+    let pages = [];
+    try {
+      pages = await DB.getPages(docId);
+    } catch (e) {
+      console.error('Erreur chargement pages:', e);
+    }
+
+    const statusLabel = {
+      en_attente: '🟡 En attente de validation',
+      valide: '✅ Valide',
+      rejete: '❌ Rejete'
+    }[doc.statut] || doc.statut;
+
+    let body = `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Fournisseur</div>
+        <div style="font-weight:600;">${esc(doc.fournisseur_nom)}</div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Date</div>
+          <div>${new Date(doc.date).toLocaleDateString('fr-FR')}</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Statut</div>
+          <div>${statusLabel}</div>
+        </div>
+      </div>`;
+
+    if (doc.reference) {
+      body += `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Reference</div>
+          <div>${esc(doc.reference)}</div>
+        </div>`;
+    }
+
+    if (doc.commande_id) {
+      const cmd = commandes.find(c => c.id === doc.commande_id);
+      body += `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Commande rattachee</div>
+          <div>${cmd ? esc(cmd.fournisseur_nom) + ' - ' + formatDateShort(cmd.date_creation) : doc.commande_id}</div>
+        </div>`;
+    }
+
+    if (doc.observation) {
+      body += `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Observation</div>
+          <div>${esc(doc.observation)}</div>
+        </div>`;
+    }
+
+    body += `
+      <div style="margin-bottom:8px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Scanne par</div>
+        <div>${esc(doc.user_nom)} (${esc(doc.user_initiales || '')}) - ${formatTime(doc.created_at)}</div>
+      </div>`;
+
+    if (doc.valide_par_nom) {
+      body += `
+        <div style="margin-bottom:8px;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">${doc.statut === 'valide' ? 'Valide' : 'Rejete'} par</div>
+          <div>${esc(doc.valide_par_nom)} - ${formatTime(doc.date_validation)}</div>
+        </div>`;
+    }
+
+    // Photos
+    if (pages.length) {
+      body += `
+        <div style="margin-top:12px;">
+          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">Pages (${pages.length})</div>
+          <div class="photo-thumbs">
+            ${pages.map((p, i) => `
+              <img class="photo-thumb" src="${p.photo_data}" alt="Page ${i+1}"
+                   onclick="event.stopPropagation();openViewerFromDoc('${docId}', ${i})">
+            `).join('')}
+          </div>
+        </div>`;
+    }
+
+    document.getElementById('modal-view-body').innerHTML = body;
+
+    // Footer: validation buttons for managers
+    let footer = '';
+    if (isManager() && doc.statut === 'en_attente') {
+      footer = `
+        <button class="btn btn-danger btn-sm" onclick="validateDocument('${doc.id}','rejete')" style="flex:1;">Rejeter</button>
+        <button class="btn btn-success btn-sm" onclick="validateDocument('${doc.id}','valide')" style="flex:2;">Valider</button>`;
+    } else if (doc.statut === 'en_attente') {
+      footer = `<div style="width:100%;text-align:center;font-size:.8rem;color:var(--gray-400);">En attente de validation par un manager</div>`;
+    }
+    document.getElementById('modal-view-footer').innerHTML = footer;
+
+    document.getElementById('modal-view').classList.add('show');
+  }
+
+  // Store pages for viewer from doc view
+  let docPagesCache = {};
+  async function openViewerFromDoc(docId, pageIndex) {
+    if (!docPagesCache[docId]) {
+      docPagesCache[docId] = await DB.getPages(docId);
+    }
+    viewerPages = docPagesCache[docId].map(p => p.photo_data);
+    viewerIndex = pageIndex;
+    showViewer();
+  }
+
+  // ====== VALIDATE DOCUMENT ======
+  async function validateDocument(docId, newStatut) {
+    try {
+      await DB.updateDocument(docId, {
+        statut: newStatut,
+        valide_par_id: currentUser.id,
+        valide_par_nom: currentUser.nom,
+        date_validation: new Date().toISOString()
+      });
+      showToast(newStatut === 'valide' ? 'Document valide !' : 'Document rejete', newStatut === 'valide' ? 'success' : 'error');
+      closeModal('modal-view');
+      loadDocuments();
+    } catch (e) {
+      console.error('Erreur validation:', e);
+      showToast('Erreur de validation', 'error');
+    }
+  }
+
+  // ====== HISTORIQUE ======
+  async function loadHistorique() {
+    const dateTo = dateStr(new Date());
+    const dateFrom = dateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // last 30 days
+
+    try {
+      const stats = await DB.getStats(currentEtablissement, dateFrom, dateTo);
+      const allDocs = await DB.getDocumentsRange(currentEtablissement, dateFrom, dateTo);
+
+      // Stats
+      const totalFactures = stats.filter(s => s.type === 'facture').length;
+      const totalEtiquettes = stats.filter(s => s.type === 'etiquette').length;
+      const enAttente = stats.filter(s => s.statut === 'en_attente').length;
+
+      document.getElementById('stats-container').innerHTML = `
+        <div class="stats-row">
+          <div class="stat-card purple">
+            <div class="number">${totalFactures}</div>
+            <div class="label">Factures/BL</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="number">${totalEtiquettes}</div>
+            <div class="label">Etiquettes</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="number">${enAttente}</div>
+            <div class="label">En attente</div>
+          </div>
+        </div>
+        <div style="font-size:.8rem;color:var(--gray-400);margin-bottom:12px;text-align:center;">30 derniers jours</div>
+      `;
+
+      // Group docs by date
+      const grouped = {};
+      allDocs.forEach(d => {
+        const key = d.date;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(d);
+      });
+
+      let html = '';
+      Object.keys(grouped).sort().reverse().forEach(date => {
+        const dateLabel = new Date(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+        html += `<div style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin:12px 0 6px;text-transform:capitalize;">${dateLabel} (${grouped[date].length})</div>`;
+        grouped[date].forEach(d => {
+          html += renderDocCard(d);
+        });
+      });
+
+      if (!html) {
+        html = '<div class="empty"><div class="icon">📊</div><div class="text">Aucun document sur les 30 derniers jours</div></div>';
+      }
+
+      document.getElementById('historique-list').innerHTML = html;
+    } catch (e) {
+      console.error('Erreur historique:', e);
+    }
+  }
+
+  // ====== IMAGE VIEWER ======
+  function showViewer() {
+    if (!viewerPages.length) return;
+    document.getElementById('viewer-img').src = viewerPages[viewerIndex];
+    document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
+    document.getElementById('viewer').classList.add('show');
+  }
+
+  function closeViewer() {
+    document.getElementById('viewer').classList.remove('show');
+  }
+
+  function viewerNav(delta) {
+    viewerIndex = (viewerIndex + delta + viewerPages.length) % viewerPages.length;
+    document.getElementById('viewer-img').src = viewerPages[viewerIndex];
+    document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
+  }
+
+  // ====== MODALS ======
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+    // Clear cache
+    if (id === 'modal-view') docPagesCache = {};
+  }
+
+  // Close on overlay click
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('show')) {
+      e.target.classList.remove('show');
+    }
+  });
+
+  // ====== TOAST ======
+  let toastTimeout;
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ====== SHOW APP ======
+  function showApp() {
+    document.getElementById('login-screen').classList.add('hidden');
+    const app = document.getElementById('app-screen');
+    app.classList.remove('hidden');
+    app.style.display = 'flex';
+
+    document.getElementById('user-badge').textContent = currentUser.initiales || currentUser.nom;
+    const etabName = currentEtablissement === 'freddy' ? 'Freddy' :
+                     currentEtablissement === 'liesel' ? 'Liesel' : currentEtablissement;
+    document.getElementById('etab-badge').textContent = etabName;
+
+    updateDateDisplay();
+    loadFournisseurs();
+    loadCommandes();
+    loadDocuments();
+  }
+
+  // ====== INIT ======
+  document.addEventListener('DOMContentLoaded', () => {
+    initSupabase();
+
+    const session = checkPortalSession();
+    if (session) {
+      currentUser = session.user;
+      currentEtablissement = session.etablissement;
+      showApp();
+    } else if (supabaseClient) {
+      // Show fallback login
+      document.getElementById('login-screen').classList.remove('hidden');
+      renderPinDots();
+    }
+  });
+</script>
+</body>
+</html>
