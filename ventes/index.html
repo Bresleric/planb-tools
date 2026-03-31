@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ventes">
+  <meta name="theme-color" content="#10b981">
+  <title>Ventes - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <style>
+    :root {
+      --accent: #10b981; --accent-light: #ecfdf5; --accent-dark: #059669;
+      --green: #22c55e; --green-bg: #f0fdf4;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --blue: #3b82f6; --blue-bg: #eff6ff;
+      --orange: #f97316; --orange-bg: #fff7ed;
+      --purple: #8b5cf6; --purple-bg: #f5f3ff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* ====== HEADER ====== */
+    .header {
+      background: white; border-bottom: 2px solid var(--accent);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back, .btn-logout {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-back:active, .btn-logout:active { background: var(--gray-100); }
+
+    /* ====== TABS ====== */
+    .tabs-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      display: flex; padding: 0 16px; overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 10px 16px; border: none; background: none;
+      font-size: 0.85rem; color: var(--gray-400); cursor: pointer;
+      border-bottom: 2px solid transparent; font-weight: 500;
+      white-space: nowrap;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab-btn:active { background: var(--gray-50); }
+
+    /* ====== CONTENT ====== */
+    .content { flex: 1; overflow-y: auto; padding: 8px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ====== CARDS ====== */
+    .card {
+      background: white; border-radius: var(--radius); padding: 14px;
+      box-shadow: var(--shadow); margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-400); font-weight: 600; margin-bottom: 8px;
+    }
+
+    /* ====== KPI GRID ====== */
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+      margin-bottom: 10px;
+    }
+    .kpi-card {
+      background: white; border-radius: var(--radius); padding: 12px;
+      box-shadow: var(--shadow); text-align: center;
+    }
+    .kpi-value { font-size: 1.4rem; font-weight: 700; }
+    .kpi-label { font-size: 0.68rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+    .kpi-sub { font-size: 0.72rem; color: var(--gray-500); margin-top: 4px; }
+    .kpi-trend { font-size: 0.72rem; font-weight: 600; margin-top: 2px; }
+    .kpi-trend.up { color: #16a34a; }
+    .kpi-trend.down { color: #dc2626; }
+
+    /* ====== FORM ====== */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.78rem; color: var(--gray-600); font-weight: 600; margin-bottom: 4px; }
+    .form-input, .form-select {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.9rem; background: white;
+    }
+    .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(16,185,129,0.15); }
+    .form-row { display: flex; gap: 8px; }
+    .form-row .form-group { flex: 1; }
+
+    .btn-submit {
+      width: 100%; padding: 12px; border: none; border-radius: var(--radius);
+      background: var(--accent); color: white; font-weight: 600; font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .btn-submit:active { background: var(--accent-dark); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      padding: 8px 16px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      background: white; color: var(--gray-600); font-size: 0.82rem; cursor: pointer; font-weight: 500;
+    }
+    .btn-secondary:active { background: var(--gray-100); }
+
+    /* ====== CHIP / FILTERS ====== */
+    .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      padding: 5px 12px; border-radius: 16px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.78rem; cursor: pointer; font-weight: 500;
+    }
+    .chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .chip:active { transform: scale(0.95); }
+
+    /* ====== DATE NAV ====== */
+    .date-nav {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      padding: 10px; background: white; border-bottom: 1px solid var(--gray-200);
+    }
+    .date-nav button {
+      width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: white; font-size: 1rem; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .date-nav button:active { background: var(--gray-100); }
+    .date-nav .date-display {
+      font-size: 0.92rem; font-weight: 600; color: var(--gray-800);
+      min-width: 180px; text-align: center;
+    }
+    .date-nav input[type="date"] {
+      border: none; background: none; font-size: 0.92rem; font-weight: 600;
+      color: var(--accent); cursor: pointer; text-align: center;
+    }
+
+    /* ====== TABLE ====== */
+    .data-table {
+      width: 100%; border-collapse: collapse; font-size: 0.82rem;
+      background: white; border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .data-table th {
+      background: var(--gray-50); padding: 8px 10px; text-align: left;
+      font-size: 0.68rem; text-transform: uppercase; color: var(--gray-500);
+      border-bottom: 2px solid var(--gray-200); font-weight: 600;
+    }
+    .data-table td { padding: 8px 10px; border-bottom: 1px solid var(--gray-100); }
+    .data-table tr:hover { background: var(--accent-light); }
+    .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ====== UPLOAD ZONE ====== */
+    .upload-zone {
+      border: 2px dashed var(--gray-300); border-radius: var(--radius);
+      padding: 30px; text-align: center; cursor: pointer;
+      transition: all .2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent); background: var(--accent-light);
+    }
+    .upload-zone .icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .upload-zone .text { font-size: 0.9rem; color: var(--gray-600); }
+    .upload-zone .sub { font-size: 0.75rem; color: var(--gray-400); margin-top: 4px; }
+
+    /* ====== PREVIEW TABLE ====== */
+    .preview-container {
+      max-height: 300px; overflow: auto; margin: 10px 0;
+      border: 1px solid var(--gray-200); border-radius: var(--radius);
+    }
+
+    /* ====== CHART PLACEHOLDER ====== */
+    .chart-container {
+      background: white; border-radius: var(--radius); padding: 14px;
+      box-shadow: var(--shadow); margin-bottom: 8px;
+    }
+    .bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 10px; }
+    .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .bar {
+      width: 100%; border-radius: 3px 3px 0 0; min-height: 2px;
+      transition: height .3s;
+    }
+    .bar.midi { background: var(--accent); }
+    .bar.soir { background: var(--blue); }
+    .bar-label { font-size: 0.6rem; color: var(--gray-400); text-align: center; }
+    .bar-value { font-size: 0.58rem; color: var(--gray-500); font-weight: 600; }
+
+    .chart-legend {
+      display: flex; gap: 16px; justify-content: center; margin-top: 8px;
+      font-size: 0.7rem; color: var(--gray-500);
+    }
+    .legend-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 4px; vertical-align: middle;
+    }
+
+    /* ====== HISTORIQUE ====== */
+    .history-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .history-date { min-width: 65px; font-weight: 600; font-size: 0.82rem; }
+    .history-values { flex: 1; display: flex; gap: 12px; font-size: 0.8rem; }
+    .history-val { display: flex; flex-direction: column; align-items: center; }
+    .history-val .num { font-weight: 700; font-size: 0.9rem; }
+    .history-val .lbl { font-size: 0.6rem; color: var(--gray-400); text-transform: uppercase; }
+
+    /* ====== EMPTY STATE ====== */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--gray-400); }
+    .empty-state .emoji { font-size: 3rem; margin-bottom: 10px; }
+    .empty-state h3 { font-size: 1rem; color: var(--gray-600); margin-bottom: 6px; }
+    .empty-state p { font-size: 0.82rem; }
+
+    /* ====== TOAST ====== */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 500;
+      z-index: 1000; opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.success { background: #065f46; color: white; }
+    .toast.error { background: #991b1b; color: white; }
+    .toast.show { opacity: 1; }
+
+    /* ====== LOADING ====== */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500; opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .loading-overlay.active { opacity: 1; pointer-events: all; }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--gray-200);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ====== MAPPING MODAL ====== */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; display: none;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: white; border-radius: 12px; width: 92%; max-width: 500px;
+      max-height: 80vh; overflow-y: auto; padding: 20px;
+    }
+    .modal h2 { font-size: 1rem; margin-bottom: 12px; color: var(--gray-800); }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .modal-actions button { flex: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <a class="btn-back" href="../index.html">← Retour</a>
+      <h1>💰 Ventes</h1>
+    </div>
+    <div class="header-right">
+      <span id="user-info"></span>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" data-tab="saisie" onclick="switchTab('saisie')">✏️ Saisie</button>
+    <button class="tab-btn" data-tab="import" onclick="switchTab('import')">📥 Import CSV</button>
+    <button class="tab-btn" data-tab="produits" onclick="switchTab('produits')">🍽️ Produits</button>
+    <button class="tab-btn" data-tab="historique" onclick="switchTab('historique')">📋 Historique</button>
+  </div>
+
+  <!-- DATE NAV -->
+  <div class="date-nav">
+    <button onclick="changeDate(-7)" title="-7 jours">⏪</button>
+    <button onclick="changeDate(-1)" title="Jour précédent">◀</button>
+    <input type="date" id="nav-date" onchange="setDate(this.value)">
+    <button onclick="changeDate(1)" title="Jour suivant">▶</button>
+    <button onclick="setToday()" title="Aujourd'hui" style="font-size:0.72rem; font-weight:600; color:var(--accent);">Auj.</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- TAB: DASHBOARD -->
+    <div class="tab-content active" id="tab-dashboard">
+      <!-- KPIs today -->
+      <div class="kpi-grid" id="kpi-today"></div>
+
+      <!-- Chart 7 jours -->
+      <div class="chart-container">
+        <div class="card-title">CA des 7 derniers jours</div>
+        <div class="bar-chart" id="chart-7days"></div>
+        <div class="chart-legend">
+          <span><span class="legend-dot" style="background:var(--accent)"></span>Midi</span>
+          <span><span class="legend-dot" style="background:var(--blue)"></span>Soir</span>
+        </div>
+      </div>
+
+      <!-- Cumul période -->
+      <div class="card">
+        <div class="card-title">Cumul du mois</div>
+        <div class="kpi-grid" id="kpi-month" style="margin-bottom:0"></div>
+      </div>
+    </div>
+
+    <!-- TAB: SAISIE MANUELLE -->
+    <div class="tab-content" id="tab-saisie">
+      <div class="card">
+        <div class="card-title">Saisie du <span id="saisie-date-label"></span></div>
+
+        <div style="margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:6px;">Service</div>
+          <div class="chip-group" id="saisie-service">
+            <button class="chip active" data-val="midi" onclick="selectService('midi')">☀️ Midi</button>
+            <button class="chip" data-val="soir" onclick="selectService('soir')">🌙 Soir</button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>CA TTC (€)</label>
+            <input type="number" class="form-input" id="s-ca-ttc" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Couverts</label>
+            <input type="number" class="form-input" id="s-couverts" min="0" step="1" placeholder="0">
+          </div>
+        </div>
+
+        <div id="s-ticket-moyen" style="padding:6px 10px; background:var(--accent-light); border-radius:6px; font-size:0.82rem; margin-bottom:10px; display:none;">
+          <span style="color:var(--accent-dark); font-weight:600;">Ticket moyen : </span>
+          <span id="s-ticket-val" style="font-weight:700;"></span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>CA HT (€)</label>
+            <input type="number" class="form-input" id="s-ca-ht" min="0" step="0.01" placeholder="Optionnel">
+          </div>
+          <div class="form-group">
+            <label>Nb Tables</label>
+            <input type="number" class="form-input" id="s-tables" min="0" step="1" placeholder="Optionnel">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>CB (€)</label>
+            <input type="number" class="form-input" id="s-cb" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Espèces (€)</label>
+            <input type="number" class="form-input" id="s-especes" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tickets Resto (€)</label>
+            <input type="number" class="form-input" id="s-tickets" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Autres (€)</label>
+            <input type="number" class="form-input" id="s-autres" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" class="form-input" id="s-notes" placeholder="Ex: événement privé, météo...">
+        </div>
+
+        <div id="saisie-existing" style="display:none; padding:8px 12px; background:#fefce8; border-radius:6px; font-size:0.78rem; color:#a16207; margin-bottom:10px;">
+          ⚠️ Des données existent déjà pour ce service — elles seront mises à jour.
+        </div>
+
+        <button class="btn-submit" onclick="saveSaisie()">💾 Enregistrer</button>
+      </div>
+    </div>
+
+    <!-- TAB: IMPORT CSV -->
+    <div class="tab-content" id="tab-import">
+      <div class="card">
+        <div class="card-title">Import depuis L'Addition</div>
+
+        <div class="chip-group" style="margin-bottom:12px;">
+          <button class="chip active" data-type="journalier" onclick="setImportType('journalier')">📊 CA journalier</button>
+          <button class="chip" data-type="produits" onclick="setImportType('produits')">🍽️ Ventes produits</button>
+        </div>
+
+        <div class="upload-zone" id="upload-zone"
+          onclick="document.getElementById('csv-file').click()"
+          ondragover="event.preventDefault(); this.classList.add('dragover')"
+          ondragleave="this.classList.remove('dragover')"
+          ondrop="event.preventDefault(); this.classList.remove('dragover'); handleFileDrop(event)">
+          <div class="icon">📄</div>
+          <div class="text">Glissez votre fichier CSV ici</div>
+          <div class="sub">ou cliquez pour sélectionner</div>
+        </div>
+        <input type="file" id="csv-file" accept=".csv,.tsv,.txt" style="display:none" onchange="handleFileSelect(event)">
+
+        <div id="csv-preview" style="display:none; margin-top:12px;"></div>
+      </div>
+
+      <!-- Imports récents -->
+      <div class="card">
+        <div class="card-title">Imports récents</div>
+        <div id="import-history"></div>
+      </div>
+    </div>
+
+    <!-- TAB: PRODUITS -->
+    <div class="tab-content" id="tab-produits">
+      <div class="card">
+        <div class="card-title">Top ventes du <span id="produits-date-label"></span></div>
+        <div id="produits-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Par catégorie</div>
+        <div id="produits-categories"></div>
+      </div>
+    </div>
+
+    <!-- TAB: HISTORIQUE -->
+    <div class="tab-content" id="tab-historique">
+      <div class="card">
+        <div class="card-title">Historique des ventes</div>
+        <div class="chip-group" style="margin-bottom:10px;">
+          <button class="chip active" data-period="7" onclick="setHistoryPeriod(7)">7 jours</button>
+          <button class="chip" data-period="30" onclick="setHistoryPeriod(30)">30 jours</button>
+          <button class="chip" data-period="90" onclick="setHistoryPeriod(90)">3 mois</button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAPPING MODAL -->
+  <div class="modal-overlay" id="mapping-modal">
+    <div class="modal">
+      <h2>📋 Mapping des colonnes</h2>
+      <p style="font-size:0.78rem; color:var(--gray-500); margin-bottom:12px;">
+        Associez les colonnes du CSV aux champs attendus.
+      </p>
+      <div id="mapping-fields"></div>
+      <div id="mapping-preview" style="margin-top:12px;"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeMappingModal()">Annuler</button>
+        <button class="btn-submit" onclick="confirmImport()">✅ Importer <span id="import-count"></span> lignes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+  <script>
+// ============= CONFIG =============
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const ROLE_LEVEL = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+
+// ============= STATE =============
+let currentUser = null;
+let currentEtablissement = null;
+let currentDate = new Date();
+let currentService = 'midi';
+let importType = 'journalier';
+let csvData = null;
+let csvHeaders = [];
+let historyPeriod = 7;
+
+// ============= INIT =============
+document.addEventListener('DOMContentLoaded', () => {
+  checkPortalSession();
+});
+
+function checkPortalSession() {
+  const userData = sessionStorage.getItem('planb_user');
+  const etab = sessionStorage.getItem('planb_etablissement');
+
+  if (!userData || !etab) {
+    window.location.href = '../index.html';
+    return;
+  }
+
+  currentUser = JSON.parse(userData);
+  currentEtablissement = etab;
+
+  document.getElementById('user-info').textContent = `${currentUser.initiales || currentUser.nom} • ${currentEtablissement}`;
+
+  setToday();
+}
+
+// ============= DATE NAVIGATION =============
+function formatDate(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function formatDateFR(d) {
+  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function setToday() {
+  currentDate = new Date();
+  updateDateDisplay();
+  loadAllData();
+}
+
+function changeDate(delta) {
+  currentDate.setDate(currentDate.getDate() + delta);
+  updateDateDisplay();
+  loadAllData();
+}
+
+function setDate(val) {
+  if (val) {
+    currentDate = new Date(val + 'T12:00:00');
+    updateDateDisplay();
+    loadAllData();
+  }
+}
+
+function updateDateDisplay() {
+  document.getElementById('nav-date').value = formatDate(currentDate);
+  document.getElementById('saisie-date-label').textContent = formatDateFR(currentDate);
+  document.getElementById('produits-date-label').textContent = formatDateFR(currentDate);
+}
+
+// ============= TABS =============
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`)?.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`tab-${tab}`)?.classList.add('active');
+
+  if (tab === 'saisie') loadSaisieData();
+  else if (tab === 'import') loadImportHistory();
+  else if (tab === 'produits') loadProduits();
+  else if (tab === 'historique') loadHistory();
+}
+
+// ============= LOAD ALL =============
+async function loadAllData() {
+  showLoading(true);
+  try {
+    await Promise.all([
+      loadDashboard(),
+      loadSaisieData()
+    ]);
+  } catch (e) {
+    console.error(e);
+  }
+  showLoading(false);
+}
+
+// ============= DASHBOARD =============
+async function loadDashboard() {
+  const dateStr = formatDate(currentDate);
+
+  // Ventes du jour
+  const { data: today } = await sb
+    .from('ventes_journalieres')
+    .select('*')
+    .eq('etablissement', currentEtablissement)
+    .eq('date', dateStr);
+
+  const midi = today?.find(v => v.service === 'midi');
+  const soir = today?.find(v => v.service === 'soir');
+  const totalCA = (midi?.ca_ttc || 0) + (soir?.ca_ttc || 0);
+  const totalCouverts = (midi?.couverts || 0) + (soir?.couverts || 0);
+  const ticketMoyen = totalCouverts > 0 ? (totalCA / totalCouverts).toFixed(2) : '—';
+
+  // Ventes N-1 (même jour semaine dernière)
+  const lastWeekDate = new Date(currentDate);
+  lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+  const { data: lastWeek } = await sb
+    .from('ventes_journalieres')
+    .select('ca_ttc, couverts')
+    .eq('etablissement', currentEtablissement)
+    .eq('date', formatDate(lastWeekDate));
+
+  const lastCA = lastWeek?.reduce((s, v) => s + (v.ca_ttc || 0), 0) || 0;
+  const lastCouverts = lastWeek?.reduce((s, v) => s + (v.couverts || 0), 0) || 0;
+
+  const trendCA = lastCA > 0 ? ((totalCA - lastCA) / lastCA * 100).toFixed(0) : null;
+  const trendCouv = lastCouverts > 0 ? ((totalCouverts - lastCouverts) / lastCouverts * 100).toFixed(0) : null;
+
+  document.getElementById('kpi-today').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--accent)">${totalCA > 0 ? totalCA.toFixed(0) + '€' : '—'}</div>
+      <div class="kpi-label">CA TTC</div>
+      ${trendCA !== null ? `<div class="kpi-trend ${parseFloat(trendCA) >= 0 ? 'up' : 'down'}">${parseFloat(trendCA) >= 0 ? '↑' : '↓'} ${Math.abs(trendCA)}% vs S-1</div>` : ''}
+      <div class="kpi-sub">Midi: ${midi?.ca_ttc?.toFixed(0) || '—'}€ / Soir: ${soir?.ca_ttc?.toFixed(0) || '—'}€</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--blue)">${totalCouverts || '—'}</div>
+      <div class="kpi-label">Couverts</div>
+      ${trendCouv !== null ? `<div class="kpi-trend ${parseFloat(trendCouv) >= 0 ? 'up' : 'down'}">${parseFloat(trendCouv) >= 0 ? '↑' : '↓'} ${Math.abs(trendCouv)}% vs S-1</div>` : ''}
+      <div class="kpi-sub">Midi: ${midi?.couverts || '—'} / Soir: ${soir?.couverts || '—'}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--orange)">${ticketMoyen}€</div>
+      <div class="kpi-label">Ticket moyen</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--purple)">${(midi?.nb_tables || 0) + (soir?.nb_tables || 0) || '—'}</div>
+      <div class="kpi-label">Tables</div>
+    </div>
+  `;
+
+  // Chart 7 derniers jours
+  await loadChart7Days();
+
+  // Cumul mois
+  await loadMonthKPIs();
+}
+
+async function loadChart7Days() {
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - i);
+    days.push(formatDate(d));
+  }
+
+  const { data } = await sb
+    .from('ventes_journalieres')
+    .select('date, service, ca_ttc')
+    .eq('etablissement', currentEtablissement)
+    .gte('date', days[0])
+    .lte('date', days[6]);
+
+  const byDay = {};
+  days.forEach(d => { byDay[d] = { midi: 0, soir: 0 }; });
+  (data || []).forEach(v => {
+    if (byDay[v.date]) byDay[v.date][v.service] = v.ca_ttc || 0;
+  });
+
+  const maxCA = Math.max(...Object.values(byDay).map(d => Math.max(d.midi, d.soir)), 1);
+  const chart = document.getElementById('chart-7days');
+
+  chart.innerHTML = days.map(d => {
+    const v = byDay[d];
+    const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' });
+    const hMidi = Math.max((v.midi / maxCA) * 100, 2);
+    const hSoir = Math.max((v.soir / maxCA) * 100, 2);
+    return `
+      <div class="bar-group">
+        <div class="bar-value">${v.midi > 0 ? (v.midi/1000).toFixed(1)+'k' : ''}</div>
+        <div class="bar midi" style="height:${hMidi}%"></div>
+        <div class="bar soir" style="height:${hSoir}%"></div>
+        <div class="bar-label">${dayLabel}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadMonthKPIs() {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const firstDay = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const lastDay = formatDate(currentDate);
+
+  const { data } = await sb
+    .from('ventes_journalieres')
+    .select('ca_ttc, couverts')
+    .eq('etablissement', currentEtablissement)
+    .gte('date', firstDay)
+    .lte('date', lastDay);
+
+  const totalCA = (data || []).reduce((s, v) => s + (v.ca_ttc || 0), 0);
+  const totalCouverts = (data || []).reduce((s, v) => s + (v.couverts || 0), 0);
+  const nbJours = new Set((data || []).map(v => v.date)).size;
+  const caJourMoyen = nbJours > 0 ? totalCA / nbJours : 0;
+
+  document.getElementById('kpi-month').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--accent); font-size:1.2rem;">${totalCA > 0 ? (totalCA/1000).toFixed(1) + 'k€' : '—'}</div>
+      <div class="kpi-label">CA Mois</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--blue); font-size:1.2rem;">${totalCouverts || '—'}</div>
+      <div class="kpi-label">Couverts Mois</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--orange); font-size:1.2rem;">${caJourMoyen > 0 ? caJourMoyen.toFixed(0) + '€' : '—'}</div>
+      <div class="kpi-label">CA / jour moyen</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--gray-600); font-size:1.2rem;">${nbJours}</div>
+      <div class="kpi-label">Jours saisis</div>
+    </div>
+  `;
+}
+
+// ============= SAISIE MANUELLE =============
+async function loadSaisieData() {
+  const dateStr = formatDate(currentDate);
+
+  const { data } = await sb
+    .from('ventes_journalieres')
+    .select('*')
+    .eq('etablissement', currentEtablissement)
+    .eq('date', dateStr)
+    .eq('service', currentService);
+
+  const existing = data?.[0];
+  const el = document.getElementById('saisie-existing');
+  el.style.display = existing ? '' : 'none';
+
+  if (existing) {
+    document.getElementById('s-ca-ttc').value = existing.ca_ttc || '';
+    document.getElementById('s-couverts').value = existing.couverts || '';
+    document.getElementById('s-ca-ht').value = existing.ca_ht || '';
+    document.getElementById('s-tables').value = existing.nb_tables || '';
+    document.getElementById('s-cb').value = existing.paiement_cb || '';
+    document.getElementById('s-especes').value = existing.paiement_especes || '';
+    document.getElementById('s-tickets').value = existing.paiement_tickets || '';
+    document.getElementById('s-autres').value = existing.paiement_autres || '';
+    document.getElementById('s-notes').value = existing.notes || '';
+    updateTicketMoyen();
+  } else {
+    // Clear form
+    ['s-ca-ttc','s-couverts','s-ca-ht','s-tables','s-cb','s-especes','s-tickets','s-autres','s-notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('s-ticket-moyen').style.display = 'none';
+  }
+}
+
+function selectService(svc) {
+  currentService = svc;
+  document.querySelectorAll('#saisie-service .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.val === svc);
+  });
+  loadSaisieData();
+}
+
+function updateTicketMoyen() {
+  const ca = parseFloat(document.getElementById('s-ca-ttc').value) || 0;
+  const couv = parseInt(document.getElementById('s-couverts').value) || 0;
+  const el = document.getElementById('s-ticket-moyen');
+  if (ca > 0 && couv > 0) {
+    document.getElementById('s-ticket-val').textContent = (ca / couv).toFixed(2) + '€';
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// Auto-update ticket moyen
+document.getElementById('s-ca-ttc')?.addEventListener('input', updateTicketMoyen);
+document.getElementById('s-couverts')?.addEventListener('input', updateTicketMoyen);
+
+async function saveSaisie() {
+  const ca = parseFloat(document.getElementById('s-ca-ttc').value);
+  const couverts = parseInt(document.getElementById('s-couverts').value);
+
+  if (!ca && ca !== 0) {
+    showToast('Saisissez au moins le CA TTC', 'error');
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const dateStr = formatDate(currentDate);
+    const record = {
+      date: dateStr,
+      service: currentService,
+      ca_ttc: ca || 0,
+      ca_ht: parseFloat(document.getElementById('s-ca-ht').value) || 0,
+      couverts: couverts || 0,
+      nb_tables: parseInt(document.getElementById('s-tables').value) || null,
+      paiement_cb: parseFloat(document.getElementById('s-cb').value) || 0,
+      paiement_especes: parseFloat(document.getElementById('s-especes').value) || 0,
+      paiement_tickets: parseFloat(document.getElementById('s-tickets').value) || 0,
+      paiement_autres: parseFloat(document.getElementById('s-autres').value) || 0,
+      source: 'manuel',
+      etablissement: currentEtablissement,
+      saisi_par_id: currentUser.id,
+      saisi_par_nom: currentUser.nom,
+      notes: document.getElementById('s-notes').value.trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    // Upsert (on conflict date+service+etablissement)
+    const { error } = await sb
+      .from('ventes_journalieres')
+      .upsert(record, { onConflict: 'date,service,etablissement' });
+
+    if (error) throw error;
+
+    showToast('Ventes enregistrées ✓', 'success');
+    await loadDashboard();
+    loadSaisieData();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+// ============= IMPORT CSV =============
+function setImportType(type) {
+  importType = type;
+  document.querySelectorAll('#tab-import .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.type === type);
+  });
+}
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) parseCSV(file);
+}
+
+function handleFileDrop(event) {
+  const file = event.dataTransfer.files[0];
+  if (file) parseCSV(file);
+}
+
+function parseCSV(file) {
+  showLoading(true);
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    encoding: 'UTF-8',
+    complete: function(results) {
+      showLoading(false);
+      if (results.errors.length > 0) {
+        showToast('Erreurs CSV: ' + results.errors[0].message, 'error');
+      }
+      csvData = results.data;
+      csvHeaders = results.meta.fields || [];
+      openMappingModal(file.name);
+    },
+    error: function(err) {
+      showLoading(false);
+      showToast('Erreur lecture CSV', 'error');
+    }
+  });
+}
+
+function openMappingModal(fileName) {
+  const modal = document.getElementById('mapping-modal');
+  modal.classList.add('active');
+
+  // Champs attendus selon le type d'import
+  const fields = importType === 'journalier'
+    ? [
+        { key: 'date', label: 'Date', required: true },
+        { key: 'service', label: 'Service (midi/soir)', required: false },
+        { key: 'ca_ttc', label: 'CA TTC', required: true },
+        { key: 'ca_ht', label: 'CA HT', required: false },
+        { key: 'couverts', label: 'Couverts', required: true },
+        { key: 'nb_tables', label: 'Nb Tables', required: false },
+        { key: 'paiement_cb', label: 'CB', required: false },
+        { key: 'paiement_especes', label: 'Espèces', required: false },
+        { key: 'paiement_tickets', label: 'Tickets resto', required: false }
+      ]
+    : [
+        { key: 'date', label: 'Date', required: true },
+        { key: 'nom_produit', label: 'Nom produit', required: true },
+        { key: 'categorie_produit', label: 'Catégorie', required: false },
+        { key: 'quantite', label: 'Quantité vendue', required: true },
+        { key: 'ca_ttc', label: 'CA TTC', required: false },
+        { key: 'service', label: 'Service (midi/soir)', required: false }
+      ];
+
+  // Auto-match headers
+  const autoMatch = {};
+  fields.forEach(f => {
+    const match = csvHeaders.find(h => {
+      const hl = h.toLowerCase().trim();
+      const fl = f.key.toLowerCase();
+      return hl === fl || hl.includes(fl) || fl.includes(hl)
+        || (f.key === 'date' && (hl.includes('date') || hl.includes('jour')))
+        || (f.key === 'ca_ttc' && (hl.includes('ca') || hl.includes('chiffre') || hl.includes('total') || hl.includes('ttc')))
+        || (f.key === 'couverts' && (hl.includes('couvert') || hl.includes('pax') || hl.includes('client')))
+        || (f.key === 'nom_produit' && (hl.includes('produit') || hl.includes('article') || hl.includes('plat') || hl.includes('désignation') || hl.includes('designation') || hl.includes('libelle') || hl.includes('libellé')))
+        || (f.key === 'quantite' && (hl.includes('qté') || hl.includes('quantite') || hl.includes('quantité') || hl.includes('nb')))
+        || (f.key === 'service' && (hl.includes('service') || hl.includes('période') || hl.includes('periode')))
+        || (f.key === 'categorie_produit' && (hl.includes('categ') || hl.includes('famille') || hl.includes('groupe')))
+        || (f.key === 'paiement_cb' && (hl.includes('cb') || hl.includes('carte')))
+        || (f.key === 'paiement_especes' && (hl.includes('espèce') || hl.includes('espece') || hl.includes('cash')))
+        || (f.key === 'nb_tables' && hl.includes('table'));
+    });
+    if (match) autoMatch[f.key] = match;
+  });
+
+  const container = document.getElementById('mapping-fields');
+  container.innerHTML = fields.map(f => `
+    <div class="form-group" style="margin-bottom:8px;">
+      <label>${f.label} ${f.required ? '*' : ''}</label>
+      <select class="form-select" id="map-${f.key}" data-field="${f.key}" data-required="${f.required}">
+        <option value="">— Ignorer —</option>
+        ${csvHeaders.map(h => `<option value="${h}" ${autoMatch[f.key] === h ? 'selected' : ''}>${h}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+
+  // Preview
+  document.getElementById('import-count').textContent = csvData.length;
+  showMappingPreview();
+}
+
+function showMappingPreview() {
+  const preview = document.getElementById('mapping-preview');
+  if (!csvData || csvData.length === 0) { preview.innerHTML = ''; return; }
+
+  const sample = csvData.slice(0, 3);
+  let html = '<div class="card-title">Aperçu (3 premières lignes)</div>';
+  html += '<div class="preview-container"><table class="data-table"><thead><tr>';
+  csvHeaders.forEach(h => { html += `<th>${h}</th>`; });
+  html += '</tr></thead><tbody>';
+  sample.forEach(row => {
+    html += '<tr>';
+    csvHeaders.forEach(h => { html += `<td>${row[h] || ''}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  preview.innerHTML = html;
+}
+
+function closeMappingModal() {
+  document.getElementById('mapping-modal').classList.remove('active');
+}
+
+async function confirmImport() {
+  if (!csvData || csvData.length === 0) return;
+
+  // Gather mappings
+  const mappings = {};
+  document.querySelectorAll('#mapping-fields select').forEach(sel => {
+    if (sel.value) mappings[sel.dataset.field] = sel.value;
+  });
+
+  // Validate required
+  const requiredFields = importType === 'journalier'
+    ? ['date', 'ca_ttc', 'couverts']
+    : ['date', 'nom_produit', 'quantite'];
+
+  const missing = requiredFields.filter(f => !mappings[f]);
+  if (missing.length > 0) {
+    showToast(`Champs obligatoires manquants: ${missing.join(', ')}`, 'error');
+    return;
+  }
+
+  showLoading(true);
+  closeMappingModal();
+
+  try {
+    // Log import
+    const importRecord = {
+      nom_fichier: 'import_' + new Date().toISOString().split('T')[0],
+      type_import: importType,
+      nb_lignes: csvData.length,
+      etablissement: currentEtablissement,
+      importe_par_id: currentUser.id,
+      importe_par_nom: currentUser.nom,
+      statut: 'ok',
+      erreurs: []
+    };
+
+    const errors = [];
+    let successCount = 0;
+    let minDate = null, maxDate = null;
+
+    if (importType === 'journalier') {
+      // Import ventes journalières
+      const records = [];
+      csvData.forEach((row, idx) => {
+        try {
+          const dateRaw = row[mappings.date];
+          const date = parseDate(dateRaw);
+          if (!date) { errors.push({ line: idx + 2, error: 'Date invalide: ' + dateRaw }); return; }
+
+          const service = mappings.service ? parseService(row[mappings.service]) : 'journee';
+          const caTTC = parseNumber(row[mappings.ca_ttc]);
+          const couverts = parseInt(row[mappings.couverts]) || 0;
+
+          if (!minDate || date < minDate) minDate = date;
+          if (!maxDate || date > maxDate) maxDate = date;
+
+          records.push({
+            date: date,
+            service: service,
+            ca_ttc: caTTC,
+            ca_ht: mappings.ca_ht ? parseNumber(row[mappings.ca_ht]) : 0,
+            couverts: couverts,
+            nb_tables: mappings.nb_tables ? parseInt(row[mappings.nb_tables]) || null : null,
+            paiement_cb: mappings.paiement_cb ? parseNumber(row[mappings.paiement_cb]) : 0,
+            paiement_especes: mappings.paiement_especes ? parseNumber(row[mappings.paiement_especes]) : 0,
+            paiement_tickets: mappings.paiement_tickets ? parseNumber(row[mappings.paiement_tickets]) : 0,
+            source: 'csv',
+            etablissement: currentEtablissement,
+            saisi_par_id: currentUser.id,
+            saisi_par_nom: currentUser.nom,
+            updated_at: new Date().toISOString()
+          });
+        } catch (e) {
+          errors.push({ line: idx + 2, error: e.message });
+        }
+      });
+
+      // Upsert by batch
+      if (records.length > 0) {
+        const { error } = await sb
+          .from('ventes_journalieres')
+          .upsert(records, { onConflict: 'date,service,etablissement' });
+        if (error) throw error;
+        successCount = records.length;
+      }
+
+    } else {
+      // Import ventes produits
+      const records = [];
+      csvData.forEach((row, idx) => {
+        try {
+          const dateRaw = row[mappings.date];
+          const date = parseDate(dateRaw);
+          if (!date) { errors.push({ line: idx + 2, error: 'Date invalide: ' + dateRaw }); return; }
+
+          const nomProduit = row[mappings.nom_produit]?.trim();
+          if (!nomProduit) { errors.push({ line: idx + 2, error: 'Nom produit vide' }); return; }
+
+          if (!minDate || date < minDate) minDate = date;
+          if (!maxDate || date > maxDate) maxDate = date;
+
+          records.push({
+            date: date,
+            service: mappings.service ? parseService(row[mappings.service]) : 'journee',
+            nom_produit: nomProduit,
+            categorie_produit: mappings.categorie_produit ? row[mappings.categorie_produit]?.trim() : null,
+            quantite: parseInt(row[mappings.quantite]) || 0,
+            ca_ttc: mappings.ca_ttc ? parseNumber(row[mappings.ca_ttc]) : 0,
+            source: 'csv',
+            etablissement: currentEtablissement
+          });
+        } catch (e) {
+          errors.push({ line: idx + 2, error: e.message });
+        }
+      });
+
+      // Insert (not upsert, as products can repeat)
+      if (records.length > 0) {
+        // Delete existing for same date range to avoid duplicates
+        if (minDate && maxDate) {
+          await sb.from('ventes_produits')
+            .delete()
+            .eq('etablissement', currentEtablissement)
+            .eq('source', 'csv')
+            .gte('date', minDate)
+            .lte('date', maxDate);
+        }
+
+        const { error } = await sb.from('ventes_produits').insert(records);
+        if (error) throw error;
+        successCount = records.length;
+      }
+    }
+
+    // Save import log
+    importRecord.nb_lignes = successCount;
+    importRecord.periode_debut = minDate;
+    importRecord.periode_fin = maxDate;
+    importRecord.erreurs = errors;
+    importRecord.statut = errors.length > 0 ? 'partiel' : 'ok';
+
+    await sb.from('ventes_imports').insert(importRecord);
+
+    showToast(`Import terminé: ${successCount} lignes${errors.length > 0 ? `, ${errors.length} erreurs` : ''}`, errors.length > 0 ? 'error' : 'success');
+
+    // Reset
+    csvData = null;
+    csvHeaders = [];
+    document.getElementById('csv-file').value = '';
+    document.getElementById('csv-preview').style.display = 'none';
+
+    await loadDashboard();
+    loadImportHistory();
+
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur import: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+// Date parsing (multiple formats)
+function parseDate(str) {
+  if (!str) return null;
+  str = str.trim();
+
+  // ISO format: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // FR format: DD/MM/YYYY or DD-MM-YYYY
+  const frMatch = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (frMatch) {
+    const y = frMatch[3].length === 2 ? '20' + frMatch[3] : frMatch[3];
+    return `${y}-${frMatch[2].padStart(2,'0')}-${frMatch[1].padStart(2,'0')}`;
+  }
+
+  // Date with time: try native parsing
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+
+  return null;
+}
+
+function parseNumber(str) {
+  if (!str) return 0;
+  // Handle FR format: 1 234,56 or 1234.56
+  return parseFloat(str.toString().replace(/\s/g, '').replace(',', '.')) || 0;
+}
+
+function parseService(str) {
+  if (!str) return 'journee';
+  const s = str.toLowerCase().trim();
+  if (s.includes('midi') || s.includes('lunch') || s.includes('déjeuner') || s.includes('dejeuner')) return 'midi';
+  if (s.includes('soir') || s.includes('dinner') || s.includes('dîner') || s.includes('diner')) return 'soir';
+  return 'journee';
+}
+
+// ============= IMPORT HISTORY =============
+async function loadImportHistory() {
+  const { data } = await sb
+    .from('ventes_imports')
+    .select('*')
+    .eq('etablissement', currentEtablissement)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  const container = document.getElementById('import-history');
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>Aucun import réalisé</p></div>';
+    return;
+  }
+
+  container.innerHTML = data.map(imp => {
+    const date = new Date(imp.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const statusIcon = imp.statut === 'ok' ? '✅' : imp.statut === 'partiel' ? '⚠️' : '❌';
+    const periode = imp.periode_debut && imp.periode_fin
+      ? `${new Date(imp.periode_debut+'T12:00:00').toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})} → ${new Date(imp.periode_fin+'T12:00:00').toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})}`
+      : '';
+    return `
+      <div class="history-row">
+        <div>${statusIcon}</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:0.82rem;">${imp.type_import === 'produits' ? '🍽️' : '📊'} ${imp.nb_lignes} lignes</div>
+          <div style="font-size:0.72rem; color:var(--gray-400);">${date} • ${periode} • par ${imp.importe_par_nom || '?'}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============= PRODUITS =============
+async function loadProduits() {
+  const dateStr = formatDate(currentDate);
+  showLoading(true);
+
+  const { data } = await sb
+    .from('ventes_produits')
+    .select('*')
+    .eq('etablissement', currentEtablissement)
+    .eq('date', dateStr)
+    .order('quantite', { ascending: false });
+
+  showLoading(false);
+
+  const list = document.getElementById('produits-list');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>Aucune donnée produit pour cette date</p></div>';
+    document.getElementById('produits-categories').innerHTML = '';
+    return;
+  }
+
+  // Top produits
+  list.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Produit</th><th>Cat.</th><th class="num">Qté</th><th class="num">CA</th></tr></thead>
+      <tbody>
+        ${data.slice(0, 20).map((p, i) => `
+          <tr>
+            <td style="font-weight:600; color:var(--gray-400);">${i + 1}</td>
+            <td style="font-weight:500;">${escapeHtml(p.nom_produit)}</td>
+            <td style="font-size:0.72rem; color:var(--gray-500);">${escapeHtml(p.categorie_produit || '—')}</td>
+            <td class="num" style="font-weight:600;">${p.quantite}</td>
+            <td class="num">${p.ca_ttc ? p.ca_ttc.toFixed(0) + '€' : '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // Par catégorie
+  const byCat = {};
+  data.forEach(p => {
+    const cat = p.categorie_produit || 'Autre';
+    if (!byCat[cat]) byCat[cat] = { qty: 0, ca: 0 };
+    byCat[cat].qty += p.quantite || 0;
+    byCat[cat].ca += p.ca_ttc || 0;
+  });
+
+  const cats = Object.entries(byCat).sort((a, b) => b[1].ca - a[1].ca);
+  document.getElementById('produits-categories').innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Catégorie</th><th class="num">Qté</th><th class="num">CA</th><th class="num">% CA</th></tr></thead>
+      <tbody>
+        ${cats.map(([cat, v]) => {
+          const totalCA = cats.reduce((s, c) => s + c[1].ca, 0);
+          const pct = totalCA > 0 ? (v.ca / totalCA * 100).toFixed(0) : 0;
+          return `
+            <tr>
+              <td style="font-weight:500;">${escapeHtml(cat)}</td>
+              <td class="num">${v.qty}</td>
+              <td class="num" style="font-weight:600;">${v.ca.toFixed(0)}€</td>
+              <td class="num">${pct}%</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ============= HISTORIQUE =============
+async function loadHistory() {
+  showLoading(true);
+  const endDate = formatDate(currentDate);
+  const startDate = new Date(currentDate);
+  startDate.setDate(startDate.getDate() - historyPeriod);
+
+  const { data } = await sb
+    .from('ventes_journalieres')
+    .select('*')
+    .eq('etablissement', currentEtablissement)
+    .gte('date', formatDate(startDate))
+    .lte('date', endDate)
+    .order('date', { ascending: false });
+
+  showLoading(false);
+
+  const container = document.getElementById('history-list');
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>Aucune donnée sur cette période</p></div>';
+    return;
+  }
+
+  // Grouper par jour
+  const byDay = {};
+  data.forEach(v => {
+    if (!byDay[v.date]) byDay[v.date] = { midi: null, soir: null };
+    if (v.service === 'midi') byDay[v.date].midi = v;
+    else if (v.service === 'soir') byDay[v.date].soir = v;
+    else byDay[v.date].midi = v; // journee → afficher comme midi
+  });
+
+  container.innerHTML = Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0])).map(([date, services]) => {
+    const d = new Date(date + 'T12:00:00');
+    const dayLabel = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const totalCA = (services.midi?.ca_ttc || 0) + (services.soir?.ca_ttc || 0);
+    const totalCouv = (services.midi?.couverts || 0) + (services.soir?.couverts || 0);
+    const tm = totalCouv > 0 ? (totalCA / totalCouv).toFixed(1) : '—';
+
+    return `
+      <div class="history-row">
+        <div class="history-date">${dayLabel}</div>
+        <div class="history-values">
+          <div class="history-val"><div class="num" style="color:var(--accent);">${totalCA > 0 ? totalCA.toFixed(0) + '€' : '—'}</div><div class="lbl">CA</div></div>
+          <div class="history-val"><div class="num" style="color:var(--blue);">${totalCouv || '—'}</div><div class="lbl">Couv.</div></div>
+          <div class="history-val"><div class="num" style="color:var(--orange);">${tm}€</div><div class="lbl">TM</div></div>
+          <div class="history-val"><div class="num" style="font-size:0.72rem; color:var(--gray-400);">M:${services.midi?.ca_ttc?.toFixed(0) || '—'} S:${services.soir?.ca_ttc?.toFixed(0) || '—'}</div><div class="lbl">Détail</div></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function setHistoryPeriod(days) {
+  historyPeriod = days;
+  document.querySelectorAll('#tab-historique .chip').forEach(c => {
+    c.classList.toggle('active', parseInt(c.dataset.period) === days);
+  });
+  loadHistory();
+}
+
+// ============= UTILITIES =============
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function showToast(msg, type = 'success') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = `toast ${type} show`;
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function showLoading(on) {
+  document.getElementById('loading').classList.toggle('active', on);
+}
+  </script>
+</body>
+</html>
