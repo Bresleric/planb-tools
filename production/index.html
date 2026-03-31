@@ -498,7 +498,6 @@
     <button class="tab-btn active" data-tab="fiches">📖 Fiches</button>
     <button class="tab-btn" data-tab="productions">📦 Productions</button>
     <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
-    <button class="tab-btn" data-tab="create" id="tab-create-btn">➕ Créer</button>
   </div>
 
   <!-- FILTERS (fiches list) -->
@@ -660,9 +659,10 @@
           <textarea class="form-textarea" id="f-notes" rows="3" placeholder="Remarques, astuces..."></textarea>
         </div>
 
-        <button class="btn-submit" id="btn-save-fiche" onclick="saveFiche()">
-          Enregistrer la fiche
-        </button>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn-submit" style="flex:1; background:var(--gray-400);" onclick="switchTab('fiches')">← Retour</button>
+          <button class="btn-submit" style="flex:1;" id="btn-save-fiche" onclick="saveFiche()">Enregistrer la fiche</button>
+        </div>
       </div>
     </div>
 
@@ -670,8 +670,9 @@
     <div class="tab-content" id="tab-detail"></div>
   </div>
 
-  <!-- FAB BUTTON (for new productions) -->
-  <button class="fab-button" id="fab-button" onclick="openProductionModal()">+</button>
+  <!-- FAB BUTTONS -->
+  <button class="fab-button" id="fab-fiches" onclick="switchTab('create')" title="Nouvelle fiche technique" style="display:none;">+</button>
+  <button class="fab-button" id="fab-productions" onclick="openProductionModal()" style="display:none;">+</button>
 
   <!-- PRODUCTION MODAL (New Production) -->
   <div class="modal-overlay" id="production-modal" style="display:none;">
@@ -716,6 +717,22 @@
               <option value="tranche">tranche</option>
             </select>
           </div>
+        </div>
+        <div class="form-group">
+          <label>DLC</label>
+          <div id="p-dlc-auto" style="display:none; padding:6px 10px; background:#f0fdf4; border-radius:6px; font-size:0.82rem; margin-bottom:6px;">
+            <span style="color:#16a34a; font-weight:600;">✅ DLC calculée : </span>
+            <span id="p-dlc-auto-value" style="font-weight:700;"></span>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:2; margin-bottom:0;">
+              <input type="datetime-local" class="form-input" id="p-dlc-manual" placeholder="Saisir DLC manuelle">
+            </div>
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+              <button class="chip" id="p-dlc-clear" onclick="clearDlcManual()" style="width:100%; font-size:0.75rem; padding:8px;">✕ Effacer</button>
+            </div>
+          </div>
+          <p style="font-size:0.68rem; color:var(--gray-400); margin-top:4px;">Si une fiche est sélectionnée, la DLC est calculée automatiquement. Sinon, saisissez-la manuellement.</p>
         </div>
         <div class="form-group">
           <label>Observation</label>
@@ -810,11 +827,7 @@ function init() {
   const userInfo = document.getElementById('user-info');
   userInfo.textContent = `${currentUser.initiales || currentUser.nom} · ${currentEtablissement}`;
 
-  // Hide create tab if not manager+
-  const userLevel = roleHierarchy[currentUser.role] || 0;
-  if (userLevel < roleHierarchy.manager) {
-    document.getElementById('tab-create-btn').style.display = 'none';
-  }
+  // Tab create is now accessed via FAB button on fiches tab (manager+ only)
 
   setupTabs();
   setupFilters();
@@ -855,9 +868,11 @@ function switchTab(tab) {
   filtersSection.style.display = (tab === 'fiches') ? '' : 'none';
   filtersProductions.style.display = (tab === 'productions') ? '' : 'none';
 
-  // Show/hide FAB button
-  const fab = document.getElementById('fab-button');
-  if (fab) fab.classList.toggle('active', tab === 'productions');
+  // Show/hide FAB buttons
+  const fabFiches = document.getElementById('fab-fiches');
+  const fabProd = document.getElementById('fab-productions');
+  if (fabFiches) fabFiches.style.display = (tab === 'fiches' && canEdit()) ? 'flex' : 'none';
+  if (fabProd) fabProd.style.display = (tab === 'productions') ? 'flex' : 'none';
 
   if (tab === 'productions') {
     loadProductions();
@@ -1311,7 +1326,7 @@ function renderProductions() {
       const catClass = `cat-${p.categorie}`;
       const metaParts = [];
       if (p.quantite_produite) metaParts.push(`<span>📊 ${p.quantite_produite} ${p.unite}</span>`);
-      if (p.dlc) metaParts.push(`<span>⏱️ DLC ${p.dlc}</span>`);
+      if (p.dlc) metaParts.push(`<span>⏱️ DLC ${new Date(p.dlc).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</span>`);
       if (p.producteur_initiales) metaParts.push(`<span>👨‍🍳 ${p.producteur_initiales}</span>`);
 
       html += `
@@ -1350,6 +1365,9 @@ function openProductionModal() {
   document.getElementById('p-quantite').value = '';
   document.getElementById('p-unite').value = 'kg';
   document.getElementById('p-observation').value = '';
+  document.getElementById('p-dlc-manual').value = '';
+  document.getElementById('p-dlc-auto').style.display = 'none';
+  document.getElementById('p-dlc-auto-value').textContent = '';
 
   // Setup fiche change handler
   ficheSelect.onchange = () => {
@@ -1365,7 +1383,12 @@ function openProductionModal() {
         document.querySelectorAll('#p-categorie .chip').forEach(chip => {
           chip.classList.toggle('active', chip.dataset.val === fiche.categorie);
         });
+
+        // Calculer et afficher DLC auto
+        updateDlcAutoDisplay(fiche);
       }
+    } else {
+      document.getElementById('p-dlc-auto').style.display = 'none';
     }
   };
 
@@ -1382,6 +1405,41 @@ function openProductionModal() {
 
 function closeProductionModal() {
   document.getElementById('production-modal').style.display = 'none';
+}
+
+function updateDlcAutoDisplay(fiche) {
+  const dlcAutoDiv = document.getElementById('p-dlc-auto');
+  const dlcAutoVal = document.getElementById('p-dlc-auto-value');
+  if (fiche && (fiche.dlc_jours || fiche.dlc_heures)) {
+    const now = new Date();
+    let dlcDate;
+    if (fiche.dlc_jours) {
+      dlcDate = new Date(now.getTime() + fiche.dlc_jours * 86400000);
+    } else {
+      dlcDate = new Date(now.getTime() + fiche.dlc_heures * 3600000);
+    }
+    dlcAutoVal.textContent = dlcDate.toLocaleDateString('fr-FR', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    dlcAutoDiv.style.display = '';
+    // Pré-remplir aussi le champ manuel avec la valeur calculée
+    document.getElementById('p-dlc-manual').value = formatDateTimeLocal(dlcDate);
+  } else {
+    dlcAutoDiv.style.display = 'none';
+  }
+}
+
+function formatDateTimeLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+function clearDlcManual() {
+  document.getElementById('p-dlc-manual').value = '';
 }
 
 async function saveProduction() {
@@ -1414,14 +1472,17 @@ async function saveProduction() {
     const ficheId = ficheSelect.value || null;
     let fiche = ficheId ? allFiches.find(f => f.id === ficheId) : null;
 
-    // Calculate DLC
+    // DLC : priorité au champ manuel, sinon calcul depuis la fiche
     const now = new Date();
     let dlc = null;
-    if (fiche) {
+    const dlcManualVal = document.getElementById('p-dlc-manual').value;
+    if (dlcManualVal) {
+      dlc = new Date(dlcManualVal).toISOString();
+    } else if (fiche) {
       if (fiche.dlc_jours) {
-        dlc = new Date(now.getTime() + fiche.dlc_jours * 24 * 60 * 60 * 1000).toISOString();
+        dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
       } else if (fiche.dlc_heures) {
-        dlc = new Date(now.getTime() + fiche.dlc_heures * 60 * 60 * 1000).toISOString();
+        dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
       }
     }
 
