@@ -783,7 +783,7 @@
       return data || [];
     },
 
-    async getNextLotNumber(date, etab) {
+    async getNextLotNumber(date, etab, dlcDate) {
       const { data, error } = await supabaseClient.from('lots_production').select('numero_lot')
         .eq('etablissement', etab).eq('date_production', date);
       if (error) throw error;
@@ -792,11 +792,20 @@
         const m = l.numero_lot.match(/-(\d{3})$/);
         return m ? parseInt(m[1]) : 0;
       }).sort((a, b) => b - a);
-      return `${date.replace(/-/g, '')}-${String((numbers[0] || 0) + 1).padStart(3, '0')}`;
+      const nextNum = (numbers[0] || 0) + 1;
+      // Format : YYMMDD-DDMMYY-NNN (date prod - DLC - séquentiel)
+      const prodParts = date.split('-');
+      const prodCode = prodParts[0].substring(2) + prodParts[1] + prodParts[2];
+      let dlcCode = '000000';
+      if (dlcDate) {
+        const d = new Date(dlcDate);
+        dlcCode = String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0') + String(d.getFullYear()).toString().substring(2);
+      }
+      return `${prodCode}-${dlcCode}-${String(nextNum).padStart(3, '0')}`;
     },
 
-    async createLot(date, etab, userId, userNom, userInitiales) {
-      const numero = await this.getNextLotNumber(date, etab);
+    async createLot(date, etab, userId, userNom, userInitiales, dlcDate) {
+      const numero = await this.getNextLotNumber(date, etab, dlcDate);
       const now = new Date();
       const { data, error } = await supabaseClient.from('lots_production').insert({
         numero_lot: numero,
@@ -1664,30 +1673,22 @@
     try {
       const today = dateStr(filterDate);
 
-      // Charger les lots du jour si pas en cache
-      if (productionLots.length === 0 || productionLots[0]?.date_production !== today) {
-        productionLots = await DB.getLots(today, currentEtablissement);
-      }
-
-      // Trouver ou créer un lot ouvert
-      let lot = productionLots.find(l => l.statut === 'ouvert');
-      if (!lot) {
-        lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales);
-        productionLots.push(lot);
-      }
-
       // Calculer DLC si fiche liée
       let dlc = null;
       let tempStock = null;
       if (ficheId && productionFiches.length > 0) {
         const fiche = productionFiches.find(f => f.id === ficheId);
         if (fiche) {
-          const now = new Date();
-          if (fiche.dlc_jours) dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
-          else if (fiche.dlc_heures) dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
+          const now2 = new Date();
+          if (fiche.dlc_jours) dlc = new Date(now2.getTime() + fiche.dlc_jours * 86400000).toISOString();
+          else if (fiche.dlc_heures) dlc = new Date(now2.getTime() + fiche.dlc_heures * 3600000).toISOString();
           tempStock = fiche.temperature_stockage || null;
         }
       }
+
+      // Créer un lot par production (numéro inclut la DLC)
+      const lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, dlc);
+      productionLots.push(lot);
 
       const now = new Date();
       const production = {

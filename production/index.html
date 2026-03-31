@@ -442,6 +442,7 @@
     .dlc-j2 { background: #fefce8; color: #ca8a04; }
     .dlc-j1 { background: #fff7ed; color: #ea580c; }
     .dlc-depasse { background: #fef2f2; color: #dc2626; }
+    .dlc-none { background: #f3f4f6; color: #6b7280; }
 
     .dlc-action-btn {
       padding: 4px 8px; border-radius: 6px; border: 1px solid var(--gray-200);
@@ -1099,7 +1100,7 @@ const DB = {
     return data || [];
   },
 
-  async getNextLotNumber(date) {
+  async getNextLotNumber(date, dlcDate) {
     const { data, error } = await sb
       .from('lots_production')
       .select('numero_lot')
@@ -1116,11 +1117,19 @@ const DB = {
       .sort((a, b) => b - a);
 
     const nextNum = (numbers[0] || 0) + 1;
-    return `${date.replace(/-/g, '')}-${String(nextNum).padStart(3, '0')}`;
+    // Format : YYMMDD-DDMMYY-NNN (date prod - DLC - séquentiel)
+    const prodParts = date.split('-'); // YYYY-MM-DD
+    const prodCode = prodParts[0].substring(2) + prodParts[1] + prodParts[2]; // YYMMDD
+    let dlcCode = '000000';
+    if (dlcDate) {
+      const d = new Date(dlcDate);
+      dlcCode = String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0') + String(d.getFullYear()).toString().substring(2);
+    }
+    return `${prodCode}-${dlcCode}-${String(nextNum).padStart(3, '0')}`;
   },
 
-  async createLot(date, responsableId, responsableNom, responsableInitiales) {
-    const numero = await this.getNextLotNumber(date);
+  async createLot(date, responsableId, responsableNom, responsableInitiales, dlcDate) {
+    const numero = await this.getNextLotNumber(date, dlcDate);
     const now = new Date();
     const heure = now.toTimeString().substring(0, 8); // HH:MM:SS
     const { data, error } = await sb
@@ -1154,16 +1163,18 @@ const DB = {
 
   // ====== DLC ======
   async getActiveProductions() {
-    // Productions avec DLC, non consommées/jetées
+    // Toutes productions actives (avec ou sans DLC)
     const { data, error } = await sb
       .from('productions')
       .select('*')
       .eq('etablissement', currentEtablissement)
-      .not('dlc', 'is', null)
       .in('statut', ['termine', 'etiquete', 'stocke'])
-      .order('dlc', { ascending: true });
+      .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    // Trier : DLC renseignée en premier (par DLC asc), puis sans DLC
+    const withDlc = (data || []).filter(p => p.dlc).sort((a, b) => new Date(a.dlc) - new Date(b.dlc));
+    const noDlc = (data || []).filter(p => !p.dlc);
+    return [...withDlc, ...noDlc];
   },
 
   async updateProductionStatut(id, statut) {
@@ -1330,7 +1341,7 @@ function renderProductions() {
       if (p.producteur_initiales) metaParts.push(`<span>👨‍🍳 ${p.producteur_initiales}</span>`);
 
       html += `
-        <div class="production-card ${catClass}">
+        <div class="production-card ${catClass}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))" style="cursor:pointer">
           <div class="production-icon">${icon}</div>
           <div class="production-info">
             <div class="production-name">${p.nom_produit}</div>
@@ -1460,13 +1471,6 @@ async function saveProduction() {
   try {
     const dateStr = selectedProductionDate || formatDateForInput(new Date());
 
-    // Get or create lot
-    let lot = allLots.find(l => l.statut === 'ouvert');
-    if (!lot) {
-      lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales);
-      allLots.push(lot);
-    }
-
     // Get fiche if selected
     const ficheSelect = document.getElementById('p-fiche-select');
     const ficheId = ficheSelect.value || null;
@@ -1485,6 +1489,10 @@ async function saveProduction() {
         dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
       }
     }
+
+    // Créer un lot par production (numéro inclut la DLC)
+    const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc);
+    allLots.push(lot);
 
     const production = {
       fiche_id: ficheId,
@@ -1929,18 +1937,18 @@ function renderDlcSuivi() {
   // Calculer les niveaux
   const withLevels = dlcProductions.map(p => ({
     ...p,
-    dlcInfo: getDlcLevel(p.dlc),
-    countdown: formatDlcCountdown(p.dlc)
+    dlcInfo: p.dlc ? getDlcLevel(p.dlc) : { level: 'none', label: 'Pas de DLC', css: 'dlc-none', icon: '❓' },
+    countdown: p.dlc ? formatDlcCountdown(p.dlc) : '—'
   }));
 
   // Stats
-  const counts = { ok: 0, j2: 0, j1: 0, depasse: 0 };
-  withLevels.forEach(p => { if (p.dlcInfo) counts[p.dlcInfo.level]++; });
+  const counts = { ok: 0, j2: 0, j1: 0, depasse: 0, none: 0 };
+  withLevels.forEach(p => { counts[p.dlcInfo.level]++; });
 
   // Filtrer
   const filtered = dlcFilter === 'all'
     ? withLevels
-    : withLevels.filter(p => p.dlcInfo?.level === dlcFilter);
+    : withLevels.filter(p => p.dlcInfo.level === dlcFilter);
 
   let html = `
     <div class="dlc-summary">
@@ -1955,11 +1963,12 @@ function renderDlcSuivi() {
       <button class="dlc-filter-chip ${dlcFilter === 'j1' ? 'active' : ''}" onclick="setDlcFilter('j1')">🔶 J-1 (${counts.j1})</button>
       <button class="dlc-filter-chip ${dlcFilter === 'j2' ? 'active' : ''}" onclick="setDlcFilter('j2')">⚠️ J-2 (${counts.j2})</button>
       <button class="dlc-filter-chip ${dlcFilter === 'ok' ? 'active' : ''}" onclick="setDlcFilter('ok')">✅ OK (${counts.ok})</button>
+      <button class="dlc-filter-chip ${dlcFilter === 'none' ? 'active' : ''}" onclick="setDlcFilter('none')">❓ Sans DLC (${counts.none})</button>
     </div>
   `;
 
   if (filtered.length === 0) {
-    html += `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune production avec DLC</h3><p>${dlcFilter !== 'all' ? 'Changez le filtre ou ' : ''}Les productions sans DLC ne sont pas affichées</p></div>`;
+    html += `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune production active</h3><p>${dlcFilter !== 'all' ? 'Changez le filtre pour voir d\'autres productions' : 'Créez une production depuis l\'onglet Productions'}</p></div>`;
     container.innerHTML = html;
     return;
   }
@@ -1987,11 +1996,11 @@ function renderDlcSuivi() {
     const dlc = p.dlcInfo;
     const catLabel = CATEGORIES[p.categorie] || p.categorie;
     const catIcon = CAT_ICONS[p.categorie] || '📦';
-    const dlcDate = new Date(p.dlc).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const dlcDate = p.dlc ? new Date(p.dlc).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
     const prodDate = new Date(p.date_production).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
 
     html += `
-      <tr>
+      <tr onclick="showEtiquette(dlcProductions.find(pr=>pr.id==='${p.id}'))" style="cursor:pointer">
         <td><span class="dlc-badge ${dlc.css}">${dlc.icon} ${dlc.label}</span></td>
         <td style="font-weight:500">${escapeHtml(p.nom_produit)}</td>
         <td>${catIcon} ${catLabel}</td>
@@ -2000,10 +2009,10 @@ function renderDlcSuivi() {
         <td style="font-weight:600; ${dlc.level === 'depasse' ? 'color:#dc2626' : ''}">${p.countdown}</td>
         <td>${prodDate}</td>
         <td>${escapeHtml(p.producteur_initiales || '')}</td>
-        <td style="white-space:nowrap">
-          <button class="dlc-action-btn consumed" onclick="dlcAction('${p.id}', 'consomme')" title="Marquer consommé">✓ Consommé</button>
-          <button class="dlc-action-btn wasted" onclick="dlcAction('${p.id}', 'jete')" title="Marquer jeté">✕ Jeté</button>
-          ${dlc.level !== 'ok' ? `<button class="dlc-action-btn extend" onclick="dlcExtend('${p.id}')" title="Prolonger DLC">⏱ +24h</button>` : ''}
+        <td style="white-space:nowrap" onclick="event.stopPropagation()">
+          <button class="dlc-action-btn consumed" onclick="dlcAction('${p.id}', 'consomme')" title="Marquer consommé">✓</button>
+          <button class="dlc-action-btn wasted" onclick="dlcAction('${p.id}', 'jete')" title="Marquer jeté">✕</button>
+          ${dlc.level !== 'ok' && dlc.level !== 'none' ? `<button class="dlc-action-btn extend" onclick="dlcExtend('${p.id}')" title="Prolonger DLC">+24h</button>` : ''}
         </td>
       </tr>
     `;
