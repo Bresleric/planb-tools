@@ -589,6 +589,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
   // ====== CONFIG ======
   const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
@@ -941,10 +942,10 @@
     input.click();
   }
 
-  // Scanner image processing: grayscale + soft contrast + white background cleanup
+  // Scanner: clean black & white with Sauvola adaptive threshold
   function scannerProcess(img) {
     const canvas = document.createElement('canvas');
-    const maxSize = 1600; // high res for OCR
+    const maxSize = 1800;
     let w = img.width, h = img.height;
     if (w > maxSize || h > maxSize) {
       if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
@@ -952,66 +953,104 @@
     }
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
-
-    // Draw original
     ctx.drawImage(img, 0, 0, w, h);
-
-    // Get pixel data
     const imageData = ctx.getImageData(0, 0, w, h);
     const data = imageData.data;
 
-    // Step 1: Convert to grayscale
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-      data[i] = data[i+1] = data[i+2] = gray;
+    // 1) Grayscale
+    const gray = new Uint8Array(w * h);
+    for (let i = 0; i < gray.length; i++) {
+      const p = i * 4;
+      gray[i] = Math.round(0.299 * data[p] + 0.587 * data[p+1] + 0.114 * data[p+2]);
     }
 
-    // Step 2: Auto-levels (stretch histogram for better contrast)
-    // Find actual min/max values (ignoring extreme 1% on each side)
-    const histogram = new Uint32Array(256);
-    const totalPixels = w * h;
-    for (let i = 0; i < data.length; i += 4) {
-      histogram[data[i]]++;
-    }
-    const clipCount = Math.floor(totalPixels * 0.01);
-    let lo = 0, hi = 255, cumLo = 0, cumHi = 0;
-    for (let i = 0; i < 256; i++) {
-      cumLo += histogram[i];
-      if (cumLo >= clipCount) { lo = i; break; }
-    }
-    for (let i = 255; i >= 0; i--) {
-      cumHi += histogram[i];
-      if (cumHi >= clipCount) { hi = i; break; }
-    }
-    if (hi <= lo) { lo = 0; hi = 255; }
-    const range = hi - lo || 1;
-
-    // Step 3: Apply auto-levels + lighten background
-    // Pixels above a high threshold get pushed to white (background cleanup)
-    for (let i = 0; i < data.length; i += 4) {
-      let val = data[i];
-      // Stretch to full range
-      val = ((val - lo) / range) * 255;
-      val = Math.max(0, Math.min(255, val));
-      // Lighten near-white areas to clean white (background cleanup)
-      if (val > 200) val = 255;
-      data[i] = data[i+1] = data[i+2] = val;
+    // 2) Light box blur (3x3) to reduce noise
+    const blurred = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let sum = 0, count = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+              sum += gray[ny * w + nx];
+              count++;
+            }
+          }
+        }
+        blurred[y * w + x] = Math.round(sum / count);
+      }
     }
 
+    // 3) Sauvola adaptive threshold
+    // Uses integral images for fast local mean & variance
+    const blockRadius = Math.max(25, Math.round(Math.min(w, h) / 20));
+    const k = 0.15; // Sauvola sensitivity (lower = more white, less noise)
+    const R = 128;   // dynamic range of std deviation
+
+    // Build integral image and integral of squares
+    const integ = new Float64Array((w + 1) * (h + 1));
+    const integ2 = new Float64Array((w + 1) * (h + 1));
+    for (let y = 0; y < h; y++) {
+      let rowS = 0, rowS2 = 0;
+      for (let x = 0; x < w; x++) {
+        const v = blurred[y * w + x];
+        rowS += v;
+        rowS2 += v * v;
+        integ[(y+1) * (w+1) + (x+1)] = rowS + integ[y * (w+1) + (x+1)];
+        integ2[(y+1) * (w+1) + (x+1)] = rowS2 + integ2[y * (w+1) + (x+1)];
+      }
+    }
+
+    const result = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const x1 = Math.max(0, x - blockRadius);
+        const y1 = Math.max(0, y - blockRadius);
+        const x2 = Math.min(w - 1, x + blockRadius);
+        const y2 = Math.min(h - 1, y + blockRadius);
+        const cnt = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+        const sumVal = integ[(y2+1)*(w+1)+(x2+1)] - integ[y1*(w+1)+(x2+1)]
+                     - integ[(y2+1)*(w+1)+x1] + integ[y1*(w+1)+x1];
+        const sumSq  = integ2[(y2+1)*(w+1)+(x2+1)] - integ2[y1*(w+1)+(x2+1)]
+                     - integ2[(y2+1)*(w+1)+x1] + integ2[y1*(w+1)+x1];
+
+        const mean = sumVal / cnt;
+        const variance = Math.max(0, (sumSq / cnt) - (mean * mean));
+        const std = Math.sqrt(variance);
+
+        // Sauvola formula: threshold = mean * (1 + k * (std/R - 1))
+        const threshold = mean * (1 + k * (std / R - 1));
+        result[y * w + x] = blurred[y * w + x] > threshold ? 255 : 0;
+      }
+    }
+
+    // 4) Morphological cleanup: remove isolated black pixels (salt noise)
+    // A black pixel surrounded mostly by white → set white
+    const cleaned = new Uint8Array(result);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        if (result[y * w + x] === 0) {
+          let whiteNeighbors = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              if (result[(y+dy) * w + (x+dx)] === 255) whiteNeighbors++;
+            }
+          }
+          if (whiteNeighbors >= 7) cleaned[y * w + x] = 255; // isolated → remove
+        }
+      }
+    }
+
+    // Write back
+    for (let i = 0; i < cleaned.length; i++) {
+      const p = i * 4;
+      data[p] = data[p+1] = data[p+2] = cleaned[i];
+    }
     ctx.putImageData(imageData, 0, 0);
-
-    // Step 4: Sharpen via unsharp mask (overlay technique)
-    // Draw blurred version, then blend to sharpen
-    const sharpCanvas = document.createElement('canvas');
-    sharpCanvas.width = w; sharpCanvas.height = h;
-    const sCtx = sharpCanvas.getContext('2d');
-    sCtx.drawImage(canvas, 0, 0);
-    // Apply light sharpening by blending
-    sCtx.globalCompositeOperation = 'source-over';
-    sCtx.filter = 'contrast(1.1) brightness(1.02)';
-    sCtx.drawImage(canvas, 0, 0);
-
-    return sharpCanvas.toDataURL('image/jpeg', 0.85);
+    return canvas.toDataURL('image/png'); // PNG for clean B&W (no JPEG artifacts)
   }
 
   // OCR with Tesseract.js
@@ -1031,11 +1070,69 @@
           }
         }
       });
-      return (result?.data?.text || '').trim();
+      // Return text + word positions (for searchable PDF)
+      const text = (result?.data?.text || '').trim();
+      const words = (result?.data?.words || []).map(w => ({
+        text: w.text,
+        x: w.bbox.x0,
+        y: w.bbox.y0,
+        w: w.bbox.x1 - w.bbox.x0,
+        h: w.bbox.y1 - w.bbox.y0,
+        confidence: w.confidence
+      }));
+      return { text, words };
     } catch (e) {
       console.error('OCR error:', e);
-      return '';
+      return { text: '', words: [] };
     }
+  }
+
+  // Generate searchable PDF from scanned pages
+  function generatePDF(pages) {
+    const { jsPDF } = window.jspdf;
+    let pdf = null;
+
+    pages.forEach((page, index) => {
+      // Load image to get dimensions
+      const img = new Image();
+      img.src = page.image;
+      const imgW = img.width || 1800;
+      const imgH = img.height || 2400;
+
+      // Create PDF page with image dimensions (in mm, A4-ish)
+      const pdfW = 210; // A4 width mm
+      const pdfH = (imgH / imgW) * pdfW;
+
+      if (index === 0) {
+        pdf = new jsPDF({ orientation: pdfH > pdfW ? 'portrait' : 'landscape', unit: 'mm', format: [pdfW, pdfH] });
+      } else {
+        pdf.addPage([pdfW, pdfH], pdfH > pdfW ? 'portrait' : 'landscape');
+      }
+
+      // Add scanned image as full page
+      pdf.addImage(page.image, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
+
+      // Add invisible OCR text layer (searchable)
+      if (page.ocrData?.words?.length) {
+        pdf.setTextColor(255, 255, 255); // white = invisible
+        pdf.setFont('helvetica');
+
+        const scaleX = pdfW / imgW;
+        const scaleY = pdfH / imgH;
+
+        page.ocrData.words.forEach(word => {
+          if (!word.text.trim() || word.confidence < 30) return;
+          const fontSize = Math.max(4, Math.min(14, word.h * scaleY * 2.5));
+          pdf.setFontSize(fontSize);
+          // Position text precisely over where it appears in the image
+          const x = word.x * scaleX;
+          const y = (word.y + word.h * 0.8) * scaleY;
+          try { pdf.text(word.text, x, y); } catch(e) { /* skip invalid chars */ }
+        });
+      }
+    });
+
+    return pdf ? pdf.output('datauristring') : null;
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1053,13 +1150,13 @@
 
           // Step 2: OCR
           showOcrOverlay(true, 'Reconnaissance du texte (OCR)...', 30);
-          const ocrText = await runOcr(scannedBase64);
+          const ocrResult = await runOcr(scannedBase64);
 
           showOcrOverlay(false);
 
-          capturedPages.push({ image: scannedBase64, ocr: ocrText });
+          capturedPages.push({ image: scannedBase64, ocr: ocrResult.text, ocrData: ocrResult });
           updatePhotoGrid();
-          const ocrMsg = ocrText ? `Page ${capturedPages.length} scannee (${ocrText.length} car.)` : `Page ${capturedPages.length} scannee`;
+          const ocrMsg = ocrResult.text ? `Page ${capturedPages.length} scannee (${ocrResult.text.length} car.)` : `Page ${capturedPages.length} scannee`;
           showToast(ocrMsg, 'success');
         };
         img.src = ev.target.result;
@@ -1111,7 +1208,16 @@
     btn.textContent = 'Enregistrement...';
 
     try {
-      // Insert document
+      // Generate searchable PDF
+      showOcrOverlay(true, 'Generation du PDF...', 80);
+      await new Promise(r => setTimeout(r, 50));
+      const pdfDataUri = generatePDF(capturedPages);
+      showOcrOverlay(false);
+
+      // Combine all OCR text
+      const allOcrText = capturedPages.map(p => p.ocr).filter(Boolean).join('\n\n');
+
+      // Insert document with PDF
       const doc = await DB.insertDocument({
         type,
         fournisseur_id: fournisseurId,
@@ -1122,13 +1228,15 @@
         statut: 'en_attente',
         observation: observation || null,
         nb_pages: capturedPages.length,
+        pdf_data: pdfDataUri || null,
+        texte_ocr: allOcrText || null,
         user_id: currentUser.id,
         user_nom: currentUser.nom,
         user_initiales: currentUser.initiales,
         etablissement: currentEtablissement
       });
 
-      // Insert pages with OCR text
+      // Insert pages (images for quick preview)
       if (doc && capturedPages.length) {
         const pages = capturedPages.map((page, i) => ({
           document_id: doc.id,
@@ -1139,7 +1247,7 @@
         await DB.insertPages(pages);
       }
 
-      showToast('Document enregistre !', 'success');
+      showToast('PDF genere et enregistre !', 'success');
       closeModal('modal-new');
       loadDocuments();
     } catch (e) {
@@ -1242,15 +1350,25 @@
         </div>`;
     }
 
+    // PDF download button
+    if (doc.pdf_data) {
+      body += `
+        <div style="margin-top:12px;">
+          <button class="btn btn-primary btn-full" onclick="downloadPdf('${doc.id}')">
+            📥 Telecharger le PDF
+          </button>
+        </div>`;
+    }
+
     // OCR text
-    const allOcr = pages.map(p => p.texte_ocr).filter(Boolean);
-    if (allOcr.length) {
+    const ocrText = doc.texte_ocr || pages.map(p => p.texte_ocr).filter(Boolean).join('\n\n');
+    if (ocrText) {
       body += `
         <div style="margin-top:12px;">
           <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">
             Texte extrait (OCR) <span class="ocr-badge">AUTO</span>
           </div>
-          <div class="ocr-text-box">${esc(allOcr.join('\n\n--- Page suivante ---\n\n'))}</div>
+          <div class="ocr-text-box">${esc(ocrText)}</div>
         </div>`;
     }
 
@@ -1279,6 +1397,20 @@
     viewerPages = docPagesCache[docId].map(p => p.photo_data);
     viewerIndex = pageIndex;
     showViewer();
+  }
+
+  // ====== PDF DOWNLOAD ======
+  function downloadPdf(docId) {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc?.pdf_data) { showToast('PDF non disponible', 'error'); return; }
+    const link = document.createElement('a');
+    link.href = doc.pdf_data;
+    const dateLabel = doc.date.replace(/-/g, '');
+    const fournLabel = doc.fournisseur_nom.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+    link.download = `${doc.type}_${fournLabel}_${dateLabel}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // ====== VALIDATE DOCUMENT ======

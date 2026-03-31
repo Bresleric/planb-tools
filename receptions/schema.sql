@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS receptions_documents (
     valide_par_id UUID,
     valide_par_nom TEXT,
     date_validation TIMESTAMPTZ,
+    pdf_data TEXT,             -- PDF searchable en base64 (data URI)
+    texte_ocr TEXT,            -- texte OCR combine de toutes les pages
     etablissement TEXT NOT NULL REFERENCES etablissements(id),
     created_at TIMESTAMPTZ DEFAULT now()
 );
