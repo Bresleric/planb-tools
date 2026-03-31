@@ -135,6 +135,14 @@
     }
     .task-table-header span { padding: 0 3px; white-space: nowrap; }
     .th-center { text-align: center; }
+    .th-sort {
+      cursor: pointer; user-select: none;
+      display: inline-flex; align-items: center; gap: 2px;
+    }
+    .th-sort:hover { color: var(--orange); }
+    .th-sort .sort-arrow { font-size: 0.55rem; opacity: 0.3; }
+    .th-sort.active .sort-arrow { opacity: 1; color: var(--orange); }
+    .th-sort.active { color: var(--orange); }
 
     .task-row {
       display: grid;
@@ -650,6 +658,8 @@
   let selectedAssignee = null;
   let productionLots = []; // lots du jour en cache
   let productionFiches = []; // fiches techniques en cache
+  let sortColumn = 'default'; // colonne de tri active
+  let sortDir = 'asc'; // 'asc' ou 'desc'
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -1065,6 +1075,8 @@
 
   // ====== FILTERED TASKS ======
   function getFilteredTasks() {
+    const creneauOrder = { Matin: 1, Midi: 2, Soir: 3 };
+
     return tasks
       .filter(t => {
         if (filterCreneau !== 'all' && t.creneau !== filterCreneau) return false;
@@ -1073,11 +1085,64 @@
         return true;
       })
       .sort((a, b) => {
+        // Toujours : terminées en bas
         const ad = !!a.fait_par_id, bd = !!b.fait_par_id;
         if (ad !== bd) return ad ? 1 : -1;
-        if (a.priorite !== b.priorite) return b.priorite - a.priorite;
-        return (a.tache || '').localeCompare(b.tache || '');
+
+        // Si tri par défaut : priorité desc puis nom asc
+        if (sortColumn === 'default') {
+          if (a.priorite !== b.priorite) return b.priorite - a.priorite;
+          return (a.tache || '').localeCompare(b.tache || '');
+        }
+
+        // Tri par colonne choisie
+        let va, vb;
+        switch (sortColumn) {
+          case 'creneau':
+            va = creneauOrder[a.creneau] || 9;
+            vb = creneauOrder[b.creneau] || 9;
+            break;
+          case 'createur':
+            va = (a.createur_nom || '').toLowerCase();
+            vb = (b.createur_nom || '').toLowerCase();
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          case 'attribue':
+            va = (a.attribue_a_nom || a.attribue_a_initiales || 'zzz').toLowerCase();
+            vb = (b.attribue_a_nom || b.attribue_a_initiales || 'zzz').toLowerCase();
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          case 'tache':
+            va = (a.tache || '').toLowerCase();
+            vb = (b.tache || '').toLowerCase();
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          case 'note':
+            va = (a.observation || '').toLowerCase();
+            vb = (b.observation || '').toLowerCase();
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          case 'priorite':
+            va = a.priorite || 0;
+            vb = b.priorite || 0;
+            break;
+          case 'statut':
+            va = a.date_validation || '';
+            vb = b.date_validation || '';
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          default:
+            return 0;
+        }
+        return sortDir === 'asc' ? va - vb : vb - va;
       });
+  }
+
+  function toggleSort(col) {
+    if (sortColumn === col) {
+      // Même colonne : inverser la direction, ou revenir au défaut
+      if (sortDir === 'asc') sortDir = 'desc';
+      else { sortColumn = 'default'; sortDir = 'asc'; }
+    } else {
+      sortColumn = col;
+      sortDir = 'asc';
+    }
+    renderFiltered();
   }
 
   // ====== TAB SWITCHING ======
@@ -1114,16 +1179,19 @@
       return;
     }
 
-    // Table header : Créneau | Créé | À | Tâche | Note | Prio | ✓ | Statut | Actions
+    // Table header with sortable columns
+    const sa = (col) => sortColumn === col ? 'active' : '';
+    const arrow = (col) => sortColumn === col ? (sortDir === 'asc' ? '▲' : '▼') : '▲';
+
     let html = `<div class="task-table-header">
-      <span>Crén.</span>
-      <span class="th-center">De</span>
-      <span class="th-center">À</span>
-      <span>Tâche</span>
-      <span>Note</span>
-      <span class="th-center">Prio</span>
+      <span class="th-sort ${sa('creneau')}" onclick="toggleSort('creneau')">Crén.<span class="sort-arrow">${arrow('creneau')}</span></span>
+      <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
+      <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
+      <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
+      <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
+      <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
       <span class="th-center">✓</span>
-      <span class="th-center">Statut</span>
+      <span class="th-sort th-center ${sa('statut')}" onclick="toggleSort('statut')">Statut<span class="sort-arrow">${arrow('statut')}</span></span>
       <span></span>
     </div>`;
 
