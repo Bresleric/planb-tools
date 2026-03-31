@@ -369,6 +369,7 @@
     .fab-button.active { display: flex; }
     .fab-button:active { background: #7c3aed; }
 
+    /* ====== ÉTIQUETTE AMÉLIORÉE ====== */
     .etiquette-modal {
       position: fixed; inset: 0; z-index: 250;
       background: rgba(0,0,0,.5); display: none;
@@ -376,18 +377,105 @@
     }
     .etiquette-modal.active { display: flex; }
     .etiquette-card {
-      background: white; border-radius: 12px; padding: 24px;
+      background: white; border-radius: 12px; padding: 0;
       max-width: 400px; width: 100%;
-      border: 2px solid var(--purple); text-align: center;
+      border: 2px solid var(--purple); overflow: hidden;
     }
-    .etiquette-title { font-size: 1.3rem; font-weight: 700; color: var(--gray-800); margin-bottom: 12px; }
-    .etiquette-section { margin-bottom: 12px; font-size: 0.9rem; }
-    .etiquette-label { color: var(--gray-500); font-size: 0.7rem; text-transform: uppercase; }
+    .etiquette-header-bar {
+      background: var(--purple); color: white; padding: 12px 16px;
+      text-align: center; font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 1px; font-weight: 600;
+    }
+    .etiquette-body { padding: 20px; text-align: center; }
+    .etiquette-title { font-size: 1.4rem; font-weight: 700; color: var(--gray-800); margin-bottom: 14px; }
+    .etiquette-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      text-align: left; margin-bottom: 14px;
+    }
+    .etiquette-section { font-size: 0.85rem; }
+    .etiquette-section.full { grid-column: 1 / -1; text-align: center; }
+    .etiquette-label { color: var(--gray-500); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.3px; }
     .etiquette-value { font-weight: 600; color: var(--gray-800); margin-top: 2px; }
-    .etiquette-close { width: 100%; padding: 10px; margin-top: 12px; border: none;
-      background: var(--purple); color: white; border-radius: var(--radius);
-      font-weight: 600; cursor: pointer; }
-    .etiquette-close:active { background: #7c3aed; }
+    .etiquette-dlc-box {
+      background: #fef2f2; border: 2px solid #ef4444; border-radius: 8px;
+      padding: 10px; margin: 12px 0; text-align: center;
+    }
+    .etiquette-dlc-box .lbl { color: #ef4444; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+    .etiquette-dlc-box .val { color: #ef4444; font-size: 1.3rem; font-weight: 800; margin-top: 2px; }
+    .etiquette-actions { display: flex; gap: 8px; padding: 0 20px 16px; }
+    .etiquette-btn {
+      flex: 1; padding: 10px; border: none; border-radius: var(--radius);
+      font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .etiquette-btn.close { background: var(--gray-200); color: var(--gray-600); }
+    .etiquette-btn.print { background: var(--purple); color: white; }
+    .etiquette-btn.print:active { background: #7c3aed; }
+    .etiquette-btn.mark { background: #22c55e; color: white; }
+
+    /* ====== DLC SUIVI ====== */
+    .dlc-filters {
+      display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap; align-items: center;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .dlc-filter-chip {
+      padding: 5px 12px; border-radius: 16px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.78rem; cursor: pointer; font-weight: 500;
+    }
+    .dlc-filter-chip.active { background: var(--purple); color: white; border-color: var(--purple); }
+    .dlc-filter-chip:active { transform: scale(0.95); }
+
+    .dlc-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .dlc-table th {
+      background: var(--gray-50); padding: 8px 10px; text-align: left;
+      font-size: 0.68rem; text-transform: uppercase; color: var(--gray-500);
+      border-bottom: 2px solid var(--gray-200); font-weight: 600; letter-spacing: 0.3px;
+      position: sticky; top: 0; z-index: 2;
+    }
+    .dlc-table td { padding: 8px 10px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+    .dlc-table tr:hover { background: #faf5ff; }
+
+    .dlc-badge {
+      padding: 3px 8px; border-radius: 10px; font-size: 0.7rem;
+      font-weight: 700; display: inline-block; white-space: nowrap;
+    }
+    .dlc-ok { background: #f0fdf4; color: #16a34a; }
+    .dlc-j2 { background: #fefce8; color: #ca8a04; }
+    .dlc-j1 { background: #fff7ed; color: #ea580c; }
+    .dlc-depasse { background: #fef2f2; color: #dc2626; }
+
+    .dlc-action-btn {
+      padding: 4px 8px; border-radius: 6px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.72rem; cursor: pointer; white-space: nowrap;
+    }
+    .dlc-action-btn:hover { background: var(--gray-50); }
+    .dlc-action-btn.consumed { border-color: #22c55e; color: #16a34a; }
+    .dlc-action-btn.wasted { border-color: #ef4444; color: #dc2626; }
+    .dlc-action-btn.extend { border-color: #f59e0b; color: #d97706; }
+
+    .dlc-summary {
+      display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap;
+    }
+    .dlc-stat {
+      flex: 1; min-width: 70px; padding: 10px; border-radius: 8px; text-align: center;
+    }
+    .dlc-stat .num { font-size: 1.4rem; font-weight: 700; }
+    .dlc-stat .lbl { font-size: 0.65rem; color: var(--gray-500); text-transform: uppercase; }
+    .dlc-stat-ok { background: #f0fdf4; }
+    .dlc-stat-ok .num { color: #16a34a; }
+    .dlc-stat-j2 { background: #fefce8; }
+    .dlc-stat-j2 .num { color: #ca8a04; }
+    .dlc-stat-j1 { background: #fff7ed; }
+    .dlc-stat-j1 .num { color: #ea580c; }
+    .dlc-stat-dep { background: #fef2f2; }
+    .dlc-stat-dep .num { color: #dc2626; }
+
+    @media print {
+      body * { visibility: hidden; }
+      .etiquette-card, .etiquette-card * { visibility: visible; }
+      .etiquette-card { position: absolute; top: 0; left: 0; border: 2px solid #000; max-width: 100%; }
+      .etiquette-actions { display: none; }
+      .etiquette-header-bar { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -409,6 +497,7 @@
   <div class="tabs-bar" id="tabs-bar">
     <button class="tab-btn active" data-tab="fiches">📖 Fiches</button>
     <button class="tab-btn" data-tab="productions">📦 Productions</button>
+    <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
     <button class="tab-btn" data-tab="create" id="tab-create-btn">➕ Créer</button>
   </div>
 
@@ -441,6 +530,9 @@
 
     <!-- TAB: Productions -->
     <div class="tab-content" id="tab-productions"></div>
+
+    <!-- TAB: DLC Suivi -->
+    <div class="tab-content" id="tab-dlc"></div>
 
     <!-- TAB: Créer / Éditer -->
     <div class="tab-content" id="tab-create">
@@ -671,6 +763,8 @@ let searchTerm = '';
 let editingFicheId = null;
 let selectedProductionDate = null;
 let selectedProductionCategory = 'all';
+let dlcProductions = [];
+let dlcFilter = 'all'; // all, ok, j2, j1, depasse
 
 const CATEGORIES = {
   mise_en_place: 'Mise en place',
@@ -767,6 +861,8 @@ function switchTab(tab) {
 
   if (tab === 'productions') {
     loadProductions();
+  } else if (tab === 'dlc') {
+    loadDlcSuivi();
   } else if (tab === 'create' && !editingFicheId) {
     resetForm();
   }
@@ -1037,6 +1133,43 @@ const DB = {
       .insert(production)
       .select()
       .single();
+    if (error) throw error;
+    return data;
+  },
+
+  // ====== DLC ======
+  async getActiveProductions() {
+    // Productions avec DLC, non consommées/jetées
+    const { data, error } = await sb
+      .from('productions')
+      .select('*')
+      .eq('etablissement', currentEtablissement)
+      .not('dlc', 'is', null)
+      .in('statut', ['termine', 'etiquete', 'stocke'])
+      .order('dlc', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async updateProductionStatut(id, statut) {
+    const { error } = await sb.from('productions').update({ statut }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async updateProductionDlc(id, newDlc) {
+    const { error } = await sb.from('productions').update({ dlc: newDlc }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async markEtiquetteImprimee(id) {
+    const { error } = await sb.from('productions').update({
+      etiquette_imprimee: true, etiquette_date: new Date().toISOString()
+    }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async insertDlcAction(action) {
+    const { data, error } = await sb.from('dlc_suivi').insert(action).select().single();
     if (error) throw error;
     return data;
   }
@@ -1322,47 +1455,6 @@ async function saveProduction() {
     showToast('Erreur: ' + e.message, 'error');
   }
   showLoading(false);
-}
-
-function showEtiquette(production) {
-  const html = `
-    <div class="etiquette-modal active" id="etiquette">
-      <div class="etiquette-card">
-        <div class="etiquette-title">${production.nom_produit}</div>
-        <div class="etiquette-section">
-          <div class="etiquette-label">Date & Heure</div>
-          <div class="etiquette-value">${new Date(production.created_at).toLocaleString('fr-FR')}</div>
-        </div>
-        ${production.dlc ? `<div class="etiquette-section">
-          <div class="etiquette-label">DLC</div>
-          <div class="etiquette-value" style="color:var(--red);font-size:1.1rem;">${new Date(production.dlc).toLocaleDateString('fr-FR', {weekday:'short', day:'numeric', month:'short', year:'numeric'})}</div>
-        </div>` : ''}
-        <div class="etiquette-section">
-          <div class="etiquette-label">Lot</div>
-          <div class="etiquette-value">${allLots.find(l => l.id === production.lot_id)?.numero_lot || 'N/A'}</div>
-        </div>
-        <div class="etiquette-section">
-          <div class="etiquette-label">Producteur</div>
-          <div class="etiquette-value">${production.producteur_initiales}</div>
-        </div>
-        <div class="etiquette-section">
-          <div class="etiquette-label">Quantité</div>
-          <div class="etiquette-value">${production.quantite_produite} ${production.unite}</div>
-        </div>
-        ${production.temperature_stockage ? `<div class="etiquette-section">
-          <div class="etiquette-label">Température</div>
-          <div class="etiquette-value">${production.temperature_stockage}</div>
-        </div>` : ''}
-        <button class="etiquette-close" onclick="closeEtiquette()">Fermer</button>
-      </div>
-    </div>
-  `;
-  document.body.insertAdjacentHTML('beforeend', html);
-}
-
-function closeEtiquette() {
-  const etiquette = document.getElementById('etiquette');
-  if (etiquette) etiquette.remove();
 }
 
 // ============= VIEW FICHE DETAIL =============
@@ -1727,6 +1819,279 @@ async function toggleActive(id, newState) {
     showToast('Erreur: ' + e.message, 'error');
   }
   showLoading(false);
+}
+
+// ============= DLC SUIVI =============
+function getDlcLevel(dlcDate) {
+  if (!dlcDate) return null;
+  const now = new Date();
+  const dlc = new Date(dlcDate);
+  const diffMs = dlc.getTime() - now.getTime();
+  const diffH = diffMs / (1000 * 60 * 60);
+
+  if (diffH < 0) return { level: 'depasse', label: 'Dépassé', css: 'dlc-depasse', icon: '🔴' };
+  if (diffH < 24) return { level: 'j1', label: 'J-1', css: 'dlc-j1', icon: '🔶' };
+  if (diffH < 48) return { level: 'j2', label: 'J-2', css: 'dlc-j2', icon: '⚠️' };
+  return { level: 'ok', label: 'OK', css: 'dlc-ok', icon: '✅' };
+}
+
+function formatDlcCountdown(dlcDate) {
+  if (!dlcDate) return '';
+  const now = new Date();
+  const dlc = new Date(dlcDate);
+  const diffMs = dlc.getTime() - now.getTime();
+  const diffH = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60));
+  const diffD = Math.floor(diffH / 24);
+  const remH = diffH % 24;
+
+  if (diffMs < 0) {
+    return diffD > 0 ? `−${diffD}j ${remH}h` : `−${remH}h`;
+  }
+  return diffD > 0 ? `${diffD}j ${remH}h` : `${remH}h`;
+}
+
+async function loadDlcSuivi() {
+  showLoading(true);
+  try {
+    dlcProductions = await DB.getActiveProductions();
+    renderDlcSuivi();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur chargement DLC', 'error');
+  }
+  showLoading(false);
+}
+
+function renderDlcSuivi() {
+  const container = document.getElementById('tab-dlc');
+
+  // Calculer les niveaux
+  const withLevels = dlcProductions.map(p => ({
+    ...p,
+    dlcInfo: getDlcLevel(p.dlc),
+    countdown: formatDlcCountdown(p.dlc)
+  }));
+
+  // Stats
+  const counts = { ok: 0, j2: 0, j1: 0, depasse: 0 };
+  withLevels.forEach(p => { if (p.dlcInfo) counts[p.dlcInfo.level]++; });
+
+  // Filtrer
+  const filtered = dlcFilter === 'all'
+    ? withLevels
+    : withLevels.filter(p => p.dlcInfo?.level === dlcFilter);
+
+  let html = `
+    <div class="dlc-summary">
+      <div class="dlc-stat dlc-stat-dep"><div class="num">${counts.depasse}</div><div class="lbl">Dépassés</div></div>
+      <div class="dlc-stat dlc-stat-j1"><div class="num">${counts.j1}</div><div class="lbl">J-1</div></div>
+      <div class="dlc-stat dlc-stat-j2"><div class="num">${counts.j2}</div><div class="lbl">J-2</div></div>
+      <div class="dlc-stat dlc-stat-ok"><div class="num">${counts.ok}</div><div class="lbl">OK</div></div>
+    </div>
+    <div class="dlc-filters">
+      <button class="dlc-filter-chip ${dlcFilter === 'all' ? 'active' : ''}" onclick="setDlcFilter('all')">Tous (${withLevels.length})</button>
+      <button class="dlc-filter-chip ${dlcFilter === 'depasse' ? 'active' : ''}" onclick="setDlcFilter('depasse')">🔴 Dépassés (${counts.depasse})</button>
+      <button class="dlc-filter-chip ${dlcFilter === 'j1' ? 'active' : ''}" onclick="setDlcFilter('j1')">🔶 J-1 (${counts.j1})</button>
+      <button class="dlc-filter-chip ${dlcFilter === 'j2' ? 'active' : ''}" onclick="setDlcFilter('j2')">⚠️ J-2 (${counts.j2})</button>
+      <button class="dlc-filter-chip ${dlcFilter === 'ok' ? 'active' : ''}" onclick="setDlcFilter('ok')">✅ OK (${counts.ok})</button>
+    </div>
+  `;
+
+  if (filtered.length === 0) {
+    html += `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune production avec DLC</h3><p>${dlcFilter !== 'all' ? 'Changez le filtre ou ' : ''}Les productions sans DLC ne sont pas affichées</p></div>`;
+    container.innerHTML = html;
+    return;
+  }
+
+  html += `
+    <div style="overflow-x:auto; padding: 0 4px;">
+    <table class="dlc-table">
+      <thead>
+        <tr>
+          <th>Alerte</th>
+          <th>Produit</th>
+          <th>Catégorie</th>
+          <th>Qté</th>
+          <th>DLC</th>
+          <th>Restant</th>
+          <th>Produit le</th>
+          <th>Par</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  filtered.forEach(p => {
+    const dlc = p.dlcInfo;
+    const catLabel = CATEGORIES[p.categorie] || p.categorie;
+    const catIcon = CAT_ICONS[p.categorie] || '📦';
+    const dlcDate = new Date(p.dlc).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const prodDate = new Date(p.date_production).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+
+    html += `
+      <tr>
+        <td><span class="dlc-badge ${dlc.css}">${dlc.icon} ${dlc.label}</span></td>
+        <td style="font-weight:500">${escapeHtml(p.nom_produit)}</td>
+        <td>${catIcon} ${catLabel}</td>
+        <td>${p.quantite_produite} ${p.unite}</td>
+        <td style="font-weight:600">${dlcDate}</td>
+        <td style="font-weight:600; ${dlc.level === 'depasse' ? 'color:#dc2626' : ''}">${p.countdown}</td>
+        <td>${prodDate}</td>
+        <td>${escapeHtml(p.producteur_initiales || '')}</td>
+        <td style="white-space:nowrap">
+          <button class="dlc-action-btn consumed" onclick="dlcAction('${p.id}', 'consomme')" title="Marquer consommé">✓ Consommé</button>
+          <button class="dlc-action-btn wasted" onclick="dlcAction('${p.id}', 'jete')" title="Marquer jeté">✕ Jeté</button>
+          ${dlc.level !== 'ok' ? `<button class="dlc-action-btn extend" onclick="dlcExtend('${p.id}')" title="Prolonger DLC">⏱ +24h</button>` : ''}
+        </td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+function setDlcFilter(f) {
+  dlcFilter = f;
+  renderDlcSuivi();
+}
+
+async function dlcAction(productionId, action) {
+  const p = dlcProductions.find(pr => pr.id === productionId);
+  if (!p) return;
+
+  const labels = { consomme: 'consommé', jete: 'jeté' };
+  const confirmMsg = `Marquer « ${p.nom_produit} » comme ${labels[action]} ?`;
+
+  showConfirmModal(`Confirmer : ${labels[action]}`, confirmMsg, async () => {
+    try {
+      await DB.updateProductionStatut(productionId, action);
+      await DB.insertDlcAction({
+        production_id: productionId,
+        action: action,
+        ancienne_dlc: p.dlc,
+        motif: action === 'jete' ? 'DLC dépassée ou produit altéré' : 'Produit utilisé',
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+      showToast(`Produit marqué ${labels[action]}`, 'success');
+      await loadDlcSuivi();
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur: ' + e.message, 'error');
+    }
+  });
+}
+
+async function dlcExtend(productionId) {
+  const p = dlcProductions.find(pr => pr.id === productionId);
+  if (!p) return;
+
+  try {
+    const oldDlc = p.dlc;
+    const newDlc = new Date(new Date(oldDlc).getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+    await DB.updateProductionDlc(productionId, newDlc);
+    await DB.insertDlcAction({
+      production_id: productionId,
+      action: 'prolongation',
+      ancienne_dlc: oldDlc,
+      nouvelle_dlc: newDlc,
+      motif: 'Prolongation +24h',
+      user_id: currentUser.id,
+      user_nom: currentUser.nom,
+      user_initiales: currentUser.initiales,
+      etablissement: currentEtablissement
+    });
+    showToast('DLC prolongée de 24h', 'success');
+    await loadDlcSuivi();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur: ' + e.message, 'error');
+  }
+}
+
+// ============= ÉTIQUETTE AMÉLIORÉE =============
+function showEtiquette(production) {
+  const dlcInfo = getDlcLevel(production.dlc);
+  const lot = allLots.find(l => l.id === production.lot_id);
+  const dlcStr = production.dlc
+    ? new Date(production.dlc).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+  const prodDate = new Date(production.date_production || production.created_at).toLocaleString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+
+  const html = `
+    <div class="etiquette-modal active" id="etiquette">
+      <div class="etiquette-card">
+        <div class="etiquette-header-bar">ÉTIQUETTE PRODUCTION — ${escapeHtml(currentEtablissement).toUpperCase()}</div>
+        <div class="etiquette-body">
+          <div class="etiquette-title">${escapeHtml(production.nom_produit)}</div>
+          <div class="etiquette-grid">
+            <div class="etiquette-section">
+              <div class="etiquette-label">Date production</div>
+              <div class="etiquette-value">${prodDate}</div>
+            </div>
+            <div class="etiquette-section">
+              <div class="etiquette-label">N° Lot</div>
+              <div class="etiquette-value">${lot?.numero_lot || 'N/A'}</div>
+            </div>
+            <div class="etiquette-section">
+              <div class="etiquette-label">Quantité</div>
+              <div class="etiquette-value">${production.quantite_produite} ${production.unite}</div>
+            </div>
+            <div class="etiquette-section">
+              <div class="etiquette-label">Producteur</div>
+              <div class="etiquette-value">${escapeHtml(production.producteur_initiales || production.producteur_nom)}</div>
+            </div>
+            ${production.temperature_stockage ? `
+            <div class="etiquette-section">
+              <div class="etiquette-label">Température stockage</div>
+              <div class="etiquette-value">${escapeHtml(production.temperature_stockage)}</div>
+            </div>` : ''}
+          </div>
+          ${dlcStr ? `
+          <div class="etiquette-dlc-box">
+            <div class="lbl">DATE LIMITE DE CONSOMMATION</div>
+            <div class="val">${dlcStr}</div>
+          </div>` : ''}
+        </div>
+        <div class="etiquette-actions">
+          <button class="etiquette-btn close" onclick="closeEtiquette()">Fermer</button>
+          <button class="etiquette-btn print" onclick="printEtiquette('${production.id}')">🖨 Imprimer</button>
+          <button class="etiquette-btn mark" onclick="markEtiquetteOk('${production.id}')">✓ Étiquetée</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeEtiquette() {
+  const el = document.getElementById('etiquette');
+  if (el) el.remove();
+}
+
+function printEtiquette(productionId) {
+  window.print();
+  // Marquer comme imprimée en arrière-plan
+  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+}
+
+async function markEtiquetteOk(productionId) {
+  try {
+    await DB.updateProductionStatut(productionId, 'etiquete');
+    await DB.markEtiquetteImprimee(productionId);
+    closeEtiquette();
+    showToast('Production marquée étiquetée ✓', 'success');
+    if (allProductions.length) await loadProductions();
+  } catch (e) {
+    showToast('Erreur: ' + e.message, 'error');
+  }
 }
 
 // ============= UTILITIES =============
