@@ -1317,6 +1317,45 @@
                         if (caisseData && caisseData.length > 0 && caisseData[0].ca > 0) {
                             prevData.ca_veille = caisseData[0].ca;
                         }
+
+                        // === AUTO-FILL depuis ventes_journalieres ===
+                        // N-1 : même jour de semaine, semaine précédente
+                        if (!prevData.ca_n1) {
+                            const n1Date = new Date(consultDate + 'T12:00:00');
+                            n1Date.setDate(n1Date.getDate() - 7);
+                            const n1Str = n1Date.toISOString().split('T')[0];
+                            const { data: ventesN1 } = await supabaseClient
+                                .from('ventes_journalieres')
+                                .select('ca_ttc, couverts')
+                                .eq('date', n1Str)
+                                .eq('etablissement', currentEstablishment);
+                            if (ventesN1 && ventesN1.length > 0) {
+                                const caN1 = ventesN1.reduce((s, v) => s + (v.ca_ttc || 0), 0);
+                                const couvN1 = ventesN1.reduce((s, v) => s + (v.couverts || 0), 0);
+                                if (caN1 > 0) {
+                                    prevData.ca_n1 = Math.round(caN1 * 100) / 100;
+                                    prevData.couverts_n1 = couvN1;
+                                    prevData.ticket_moyen_n1 = couvN1 > 0 ? Math.round(caN1 / couvN1 * 100) / 100 : 0;
+                                }
+                            }
+                        }
+                        // Veille : depuis ventes_journalieres si pas trouvé dans caisse_controle
+                        if (!prevData.ca_veille) {
+                            const { data: ventesVeille } = await supabaseClient
+                                .from('ventes_journalieres')
+                                .select('ca_ttc, couverts')
+                                .eq('date', veilleStr)
+                                .eq('etablissement', currentEstablishment);
+                            if (ventesVeille && ventesVeille.length > 0) {
+                                const caV = ventesVeille.reduce((s, v) => s + (v.ca_ttc || 0), 0);
+                                const couvV = ventesVeille.reduce((s, v) => s + (v.couverts || 0), 0);
+                                if (caV > 0) {
+                                    prevData.ca_veille = Math.round(caV * 100) / 100;
+                                    prevData.couverts_veille = couvV;
+                                    prevData.ticket_moyen_veille = couvV > 0 ? Math.round(caV / couvV * 100) / 100 : 0;
+                                }
+                            }
+                        }
                     }
 
                     // === CONTINUITE : charger le briefing precedent ===
@@ -1887,12 +1926,58 @@
                     .eq('service', prevService)
                     .limit(1);
                 prev = data && data.length > 0 ? data[0] : null;
+
+                // Auto-fill N-1 et Veille depuis ventes_journalieres si pas de prévisions
+                if (!prev || (!prev.ca_n1 && !prev.ca_veille)) {
+                    if (!prev) prev = {};
+                    // N-1 : même jour semaine -7j
+                    if (!prev.ca_n1) {
+                        const n1Date = new Date(consultDate + 'T12:00:00');
+                        n1Date.setDate(n1Date.getDate() - 7);
+                        const n1Str = n1Date.toISOString().split('T')[0];
+                        const { data: vN1 } = await supabaseClient
+                            .from('ventes_journalieres')
+                            .select('ca_ttc, couverts')
+                            .eq('date', n1Str)
+                            .eq('etablissement', currentEstablishment)
+                            .eq('service', prevService);
+                        if (vN1 && vN1.length > 0) {
+                            const ca = vN1.reduce((s, v) => s + (v.ca_ttc || 0), 0);
+                            const couv = vN1.reduce((s, v) => s + (v.couverts || 0), 0);
+                            if (ca > 0) {
+                                prev.ca_n1 = Math.round(ca * 100) / 100;
+                                prev.couverts_n1 = couv;
+                                prev.ticket_moyen_n1 = couv > 0 ? Math.round(ca / couv * 100) / 100 : 0;
+                            }
+                        }
+                    }
+                    // Veille
+                    if (!prev.ca_veille) {
+                        const veilleD = new Date(consultDate + 'T12:00:00');
+                        veilleD.setDate(veilleD.getDate() - 1);
+                        const vStr = veilleD.toISOString().split('T')[0];
+                        const { data: vV } = await supabaseClient
+                            .from('ventes_journalieres')
+                            .select('ca_ttc, couverts')
+                            .eq('date', vStr)
+                            .eq('etablissement', currentEstablishment);
+                        if (vV && vV.length > 0) {
+                            const caV = vV.reduce((s, v) => s + (v.ca_ttc || 0), 0);
+                            const couvV = vV.reduce((s, v) => s + (v.couverts || 0), 0);
+                            if (caV > 0) {
+                                prev.ca_veille = Math.round(caV * 100) / 100;
+                                prev.couverts_veille = couvV;
+                                prev.ticket_moyen_veille = couvV > 0 ? Math.round(caV / couvV * 100) / 100 : 0;
+                            }
+                        }
+                    }
+                }
             }
 
             form.innerHTML = `
                 <div class="form-section" style="box-shadow:none; border:1px solid var(--gray-200);">
                     <div style="padding:14px;">
-                        <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin-bottom:10px;">CHIFFRES N-1</div>
+                        <div style="font-size:12px; font-weight:700; color:var(--gray-500); margin-bottom:10px;">CHIFFRES N-1 <span style="font-weight:400; color:var(--accent);">(auto depuis Ventes)</span></div>
                         <div class="form-row">
                             <div class="form-group"><label class="form-label">CA N-1</label><input type="number" class="form-input" id="p-ca-n1" value="${n(prev?.ca_n1)}" inputmode="decimal" step="0.01"></div>
                             <div class="form-group"><label class="form-label">Couverts N-1</label><input type="number" class="form-input" id="p-couverts-n1" value="${n(prev?.couverts_n1)}" inputmode="numeric"></div>

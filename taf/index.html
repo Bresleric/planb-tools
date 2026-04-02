@@ -1298,25 +1298,41 @@
   // ====== ASSIGN MODAL ======
   function showAssignModal(taskId) {
     const task = tasks.find(t => t.id === taskId);
-    const teamUsers = users.filter(u =>
-      u.equipe === task?.equipe || u.role === 'admin' || u.role === 'manager'
-    );
+    // Group all users by equipe, task's equipe first
+    const taskEquipe = task?.equipe || '';
+    const equipeOrder = [taskEquipe, ...EQUIPES.filter(e => e !== taskEquipe)];
+    const grouped = {};
+    users.forEach(u => {
+      const eq = u.equipe || 'autre';
+      if (!grouped[eq]) grouped[eq] = [];
+      grouped[eq].push(u);
+    });
 
-    openModal('Attribuer la tâche', `
-      <p style="margin-bottom:8px;font-size:0.85rem;color:var(--gray-500)">
-        ${esc(task?.tache)} — ${esc((task?.equipe || '').charAt(0).toUpperCase() + (task?.equipe || '').slice(1))}
-      </p>
-      <div class="user-list-picker">
-        <div class="user-pick-item" onclick="doAssignTask('${taskId}', null, null, null)" style="color:var(--gray-400);font-style:italic">
-          Non attribuée
-        </div>
-        ${teamUsers.map(u => `
+    let userHtml = '';
+    equipeOrder.forEach(eq => {
+      if (!grouped[eq] || grouped[eq].length === 0) return;
+      const label = eq.charAt(0).toUpperCase() + eq.slice(1);
+      const isSameTeam = eq === taskEquipe;
+      userHtml += `<div style="padding:4px 8px;font-size:0.75rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-top:6px">${label}${isSameTeam ? ' ★' : ''}</div>`;
+      grouped[eq].forEach(u => {
+        userHtml += `
           <div class="user-pick-item ${task?.attribue_a_id === u.id ? 'selected' : ''}"
                onclick="doAssignTask('${taskId}', '${u.id}', '${esc(u.nom)}', '${esc(u.initiales)}')">
             <span class="user-initials-sm">${esc(u.initiales)}</span>
             <span>${esc(u.nom)}</span>
-          </div>
-        `).join('')}
+          </div>`;
+      });
+    });
+
+    openModal('Attribuer la tâche', `
+      <p style="margin-bottom:8px;font-size:0.85rem;color:var(--gray-500)">
+        ${esc(task?.tache)} — ${esc(taskEquipe.charAt(0).toUpperCase() + taskEquipe.slice(1))}
+      </p>
+      <div class="user-list-picker" style="max-height:300px;overflow-y:auto">
+        <div class="user-pick-item" onclick="doAssignTask('${taskId}', null, null, null)" style="color:var(--gray-400);font-style:italic">
+          Non attribuée
+        </div>
+        ${userHtml}
       </div>
     `, []);
   }
@@ -1510,19 +1526,30 @@
     list.style.display = '';
     const s = (search || '').toLowerCase();
     const selectedEquipe = document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
-    const filtered = users.filter(u =>
-      (u.equipe === selectedEquipe || u.role === 'admin' || u.role === 'manager') &&
-      (!s || u.nom.toLowerCase().includes(s))
-    );
-
-    list.innerHTML = `<div class="user-pick-item" onclick="pickAssignee(null)"
-      style="color:var(--gray-400);font-style:italic">Non attribuée</div>` +
-      filtered.map(u => `
-        <div class="user-pick-item" onclick="pickAssignee({id:'${u.id}',nom:'${esc(u.nom)}',initiales:'${esc(u.initiales)}'})">
+    const filtered = users.filter(u => !s || u.nom.toLowerCase().includes(s));
+    // Group by equipe, selected equipe first
+    const equipeOrder = [selectedEquipe, ...EQUIPES.filter(e => e !== selectedEquipe)];
+    const grouped = {};
+    filtered.forEach(u => {
+      const eq = u.equipe || 'autre';
+      if (!grouped[eq]) grouped[eq] = [];
+      grouped[eq].push(u);
+    });
+    let html = `<div class="user-pick-item" onclick="pickAssignee(null)"
+      style="color:var(--gray-400);font-style:italic">Non attribuée</div>`;
+    equipeOrder.forEach(eq => {
+      if (!grouped[eq] || grouped[eq].length === 0) return;
+      const label = eq.charAt(0).toUpperCase() + eq.slice(1);
+      const isSame = eq === selectedEquipe;
+      html += `<div style="padding:4px 8px;font-size:0.75rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-top:6px">${label}${isSame ? ' ★' : ''}</div>`;
+      grouped[eq].forEach(u => {
+        html += `<div class="user-pick-item" onclick="pickAssignee({id:'${u.id}',nom:'${esc(u.nom)}',initiales:'${esc(u.initiales)}'})">
           <span class="user-initials-sm">${esc(u.initiales)}</span>
           <span>${esc(u.nom)}</span>
-        </div>
-      `).join('');
+        </div>`;
+      });
+    });
+    list.innerHTML = html;
   }
 
   function pickAssignee(user) {
