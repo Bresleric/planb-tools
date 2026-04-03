@@ -496,9 +496,9 @@
 
   <!-- TABS -->
   <div class="tabs-bar" id="tabs-bar">
-    <button class="tab-btn active" data-tab="fiches">📖 Fiches</button>
-    <button class="tab-btn" data-tab="productions">📦 Productions</button>
+    <button class="tab-btn active" data-tab="productions">📦 Productions</button>
     <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
+    <button class="tab-btn" data-tab="fiches" style="margin-left:auto">📖 Fiches</button>
   </div>
 
   <!-- FILTERS (fiches list) -->
@@ -526,10 +526,10 @@
   <!-- CONTENT -->
   <div class="content">
     <!-- TAB: Liste des fiches -->
-    <div class="tab-content active" id="tab-fiches"></div>
+    <div class="tab-content" id="tab-fiches"></div>
 
     <!-- TAB: Productions -->
-    <div class="tab-content" id="tab-productions"></div>
+    <div class="tab-content active" id="tab-productions"></div>
 
     <!-- TAB: DLC Suivi -->
     <div class="tab-content" id="tab-dlc"></div>
@@ -846,6 +846,7 @@ function init() {
   setupAllergens();
   setupIngredientForm();
   loadFiches();
+  loadProductions();
 }
 
 function logout() {
