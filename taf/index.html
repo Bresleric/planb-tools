@@ -1357,6 +1357,9 @@
   let editingTaskId = null;
   let editAssignee = null;
 
+  // Store users list for edit modal to avoid inline JS with special chars
+  let editUsersList = [];
+
   function showEditTaskModal(taskId) {
     if (userRole() < 3) return;
     const task = tasks.find(t => t.id === taskId);
@@ -1371,7 +1374,8 @@
       { val: 4, label: '!!!! Urgente' }
     ];
 
-    // Group users by equipe
+    // Build indexed user list for safe onclick
+    editUsersList = [];
     const equipeOrder = [task.equipe || 'cuisine', ...EQUIPES.filter(e => e !== (task.equipe || 'cuisine'))];
     const grouped = {};
     users.forEach(u => {
@@ -1379,14 +1383,16 @@
       if (!grouped[eq]) grouped[eq] = [];
       grouped[eq].push(u);
     });
-    let userOptions = `<div class="user-pick-item" onclick="pickEditAssignee(null)" style="color:var(--gray-400);font-style:italic;${!editAssignee ? 'background:var(--orange-light)' : ''}">Non attribuée</div>`;
+    let userOptions = `<div class="user-pick-item" onclick="pickEditAssignee(-1)" style="color:var(--gray-400);font-style:italic;${!editAssignee ? 'background:var(--orange-light)' : ''}">Non attribuée</div>`;
     equipeOrder.forEach(eq => {
       if (!grouped[eq] || grouped[eq].length === 0) return;
       const label = eq.charAt(0).toUpperCase() + eq.slice(1);
       userOptions += `<div style="padding:4px 8px;font-size:0.72rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-top:4px">${label}</div>`;
       grouped[eq].forEach(u => {
+        const idx = editUsersList.length;
+        editUsersList.push({ id: u.id, nom: u.nom, initiales: u.initiales });
         const sel = editAssignee?.id === u.id;
-        userOptions += `<div class="user-pick-item ${sel ? 'selected' : ''}" onclick="pickEditAssignee({id:'${u.id}',nom:'${esc(u.nom)}',initiales:'${esc(u.initiales)}'})">
+        userOptions += `<div class="user-pick-item ${sel ? 'selected' : ''}" onclick="pickEditAssignee(${idx})">
           <span class="user-initials-sm">${esc(u.initiales)}</span> <span>${esc(u.nom)}</span>
         </div>`;
       });
@@ -1440,7 +1446,8 @@
     ]);
   }
 
-  function pickEditAssignee(user) {
+  function pickEditAssignee(idx) {
+    const user = idx >= 0 ? editUsersList[idx] : null;
     editAssignee = user;
     const disp = document.getElementById('edit-assignee-display');
     if (disp) {
@@ -1449,7 +1456,10 @@
         : `<span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>`;
     }
     // Update selection highlight
-    document.querySelectorAll('#modal-body .user-pick-item').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('#modal-body .user-pick-item').forEach(el => {
+      el.classList.remove('selected');
+      el.style.removeProperty('background');
+    });
     if (!user) {
       document.querySelector('#modal-body .user-pick-item')?.style.setProperty('background', 'var(--orange-light)');
     }
@@ -1484,8 +1494,8 @@
       renderFiltered();
       showToast('Tâche modifiée ✓', 'success');
     } catch (e) {
-      console.error(e);
-      showToast('Erreur modification', 'error');
+      console.error('Edit task error:', e);
+      showToast('Erreur: ' + (e.message || e.details || JSON.stringify(e)), 'error');
     }
   }
 
