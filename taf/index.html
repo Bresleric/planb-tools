@@ -1468,26 +1468,30 @@
   async function submitEditTask() {
     if (!editingTaskId) return;
     try {
-      const tache = document.getElementById('edit-task-name').value.trim();
+      const tache = document.getElementById('edit-task-name')?.value?.trim();
       if (!tache) { showToast('Le libellé est obligatoire', 'error'); return; }
 
-      const creneau = document.querySelector('#edit-creneau .chip.active')?.dataset.val || 'Matin';
-      const equipe = document.querySelector('#edit-equipe .chip.active')?.dataset.val || 'cuisine';
-      const priorite = parseInt(document.querySelector('#edit-priority .chip.active')?.dataset.val || '3');
-      const obs = document.getElementById('edit-task-obs').value.trim();
-      const echeance = document.getElementById('edit-task-date').value;
+      const creneau = document.querySelector('#edit-creneau .chip.active')?.dataset?.val || 'Matin';
+      const equipe = document.querySelector('#edit-equipe .chip.active')?.dataset?.val || 'cuisine';
+      const priorite = parseInt(document.querySelector('#edit-priority .chip.active')?.dataset?.val || '3');
+      const obs = document.getElementById('edit-task-obs')?.value?.trim();
+      const echeance = document.getElementById('edit-task-date')?.value;
 
-      await DB.updateTask(editingTaskId, {
-        tache,
-        creneau,
-        equipe,
-        priorite,
+      const updates = {
+        tache: tache,
+        creneau: creneau,
+        equipe: equipe,
+        priorite: priorite,
         observation: obs || null,
-        echeance: echeance || null,
-        attribue_a_id: editAssignee?.id || null,
-        attribue_a_nom: editAssignee?.nom || null,
-        attribue_a_initiales: editAssignee?.initiales || null
-      });
+        echeance: echeance || dateStr(filterDate),
+        attribue_a_id: editAssignee ? editAssignee.id : null,
+        attribue_a_nom: editAssignee ? editAssignee.nom : null,
+        attribue_a_initiales: editAssignee ? editAssignee.initiales : null
+      };
+
+      console.log('Updating task', editingTaskId, updates);
+      const { error } = await supabaseClient.from('tasks').update(updates).eq('id', editingTaskId);
+      if (error) throw error;
 
       tasks = await DB.getTasks(filterDate);
       closeModal();
@@ -1495,7 +1499,8 @@
       showToast('Tâche modifiée ✓', 'success');
     } catch (e) {
       console.error('Edit task error:', e);
-      showToast('Erreur: ' + (e.message || e.details || JSON.stringify(e)), 'error');
+      const msg = e.message || e.details || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      showToast('Erreur: ' + msg, 'error');
     }
   }
 
