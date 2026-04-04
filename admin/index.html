@@ -1756,10 +1756,23 @@
                 if (error) throw error;
                 const all = data || [];
 
+                // Normalisation : minuscules, accents supprimés, espaces collapsés
+                const normalize = s => (s || '')
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // retire accents
+                    .replace(/\s+/g, ' ') // collapse espaces multiples
+                    .trim()
+                    .toLowerCase();
+                const normEtab = e => {
+                    const v = (e || '').trim().toLowerCase();
+                    if (!v) return 'null';
+                    if (v === 'bonbao') return 'liesel'; // ancien nom
+                    return v;
+                };
+
                 // Grouper par nom+etablissement (normalisé)
                 const groups = {};
                 all.forEach(t => {
-                    const key = (t.nom || '').trim().toLowerCase() + '||' + (t.etablissement || 'null');
+                    const key = normalize(t.nom) + '||' + normEtab(t.etablissement);
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(t);
                 });
