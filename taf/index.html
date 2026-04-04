@@ -453,6 +453,35 @@
     .toast.success { background: var(--green); }
     .toast.error { background: var(--red); }
 
+    /* Toast avec bouton Annuler (undo) */
+    .undo-toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 14px; border-radius: 20px; background: var(--gray-800);
+      color: white; font-size: 0.85rem; z-index: 310;
+      display: flex; align-items: center; gap: 12px;
+      opacity: 0; transition: opacity .3s;
+      max-width: 92vw;
+    }
+    .undo-toast.show { opacity: 1; }
+    .undo-toast.success { background: var(--green); }
+    .undo-btn {
+      background: rgba(255,255,255,0.25); color: white; border: none;
+      padding: 6px 12px; border-radius: 6px; font-weight: 600;
+      cursor: pointer; font-size: 0.8rem; white-space: nowrap;
+    }
+    .undo-btn:hover { background: rgba(255,255,255,0.4); }
+
+    /* Badges Catégorie */
+    .cat-badge {
+      display: inline-block; padding: 2px 6px; border-radius: 4px;
+      font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+      margin-left: 6px; vertical-align: middle; letter-spacing: 0.3px;
+    }
+    .cat-production { background: #fee2e2; color: #991b1b; }
+    .cat-mise-en-place { background: #dbeafe; color: #1e40af; }
+    .cat-nettoyage { background: #d1fae5; color: #065f46; }
+    .cat-rangements { background: #fef3c7; color: #92400e; }
+
     /* ====== LOGIN ====== */
     .login-screen {
       display: flex; flex-direction: column; align-items: center;
@@ -650,6 +679,7 @@
   const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
   const EQUIPES = ['cuisine', 'salle', 'plonge', 'autre'];
   const CRENEAUX = ['Matin', 'Midi', 'Soir'];
+  const CATEGORIES = ['Production', 'Mise en Place', 'Nettoyage', 'Rangements'];
   const JOURS_SEMAINE = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
   // ====== STATE ======
@@ -1049,6 +1079,7 @@
           equipe: rec.equipe,
           creneau: rec.creneau,
           priorite: rec.priorite || 3,
+          categorie: rec.categorie || null,
           observation: rec.observation || '',
           echeance: today,
           date_creation: new Date().toISOString(),
@@ -1229,6 +1260,7 @@
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-main">
           <span class="task-name ${!done && userRole() >= 3 ? 'editable' : ''}" title="${!done && userRole() >= 3 ? 'Cliquer pour modifier' : esc(t.tache)}" ${!done && userRole() >= 3 ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
+          ${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}
         </div>
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
@@ -1270,7 +1302,42 @@
           });
           tasks = await DB.getTasks(filterDate);
           renderFiltered();
-          showToast('Tâche terminée ✓', 'success');
+
+          // Si la tâche est de catégorie "Production" : créer un brouillon de lot
+          if (task && task.categorie === 'Production') {
+            try {
+              const today = dateStr(filterDate);
+              const lot = await DB.createLot(
+                today,
+                currentEtablissement,
+                currentUser.id,
+                currentUser.nom,
+                currentUser.initiales,
+                null,     // DLC à définir dans le module Production
+                'DRFT'    // code provisoire pour brouillon
+              );
+              showUndoToast(
+                `Tâche terminée ✓ — Brouillon lot ${lot.numero_lot} créé`,
+                8000,
+                async () => {
+                  try {
+                    const { error } = await supabaseClient
+                      .from('lots_production').delete().eq('id', lot.id);
+                    if (error) throw error;
+                    showToast('Création du lot annulée', 'success');
+                  } catch (err) {
+                    console.error('Erreur annulation lot:', err);
+                    showToast('Erreur annulation lot', 'error');
+                  }
+                }
+              );
+            } catch (err) {
+              console.error('Erreur création brouillon lot:', err);
+              showToast('Tâche terminée ✓ (lot non créé)', 'success');
+            }
+          } else {
+            showToast('Tâche terminée ✓', 'success');
+          }
         }
       }
     } catch (e) {
@@ -1425,6 +1492,12 @@
           </div>
         </div>
         <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Catégorie <span style="color:var(--red)">*</span></label>
+          <div class="chip-group" id="edit-categorie">
+            ${CATEGORIES.map(c => `<button class="chip ${c === task.categorie ? 'active' : ''}" data-val="${c}" onclick="selectChip(this, 'edit-categorie')">${c}</button>`).join('')}
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
           <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Attribuer à</label>
           <div id="edit-assignee-display" style="margin-bottom:4px">
             ${editAssignee ? `<span style="font-size:0.8rem;color:var(--orange);font-weight:600">${esc(editAssignee.initiales)} — ${esc(editAssignee.nom)}</span>` : `<span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>`}
@@ -1476,6 +1549,7 @@
       const creneau = document.querySelector('#edit-creneau .chip.active')?.dataset?.val || 'Matin';
       const equipe = document.querySelector('#edit-equipe .chip.active')?.dataset?.val || 'cuisine';
       const priorite = parseInt(document.querySelector('#edit-priority .chip.active')?.dataset?.val || '3');
+      const categorie = document.querySelector('#edit-categorie .chip.active')?.dataset?.val || null;
       const obs = document.getElementById('edit-task-obs')?.value?.trim();
       const echeance = document.getElementById('edit-task-date')?.value;
 
@@ -1484,6 +1558,7 @@
         creneau: creneau,
         equipe: equipe,
         priorite: priorite,
+        categorie: categorie,
         observation: obs || null,
         echeance: echeance || dateStr(filterDate),
         attribue_a_id: editAssignee ? editAssignee.id : null,
@@ -1549,6 +1624,14 @@
             <button class="chip" data-val="2" onclick="selectChip(this, 'create-priority')">!! Normale</button>
             <button class="chip active" data-val="3" onclick="selectChip(this, 'create-priority')">!!! Haute</button>
             <button class="chip" data-val="4" onclick="selectChip(this, 'create-priority')">!!!! Urgente</button>
+          </div>
+        </div>
+
+        <!-- Catégorie (obligatoire) -->
+        <div class="form-group">
+          <label>Catégorie <span style="color:var(--red)">*</span></label>
+          <div class="chip-group" id="create-categorie">
+            ${CATEGORIES.map(c => `<button class="chip" data-val="${c}" onclick="selectChip(this, 'create-categorie')">${c}</button>`).join('')}
           </div>
         </div>
 
@@ -1724,6 +1807,8 @@
 
   async function submitCreate() {
     if (!selectedPredefined) { showToast('Choisissez une tâche', 'error'); return; }
+    const categorieSel = document.querySelector('#create-categorie .chip.active')?.dataset.val || null;
+    if (!categorieSel) { showToast('Choisissez une catégorie', 'error'); return; }
     const btn = document.getElementById('btn-create');
     btn.disabled = true; btn.textContent = 'Création...';
 
@@ -1731,6 +1816,7 @@
       const creneau = document.querySelector('#create-creneau .chip.active')?.dataset.val || 'Matin';
       const equipe = document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
       const priorite = parseInt(document.querySelector('#create-priority .chip.active')?.dataset.val || '3');
+      const categorie = categorieSel;
       const obs = document.getElementById('create-obs').value.trim();
       const echeance = document.getElementById('create-date').value;
 
@@ -1739,6 +1825,7 @@
         creneau,
         equipe,
         priorite,
+        categorie,
         observation: obs || null,
         echeance: echeance || dateStr(filterDate),
         date_creation: new Date().toISOString(),
@@ -2282,6 +2369,44 @@
     t.textContent = msg;
     t.className = 'toast show' + (type ? ` ${type}` : '');
     setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function showUndoToast(msg, duration, onUndo) {
+    // Nettoyer un éventuel toast précédent
+    const existing = document.getElementById('undo-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'undo-toast';
+    toast.className = 'undo-toast success';
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = msg;
+    const btn = document.createElement('button');
+    btn.className = 'undo-btn';
+    btn.textContent = 'Annuler';
+    toast.appendChild(msgSpan);
+    toast.appendChild(btn);
+    document.body.appendChild(toast);
+
+    // Animer apparition
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    let undone = false;
+    btn.onclick = async () => {
+      if (undone) return;
+      undone = true;
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+      if (onUndo) {
+        try { await onUndo(); } catch (e) { console.error(e); }
+      }
+    };
+
+    setTimeout(() => {
+      if (undone) return;
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }, duration || 8000);
   }
 
   // ====== INIT ======
