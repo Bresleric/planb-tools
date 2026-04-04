@@ -1089,7 +1089,7 @@
   // Scanner: clean black & white with Sauvola adaptive threshold
   function scannerProcess(img) {
     const canvas = document.createElement('canvas');
-    const maxSize = 1800;
+    const maxSize = 1200;
     let w = img.width, h = img.height;
     if (w > maxSize || h > maxSize) {
       if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
@@ -1194,7 +1194,7 @@
       data[p] = data[p+1] = data[p+2] = cleaned[i];
     }
     ctx.putImageData(imageData, 0, 0);
-    return canvas.toDataURL('image/png'); // PNG for clean B&W (no JPEG artifacts)
+    return canvas.toDataURL('image/jpeg', 0.65); // JPEG 65% quality to reduce payload size
   }
 
   // OCR with Tesseract.js
@@ -1254,7 +1254,8 @@
       }
 
       // Add scanned image as full page
-      pdf.addImage(page.image, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
+      const imgFormat = page.image.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+      pdf.addImage(page.image, imgFormat, 0, 0, pdfW, pdfH, undefined, 'FAST');
 
       // Add invisible OCR text layer (searchable)
       if (page.ocrData?.words?.length) {
@@ -1373,16 +1374,11 @@
     btn.textContent = 'Enregistrement...';
 
     try {
-      // Generate searchable PDF
-      showOcrOverlay(true, 'Generation du PDF...', 80);
-      await new Promise(r => setTimeout(r, 50));
-      const pdfDataUri = generatePDF(capturedPages);
-      showOcrOverlay(false);
-
       // Combine all OCR text
       const allOcrText = capturedPages.map(p => p.ocr).filter(Boolean).join('\n\n');
 
-      // Insert document with PDF
+      // Step 1: Insert document WITHOUT pdf_data (small payload)
+      showOcrOverlay(true, 'Enregistrement...', 50);
       const doc = await DB.insertDocument({
         type,
         fournisseur_id: fournisseurId,
@@ -1393,7 +1389,7 @@
         statut: 'en_attente',
         observation: observation || null,
         nb_pages: capturedPages.length,
-        pdf_data: pdfDataUri || null,
+        pdf_data: null,
         texte_ocr: allOcrText || null,
         user_id: currentUser.id,
         user_nom: currentUser.nom,
@@ -1401,23 +1397,38 @@
         etablissement: currentEtablissement
       });
 
-      // Insert pages (images for quick preview)
+      // Step 2: Insert pages ONE BY ONE (avoids payload limit)
       if (doc && capturedPages.length) {
-        const pages = capturedPages.map((page, i) => ({
-          document_id: doc.id,
-          page_num: i + 1,
-          photo_data: page.image,
-          texte_ocr: page.ocr || null
-        }));
-        await DB.insertPages(pages);
+        for (let i = 0; i < capturedPages.length; i++) {
+          showOcrOverlay(true, `Enregistrement page ${i + 1}/${capturedPages.length}...`, 50 + Math.round(30 * i / capturedPages.length));
+          await DB.insertPages([{
+            document_id: doc.id,
+            page_num: i + 1,
+            photo_data: capturedPages[i].image,
+            texte_ocr: capturedPages[i].ocr || null
+          }]);
+        }
       }
 
-      showToast('PDF genere et enregistre !', 'success');
+      // Step 3: Generate PDF and update document
+      try {
+        showOcrOverlay(true, 'Generation du PDF...', 85);
+        await new Promise(r => setTimeout(r, 50));
+        const pdfDataUri = generatePDF(capturedPages);
+        await DB.updateDocument(doc.id, { pdf_data: pdfDataUri });
+      } catch (pdfErr) {
+        console.warn('PDF generation failed, document saved without PDF:', pdfErr);
+        // Document is saved, PDF will be missing but pages are there
+      }
+
+      showOcrOverlay(false);
+      showToast('Document enregistre !', 'success');
       closeModal('modal-new');
       loadDocuments();
     } catch (e) {
       console.error('Erreur enregistrement:', e);
-      showToast('Erreur d\'enregistrement', 'error');
+      const msg = e.message || e.details || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      showToast('Erreur: ' + msg, 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Enregistrer';
