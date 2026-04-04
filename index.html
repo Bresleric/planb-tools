@@ -597,7 +597,7 @@
                     <h2 class="establishment-name">Freddy</h2>
                     <p class="establishment-description">L'Oncle Freddy</p>
                 </div>
-                <div class="establishment-card" data-establishment="bonbao">
+                <div class="establishment-card" data-establishment="liesel">
                     <img class="establishment-logo" src="Logo%20Liesel.png" alt="Liesel" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
                     <span class="establishment-icon" style="display:none">🍜</span>
                     <h2 class="establishment-name">Liesel</h2>
@@ -726,6 +726,8 @@
                         nom: u.nom,
                         initiales: u.initiales,
                         role: u.role,
+                        equipe: u.equipe || null,
+                        acces_modules: u.acces_modules || null,
                         etablissements: u.acces_etablissements && u.acces_etablissements.length > 0
                             ? u.acces_etablissements
                             : [u.etablissement]
@@ -743,7 +745,7 @@
                         nom: 'Marc Durand',
                         initiales: 'MD',
                         role: 'collaborateur',
-                        etablissements: ['freddy', 'bonbao']
+                        etablissements: ['freddy', 'liesel']
                     },
                     '12345': {
                         id: 'demo-resp-1',
@@ -757,7 +759,7 @@
                         nom: 'Jean Leclerc',
                         initiales: 'JL',
                         role: 'admin',
-                        etablissements: ['freddy', 'bonbao']
+                        etablissements: ['freddy', 'liesel']
                     }
                 };
                 return demoUsers[pin] || null;
@@ -766,7 +768,7 @@
             getEstablishmentName(code) {
                 const names = {
                     'freddy': 'Freddy',
-                    'bonbao': 'Liesel'
+                    'liesel': 'Liesel'
                 };
                 return names[code] || code;
             }
@@ -960,17 +962,26 @@
             modalOverlay.classList.remove('active');
         }
 
-        function canAccessModule(minRole) {
+        function canAccessModule(moduleId, minRole) {
             const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
             const userLevel = roleHierarchy[currentUser.role] || 0;
             const requiredLevel = roleHierarchy[minRole] || 0;
-            return userLevel >= requiredLevel;
+            // Check role first
+            if (userLevel < requiredLevel) return false;
+            // Admin always has access to everything
+            if (currentUser.role === 'admin') return true;
+            // If acces_modules is defined and non-empty, check module is in the list
+            if (currentUser.acces_modules && Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.length > 0) {
+                return currentUser.acces_modules.includes(moduleId);
+            }
+            // No acces_modules restriction → role-based access only
+            return true;
         }
 
         function getEstablishmentDisplayName(code) {
             const names = {
                 'freddy': 'Freddy',
-                'bonbao': 'Liesel'
+                'liesel': 'Liesel'
             };
             return names[code] || code;
         }
@@ -981,6 +992,8 @@
                 nom: user.nom,
                 initiales: user.initiales,
                 role: user.role,
+                equipe: user.equipe || null,
+                acces_modules: user.acces_modules || null,
                 etablissement: establishment,
                 device_id: currentDevice ? currentDevice.id : null,
                 device_nom: currentDevice ? currentDevice.nom : null,
@@ -1023,7 +1036,7 @@
         function renderModules() {
             modulesGrid.innerHTML = '';
 
-            const filteredModules = MODULES.filter(module => canAccessModule(module.minRole));
+            const filteredModules = MODULES.filter(module => canAccessModule(module.id, module.minRole));
 
             filteredModules.forEach(module => {
                 const card = document.createElement('div');
