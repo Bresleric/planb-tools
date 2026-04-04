@@ -1220,10 +1220,12 @@
       const valTime = t.date_validation ? new Date(t.date_validation).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
       const assignee = t.attribue_a_initiales || t.attribue_a_nom;
       const creator = t.createur_nom ? (t.createur_nom.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()) : '';
+      const createdDt = t.date_creation ? new Date(t.date_creation) : null;
+      const createdDay = createdDt ? createdDt.toLocaleDateString('fr-FR', { weekday: 'short' }).substring(0, 3).toUpperCase() : '';
 
       return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}">
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
-        <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}">${creator}</span>` : ''}</div>
+        <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-main">
           <span class="task-name ${!done && userRole() >= 3 ? 'editable' : ''}" title="${!done && userRole() >= 3 ? 'Cliquer pour modifier' : esc(t.tache)}" ${!done && userRole() >= 3 ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
