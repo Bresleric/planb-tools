@@ -182,6 +182,8 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .task-row.done .task-name { text-decoration: line-through; color: var(--gray-400); }
+    .task-name.editable { cursor: pointer; text-decoration-style: dotted; text-underline-offset: 3px; }
+    .task-name.editable:hover { color: var(--orange); }
     .task-note-cell { min-width: 0; overflow: hidden; padding: 0 4px; }
     .task-note {
       font-size: 0.72rem; color: var(--gray-500); font-style: italic;
@@ -1224,7 +1226,7 @@
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}">${creator}</span>` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-main">
-          <span class="task-name" title="${esc(t.tache)}">${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
+          <span class="task-name ${!done && userRole() >= 3 ? 'editable' : ''}" title="${!done && userRole() >= 3 ? 'Cliquer pour modifier' : esc(t.tache)}" ${!done && userRole() >= 3 ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
         </div>
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
@@ -1349,6 +1351,142 @@
       renderFiltered();
       showToast(userId ? `Attribuée à ${nom}` : 'Attribution retirée', 'success');
     } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  // ====== EDIT TASK MODAL (manager+admin) ======
+  let editingTaskId = null;
+  let editAssignee = null;
+
+  function showEditTaskModal(taskId) {
+    if (userRole() < 3) return;
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    editingTaskId = taskId;
+    editAssignee = task.attribue_a_id ? { id: task.attribue_a_id, nom: task.attribue_a_nom, initiales: task.attribue_a_initiales } : null;
+
+    const pLabels = [
+      { val: 1, label: '! Basse' },
+      { val: 2, label: '!! Normale' },
+      { val: 3, label: '!!! Haute' },
+      { val: 4, label: '!!!! Urgente' }
+    ];
+
+    // Group users by equipe
+    const equipeOrder = [task.equipe || 'cuisine', ...EQUIPES.filter(e => e !== (task.equipe || 'cuisine'))];
+    const grouped = {};
+    users.forEach(u => {
+      const eq = u.equipe || 'autre';
+      if (!grouped[eq]) grouped[eq] = [];
+      grouped[eq].push(u);
+    });
+    let userOptions = `<div class="user-pick-item" onclick="pickEditAssignee(null)" style="color:var(--gray-400);font-style:italic;${!editAssignee ? 'background:var(--orange-light)' : ''}">Non attribuée</div>`;
+    equipeOrder.forEach(eq => {
+      if (!grouped[eq] || grouped[eq].length === 0) return;
+      const label = eq.charAt(0).toUpperCase() + eq.slice(1);
+      userOptions += `<div style="padding:4px 8px;font-size:0.72rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-top:4px">${label}</div>`;
+      grouped[eq].forEach(u => {
+        const sel = editAssignee?.id === u.id;
+        userOptions += `<div class="user-pick-item ${sel ? 'selected' : ''}" onclick="pickEditAssignee({id:'${u.id}',nom:'${esc(u.nom)}',initiales:'${esc(u.initiales)}'})">
+          <span class="user-initials-sm">${esc(u.initiales)}</span> <span>${esc(u.nom)}</span>
+        </div>`;
+      });
+    });
+
+    const body = `
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Tâche</label>
+          <input class="form-input" type="text" id="edit-task-name" value="${esc(task.tache)}" style="font-size:0.9rem">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Créneau</label>
+          <div class="chip-group" id="edit-creneau">
+            ${CRENEAUX.map(c => `<button class="chip ${c === task.creneau ? 'active' : ''}" data-val="${c}" onclick="selectChip(this, 'edit-creneau')">${c}</button>`).join('')}
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Équipe</label>
+          <div class="chip-group" id="edit-equipe">
+            ${EQUIPES.map(eq => `<button class="chip ${eq === task.equipe ? 'active' : ''}" data-val="${eq}" onclick="selectChip(this, 'edit-equipe')">${eq.charAt(0).toUpperCase() + eq.slice(1)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Priorité</label>
+          <div class="chip-group" id="edit-priority">
+            ${pLabels.map(p => `<button class="chip ${p.val === (task.priorite || 3) ? 'active' : ''}" data-val="${p.val}" onclick="selectChip(this, 'edit-priority')">${p.label}</button>`).join('')}
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Attribuer à</label>
+          <div id="edit-assignee-display" style="margin-bottom:4px">
+            ${editAssignee ? `<span style="font-size:0.8rem;color:var(--orange);font-weight:600">${esc(editAssignee.initiales)} — ${esc(editAssignee.nom)}</span>` : `<span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>`}
+          </div>
+          <div class="user-list-picker" style="max-height:120px;overflow-y:auto">${userOptions}</div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Observation</label>
+          <textarea class="form-textarea" id="edit-task-obs" style="min-height:50px">${esc(task.observation || '')}</textarea>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Échéance</label>
+          <input class="form-input" type="date" id="edit-task-date" value="${task.echeance || dateStr(filterDate)}">
+        </div>
+      </div>
+    `;
+
+    openModal('Modifier la tâche', body, [
+      { label: 'Annuler', action: 'closeModal()', cls: '' },
+      { label: 'Enregistrer', action: 'submitEditTask()', cls: 'primary' }
+    ]);
+  }
+
+  function pickEditAssignee(user) {
+    editAssignee = user;
+    const disp = document.getElementById('edit-assignee-display');
+    if (disp) {
+      disp.innerHTML = user
+        ? `<span style="font-size:0.8rem;color:var(--orange);font-weight:600">${esc(user.initiales)} — ${esc(user.nom)}</span>`
+        : `<span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>`;
+    }
+    // Update selection highlight
+    document.querySelectorAll('#modal-body .user-pick-item').forEach(el => el.classList.remove('selected'));
+    if (!user) {
+      document.querySelector('#modal-body .user-pick-item')?.style.setProperty('background', 'var(--orange-light)');
+    }
+  }
+
+  async function submitEditTask() {
+    if (!editingTaskId) return;
+    try {
+      const tache = document.getElementById('edit-task-name').value.trim();
+      if (!tache) { showToast('Le libellé est obligatoire', 'error'); return; }
+
+      const creneau = document.querySelector('#edit-creneau .chip.active')?.dataset.val || 'Matin';
+      const equipe = document.querySelector('#edit-equipe .chip.active')?.dataset.val || 'cuisine';
+      const priorite = parseInt(document.querySelector('#edit-priority .chip.active')?.dataset.val || '3');
+      const obs = document.getElementById('edit-task-obs').value.trim();
+      const echeance = document.getElementById('edit-task-date').value;
+
+      await DB.updateTask(editingTaskId, {
+        tache,
+        creneau,
+        equipe,
+        priorite,
+        observation: obs || null,
+        echeance: echeance || null,
+        attribue_a_id: editAssignee?.id || null,
+        attribue_a_nom: editAssignee?.nom || null,
+        attribue_a_initiales: editAssignee?.initiales || null
+      });
+
+      tasks = await DB.getTasks(filterDate);
+      closeModal();
+      renderFiltered();
+      showToast('Tâche modifiée ✓', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur modification', 'error');
+    }
   }
 
   // ====== CREATE TAB ======
