@@ -614,6 +614,7 @@
 
                         <button class="admin-tab-btn" data-admin-tab="droits" onclick="switchAdminTab('droits')">Droits</button>
                             <button class="admin-tab-btn" data-admin-tab="devices" onclick="switchAdminTab('devices')">Appareils</button>
+                            <button class="admin-tab-btn" data-admin-tab="taf" onclick="switchAdminTab('taf')">TAF</button>
                         </div>
                     </div>
                 </div>
@@ -653,16 +654,16 @@
                         </div>
                         <div style="display:flex; gap:4px;">
                             <button class="droits-filter-btn active" id="vue-modules-btn" onclick="setDroitsVue('modules')">Modules</button>
-                            <button class="droits-filter-btn" id="vue-detail-btn" onclick="setDroitsVue('detail')">Détaillé</button>
+                            <button class="droits-filter-btn" id="vue-detail-btn" onclick="setDroitsVue('detail')">D\u00e9taill\u00e9</button>
                         </div>
                     </div>
                     <div id="droits-table-container">
                         <div class="loading-spinner">Chargement...</div>
                     </div>
                     <div class="droits-legend">
-                        <div class="droits-legend-item"><span class="droits-check granted">&#10003;</span> Accès accordé (personnalisé)</div>
-                        <div class="droits-legend-item"><span class="droits-check role-default">&#10003;</span> Accès par défaut (rôle)</div>
-                        <div class="droits-legend-item"><span class="droits-check denied">&#10007;</span> Pas d'accès</div>
+                        <div class="droits-legend-item"><span class="droits-check granted">&#10003;</span> Acc\u00e8s accord\u00e9 (personnalis\u00e9)</div>
+                        <div class="droits-legend-item"><span class="droits-check role-default">&#10003;</span> Acc\u00e8s par d\u00e9faut (r\u00f4le)</div>
+                        <div class="droits-legend-item"><span class="droits-check denied">&#10007;</span> Pas d'acc\u00e8s</div>
                     </div>
                 </div>
             </div>
@@ -674,6 +675,38 @@
                 </div>
                 <div id="devices-list">
                     <div class="loading-spinner">Chargement des appareils...</div>
+                </div>
+            </div>
+
+            <div id="taf-section" class="admin-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                    <div class="filter-bar" style="margin:0;">
+                        <button class="filter-btn active" data-taf-filter="all" onclick="filterTaf('all')">Tous</button>
+                        <button class="filter-btn" data-taf-filter="freddy" onclick="filterTaf('freddy')">Freddy</button>
+                        <button class="filter-btn" data-taf-filter="liesel" onclick="filterTaf('liesel')">Liesel</button>
+                    </div>
+                    <button class="add-btn" onclick="openAddPredefModal()" style="padding:8px 16px; background:var(--orange); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;">+ Ajouter tâche</button>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                    <input type="text" id="taf-search" placeholder="Rechercher une tâche..." style="flex:1; min-width:180px; padding:8px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:13px;" oninput="renderPredefTasks()">
+                    <select id="taf-filter-equipe" onchange="renderPredefTasks()" style="padding:8px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:13px;">
+                        <option value="all">Toutes équipes</option>
+                        <option value="cuisine">Cuisine</option>
+                        <option value="salle">Salle</option>
+                        <option value="plonge">Plonge</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                    <select id="taf-filter-categorie" onchange="renderPredefTasks()" style="padding:8px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:13px;">
+                        <option value="all">Toutes catégories</option>
+                        <option value="Production">Production</option>
+                        <option value="Mise en Place">Mise en Place</option>
+                        <option value="Nettoyage">Nettoyage</option>
+                        <option value="Rangements">Rangements</option>
+                    </select>
+                </div>
+                <div id="taf-count" style="font-size:13px; color:var(--gray-500); margin-bottom:8px;"></div>
+                <div id="taf-list">
+                    <div class="loading-spinner">Chargement des tâches prédéfinies...</div>
                 </div>
             </div>
 
@@ -779,6 +812,61 @@
         </div>
     </div>
 
+    <!-- TAF Predefined Task Modal -->
+    <div class="modal-overlay" id="predef-modal" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="predef-modal-title">Nouvelle tâche prédéfinie</h2>
+                <button class="modal-close" onclick="closePredefModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nom de la tâche</label>
+                    <input type="text" id="predef-nom" placeholder="Ex: Éplucher les oignons">
+                </div>
+                <div class="form-group">
+                    <label>Catégorie <span style="color:#dc2626">*</span></label>
+                    <select id="predef-categorie">
+                        <option value="">— Choisir —</option>
+                        <option value="Production">Production</option>
+                        <option value="Mise en Place">Mise en Place</option>
+                        <option value="Nettoyage">Nettoyage</option>
+                        <option value="Rangements">Rangements</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Équipe</label>
+                    <select id="predef-equipe">
+                        <option value="cuisine">Cuisine</option>
+                        <option value="salle">Salle</option>
+                        <option value="plonge">Plonge</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Créneau par défaut</label>
+                    <select id="predef-creneau">
+                        <option value="Matin">Matin</option>
+                        <option value="Midi">Midi</option>
+                        <option value="Soir">Soir</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Établissement</label>
+                    <select id="predef-etablissement">
+                        <option value="">Tous les établissements</option>
+                        <option value="freddy">Freddy</option>
+                        <option value="liesel">Liesel</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closePredefModal()">Annuler</button>
+                <button class="btn-save" onclick="savePredefined()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
 <script>
         // ============= Configuration =============
         const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
@@ -792,7 +880,7 @@
 
         // ============= Modules Definition =============
         const ALL_MODULES = [
-            { id: 'taf', name: 'TAF', icon: '📋', minRole: 'collaborateur' },
+            { id: 'kitchen-taf', name: 'Kitchen TAF', icon: '🍴', minRole: 'collaborateur' },
             { id: 'pointages', name: 'Pointages', icon: '⏰', minRole: 'collaborateur' },
             { id: 'caisse', name: 'Contrôle Caisse', icon: '💰', minRole: 'responsable' },
             { id: 'briefings', name: 'Briefings', icon: '📋', minRole: 'responsable' },
@@ -800,7 +888,6 @@
             { id: 'receptions', name: 'Réceptions', icon: '🚛', minRole: 'responsable' },
             { id: 'checklist', name: 'Check-Lists', icon: '✅', minRole: 'collaborateur' },
             { id: 'cartons-jvr', name: 'Cartons JVR', icon: '🟡', minRole: 'manager' },
-            { id: 'temperatures', name: 'Temperatures', icon: '🌡️' },
         { id: 'admin', name: 'Admin', icon: '⚙️', minRole: 'admin' }
         ];
 
@@ -1204,7 +1291,7 @@
 
         // Matrice des sous-modules (onglets) par module
         const MODULE_TABS = {
-            'taf': [
+            'kitchen-taf': [
                 { name: 'Taches', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
                 { name: 'Creer', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
                 { name: 'Admin', roles: ['admin'] }
@@ -1265,7 +1352,7 @@
             const modules = ALL_MODULES.filter(m => m.id !== 'admin');
 
             if (filtered.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun utilisateur trouvé</p>';
+                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun utilisateur trouv\u00e9</p>';
                 return;
             }
 
@@ -1295,10 +1382,10 @@
                 modules.forEach(m => {
                     const hasAccess = user.role === 'admin' || userMods.includes(m.id);
                     const isRoleDefault = !isCustom && defaultMods.includes(m.id);
-                    let cls = 'denied', icon = '✗';
-                    if (hasAccess && user.role === 'admin') { cls = 'granted'; icon = '✓'; }
-                    else if (hasAccess && isRoleDefault && !isCustom) { cls = 'role-default'; icon = '✓'; }
-                    else if (hasAccess) { cls = 'granted'; icon = '✓'; }
+                    let cls = 'denied', icon = '\u2717';
+                    if (hasAccess && user.role === 'admin') { cls = 'granted'; icon = '\u2713'; }
+                    else if (hasAccess && isRoleDefault && !isCustom) { cls = 'role-default'; icon = '\u2713'; }
+                    else if (hasAccess) { cls = 'granted'; icon = '\u2713'; }
                     html += '<td><span class="droits-check ' + cls + '">' + icon + '</span></td>';
                 });
                 html += '</tr>';
@@ -1368,7 +1455,7 @@
                     // First check module-level access
                     const hasModuleAccess = user.role === 'admin' || userMods.includes(col.moduleId);
                     if (!hasModuleAccess) {
-                        html += '<td><span class="droits-check denied">✗</span></td>';
+                        html += '<td><span class="droits-check denied">\u2717</span></td>';
                         return;
                     }
 
@@ -1378,15 +1465,15 @@
                         if (hasTabAccess) {
                             const isRoleDefault = !isCustom && defaultMods.includes(col.moduleId);
                             let cls = (user.role === 'admin') ? 'granted' : (isRoleDefault && !isCustom) ? 'role-default' : 'granted';
-                            html += '<td><span class="droits-check ' + cls + '">✓</span></td>';
+                            html += '<td><span class="droits-check ' + cls + '">\u2713</span></td>';
                         } else {
-                            html += '<td><span class="droits-check denied">✗</span></td>';
+                            html += '<td><span class="droits-check denied">\u2717</span></td>';
                         }
                     } else {
                         // No tabs defined - just show module access
                         const isRoleDefault = !isCustom && defaultMods.includes(col.moduleId);
                         let cls = (user.role === 'admin') ? 'granted' : (isRoleDefault && !isCustom) ? 'role-default' : 'granted';
-                        html += '<td><span class="droits-check ' + cls + '">✓</span></td>';
+                        html += '<td><span class="droits-check ' + cls + '">\u2713</span></td>';
                     }
                 });
                 html += '</tr>';
@@ -1426,6 +1513,7 @@
             
             if (tab === 'devices') loadDevices();
             if (tab === 'droits') renderDroits();
+            if (tab === 'taf') loadPredefTasks();
         }
 
         async function loadDevices() {
@@ -1444,23 +1532,23 @@
         function renderDevices() {
             const list = document.getElementById('devices-list');
             if (devices.length === 0) {
-                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun appareil enregistré.<br>Cliquez sur "+ Ajouter" pour enregistrer un iPad.</p>';
+                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucun appareil enregistr\u00e9.<br>Cliquez sur "+ Ajouter" pour enregistrer un iPad.</p>';
                 return;
             }
             list.innerHTML = devices.map(d => {
                 const status = d.date_enregistrement ? (d.actif ? 'active' : 'inactive') : 'pending';
                 const statusLabel = d.date_enregistrement ? (d.actif ? 'Actif' : 'Inactif') : 'En attente';
                 const lastConn = d.derniere_connexion ? new Date(d.derniere_connexion).toLocaleDateString('fr-FR') : '-';
-                const registered = d.date_enregistrement ? new Date(d.date_enregistrement).toLocaleDateString('fr-FR') : 'Non activé';
+                const registered = d.date_enregistrement ? new Date(d.date_enregistrement).toLocaleDateString('fr-FR') : 'Non activ\u00e9';
                 const estab = d.etablissement ? (d.etablissement === 'freddy' ? 'Freddy' : 'Liesel') : 'Tous';
                 return '<div class="device-card">' +
                     '<div class="device-info">' +
                         '<div class="device-name"><span class="device-status ' + status + '"></span>' + escapeHtml(d.nom) + '</div>' +
-                        '<div class="device-meta">' + estab + ' | ' + statusLabel + ' | Dernière connexion: ' + lastConn + ' | Enregistré: ' + registered + '</div>' +
+                        '<div class="device-meta">' + estab + ' | ' + statusLabel + ' | Derni\u00e8re connexion: ' + lastConn + ' | Enregistr\u00e9: ' + registered + '</div>' +
                     '</div>' +
                     (!d.date_enregistrement ? '<div class="device-code">' + d.code_activation + '</div>' : '') +
                     '<div class="device-actions">' +
-                        '<button onclick="toggleDeviceActive(\'' + d.id + '\', ' + d.actif + ')">' + (d.actif ? 'Désactiver' : 'Activer') + '</button>' +
+                        '<button onclick="toggleDeviceActive(\'' + d.id + '\', ' + d.actif + ')">' + (d.actif ? 'D\u00e9sactiver' : 'Activer') + '</button>' +
                         '<button class="delete-btn" onclick="deleteDevice(\'' + d.id + '\')">Supprimer</button>' +
                     '</div>' +
                 '</div>';
@@ -1492,7 +1580,7 @@
             try {
                 await supabaseClient.from('devices').insert({ nom, etablissement, code_activation: code, actif: true });
                 closeDeviceModal();
-                showToast('Appareil créé ! Code d\'activation : ' + code);
+                showToast('Appareil cr\u00e9\u00e9 ! Code d\'activation : ' + code);
                 loadDevices();
             } catch (e) {
                 alert('Erreur: ' + e.message);
@@ -1505,10 +1593,169 @@
         }
 
         async function deleteDevice(id) {
-            if (!confirm('Supprimer cet appareil ? Il ne pourra plus accéder à PlanB Tools.')) return;
+            if (!confirm('Supprimer cet appareil ? Il ne pourra plus acc\u00e9der \u00e0 PlanB Tools.')) return;
             await supabaseClient.from('devices').delete().eq('id', id);
-            showToast('Appareil supprimé');
+            showToast('Appareil supprim\u00e9');
             loadDevices();
+        }
+
+        // ========== TAF PREDEFINED TASKS MANAGEMENT ==========
+
+        let predefTasks = [];
+        let predefFilterEtab = 'all';
+        let editingPredefId = null;
+
+        async function loadPredefTasks() {
+            const list = document.getElementById('taf-list');
+            try {
+                const { data, error } = await supabaseClient.from('predefined_tasks').select('*').order('nom');
+                if (error) throw error;
+                predefTasks = data || [];
+                renderPredefTasks();
+            } catch (e) {
+                list.innerHTML = '<p style="color: var(--error); padding:16px;">Erreur de chargement: ' + (e.message || e) + '</p>';
+            }
+        }
+
+        function filterTaf(etab) {
+            predefFilterEtab = etab;
+            document.querySelectorAll('[data-taf-filter]').forEach(b => b.classList.toggle('active', b.dataset.tafFilter === etab));
+            renderPredefTasks();
+        }
+
+        function renderPredefTasks() {
+            const list = document.getElementById('taf-list');
+            const countEl = document.getElementById('taf-count');
+            const search = (document.getElementById('taf-search').value || '').toLowerCase().trim();
+            const eq = document.getElementById('taf-filter-equipe').value;
+            const cat = document.getElementById('taf-filter-categorie').value;
+
+            let filtered = predefTasks.filter(t => {
+                if (predefFilterEtab !== 'all') {
+                    if (t.etablissement && t.etablissement !== predefFilterEtab) return false;
+                }
+                if (eq !== 'all' && t.equipe !== eq) return false;
+                if (cat !== 'all' && t.categorie !== cat) return false;
+                if (search && !(t.nom || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            countEl.textContent = filtered.length + ' tâche(s) prédéfinie(s)';
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding: 40px 0;">Aucune tâche prédéfinie.<br>Cliquez sur "+ Ajouter tâche" pour en créer une.</p>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(t => {
+                const estab = t.etablissement ? (t.etablissement === 'freddy' ? 'Freddy' : 'Liesel') : 'Tous';
+                const catColor = {
+                    'Production': '#8b5cf6',
+                    'Mise en Place': '#0ea5e9',
+                    'Nettoyage': '#10b981',
+                    'Rangements': '#f59e0b'
+                }[t.categorie] || '#6b7280';
+                const catBadge = t.categorie ? '<span style="background:' + catColor + '; color:white; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">' + t.categorie + '</span>' : '<span style="color:#9ca3af; font-size:11px; font-style:italic;">Sans catégorie</span>';
+                const actif = t.actif !== false;
+                return '<div class="device-card" style="' + (actif ? '' : 'opacity:0.55;') + '">' +
+                    '<div class="device-info">' +
+                        '<div class="device-name">' + escapeHtml(t.nom || '') + '</div>' +
+                        '<div class="device-meta" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px;">' +
+                            catBadge +
+                            '<span style="color:#6b7280;">' + (t.equipe || '-') + '</span>' +
+                            '<span style="color:#6b7280;">|</span>' +
+                            '<span style="color:#6b7280;">' + (t.creneau || '-') + '</span>' +
+                            '<span style="color:#6b7280;">|</span>' +
+                            '<span style="color:#6b7280;">' + estab + '</span>' +
+                            (!actif ? '<span style="color:#dc2626;">| Inactif</span>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="device-actions">' +
+                        '<button onclick="editPredefined(\'' + t.id + '\')">Modifier</button>' +
+                        '<button onclick="togglePredefActive(\'' + t.id + '\', ' + actif + ')">' + (actif ? 'Désactiver' : 'Activer') + '</button>' +
+                        '<button class="delete-btn" onclick="deletePredefined(\'' + t.id + '\')">Supprimer</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function openAddPredefModal() {
+            editingPredefId = null;
+            document.getElementById('predef-modal-title').textContent = 'Nouvelle tâche prédéfinie';
+            document.getElementById('predef-nom').value = '';
+            document.getElementById('predef-categorie').value = '';
+            document.getElementById('predef-equipe').value = 'cuisine';
+            document.getElementById('predef-creneau').value = 'Matin';
+            document.getElementById('predef-etablissement').value = '';
+            document.getElementById('predef-modal').style.display = 'flex';
+        }
+
+        function editPredefined(id) {
+            const t = predefTasks.find(x => x.id === id);
+            if (!t) return;
+            editingPredefId = id;
+            document.getElementById('predef-modal-title').textContent = 'Modifier tâche prédéfinie';
+            document.getElementById('predef-nom').value = t.nom || '';
+            document.getElementById('predef-categorie').value = t.categorie || '';
+            document.getElementById('predef-equipe').value = t.equipe || 'cuisine';
+            document.getElementById('predef-creneau').value = t.creneau || 'Matin';
+            document.getElementById('predef-etablissement').value = t.etablissement || '';
+            document.getElementById('predef-modal').style.display = 'flex';
+        }
+
+        function closePredefModal() {
+            document.getElementById('predef-modal').style.display = 'none';
+            editingPredefId = null;
+        }
+
+        async function savePredefined() {
+            const nom = document.getElementById('predef-nom').value.trim();
+            const categorie = document.getElementById('predef-categorie').value;
+            const equipe = document.getElementById('predef-equipe').value;
+            const creneau = document.getElementById('predef-creneau').value;
+            const etablissement = document.getElementById('predef-etablissement').value || null;
+
+            if (!nom) { alert('Veuillez saisir le nom de la tâche.'); return; }
+            if (!categorie) { alert('Veuillez choisir une catégorie.'); return; }
+
+            const payload = { nom, categorie, equipe, creneau, etablissement, actif: true };
+            try {
+                if (editingPredefId) {
+                    const { error } = await supabaseClient.from('predefined_tasks').update(payload).eq('id', editingPredefId);
+                    if (error) throw error;
+                    showToast('Tâche modifiée');
+                } else {
+                    const { error } = await supabaseClient.from('predefined_tasks').insert(payload);
+                    if (error) throw error;
+                    showToast('Tâche créée');
+                }
+                closePredefModal();
+                loadPredefTasks();
+            } catch (e) {
+                alert('Erreur: ' + (e.message || e));
+            }
+        }
+
+        async function togglePredefActive(id, currentState) {
+            try {
+                const { error } = await supabaseClient.from('predefined_tasks').update({ actif: !currentState }).eq('id', id);
+                if (error) throw error;
+                loadPredefTasks();
+            } catch (e) {
+                alert('Erreur: ' + (e.message || e));
+            }
+        }
+
+        async function deletePredefined(id) {
+            if (!confirm('Supprimer cette tâche prédéfinie ? Cette action est irréversible.')) return;
+            try {
+                const { error } = await supabaseClient.from('predefined_tasks').delete().eq('id', id);
+                if (error) throw error;
+                showToast('Tâche supprimée');
+                loadPredefTasks();
+            } catch (e) {
+                alert('Erreur: ' + (e.message || e));
+            }
         }
 
         async function init() {
