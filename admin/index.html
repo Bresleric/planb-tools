@@ -685,7 +685,10 @@
                         <button class="filter-btn" data-taf-filter="freddy" onclick="filterTaf('freddy')">Freddy</button>
                         <button class="filter-btn" data-taf-filter="liesel" onclick="filterTaf('liesel')">Liesel</button>
                     </div>
-                    <button class="add-btn" onclick="openAddPredefModal()" style="padding:8px 16px; background:var(--orange); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;">+ Ajouter tâche</button>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="cleanupDuplicates()" style="padding:8px 14px; background:#fef3c7; color:#92400e; border:1px solid #fcd34d; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;" title="Supprimer les doublons (même nom + même établissement)">🧹 Supprimer doublons</button>
+                        <button class="add-btn" onclick="openAddPredefModal()" style="padding:8px 16px; background:var(--orange); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;">+ Ajouter tâche</button>
+                    </div>
                 </div>
                 <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
                     <input type="text" id="taf-search" placeholder="Rechercher une tâche..." style="flex:1; min-width:180px; padding:8px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:13px;" oninput="renderPredefTasks()">
@@ -1740,6 +1743,62 @@
             try {
                 const { error } = await supabaseClient.from('predefined_tasks').update({ actif: !currentState }).eq('id', id);
                 if (error) throw error;
+                loadPredefTasks();
+            } catch (e) {
+                alert('Erreur: ' + (e.message || e));
+            }
+        }
+
+        async function cleanupDuplicates() {
+            // Recharger depuis la base pour avoir l'état actuel
+            try {
+                const { data, error } = await supabaseClient.from('predefined_tasks').select('*').order('id');
+                if (error) throw error;
+                const all = data || [];
+
+                // Grouper par nom+etablissement (normalisé)
+                const groups = {};
+                all.forEach(t => {
+                    const key = (t.nom || '').trim().toLowerCase() + '||' + (t.etablissement || 'null');
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(t);
+                });
+
+                // Identifier les doublons : garder le premier (plus ancien id), supprimer les autres
+                const toDelete = [];
+                const dupGroups = [];
+                Object.values(groups).forEach(group => {
+                    if (group.length > 1) {
+                        dupGroups.push(group);
+                        // Garde le premier (plus petit id grâce au order by id), supprime le reste
+                        for (let i = 1; i < group.length; i++) toDelete.push(group[i]);
+                    }
+                });
+
+                if (toDelete.length === 0) {
+                    alert('Aucun doublon détecté. ✅');
+                    return;
+                }
+
+                // Aperçu pour confirmation
+                const preview = dupGroups.slice(0, 10).map(g => {
+                    const etab = g[0].etablissement || 'Tous';
+                    return '• "' + g[0].nom + '" (' + etab + ') — ' + g.length + ' occurrences';
+                }).join('\n');
+                const more = dupGroups.length > 10 ? '\n... et ' + (dupGroups.length - 10) + ' autre(s) groupe(s)' : '';
+
+                const msg = toDelete.length + ' doublon(s) détecté(s) dans ' + dupGroups.length + ' groupe(s).\n\n' +
+                            preview + more + '\n\n' +
+                            'Supprimer les ' + toDelete.length + ' doublon(s) ? (les plus anciens sont conservés)';
+
+                if (!confirm(msg)) return;
+
+                // Suppression par lot
+                const ids = toDelete.map(t => t.id);
+                const { error: delErr } = await supabaseClient.from('predefined_tasks').delete().in('id', ids);
+                if (delErr) throw delErr;
+
+                showToast(toDelete.length + ' doublon(s) supprimé(s)');
                 loadPredefTasks();
             } catch (e) {
                 alert('Erreur: ' + (e.message || e));
