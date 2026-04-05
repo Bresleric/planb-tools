@@ -726,6 +726,30 @@
             padding: 10px 16px;
         }
 
+        /* Inventaire journalier */
+        .inv-header { background: white; border: 1px solid var(--gray-300); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .inv-header .inv-date { font-weight: 600; color: var(--gray-900); }
+        .inv-header .inv-statut { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+        .inv-header .inv-statut.en_cours { background: #fef3c7; color: #92400e; }
+        .inv-header .inv-statut.valide { background: #d1fae5; color: #065f46; }
+        .inv-list { display: flex; flex-direction: column; gap: 8px; }
+        .inv-item { background: white; border: 1px solid var(--gray-300); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+        .inv-item.saisi { border-color: #10b981; background: #f0fdf4; }
+        .inv-item .inv-nom { font-weight: 600; font-size: 14px; color: var(--gray-900); }
+        .inv-item .inv-meta { font-size: 11px; color: var(--gray-600); margin-top: 2px; }
+        .inv-item .inv-qty { display: flex; gap: 6px; align-items: center; }
+        .inv-item .inv-qty input { width: 80px; padding: 6px 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px; text-align: right; }
+        .inv-item .inv-qty .unite { font-size: 12px; color: var(--gray-600); min-width: 40px; }
+        .inv-item .inv-del { background: none; border: none; color: var(--gray-600); cursor: pointer; font-size: 16px; padding: 4px 8px; }
+        .inv-item .inv-del:hover { color: #dc2626; }
+        .inv-item .inv-tag { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+        .inv-item .inv-tag.auto { background: #e0e7ff; color: #3730a3; }
+        .inv-item .inv-tag.manuel { background: #fce7f3; color: #9f1239; }
+        .inv-item .inv-tag.boisson { background: #dbeafe; color: #1e40af; }
+        .inv-item .inv-tag.solide { background: #fef3c7; color: #92400e; }
+        .inv-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .inv-actions .btn-main { flex: 1; min-width: 140px; }
+
         /* Toast */
         .toast {
             position: fixed;
@@ -866,6 +890,7 @@
             <div class="tabs">
                 <div class="tab active" data-tab="besoins" onclick="switchTab('besoins')">📋 Besoins</div>
                 <div class="tab" data-tab="commandes" onclick="switchTab('commandes')">📦 Commandes</div>
+                <div class="tab" data-tab="inventaire" onclick="switchTab('inventaire')">🔍 Inventaire</div>
                 <div class="tab" data-tab="catalogue" onclick="switchTab('catalogue')">📚 Catalogue</div>
             </div>
         </header>
@@ -915,6 +940,20 @@
                     <div class="empty-state-icon">📦</div>
                     <div class="empty-state-text">Aucune commande</div>
                     <div class="empty-state-subtext">Créez une commande pour commencer</div>
+                </div>
+            </div>
+
+            <!-- TAB: Inventaire journalier -->
+            <div class="tab-content" id="tab-inventaire">
+                <div id="inv-header" class="inv-header"></div>
+                <div id="inv-list" class="inv-list"></div>
+                <div id="inv-empty" class="empty-state hidden">
+                    <div class="empty-state-icon">🔍</div>
+                    <div class="empty-state-text">Chargement de l'inventaire du jour...</div>
+                </div>
+                <div class="inv-actions">
+                    <button class="btn-main secondary" onclick="openInvAddModal()">➕ Ajouter un article</button>
+                    <button class="btn-main primary hidden" id="inv-validate-btn" onclick="validateInventaire()">✓ Valider l'inventaire</button>
                 </div>
             </div>
 
@@ -1130,6 +1169,26 @@
         </div>
     </div>
 
+    <!-- Modal: ajouter article à l'inventaire -->
+    <div class="modal-overlay" id="modal-inv-add">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Ajouter un article à l'inventaire</div>
+                <button class="modal-close" onclick="closeInvAddModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="position:relative;">
+                    <label class="form-label">Rechercher un article</label>
+                    <input type="text" id="inv-add-search" class="form-input" placeholder="3 caractères min..." autocomplete="off">
+                    <div class="search-dropdown" id="inv-add-dropdown" style="top:auto;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-small btn-secondary" onclick="closeInvAddModal()">Annuler</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="toast"></div>
 
     <script>
@@ -1269,6 +1328,7 @@
             document.getElementById('search-input').addEventListener('input', debounceSearch);
             document.getElementById('articles-search').addEventListener('input', filterArticles);
             document.getElementById('prix-search').addEventListener('input', debounceSearchPrix);
+            document.getElementById('inv-add-search').addEventListener('input', invAddSearchHandler);
         }
 
         function debounceSearch(e) {
@@ -1421,7 +1481,7 @@
                         ${b.urgence ? '<span class="badge badge-urgent" style="font-size:10px">🔴</span>' : ''}
                     </div>
                     <div class="validation-item-inputs">
-                        <input type="number" class="qty-input" data-besoin-id="${b.id}" value="${b.quantite || 1}" min="0.1" step="0.1" placeholder="Qté">
+                        <input type="number" class="qty-input" data-besoin-id="${b.id}" value="${b.quantite || 1}" min="1" step="1" placeholder="Qté">
                         <div class="validation-item-unit">${b.unite || 'kg'}</div>
                     </div>
                 </div>
@@ -1693,7 +1753,7 @@
         function renderFournisseurs() {
             const container = document.getElementById('fournisseurs-list');
             const empty = document.getElementById('fournisseurs-empty');
-            const list = fournisseurs.filter(f => f.etablissement === currentEstablishment && f.actif);
+            const list = fournisseurs.filter(f => (!f.etablissement || f.etablissement === currentEstablishment) && f.actif);
 
             if (list.length === 0) {
                 container.innerHTML = '';
@@ -1722,7 +1782,7 @@
             const term = (e?.target?.value || '').toLowerCase();
             const container = document.getElementById('articles-list');
             const empty = document.getElementById('articles-empty');
-            const list = articles.filter(a => a.etablissement === currentEstablishment && a.actif && a.nom.toLowerCase().includes(term));
+            const list = articles.filter(a => (!a.etablissement || a.etablissement === currentEstablishment) && a.actif && a.nom.toLowerCase().includes(term));
 
             if (list.length === 0) {
                 container.innerHTML = '';
@@ -1756,7 +1816,7 @@
         async function searchPrixArticles(term) {
             const normalized = normalizeSearch(term);
             const results = articles.filter(a =>
-                a.etablissement === currentEstablishment && a.actif && a.nom_recherche && a.nom_recherche.includes(normalized)
+                (!a.etablissement || a.etablissement === currentEstablishment) && a.actif && a.nom_recherche && a.nom_recherche.includes(normalized)
             ).slice(0, 10);
 
             const dropdown = document.getElementById('prix-dropdown');
@@ -1827,6 +1887,351 @@
 
             if (tabName === 'catalogue') {
                 populateFournisseurSelect();
+            }
+            if (tabName === 'inventaire') {
+                loadInventaireJour();
+            }
+        }
+
+        // ===========================================================
+        // Inventaire journalier
+        // ===========================================================
+        const BOISSON_CAT = ['Boissons'];
+        const SOLIDE_CATS = ['Alimentaire', 'Frais', 'Viande', 'Viande & charcuterie', 'Fruits & Légumes', 'Poisson', 'Épicerie'];
+        let currentInventaire = null;
+        let currentInvLignes = [];
+        let invAddDebounce = null;
+
+        function userRoleLevel() {
+            const hierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+            return hierarchy[currentUser?.role] || 0;
+        }
+
+        async function loadInventaireJour() {
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('inv-list').innerHTML = '';
+            document.getElementById('inv-empty').classList.remove('hidden');
+            document.getElementById('inv-empty').querySelector('.empty-state-text').textContent = 'Chargement...';
+
+            if (isDemo) {
+                // demo : tirage éphémère non persisté
+                currentInventaire = { id: 'demo', date: today, etablissement: currentEstablishment, statut: 'en_cours' };
+                currentInvLignes = tirageAleatoire();
+                renderInventaire();
+                return;
+            }
+
+            try {
+                // chercher inventaire existant aujourd'hui
+                const { data: invs, error: e1 } = await supabase
+                    .from('appro_inventaire_journalier')
+                    .select('*')
+                    .eq('date', today)
+                    .eq('etablissement', currentEstablishment)
+                    .limit(1);
+                if (e1) throw e1;
+
+                if (invs && invs.length > 0) {
+                    currentInventaire = invs[0];
+                    const { data: lignes, error: e2 } = await supabase
+                        .from('appro_inventaire_lignes')
+                        .select('*')
+                        .eq('inventaire_id', currentInventaire.id)
+                        .order('type_tirage', { ascending: true });
+                    if (e2) throw e2;
+                    currentInvLignes = lignes || [];
+                } else {
+                    // créer un nouvel inventaire avec tirage
+                    const tirage = tirageAleatoire();
+                    const { data: newInv, error: e3 } = await supabase
+                        .from('appro_inventaire_journalier')
+                        .insert({
+                            date: today,
+                            etablissement: currentEstablishment,
+                            statut: 'en_cours',
+                            cree_par_id: currentUser.id,
+                            cree_par_nom: currentUser.nom
+                        })
+                        .select()
+                        .single();
+                    if (e3) throw e3;
+                    currentInventaire = newInv;
+
+                    // insérer les lignes du tirage
+                    const lignesInsert = tirage.map(a => ({
+                        inventaire_id: newInv.id,
+                        article_id: a.id,
+                        article_nom: a.nom,
+                        categorie: a.categorie,
+                        unite: a.unite,
+                        type_tirage: 'auto'
+                    }));
+                    if (lignesInsert.length > 0) {
+                        const { data: lignes, error: e4 } = await supabase
+                            .from('appro_inventaire_lignes')
+                            .insert(lignesInsert)
+                            .select();
+                        if (e4) throw e4;
+                        currentInvLignes = lignes || [];
+                    } else {
+                        currentInvLignes = [];
+                    }
+                }
+                renderInventaire();
+            } catch (err) {
+                console.error('Erreur inventaire:', err);
+                showToast('Erreur chargement inventaire: ' + (err.message || err), 'error');
+                document.getElementById('inv-empty').querySelector('.empty-state-text').textContent = 'Erreur de chargement';
+            }
+        }
+
+        function isBoisson(cat) { return BOISSON_CAT.includes(cat); }
+        function isSolide(cat) { return SOLIDE_CATS.includes(cat); }
+
+        function tirageAleatoire() {
+            const articlesEtab = articles.filter(a =>
+                a.actif && (!a.etablissement || a.etablissement === currentEstablishment)
+            );
+            const boissons = articlesEtab.filter(a => isBoisson(a.categorie));
+            const solides = articlesEtab.filter(a => isSolide(a.categorie));
+            const pick = (arr, n) => {
+                const copy = [...arr];
+                const out = [];
+                for (let i = 0; i < n && copy.length > 0; i++) {
+                    const idx = Math.floor(Math.random() * copy.length);
+                    out.push(copy.splice(idx, 1)[0]);
+                }
+                return out;
+            };
+            return [...pick(boissons, 2), ...pick(solides, 4)];
+        }
+
+        function renderInventaire() {
+            const list = document.getElementById('inv-list');
+            const empty = document.getElementById('inv-empty');
+            const header = document.getElementById('inv-header');
+            const validateBtn = document.getElementById('inv-validate-btn');
+
+            const dateFr = new Date(currentInventaire.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            const statutLabel = currentInventaire.statut === 'valide' ? 'Validé' : 'En cours';
+            header.innerHTML = `
+                <div>
+                    <div class="inv-date">Inventaire du ${dateFr}</div>
+                    ${currentInventaire.valide_par_nom ? `<div style="font-size:11px;color:var(--gray-600);margin-top:2px;">Validé par ${currentInventaire.valide_par_nom}</div>` : ''}
+                </div>
+                <span class="inv-statut ${currentInventaire.statut}">${statutLabel}</span>
+            `;
+
+            if (currentInvLignes.length === 0) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                empty.querySelector('.empty-state-text').textContent = 'Aucun article';
+            } else {
+                empty.classList.add('hidden');
+                const isValide = currentInventaire.statut === 'valide';
+                list.innerHTML = currentInvLignes.map(l => {
+                    const catTag = isBoisson(l.categorie) ? 'boisson' : (isSolide(l.categorie) ? 'solide' : '');
+                    const catLabel = catTag === 'boisson' ? 'BOISSON' : (catTag === 'solide' ? 'SOLIDE' : '');
+                    const saisi = l.quantite !== null && l.quantite !== undefined;
+                    return `
+                        <div class="inv-item ${saisi ? 'saisi' : ''}">
+                            <div>
+                                <div class="inv-nom">
+                                    ${escapeHtml(l.article_nom)}
+                                    <span class="inv-tag ${l.type_tirage}">${l.type_tirage === 'auto' ? 'AUTO' : 'MANUEL'}</span>
+                                    ${catTag ? `<span class="inv-tag ${catTag}">${catLabel}</span>` : ''}
+                                </div>
+                                <div class="inv-meta">${escapeHtml(l.categorie || '—')}${l.saisi_par_nom ? ` • saisi par ${escapeHtml(l.saisi_par_nom)}` : ''}</div>
+                            </div>
+                            <div class="inv-qty">
+                                <input type="number" step="0.001" min="0" value="${l.quantite ?? ''}"
+                                    ${isValide ? 'disabled' : ''}
+                                    onchange="saveInvQuantite('${l.id}', this.value)"
+                                    placeholder="0">
+                                <span class="unite">${escapeHtml(l.unite || '')}</span>
+                            </div>
+                            <button class="inv-del" ${isValide ? 'disabled' : ''}
+                                onclick="deleteInvLigne('${l.id}')" title="Retirer">✕</button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Bouton valider: managers+ seulement, et statut en_cours
+            if (userRoleLevel() >= 3 && currentInventaire.statut === 'en_cours') {
+                validateBtn.classList.remove('hidden');
+            } else {
+                validateBtn.classList.add('hidden');
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        async function saveInvQuantite(ligneId, val) {
+            const qty = val === '' ? null : parseFloat(val);
+            if (val !== '' && (isNaN(qty) || qty < 0)) {
+                showToast('Quantité invalide', 'error');
+                return;
+            }
+            const ligne = currentInvLignes.find(l => l.id === ligneId);
+            if (!ligne) return;
+            if (isDemo) {
+                ligne.quantite = qty;
+                ligne.saisi_par_nom = currentUser.nom;
+                renderInventaire();
+                return;
+            }
+            try {
+                const { data, error } = await supabase
+                    .from('appro_inventaire_lignes')
+                    .update({
+                        quantite: qty,
+                        saisi_par_id: qty !== null ? currentUser.id : null,
+                        saisi_par_nom: qty !== null ? currentUser.nom : null,
+                        saisi_at: qty !== null ? new Date().toISOString() : null
+                    })
+                    .eq('id', ligneId)
+                    .select()
+                    .single();
+                if (error) throw error;
+                Object.assign(ligne, data);
+                renderInventaire();
+            } catch (err) {
+                showToast('Erreur enregistrement: ' + (err.message || err), 'error');
+            }
+        }
+
+        async function deleteInvLigne(ligneId) {
+            if (!confirm('Retirer cet article de l\'inventaire du jour ?')) return;
+            if (isDemo) {
+                currentInvLignes = currentInvLignes.filter(l => l.id !== ligneId);
+                renderInventaire();
+                return;
+            }
+            try {
+                const { error } = await supabase.from('appro_inventaire_lignes').delete().eq('id', ligneId);
+                if (error) throw error;
+                currentInvLignes = currentInvLignes.filter(l => l.id !== ligneId);
+                renderInventaire();
+            } catch (err) {
+                showToast('Erreur suppression: ' + (err.message || err), 'error');
+            }
+        }
+
+        function openInvAddModal() {
+            if (currentInventaire?.statut === 'valide') {
+                showToast('Inventaire déjà validé', 'error');
+                return;
+            }
+            document.getElementById('inv-add-search').value = '';
+            document.getElementById('inv-add-dropdown').innerHTML = '';
+            document.getElementById('modal-inv-add').classList.add('show');
+            setTimeout(() => document.getElementById('inv-add-search').focus(), 100);
+        }
+
+        function closeInvAddModal() {
+            document.getElementById('modal-inv-add').classList.remove('show');
+        }
+
+        function normalize(s) {
+            return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function invAddSearchHandler() {
+            clearTimeout(invAddDebounce);
+            invAddDebounce = setTimeout(() => {
+                const term = normalize(document.getElementById('inv-add-search').value.trim());
+                const dropdown = document.getElementById('inv-add-dropdown');
+                if (term.length < 3) { dropdown.innerHTML = ''; dropdown.classList.remove('show'); return; }
+                const existingIds = new Set(currentInvLignes.map(l => l.article_id).filter(Boolean));
+                const results = articles.filter(a =>
+                    a.actif && (!a.etablissement || a.etablissement === currentEstablishment) &&
+                    !existingIds.has(a.id) &&
+                    (normalize(a.nom).includes(term) || (a.nom_recherche || '').includes(term))
+                ).slice(0, 30);
+                if (results.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-item" style="color:var(--gray-600);">Aucun résultat</div>';
+                } else {
+                    dropdown.innerHTML = results.map(a =>
+                        `<div class="dropdown-item" onclick="addInvArticle('${a.id}')">
+                            <div style="font-weight:600;">${escapeHtml(a.nom)}</div>
+                            <div style="font-size:11px;color:var(--gray-600);">${escapeHtml(a.categorie || '')} • ${escapeHtml(a.unite || '')}</div>
+                        </div>`
+                    ).join('');
+                }
+                dropdown.classList.add('show');
+            }, 200);
+        }
+
+        async function addInvArticle(articleId) {
+            const a = articles.find(x => x.id === articleId);
+            if (!a) return;
+            if (isDemo) {
+                currentInvLignes.push({
+                    id: 'demo-' + Date.now(), inventaire_id: currentInventaire.id,
+                    article_id: a.id, article_nom: a.nom, categorie: a.categorie, unite: a.unite,
+                    type_tirage: 'manuel', quantite: null
+                });
+                closeInvAddModal();
+                renderInventaire();
+                return;
+            }
+            try {
+                const { data, error } = await supabase
+                    .from('appro_inventaire_lignes')
+                    .insert({
+                        inventaire_id: currentInventaire.id,
+                        article_id: a.id,
+                        article_nom: a.nom,
+                        categorie: a.categorie,
+                        unite: a.unite,
+                        type_tirage: 'manuel'
+                    })
+                    .select()
+                    .single();
+                if (error) throw error;
+                currentInvLignes.push(data);
+                closeInvAddModal();
+                renderInventaire();
+            } catch (err) {
+                showToast('Erreur ajout: ' + (err.message || err), 'error');
+            }
+        }
+
+        async function validateInventaire() {
+            if (userRoleLevel() < 3) { showToast('Accès refusé', 'error'); return; }
+            const nonSaisis = currentInvLignes.filter(l => l.quantite === null || l.quantite === undefined);
+            if (nonSaisis.length > 0) {
+                if (!confirm(`${nonSaisis.length} article(s) sans quantité. Valider quand même ?`)) return;
+            } else if (!confirm('Valider l\'inventaire du jour ? Plus aucune modification ne sera possible.')) return;
+
+            if (isDemo) {
+                currentInventaire.statut = 'valide';
+                currentInventaire.valide_par_nom = currentUser.nom;
+                renderInventaire();
+                showToast('Inventaire validé', 'success');
+                return;
+            }
+            try {
+                const { data, error } = await supabase
+                    .from('appro_inventaire_journalier')
+                    .update({
+                        statut: 'valide',
+                        valide_par_id: currentUser.id,
+                        valide_par_nom: currentUser.nom,
+                        date_validation: new Date().toISOString()
+                    })
+                    .eq('id', currentInventaire.id)
+                    .select()
+                    .single();
+                if (error) throw error;
+                currentInventaire = data;
+                renderInventaire();
+                showToast('Inventaire validé ✓', 'success');
+            } catch (err) {
+                showToast('Erreur validation: ' + (err.message || err), 'error');
             }
         }
 
@@ -1992,7 +2397,7 @@
 
         function populateFournisseurSelect() {
             const select = document.getElementById('prix-fournisseur');
-            const list = fournisseurs.filter(f => f.etablissement === currentEstablishment && f.actif);
+            const list = fournisseurs.filter(f => (!f.etablissement || f.etablissement === currentEstablishment) && f.actif);
             select.innerHTML = list.map(f => `<option value="${f.id}">${f.nom}</option>`).join('');
         }
 
