@@ -765,9 +765,10 @@
     },
 
     async getPredefined(etab) {
+      // Tâches prédéfinies partagées entre tous les établissements
       const { data } = await supabaseClient.from('predefined_tasks').select('*')
         .eq('actif', true).order('nom');
-      return (data || []).filter(t => !t.etablissement || t.etablissement === etab);
+      return data || [];
     },
 
     async insertPredefined(item) {
@@ -2329,7 +2330,7 @@
         nom,
         categorie: document.getElementById('predef-cat').value.trim() || null,
         equipe: document.getElementById('predef-equipe').value,
-        etablissement: currentEtablissement,
+        etablissement: null,
         actif: true
       });
       predefinedTasks = await DB.getPredefined(currentEtablissement);

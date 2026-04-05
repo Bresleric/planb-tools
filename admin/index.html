@@ -680,11 +680,7 @@
 
             <div id="taf-section" class="admin-section">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
-                    <div class="filter-bar" style="margin:0;">
-                        <button class="filter-btn active" data-taf-filter="all" onclick="filterTaf('all')">Tous</button>
-                        <button class="filter-btn" data-taf-filter="freddy" onclick="filterTaf('freddy')">Freddy</button>
-                        <button class="filter-btn" data-taf-filter="liesel" onclick="filterTaf('liesel')">Liesel</button>
-                    </div>
+                    <div style="font-size:13px; color:var(--gray-500);">Tâches prédéfinies (partagées entre Freddy et Liesel)</div>
                     <div style="display:flex; gap:8px;">
                         <button onclick="cleanupDuplicates()" style="padding:8px 14px; background:#fef3c7; color:#92400e; border:1px solid #fcd34d; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;" title="Supprimer les doublons (même nom + même établissement)">🧹 Supprimer doublons</button>
                         <button class="add-btn" onclick="openAddPredefModal()" style="padding:8px 16px; background:var(--orange); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;">+ Ajouter tâche</button>
@@ -852,14 +848,6 @@
                         <option value="Matin">Matin</option>
                         <option value="Midi">Midi</option>
                         <option value="Soir">Soir</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Établissement</label>
-                    <select id="predef-etablissement">
-                        <option value="">Tous les établissements</option>
-                        <option value="freddy">Freddy</option>
-                        <option value="liesel">Liesel</option>
                     </select>
                 </div>
             </div>
@@ -1605,7 +1593,6 @@
         // ========== TAF PREDEFINED TASKS MANAGEMENT ==========
 
         let predefTasks = [];
-        let predefFilterEtab = 'all';
         let editingPredefId = null;
 
         async function loadPredefTasks() {
@@ -1620,12 +1607,6 @@
             }
         }
 
-        function filterTaf(etab) {
-            predefFilterEtab = etab;
-            document.querySelectorAll('[data-taf-filter]').forEach(b => b.classList.toggle('active', b.dataset.tafFilter === etab));
-            renderPredefTasks();
-        }
-
         function renderPredefTasks() {
             const list = document.getElementById('taf-list');
             const countEl = document.getElementById('taf-count');
@@ -1634,9 +1615,6 @@
             const cat = document.getElementById('taf-filter-categorie').value;
 
             let filtered = predefTasks.filter(t => {
-                if (predefFilterEtab !== 'all') {
-                    if (t.etablissement && t.etablissement !== predefFilterEtab) return false;
-                }
                 if (eq !== 'all' && t.equipe !== eq) return false;
                 if (cat !== 'all' && t.categorie !== cat) return false;
                 if (search && !(t.nom || '').toLowerCase().includes(search)) return false;
@@ -1651,7 +1629,6 @@
             }
 
             list.innerHTML = filtered.map(t => {
-                const estab = t.etablissement ? (t.etablissement === 'freddy' ? 'Freddy' : 'Liesel') : 'Tous';
                 const catColor = {
                     'Production': '#8b5cf6',
                     'Mise en Place': '#0ea5e9',
@@ -1668,8 +1645,6 @@
                             '<span style="color:#6b7280;">' + (t.equipe || '-') + '</span>' +
                             '<span style="color:#6b7280;">|</span>' +
                             '<span style="color:#6b7280;">' + (t.creneau || '-') + '</span>' +
-                            '<span style="color:#6b7280;">|</span>' +
-                            '<span style="color:#6b7280;">' + estab + '</span>' +
                             (!actif ? '<span style="color:#dc2626;">| Inactif</span>' : '') +
                         '</div>' +
                     '</div>' +
@@ -1689,7 +1664,6 @@
             document.getElementById('predef-categorie').value = '';
             document.getElementById('predef-equipe').value = 'cuisine';
             document.getElementById('predef-creneau').value = 'Matin';
-            document.getElementById('predef-etablissement').value = '';
             document.getElementById('predef-modal').style.display = 'flex';
         }
 
@@ -1702,7 +1676,6 @@
             document.getElementById('predef-categorie').value = t.categorie || '';
             document.getElementById('predef-equipe').value = t.equipe || 'cuisine';
             document.getElementById('predef-creneau').value = t.creneau || 'Matin';
-            document.getElementById('predef-etablissement').value = t.etablissement || '';
             document.getElementById('predef-modal').style.display = 'flex';
         }
 
@@ -1716,12 +1689,11 @@
             const categorie = document.getElementById('predef-categorie').value;
             const equipe = document.getElementById('predef-equipe').value;
             const creneau = document.getElementById('predef-creneau').value;
-            const etablissement = document.getElementById('predef-etablissement').value || null;
 
             if (!nom) { alert('Veuillez saisir le nom de la tâche.'); return; }
             if (!categorie) { alert('Veuillez choisir une catégorie.'); return; }
 
-            const payload = { nom, categorie, equipe, creneau, etablissement, actif: true };
+            const payload = { nom, categorie, equipe, creneau, etablissement: null, actif: true };
             try {
                 if (editingPredefId) {
                     const { error } = await supabaseClient.from('predefined_tasks').update(payload).eq('id', editingPredefId);
@@ -1762,17 +1734,10 @@
                     .replace(/\s+/g, ' ') // collapse espaces multiples
                     .trim()
                     .toLowerCase();
-                const normEtab = e => {
-                    const v = (e || '').trim().toLowerCase();
-                    if (!v) return 'null';
-                    if (v === 'bonbao') return 'liesel'; // ancien nom
-                    return v;
-                };
-
-                // Grouper par nom+etablissement (normalisé)
+                // Grouper par nom (normalisé) — les tâches prédéfinies sont partagées
                 const groups = {};
                 all.forEach(t => {
-                    const key = normalize(t.nom) + '||' + normEtab(t.etablissement);
+                    const key = normalize(t.nom);
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(t);
                 });
@@ -1795,8 +1760,7 @@
 
                 // Aperçu pour confirmation
                 const preview = dupGroups.slice(0, 10).map(g => {
-                    const etab = g[0].etablissement || 'Tous';
-                    return '• "' + g[0].nom + '" (' + etab + ') — ' + g.length + ' occurrences';
+                    return '• "' + g[0].nom + '" — ' + g.length + ' occurrences';
                 }).join('\n');
                 const more = dupGroups.length > 10 ? '\n... et ' + (dupGroups.length - 10) + ' autre(s) groupe(s)' : '';
 
