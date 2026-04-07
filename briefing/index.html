@@ -159,6 +159,37 @@
         .kpi-card.highlight { background: var(--orange-light); }
         .kpi-card.highlight .kpi-value { color: var(--orange-dark); }
 
+        /* Meteo card */
+        .meteo-card {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 14px;
+            box-shadow: var(--shadow);
+        }
+        .meteo-icon { font-size: 40px; flex-shrink: 0; }
+        .meteo-info { flex: 1; }
+        .meteo-temp { font-size: 28px; font-weight: 800; color: #0369a1; }
+        .meteo-desc { font-size: 13px; color: #0c4a6e; text-transform: capitalize; margin-top: 2px; }
+        .meteo-details { font-size: 11px; color: #0e7490; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .meteo-detail-item { display: flex; align-items: center; gap: 3px; }
+
+        /* Tendances */
+        .trend-card {
+            background: white; border-radius: var(--radius); padding: 12px; margin-bottom: 8px;
+            box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px;
+        }
+        .trend-arrow { font-size: 24px; flex-shrink: 0; }
+        .trend-arrow.up { color: var(--green); }
+        .trend-arrow.down { color: var(--red); }
+        .trend-arrow.stable { color: var(--gray-400); }
+        .trend-info { flex: 1; }
+        .trend-label { font-size: 11px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; }
+        .trend-value { font-size: 16px; font-weight: 700; color: var(--gray-800); }
+        .trend-sub { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+        .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .trend-mini { font-size: 10px; color: var(--gray-400); display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+        .trend-mini span { background: var(--gray-50); padding: 1px 5px; border-radius: 4px; }
+
         /* List items */
         .brief-item {
             display: flex; align-items: start; gap: 10px; padding: 10px 0;
@@ -530,6 +561,272 @@
     </div>
 
     <script>
+        // ============ METEO CONFIG ============
+        // Cle API stockee dans localStorage (saisie une seule fois via l'interface)
+        function getMeteoApiKey() { return localStorage.getItem('planb_openweather_key') || ''; }
+        function setMeteoApiKey(key) { localStorage.setItem('planb_openweather_key', key); }
+        const METEO_CITY = 'Strasbourg,FR';
+        const METEO_LAT = 48.5734;
+        const METEO_LON = 7.7521;
+
+        // Mapping codes meteo OpenWeatherMap -> emojis
+        const meteoEmojis = {
+            '01d': '\u2600\uFE0F', '01n': '\uD83C\uDF19', '02d': '\u26C5', '02n': '\u2601\uFE0F',
+            '03d': '\u2601\uFE0F', '03n': '\u2601\uFE0F', '04d': '\u2601\uFE0F', '04n': '\u2601\uFE0F',
+            '09d': '\uD83C\uDF27\uFE0F', '09n': '\uD83C\uDF27\uFE0F', '10d': '\uD83C\uDF26\uFE0F', '10n': '\uD83C\uDF27\uFE0F',
+            '11d': '\u26C8\uFE0F', '11n': '\u26C8\uFE0F', '13d': '\u2744\uFE0F', '13n': '\u2744\uFE0F',
+            '50d': '\uD83C\uDF2B\uFE0F', '50n': '\uD83C\uDF2B\uFE0F'
+        };
+
+        async function fetchMeteo(dateStr) {
+            const apiKey = getMeteoApiKey();
+            if (!apiKey) return null;
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                let url;
+                if (dateStr === today) {
+                    url = `https://api.openweathermap.org/data/2.5/weather?lat=${METEO_LAT}&lon=${METEO_LON}&units=metric&lang=fr&appid=${apiKey}`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) { console.warn('Meteo API error:', resp.status); return null; }
+                    const d = await resp.json();
+                    return {
+                        temp: Math.round(d.main.temp),
+                        temp_min: Math.round(d.main.temp_min),
+                        temp_max: Math.round(d.main.temp_max),
+                        description: d.weather[0].description,
+                        icon: d.weather[0].icon,
+                        emoji: meteoEmojis[d.weather[0].icon] || '\uD83C\uDF24\uFE0F',
+                        humidity: d.main.humidity,
+                        wind: Math.round(d.wind.speed * 3.6),
+                        rain_1h: d.rain?.['1h'] || 0,
+                        source: 'current'
+                    };
+                } else {
+                    const target = new Date(dateStr + 'T12:00:00');
+                    const diff = (target - new Date()) / (1000 * 60 * 60 * 24);
+                    if (diff > 5 || diff < 0) return null;
+                    url = `https://api.openweathermap.org/data/2.5/forecast?lat=${METEO_LAT}&lon=${METEO_LON}&units=metric&lang=fr&appid=${apiKey}`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) return null;
+                    const d = await resp.json();
+                    const noon = new Date(dateStr + 'T12:00:00').getTime();
+                    let closest = d.list[0];
+                    let minDist = Infinity;
+                    d.list.forEach(item => {
+                        const dist = Math.abs(new Date(item.dt_txt).getTime() - noon);
+                        if (dist < minDist) { minDist = dist; closest = item; }
+                    });
+                    return {
+                        temp: Math.round(closest.main.temp),
+                        temp_min: Math.round(closest.main.temp_min),
+                        temp_max: Math.round(closest.main.temp_max),
+                        description: closest.weather[0].description,
+                        icon: closest.weather[0].icon,
+                        emoji: meteoEmojis[closest.weather[0].icon] || '\uD83C\uDF24\uFE0F',
+                        humidity: closest.main.humidity,
+                        wind: Math.round(closest.wind.speed * 3.6),
+                        rain_1h: closest.rain?.['3h'] || 0,
+                        source: 'forecast'
+                    };
+                }
+            } catch (err) {
+                console.warn('Meteo fetch error:', err);
+                return null;
+            }
+        }
+
+        async function fetchTendances(dateStr, etablissement) {
+            if (isDemo) return null;
+            try {
+                const weeks = [];
+                for (let w = 1; w <= 4; w++) {
+                    const d = new Date(dateStr + 'T12:00:00');
+                    d.setDate(d.getDate() - (w * 7));
+                    weeks.push(d.toISOString().split('T')[0]);
+                }
+
+                const { data: ventesHist } = await supabaseClient
+                    .from('ventes_journalieres')
+                    .select('date, ca_ttc, couverts, service')
+                    .eq('etablissement', etablissement)
+                    .in('date', weeks);
+
+                if (!ventesHist || ventesHist.length === 0) return null;
+
+                const byDate = {};
+                ventesHist.forEach(v => {
+                    if (!byDate[v.date]) byDate[v.date] = { ca: 0, couv: 0 };
+                    byDate[v.date].ca += (v.ca_ttc || 0);
+                    byDate[v.date].couv += (v.couverts || 0);
+                });
+
+                const entries = weeks.map(w => byDate[w] || null).filter(Boolean);
+                if (entries.length === 0) return null;
+
+                const avgCA = entries.reduce((s, e) => s + e.ca, 0) / entries.length;
+                const avgCouv = entries.reduce((s, e) => s + e.couv, 0) / entries.length;
+                const avgTM = avgCouv > 0 ? avgCA / avgCouv : 0;
+
+                const recent = entries.slice(0, 2);
+                const older = entries.slice(2);
+                let trendCA = 'stable', trendCouv = 'stable';
+                if (recent.length > 0 && older.length > 0) {
+                    const avgRecent = recent.reduce((s, e) => s + e.ca, 0) / recent.length;
+                    const avgOlder = older.reduce((s, e) => s + e.ca, 0) / older.length;
+                    const pctChange = avgOlder > 0 ? ((avgRecent - avgOlder) / avgOlder) * 100 : 0;
+                    if (pctChange > 5) trendCA = 'up';
+                    else if (pctChange < -5) trendCA = 'down';
+
+                    const avgRecentC = recent.reduce((s, e) => s + e.couv, 0) / recent.length;
+                    const avgOlderC = older.reduce((s, e) => s + e.couv, 0) / older.length;
+                    const pctChangeC = avgOlderC > 0 ? ((avgRecentC - avgOlderC) / avgOlderC) * 100 : 0;
+                    if (pctChangeC > 5) trendCouv = 'up';
+                    else if (pctChangeC < -5) trendCouv = 'down';
+                }
+
+                const moisDebut = dateStr.substring(0, 7) + '-01';
+                const { data: venteMois } = await supabaseClient
+                    .from('ventes_journalieres')
+                    .select('date, ca_ttc')
+                    .eq('etablissement', etablissement)
+                    .gte('date', moisDebut)
+                    .lt('date', dateStr)
+                    .order('ca_ttc', { ascending: false })
+                    .limit(1);
+
+                const record = venteMois && venteMois.length > 0
+                    ? { date: venteMois[0].date, ca: venteMois[0].ca_ttc }
+                    : null;
+
+                const weekDetail = weeks.map((w, i) => ({
+                    label: 'S-' + (i + 1),
+                    date: w,
+                    ca: byDate[w]?.ca || 0,
+                    couv: byDate[w]?.couv || 0
+                }));
+
+                return {
+                    moy_ca: Math.round(avgCA * 100) / 100,
+                    moy_couverts: Math.round(avgCouv),
+                    moy_ticket_moyen: Math.round(avgTM * 100) / 100,
+                    trend_ca: trendCA,
+                    trend_couv: trendCouv,
+                    nb_semaines: entries.length,
+                    record_mois: record,
+                    detail_semaines: weekDetail
+                };
+            } catch (err) {
+                console.warn('Tendances fetch error:', err);
+                return null;
+            }
+        }
+
+        async function fetchEffectifsFallback(dateStr, etablissement, service) {
+            try {
+                const { data: usersData } = await supabaseClient
+                    .from('users')
+                    .select('nom, initiales, equipe, role')
+                    .eq('etablissement', etablissement)
+                    .eq('actif', true)
+                    .order('equipe')
+                    .order('nom');
+
+                if (!usersData || usersData.length === 0) return [];
+
+                return usersData.map(u => ({
+                    nom: u.nom,
+                    initiales: u.initiales,
+                    equipe: u.equipe || 'autre',
+                    poste: u.role || '',
+                    horaire: '(planning a definir)'
+                }));
+            } catch (err) {
+                console.warn('Effectifs fallback error:', err);
+                return [];
+            }
+        }
+
+        function renderMeteoSetup() {
+            if (getMeteoApiKey()) return '';
+            return `<div class="meteo-card" style="background:linear-gradient(135deg,#fef3c7,#fde68a); cursor:pointer;" onclick="promptMeteoKey()">
+                <div class="meteo-icon">\u2600\uFE0F</div>
+                <div class="meteo-info">
+                    <div style="font-size:14px; font-weight:700; color:#92400e;">Activer la meteo Strasbourg</div>
+                    <div style="font-size:12px; color:#a16207; margin-top:4px;">Cliquez ici pour saisir votre cle API OpenWeatherMap (gratuit)</div>
+                </div>
+            </div>`;
+        }
+
+        function promptMeteoKey() {
+            const key = prompt('Collez votre cle API OpenWeatherMap ici :\\n(Compte gratuit sur openweathermap.org/api)');
+            if (key && key.trim().length > 10) {
+                setMeteoApiKey(key.trim());
+                showToast('Cle meteo enregistree ! Rechargez la page.', 'success');
+                setTimeout(() => location.reload(), 1500);
+            }
+        }
+
+        function renderMeteoCard(meteo) {
+            if (!meteo) return renderMeteoSetup();
+            const sourceLabel = meteo.source === 'forecast' ? 'Previsions' : 'Temps actuel';
+            return `<div class="meteo-card">
+                <div class="meteo-icon">${meteo.emoji}</div>
+                <div class="meteo-info">
+                    <div class="meteo-temp">${meteo.temp}\u00B0C</div>
+                    <div class="meteo-desc">${escapeHtml(meteo.description)} \u2014 Strasbourg</div>
+                    <div class="meteo-details">
+                        <div class="meteo-detail-item">\uD83C\uDF21\uFE0F ${meteo.temp_min}\u00B0/${meteo.temp_max}\u00B0</div>
+                        <div class="meteo-detail-item">\uD83D\uDCA7 ${meteo.humidity}%</div>
+                        <div class="meteo-detail-item">\uD83D\uDCA8 ${meteo.wind} km/h</div>
+                        ${meteo.rain_1h > 0 ? `<div class="meteo-detail-item">\uD83C\uDF27\uFE0F ${meteo.rain_1h}mm</div>` : ''}
+                    </div>
+                </div>
+                <div style="font-size:10px; color:#0e7490; text-align:right; align-self:flex-start;">${sourceLabel}</div>
+            </div>`;
+        }
+
+        function renderTendancesCard(tendances) {
+            if (!tendances) return '';
+            const trendIcons = { up: '\uD83D\uDCC8', down: '\uD83D\uDCC9', stable: '\u27A1\uFE0F' };
+            const trendLabels = { up: 'En hausse', down: 'En baisse', stable: 'Stable' };
+            const trendClasses = { up: 'up', down: 'down', stable: 'stable' };
+
+            let html = `<div class="trend-grid">
+                <div class="trend-card">
+                    <div class="trend-arrow ${trendClasses[tendances.trend_ca]}">${trendIcons[tendances.trend_ca]}</div>
+                    <div class="trend-info">
+                        <div class="trend-label">CA moy. (${tendances.nb_semaines} sem.)</div>
+                        <div class="trend-value">${formatMoney(tendances.moy_ca)}</div>
+                        <div class="trend-sub">${trendLabels[tendances.trend_ca]}</div>
+                    </div>
+                </div>
+                <div class="trend-card">
+                    <div class="trend-arrow ${trendClasses[tendances.trend_couv]}">${trendIcons[tendances.trend_couv]}</div>
+                    <div class="trend-info">
+                        <div class="trend-label">Couv. moy. (${tendances.nb_semaines} sem.)</div>
+                        <div class="trend-value">${tendances.moy_couverts}</div>
+                        <div class="trend-sub">${trendLabels[tendances.trend_couv]}</div>
+                    </div>
+                </div>
+            </div>`;
+
+            if (tendances.detail_semaines && tendances.detail_semaines.length > 0) {
+                html += `<div class="trend-mini">`;
+                tendances.detail_semaines.forEach(s => {
+                    html += `<span>${s.label}: ${formatMoney(s.ca)} / ${s.couv} couv.</span>`;
+                });
+                html += `</div>`;
+            }
+
+            if (tendances.record_mois) {
+                html += `<div style="font-size:11px; color:var(--amber); font-weight:600; margin-top:6px;">
+                    \uD83C\uDFC6 Record du mois : ${formatMoney(tendances.record_mois.ca)} le ${formatDateShort(tendances.record_mois.date)}
+                </div>`;
+            }
+
+            return html;
+        }
+
         // ============ INITIALIZATION & STATE ============
         var supabaseClient = null;
         let currentUser = null;
@@ -742,6 +1039,23 @@
 
                 currentBriefing = briefing;
 
+                // Enrichir avec meteo fraiche si pas stockee
+                if (briefing && !briefing.chiffres?.meteo) {
+                    const liveMeteo = await fetchMeteo(consultDate);
+                    if (liveMeteo) {
+                        if (!briefing.chiffres) briefing.chiffres = {};
+                        briefing.chiffres.meteo = liveMeteo;
+                    }
+                }
+                // Enrichir avec tendances si pas stockees
+                if (briefing && !briefing.chiffres?.tendances) {
+                    const liveTendances = await fetchTendances(consultDate, currentEstablishment);
+                    if (liveTendances) {
+                        if (!briefing.chiffres) briefing.chiffres = {};
+                        briefing.chiffres.tendances = liveTendances;
+                    }
+                }
+
                 if (!briefing) {
                     container.innerHTML = `
                         <div class="empty-state">
@@ -771,6 +1085,11 @@
                 <span class="status-badge status-${b.statut}">${b.statut === 'publie' ? '&#10003; Publie' : '&#9998; Brouillon'}</span>
                 <span style="font-size:12px; color:var(--gray-500);">${typeLabel} — par ${escapeHtml(b.cree_par_nom || '—')}</span>
             </div>`;
+
+            // Section: Meteo
+            if (b.chiffres?.meteo) {
+                html += renderMeteoCard(b.chiffres.meteo);
+            }
 
             // Section: Chiffres cles
             if (b.chiffres && Object.keys(b.chiffres).length > 0) {
@@ -811,6 +1130,11 @@
                         </div>
                     </div>
                 `, true);
+            }
+
+            // Section: Tendances historiques
+            if (b.chiffres?.tendances) {
+                html += renderSection('&#128200;', 'Tendances (' + (b.chiffres.tendances.nb_semaines || 4) + ' sem.)', '', renderTendancesCard(b.chiffres.tendances), false);
             }
 
             // Section: Equipes (tableau compact)
@@ -1260,9 +1584,27 @@
                     }
                 }
 
+                // === FALLBACK EFFECTIFS : users actifs si pas de planning ===
+                if (planningEquipes.length === 0 && !isDemo) {
+                    planningEquipes = await fetchEffectifsFallback(consultDate, currentEstablishment, service);
+                }
+
                 // Si briefing existant mais equipes vides, injecter le planning
                 if (briefing && (!briefing.equipes || briefing.equipes.length === 0) && planningEquipes.length > 0) {
                     briefing.equipes = planningEquipes;
+                }
+
+                // === METEO & TENDANCES (en parallele) ===
+                const [meteoData, tendancesData] = await Promise.all([
+                    fetchMeteo(consultDate),
+                    fetchTendances(consultDate, currentEstablishment)
+                ]);
+
+                // Injecter dans briefing existant
+                if (briefing) {
+                    if (!briefing.chiffres) briefing.chiffres = {};
+                    if (meteoData && !briefing.chiffres.meteo) briefing.chiffres.meteo = meteoData;
+                    if (tendancesData && !briefing.chiffres.tendances) briefing.chiffres.tendances = tendancesData;
                 }
 
                 if (!briefing) {
@@ -1420,6 +1762,10 @@
                     // === CONSTRUCTION DU BRIEFING avec continuite selective ===
                     // On reporte UNIQUEMENT les produits limites et dates courtes (infos persistantes)
                     // Les evenements, plats, objectifs sont specifiques a chaque service => pas de report
+                    // Enrichir prevData avec meteo et tendances
+                    if (meteoData) prevData.meteo = meteoData;
+                    if (tendancesData) prevData.tendances = tendancesData;
+
                     briefing = {
                         date: consultDate, etablissement: currentEstablishment,
                         type: type, service: service, statut: 'brouillon',
@@ -1453,6 +1799,23 @@
                 <span class="status-badge status-${b.statut}">${b.statut === 'publie' ? '&#10003; Publie' : '&#9998; Brouillon'}</span>
                 ${b.id ? '<span style="font-size:12px; color:var(--gray-500);">Briefing existant</span>' : '<span style="font-size:12px; color:var(--gray-500);">Nouveau briefing</span>'}
             </div>`;
+
+            // Meteo auto-remplie
+            if (b.chiffres?.meteo) {
+                html += renderMeteoCard(b.chiffres.meteo);
+            }
+
+            // Tendances historiques (lecture seule)
+            if (b.chiffres?.tendances) {
+                html += `<div class="form-section">
+                    <div class="form-section-header" onclick="toggleFormSection(this)">
+                        <div class="section-icon">&#128200;</div>
+                        <div class="section-title">Tendances (${b.chiffres.tendances.nb_semaines || 4} sem.)</div>
+                        <div class="section-chevron">&#9654;</div>
+                    </div>
+                    <div class="form-section-body">${renderTendancesCard(b.chiffres.tendances)}</div>
+                </div>`;
+            }
 
             // Chiffres section
             html += `<div class="form-section">
@@ -1790,7 +2153,9 @@
                         couverts_n1: parseInt(document.getElementById('f-couverts-n1')?.value) || 0,
                         reservations: parseInt(document.getElementById('f-reservations')?.value) || 0,
                         couverts_attendus: parseInt(document.getElementById('f-couverts-attendus')?.value) || 0,
-                        ca_prevu: parseFloat(document.getElementById('f-ca-prevu')?.value) || 0
+                        ca_prevu: parseFloat(document.getElementById('f-ca-prevu')?.value) || 0,
+                        meteo: editingBriefing?.chiffres?.meteo || null,
+                        tendances: editingBriefing?.chiffres?.tendances || null
                     },
                     equipes: collectEditorData('equipes'),
                     evenements: collectEditorData('evenements'),
