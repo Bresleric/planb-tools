@@ -1086,10 +1086,8 @@
                 <span style="font-size:12px; color:var(--gray-500);">${typeLabel} — par ${escapeHtml(b.cree_par_nom || '—')}</span>
             </div>`;
 
-            // Section: Meteo
-            if (b.chiffres?.meteo) {
-                html += renderMeteoCard(b.chiffres.meteo);
-            }
+            // Section: Meteo (affiche le setup si pas de cle API)
+            html += renderMeteoCard(b.chiffres?.meteo || null);
 
             // Section: Chiffres cles
             if (b.chiffres && Object.keys(b.chiffres).length > 0) {
@@ -1801,9 +1799,8 @@
             </div>`;
 
             // Meteo auto-remplie
-            if (b.chiffres?.meteo) {
-                html += renderMeteoCard(b.chiffres.meteo);
-            }
+            // Meteo (affiche le setup si pas de cle API)
+            html += renderMeteoCard(b.chiffres?.meteo || null);
 
             // Tendances historiques (lecture seule)
             if (b.chiffres?.tendances) {
