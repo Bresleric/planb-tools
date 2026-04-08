@@ -528,10 +528,16 @@
       <!-- Document import -->
       <div class="form-section">
         <label class="form-label required">Document scanne</label>
-        <div class="photo-capture-area" onclick="triggerImport()">
-          <div class="icon">📥</div>
-          <div class="label">Importer un PDF ou une image</div>
-          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Scanner Pro → Fichiers → Importer ici</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button type="button" onclick="openScannerPro()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+            <span style="font-size:1.1rem;">📷</span> Ouvrir Scanner Pro
+          </button>
+          <button type="button" onclick="triggerImport()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#48bb78,#38a169);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+            <span style="font-size:1.1rem;">📄</span> Importer PDF
+          </button>
+        </div>
+        <div class="photo-capture-area" onclick="triggerImport()" style="padding:12px;">
+          <div style="font-size:.7rem;color:var(--gray-400);">1. Scanner Pro pour numeriser → 2. Importer le PDF ici</div>
           <div class="count" id="file-count">Aucun fichier</div>
         </div>
         <div id="file-preview" style="margin-top:10px;"></div>
@@ -585,7 +591,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- Hidden file input for import (PDF + images) -->
-<input type="file" id="file-input" class="hidden-input" accept="application/pdf,image/*">
+<input type="file" id="file-input" class="hidden-input" accept="application/pdf">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -916,6 +922,30 @@
     document.getElementById('form-commande-section').classList.toggle('hidden', !isFacture);
     document.getElementById('modal-new-title').textContent =
       isFacture ? 'Nouvelle facture / BL' : 'Nouvelle etiquette';
+  }
+
+  // ====== SCANNER PRO ======
+  function openScannerPro() {
+    // Try known Readdle Scanner Pro URL schemes
+    const schemes = ['scannerpro://', 'readdle-scannerpro://'];
+    const startTime = Date.now();
+
+    // Try first scheme
+    window.location.href = schemes[0];
+
+    // If we're still here after 1.5s, the app didn't open
+    setTimeout(() => {
+      if (Date.now() - startTime < 2000) return; // App opened
+      // Try App Store link as fallback
+      const useStore = confirm(
+        'Scanner Pro ne s\'est pas ouvert.\n\n' +
+        'Verifiez que l\'app est bien installee.\n\n' +
+        'Ouvrir l\'App Store ?'
+      );
+      if (useStore) {
+        window.location.href = 'https://apps.apple.com/app/scanner-pro-scan-documents/id333710667';
+      }
+    }, 1500);
   }
 
   // ====== FILE IMPORT ======
