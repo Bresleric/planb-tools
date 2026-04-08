@@ -871,11 +871,13 @@
 
         // ============= Modules Definition =============
         const ALL_MODULES = [
-            { id: 'kitchen-taf', name: 'Kitchen TAF', icon: '🍴', minRole: 'collaborateur' },
+            { id: 'taf', name: 'TAF', icon: '📋', minRole: 'collaborateur' },
+            { id: 'production', name: 'Production', icon: '🏭', minRole: 'collaborateur' },
+            { id: 'ventes', name: 'Ventes', icon: '💰', minRole: 'responsable' },
             { id: 'pointages', name: 'Pointages', icon: '⏰', minRole: 'collaborateur' },
-            { id: 'caisse', name: 'Contrôle Caisse', icon: '💰', minRole: 'responsable' },
-            { id: 'briefings', name: 'Briefings', icon: '📋', minRole: 'responsable' },
-            { id: 'approvisionnement', name: 'Appro.', icon: '📦', minRole: 'responsable' },
+            { id: 'caisse', name: 'Contrôle Caisse', icon: '🧾', minRole: 'collaborateur' },
+            { id: 'briefings', name: 'Briefings', icon: '📋', minRole: 'collaborateur' },
+            { id: 'approvisionnement', name: 'Appro.', icon: '📦', minRole: 'collaborateur' },
             { id: 'receptions', name: 'Réceptions', icon: '🚛', minRole: 'responsable' },
             { id: 'checklist', name: 'Check-Lists', icon: '✅', minRole: 'collaborateur' },
             { id: 'temperatures', name: 'Températures', icon: '🌡️', minRole: 'collaborateur' },
@@ -1283,7 +1285,7 @@
 
         // Matrice des sous-modules (onglets) par module
         const MODULE_TABS = {
-            'kitchen-taf': [
+            'taf': [
                 { name: 'Taches', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
                 { name: 'Creer', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
                 { name: 'Admin', roles: ['admin'] }
