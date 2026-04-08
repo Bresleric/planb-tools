@@ -531,7 +531,7 @@
         <div class="photo-capture-area" onclick="triggerImport()">
           <div class="icon">📥</div>
           <div class="label">Importer un PDF ou une image</div>
-          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Scannez avec l'app Fichiers iOS puis importez ici</div>
+          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Scanner Pro → Fichiers → Importer ici</div>
           <div class="count" id="file-count">Aucun fichier</div>
         </div>
         <div id="file-preview" style="margin-top:10px;"></div>
@@ -1161,8 +1161,9 @@
       loadDocuments();
     } catch (e) {
       console.error('Erreur enregistrement:', e);
-      const msg = e?.message || e?.details || JSON.stringify(e);
-      showToast('Erreur: ' + msg.substring(0, 120), 'error');
+      const msg = e?.message || e?.details || e?.hint || JSON.stringify(e);
+      showToast('Erreur d\'enregistrement', 'error');
+      setTimeout(() => alert('Erreur Supabase:\n' + msg), 300);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Enregistrer';
