@@ -525,17 +525,16 @@
         </select>
       </div>
 
-      <!-- Photos -->
+      <!-- Document import -->
       <div class="form-section">
-        <label class="form-label required">Photos du document</label>
-        <div class="photo-capture-area" onclick="triggerCamera()">
-          <div class="icon">📋</div>
-          <div class="label">Scanner un document</div>
-          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Cadrage auto + N&B + OCR</div>
-          <div class="count" id="photo-count">0 page(s)</div>
-          <div id="cv-status" style="font-size:.65rem;color:var(--amber);margin-top:4px;"></div>
+        <label class="form-label required">Document scanne</label>
+        <div class="photo-capture-area" onclick="triggerImport()">
+          <div class="icon">📥</div>
+          <div class="label">Importer un PDF ou une image</div>
+          <div style="font-size:.7rem;color:var(--gray-400);margin-top:2px;">Scannez avec l'app Fichiers iOS puis importez ici</div>
+          <div class="count" id="file-count">Aucun fichier</div>
         </div>
-        <div class="photo-grid" id="photo-grid"></div>
+        <div id="file-preview" style="margin-top:10px;"></div>
       </div>
 
       <!-- Observation -->
@@ -585,19 +584,23 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- Hidden file input for camera -->
-<input type="file" id="camera-input" class="hidden-input" accept="image/*" capture="environment">
+<!-- Hidden file input for import (PDF + images) -->
+<input type="file" id="file-input" class="hidden-input" accept="application/pdf,image/*">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script async src="https://docs.opencv.org/4.9.0/opencv.js" onload="onOpenCvReady()"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
   // ====== CONFIG ======
   const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
 
   const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+
+  // pdf.js worker
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 
   // ====== STATE ======
   let currentUser = null;
@@ -609,17 +612,9 @@
   let fournisseurs = [];
   let commandes = [];
   let documents = [];
-  let capturedPages = []; // array of { image, ocr, ocrData } for new document
+  let importedFile = null;    // { type:'pdf'|'image', dataUri: string, name: string, pageImages: [base64], textContent: string }
   let viewerPages = [];
   let viewerIndex = 0;
-  let cvReady = false;
-
-  function onOpenCvReady() {
-    cvReady = true;
-    console.log('OpenCV.js ready');
-    const st = document.getElementById('cv-status');
-    if (st) st.textContent = '';
-  }
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -647,7 +642,6 @@
   }
 
   const DB = {
-    // Fournisseurs (from appro module)
     async getFournisseurs(etab) {
       const { data } = await supabaseClient.from('appro_fournisseurs').select('id, nom')
         .or(`etablissement.eq.${etab},etablissement.is.null`)
@@ -655,7 +649,6 @@
       return data || [];
     },
 
-    // Commandes (from appro module, for linking)
     async getCommandes(etab) {
       const { data } = await supabaseClient.from('appro_commandes').select('id, fournisseur_nom, date_creation, statut')
         .eq('etablissement', etab)
@@ -665,7 +658,6 @@
       return data || [];
     },
 
-    // Documents
     async getDocuments(etab, date, type) {
       let query = supabaseClient.from('receptions_documents').select('*')
         .eq('etablissement', etab).eq('date', date);
@@ -795,19 +787,13 @@
     document.querySelectorAll('.tab-content').forEach(c =>
       c.classList.toggle('active', c.id === `tab-${tab}`)
     );
-    // Show/hide FAB on historique tab
     document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique');
-
-    if (tab === 'historique') {
-      loadHistorique();
-    } else {
-      renderDocuments();
-    }
+    if (tab === 'historique') loadHistorique();
+    else renderDocuments();
   }
 
   function filterDocs(tabType, filter) {
     currentSubFilter[tabType] = filter;
-    // Update sub-tab buttons
     const container = document.getElementById(`tab-${tabType}`);
     container.querySelectorAll('.sub-tab').forEach(b =>
       b.classList.toggle('active', b.dataset.sub === filter)
@@ -824,9 +810,7 @@
       fournisseurs.forEach(f => {
         sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`;
       });
-    } catch (e) {
-      console.error('Erreur chargement fournisseurs:', e);
-    }
+    } catch (e) { console.error('Erreur fournisseurs:', e); }
   }
 
   async function loadCommandes() {
@@ -838,9 +822,7 @@
         const dt = formatDateShort(c.date_creation);
         sel.innerHTML += `<option value="${c.id}">${esc(c.fournisseur_nom)} - ${dt} (${c.statut})</option>`;
       });
-    } catch (e) {
-      console.error('Erreur chargement commandes:', e);
-    }
+    } catch (e) { console.error('Erreur commandes:', e); }
   }
 
   async function loadDocuments() {
@@ -848,7 +830,7 @@
       documents = await DB.getDocuments(currentEtablissement, dateStr(filterDate));
       renderDocuments();
     } catch (e) {
-      console.error('Erreur chargement documents:', e);
+      console.error('Erreur documents:', e);
       showToast('Erreur de chargement', 'error');
     }
   }
@@ -863,17 +845,14 @@
     const container = document.getElementById(`${tabType}-list`);
     const filter = currentSubFilter[tabType];
     let docs = documents.filter(d => d.type === docType);
-    if (filter !== 'all') {
-      docs = docs.filter(d => d.statut === filter);
-    }
+    if (filter !== 'all') docs = docs.filter(d => d.statut === filter);
 
     if (!docs.length) {
-      const emptyIcon = docType === 'facture' ? '📄' : '🏷️';
-      const emptyText = docType === 'facture' ? 'Aucune facture/BL ce jour' : 'Aucune etiquette ce jour';
-      container.innerHTML = `<div class="empty"><div class="icon">${emptyIcon}</div><div class="text">${emptyText}</div></div>`;
+      const icon = docType === 'facture' ? '📄' : '🏷️';
+      const text = docType === 'facture' ? 'Aucune facture/BL ce jour' : 'Aucune etiquette ce jour';
+      container.innerHTML = `<div class="empty"><div class="icon">${icon}</div><div class="text">${text}</div></div>`;
       return;
     }
-
     container.innerHTML = docs.map(d => renderDocCard(d)).join('');
   }
 
@@ -890,7 +869,8 @@
 
     const ref = doc.reference ? `<div style="font-size:.8rem;color:var(--gray-500);">Ref: ${esc(doc.reference)}</div>` : '';
     const obs = doc.observation ? `<div style="font-size:.8rem;color:var(--gray-500);margin-top:4px;">${esc(doc.observation)}</div>` : '';
-    const pages = doc.nb_pages > 0 ? `<span style="font-size:.75rem;color:var(--gray-400);">📋 ${doc.nb_pages} scan(s) <span class="ocr-badge">OCR</span></span>` : '';
+    const pdfBadge = doc.pdf_data ? '<span class="ocr-badge">PDF</span>' : '';
+    const pages = doc.nb_pages > 0 ? `<span style="font-size:.75rem;color:var(--gray-400);">📋 ${doc.nb_pages} page(s) ${pdfBadge}</span>` : '';
 
     return `
       <div class="card" onclick="viewDocument('${doc.id}')">
@@ -916,26 +896,16 @@
 
   // ====== NEW DOCUMENT ======
   function openNewDocModal() {
-    // Set type based on current tab
     const typeSelect = document.getElementById('form-type');
     typeSelect.value = currentMainTab === 'etiquettes' ? 'etiquette' : 'facture';
     onTypeChange();
-
-    // Reset form
     document.getElementById('form-fournisseur').value = '';
     document.getElementById('form-reference').value = '';
     document.getElementById('form-commande').value = '';
     document.getElementById('form-observation').value = '';
-    capturedPages = [];
-    updatePhotoGrid();
-
-    // Load fresh commandes
+    importedFile = null;
+    updateFilePreview();
     loadCommandes();
-
-    // Show OpenCV loading status
-    const cvSt = document.getElementById('cv-status');
-    if (cvSt) cvSt.textContent = cvReady ? '' : 'Chargement moteur de cadrage...';
-
     document.getElementById('modal-new').classList.add('show');
   }
 
@@ -948,408 +918,169 @@
       isFacture ? 'Nouvelle facture / BL' : 'Nouvelle etiquette';
   }
 
-  // ====== SCANNER + OCR ======
-  function triggerCamera() {
-    const input = document.getElementById('camera-input');
+  // ====== FILE IMPORT ======
+  function triggerImport() {
+    const input = document.getElementById('file-input');
     input.value = '';
     input.click();
   }
 
-  // ====== DOCUMENT DETECTION (OpenCV.js) ======
-  function orderCorners(pts) {
-    // Order: top-left, top-right, bottom-right, bottom-left
-    const sorted = [...pts].sort((a, b) => a.y - b.y);
-    const top = sorted.slice(0, 2).sort((a, b) => a.x - b.x);
-    const bottom = sorted.slice(2, 4).sort((a, b) => a.x - b.x);
-    return [top[0], top[1], bottom[1], bottom[0]];
-  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('file-input')?.addEventListener('change', async function(e) {
+      if (!this.files?.length) return;
+      const file = this.files[0];
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
-  function ptDist(a, b) {
-    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-  }
+      showOcrOverlay(true, 'Chargement du fichier...', 10);
 
-  function detectAndCropDocument(imgElement) {
-    if (!cvReady || typeof cv === 'undefined') return null;
-
-    try {
-      // Load image into OpenCV
-      const src = cv.imread(imgElement);
-      const origRows = src.rows, origCols = src.cols;
-
-      // Downscale for fast processing
-      const maxProc = 600;
-      const ratio = maxProc / Math.max(origRows, origCols);
-      const small = new cv.Mat();
-      const smallSize = new cv.Size(Math.round(origCols * ratio), Math.round(origRows * ratio));
-      cv.resize(src, small, smallSize);
-
-      // Grayscale
-      const gray = new cv.Mat();
-      cv.cvtColor(small, gray, cv.COLOR_RGBA2GRAY);
-
-      // Blur to reduce noise
-      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
-
-      // Canny edge detection
-      const edges = new cv.Mat();
-      cv.Canny(gray, edges, 40, 120);
-
-      // Dilate to close gaps in edges
-      const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-      cv.dilate(edges, edges, kernel, new cv.Point(-1, -1), 2);
-
-      // Find contours
-      const contours = new cv.MatVector();
-      const hierarchy = new cv.Mat();
-      cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-      // Find largest 4-point contour (the document)
-      const imageArea = small.rows * small.cols;
-      let bestContour = null;
-      let bestArea = 0;
-
-      for (let i = 0; i < contours.size(); i++) {
-        const cnt = contours.get(i);
-        const area = cv.contourArea(cnt);
-
-        // Must be at least 10% of image area
-        if (area < imageArea * 0.10) continue;
-
-        const peri = cv.arcLength(cnt, true);
-        const approx = new cv.Mat();
-        cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-
-        if (approx.rows === 4 && area > bestArea) {
-          bestArea = area;
-          if (bestContour) bestContour.delete();
-          bestContour = approx;
+      try {
+        if (isPdf) {
+          await processPdfFile(file);
         } else {
-          approx.delete();
+          await processImageFile(file);
         }
+        showOcrOverlay(false);
+        updateFilePreview();
+        showToast(importedFile ? `${importedFile.name} importe` : 'Fichier importe', 'success');
+      } catch (err) {
+        console.error('Import error:', err);
+        showOcrOverlay(false);
+        showToast('Erreur d\'import', 'error');
       }
+    });
+  });
 
-      let resultCanvas = null;
+  // Process PDF file: extract pages as images + text
+  async function processPdfFile(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdf.numPages;
 
-      if (bestContour) {
-        // Extract corners and scale back to original image size
-        const corners = [];
-        for (let i = 0; i < 4; i++) {
-          corners.push({
-            x: bestContour.data32S[i * 2] / ratio,
-            y: bestContour.data32S[i * 2 + 1] / ratio
-          });
-        }
-        const ordered = orderCorners(corners);
+    // Read file as data URI for storage
+    const dataUri = await fileToDataUri(file);
 
-        // Calculate output dimensions
-        const wTop = ptDist(ordered[0], ordered[1]);
-        const wBot = ptDist(ordered[3], ordered[2]);
-        const hLeft = ptDist(ordered[0], ordered[3]);
-        const hRight = ptDist(ordered[1], ordered[2]);
-        const outW = Math.round(Math.max(wTop, wBot));
-        const outH = Math.round(Math.max(hLeft, hRight));
+    const pageImages = [];
+    let fullText = '';
 
-        // Ensure A4-like minimum (reasonable document size)
-        if (outW > 200 && outH > 200) {
-          // Perspective transform
-          const srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
-            ordered[0].x, ordered[0].y,
-            ordered[1].x, ordered[1].y,
-            ordered[2].x, ordered[2].y,
-            ordered[3].x, ordered[3].y
-          ]);
-          const dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, [
-            0, 0, outW, 0, outW, outH, 0, outH
-          ]);
+    for (let i = 1; i <= numPages; i++) {
+      showOcrOverlay(true, `Page ${i}/${numPages}...`, 10 + (70 * i / numPages));
+      const page = await pdf.getPage(i);
 
-          const M = cv.getPerspectiveTransform(srcPts, dstPts);
-          const dst = new cv.Mat();
-          cv.warpPerspective(src, dst, M, new cv.Size(outW, outH), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255, 255, 255, 255));
+      // Render page to canvas (for preview thumbnails)
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pageImages.push(canvas.toDataURL('image/jpeg', 0.8));
 
-          // Write to canvas
-          resultCanvas = document.createElement('canvas');
-          cv.imshow(resultCanvas, dst);
-
-          M.delete(); srcPts.delete(); dstPts.delete(); dst.delete();
-        }
-        bestContour.delete();
-      }
-
-      // Cleanup
-      src.delete(); small.delete(); gray.delete(); edges.delete();
-      kernel.delete(); contours.delete(); hierarchy.delete();
-
-      return resultCanvas; // null if no document detected
-    } catch (e) {
-      console.error('Document detection error:', e);
-      return null;
+      // Extract text content (if PDF has text layer — iOS scanner usually does)
+      try {
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        if (pageText.trim()) fullText += (fullText ? '\n\n' : '') + pageText.trim();
+      } catch (e) { /* no text layer */ }
     }
+
+    // If no text extracted, try OCR on the first page
+    if (!fullText.trim() && pageImages.length > 0) {
+      showOcrOverlay(true, 'OCR en cours (pas de texte dans le PDF)...', 80);
+      fullText = await runOcrOnImage(pageImages[0]);
+    }
+
+    importedFile = {
+      type: 'pdf',
+      dataUri,
+      name: file.name,
+      pageImages,
+      textContent: fullText,
+      nbPages: numPages
+    };
   }
 
-  // Scanner: clean black & white with Sauvola adaptive threshold
-  function scannerProcess(img) {
-    const canvas = document.createElement('canvas');
-    const maxSize = 1200;
-    let w = img.width, h = img.height;
-    if (w > maxSize || h > maxSize) {
-      if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-      else { w = Math.round(w * maxSize / h); h = maxSize; }
-    }
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, w, h);
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
+  // Process image file
+  async function processImageFile(file) {
+    const dataUri = await fileToDataUri(file);
 
-    // 1) Grayscale
-    const gray = new Uint8Array(w * h);
-    for (let i = 0; i < gray.length; i++) {
-      const p = i * 4;
-      gray[i] = Math.round(0.299 * data[p] + 0.587 * data[p+1] + 0.114 * data[p+2]);
-    }
+    // OCR on the image
+    showOcrOverlay(true, 'OCR en cours...', 50);
+    const ocrText = await runOcrOnImage(dataUri);
 
-    // 2) Light box blur (3x3) to reduce noise
-    const blurred = new Uint8Array(w * h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let sum = 0, count = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx, ny = y + dy;
-            if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-              sum += gray[ny * w + nx];
-              count++;
-            }
-          }
-        }
-        blurred[y * w + x] = Math.round(sum / count);
-      }
-    }
-
-    // 3) Sauvola adaptive threshold
-    // Uses integral images for fast local mean & variance
-    const blockRadius = Math.max(25, Math.round(Math.min(w, h) / 20));
-    const k = 0.15; // Sauvola sensitivity (lower = more white, less noise)
-    const R = 128;   // dynamic range of std deviation
-
-    // Build integral image and integral of squares
-    const integ = new Float64Array((w + 1) * (h + 1));
-    const integ2 = new Float64Array((w + 1) * (h + 1));
-    for (let y = 0; y < h; y++) {
-      let rowS = 0, rowS2 = 0;
-      for (let x = 0; x < w; x++) {
-        const v = blurred[y * w + x];
-        rowS += v;
-        rowS2 += v * v;
-        integ[(y+1) * (w+1) + (x+1)] = rowS + integ[y * (w+1) + (x+1)];
-        integ2[(y+1) * (w+1) + (x+1)] = rowS2 + integ2[y * (w+1) + (x+1)];
-      }
-    }
-
-    const result = new Uint8Array(w * h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const x1 = Math.max(0, x - blockRadius);
-        const y1 = Math.max(0, y - blockRadius);
-        const x2 = Math.min(w - 1, x + blockRadius);
-        const y2 = Math.min(h - 1, y + blockRadius);
-        const cnt = (x2 - x1 + 1) * (y2 - y1 + 1);
-
-        const sumVal = integ[(y2+1)*(w+1)+(x2+1)] - integ[y1*(w+1)+(x2+1)]
-                     - integ[(y2+1)*(w+1)+x1] + integ[y1*(w+1)+x1];
-        const sumSq  = integ2[(y2+1)*(w+1)+(x2+1)] - integ2[y1*(w+1)+(x2+1)]
-                     - integ2[(y2+1)*(w+1)+x1] + integ2[y1*(w+1)+x1];
-
-        const mean = sumVal / cnt;
-        const variance = Math.max(0, (sumSq / cnt) - (mean * mean));
-        const std = Math.sqrt(variance);
-
-        // Sauvola formula: threshold = mean * (1 + k * (std/R - 1))
-        const threshold = mean * (1 + k * (std / R - 1));
-        result[y * w + x] = blurred[y * w + x] > threshold ? 255 : 0;
-      }
-    }
-
-    // 4) Morphological cleanup: remove isolated black pixels (salt noise)
-    // A black pixel surrounded mostly by white → set white
-    const cleaned = new Uint8Array(result);
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        if (result[y * w + x] === 0) {
-          let whiteNeighbors = 0;
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              if (dx === 0 && dy === 0) continue;
-              if (result[(y+dy) * w + (x+dx)] === 255) whiteNeighbors++;
-            }
-          }
-          if (whiteNeighbors >= 7) cleaned[y * w + x] = 255; // isolated → remove
-        }
-      }
-    }
-
-    // Write back
-    for (let i = 0; i < cleaned.length; i++) {
-      const p = i * 4;
-      data[p] = data[p+1] = data[p+2] = cleaned[i];
-    }
-    ctx.putImageData(imageData, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.65); // JPEG 65% quality to reduce payload size
+    importedFile = {
+      type: 'image',
+      dataUri,
+      name: file.name,
+      pageImages: [dataUri],
+      textContent: ocrText,
+      nbPages: 1
+    };
   }
 
-  // OCR with Tesseract.js
-  function showOcrOverlay(show, status, progress) {
-    const overlay = document.getElementById('ocr-overlay');
-    overlay.style.display = show ? 'flex' : 'none';
-    if (status) document.getElementById('ocr-status').textContent = status;
-    if (progress !== undefined) document.getElementById('ocr-progress').style.width = progress + '%';
+  function fileToDataUri(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
-  async function runOcr(base64Image) {
+  // OCR fallback with Tesseract.js
+  async function runOcrOnImage(base64Image) {
     try {
       const result = await Tesseract.recognize(base64Image, 'fra', {
         logger: m => {
           if (m.status === 'recognizing text') {
-            showOcrOverlay(true, 'Extraction du texte...', Math.round((m.progress || 0) * 100));
+            showOcrOverlay(true, 'Extraction du texte...', 80 + Math.round((m.progress || 0) * 20));
           }
         }
       });
-      // Return text + word positions (for searchable PDF)
-      const text = (result?.data?.text || '').trim();
-      const words = (result?.data?.words || []).map(w => ({
-        text: w.text,
-        x: w.bbox.x0,
-        y: w.bbox.y0,
-        w: w.bbox.x1 - w.bbox.x0,
-        h: w.bbox.y1 - w.bbox.y0,
-        confidence: w.confidence
-      }));
-      return { text, words };
+      return (result?.data?.text || '').trim();
     } catch (e) {
       console.error('OCR error:', e);
-      return { text: '', words: [] };
+      return '';
     }
   }
 
-  // Generate searchable PDF from scanned pages
-  function generatePDF(pages) {
-    const { jsPDF } = window.jspdf;
-    let pdf = null;
+  // Update file preview
+  function updateFilePreview() {
+    const countEl = document.getElementById('file-count');
+    const previewEl = document.getElementById('file-preview');
 
-    pages.forEach((page, index) => {
-      // Load image to get dimensions
-      const img = new Image();
-      img.src = page.image;
-      const imgW = img.width || 1800;
-      const imgH = img.height || 2400;
+    if (!importedFile) {
+      countEl.textContent = 'Aucun fichier';
+      previewEl.innerHTML = '';
+      return;
+    }
 
-      // Create PDF page with image dimensions (in mm, A4-ish)
-      const pdfW = 210; // A4 width mm
-      const pdfH = (imgH / imgW) * pdfW;
+    const icon = importedFile.type === 'pdf' ? '📄' : '🖼️';
+    countEl.textContent = `${icon} ${importedFile.name} (${importedFile.nbPages} page(s))`;
 
-      if (index === 0) {
-        pdf = new jsPDF({ orientation: pdfH > pdfW ? 'portrait' : 'landscape', unit: 'mm', format: [pdfW, pdfH] });
-      } else {
-        pdf.addPage([pdfW, pdfH], pdfH > pdfW ? 'portrait' : 'landscape');
-      }
-
-      // Add scanned image as full page
-      const imgFormat = page.image.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
-      pdf.addImage(page.image, imgFormat, 0, 0, pdfW, pdfH, undefined, 'FAST');
-
-      // Add invisible OCR text layer (searchable)
-      if (page.ocrData?.words?.length) {
-        pdf.setTextColor(255, 255, 255); // white = invisible
-        pdf.setFont('helvetica');
-
-        const scaleX = pdfW / imgW;
-        const scaleY = pdfH / imgH;
-
-        page.ocrData.words.forEach(word => {
-          if (!word.text.trim() || word.confidence < 30) return;
-          const fontSize = Math.max(4, Math.min(14, word.h * scaleY * 2.5));
-          pdf.setFontSize(fontSize);
-          // Position text precisely over where it appears in the image
-          const x = word.x * scaleX;
-          const y = (word.y + word.h * 0.8) * scaleY;
-          try { pdf.text(word.text, x, y); } catch(e) { /* skip invalid chars */ }
-        });
-      }
+    // Show page thumbnails
+    let html = '<div class="photo-grid">';
+    importedFile.pageImages.forEach((img, i) => {
+      html += `
+        <div class="photo-item">
+          <img src="${img}" alt="Page ${i+1}" onclick="previewPage(${i})">
+          <span class="page-num">p.${i+1}</span>
+        </div>`;
     });
+    html += '</div>';
 
-    return pdf ? pdf.output('datauristring') : null;
-  }
+    // Show OCR text preview
+    if (importedFile.textContent) {
+      const preview = importedFile.textContent.substring(0, 200);
+      html += `<div style="margin-top:8px;font-size:.75rem;color:var(--gray-400);">Texte extrait: ${esc(preview)}${importedFile.textContent.length > 200 ? '...' : ''}</div>`;
+    }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('camera-input')?.addEventListener('change', async function(e) {
-      if (!this.files?.length) return;
-      const file = this.files[0];
-      const reader = new FileReader();
-      reader.onload = async function(ev) {
-        const img = new Image();
-        img.onload = async function() {
-          // Step 1: Detect and crop document (OpenCV)
-          showOcrOverlay(true, 'Detection du document...', 5);
-          await new Promise(r => setTimeout(r, 50));
-
-          let sourceForScan = img;
-          const croppedCanvas = detectAndCropDocument(img);
-          if (croppedCanvas) {
-            // Use cropped document as source
-            const croppedImg = new Image();
-            await new Promise(resolve => {
-              croppedImg.onload = resolve;
-              croppedImg.src = croppedCanvas.toDataURL('image/png');
-            });
-            sourceForScan = croppedImg;
-            showOcrOverlay(true, 'Document detecte ! Numerisation...', 20);
-          } else {
-            showOcrOverlay(true, 'Numerisation (cadrage manuel)...', 20);
-          }
-          await new Promise(r => setTimeout(r, 50));
-
-          // Step 2: Sauvola B&W processing
-          const scannedBase64 = scannerProcess(sourceForScan);
-
-          // Step 3: OCR
-          showOcrOverlay(true, 'Reconnaissance du texte (OCR)...', 40);
-          const ocrResult = await runOcr(scannedBase64);
-
-          showOcrOverlay(false);
-
-          capturedPages.push({ image: scannedBase64, ocr: ocrResult.text, ocrData: ocrResult });
-          updatePhotoGrid();
-          const detectMsg = croppedCanvas ? 'Cadrage auto + ' : '';
-          const ocrMsg = ocrResult.text
-            ? `${detectMsg}OCR ok (${ocrResult.text.length} car.)`
-            : `${detectMsg}Page scannee`;
-          showToast(ocrMsg, 'success');
-        };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  });
-
-  function updatePhotoGrid() {
-    document.getElementById('photo-count').textContent = `${capturedPages.length} page(s)`;
-    const grid = document.getElementById('photo-grid');
-    grid.innerHTML = capturedPages.map((p, i) => `
-      <div class="photo-item">
-        <img src="${p.image}" alt="Page ${i + 1}" onclick="previewPage(${i})">
-        <button class="remove-btn" onclick="event.stopPropagation();removePage(${i})">×</button>
-        <span class="page-num">p.${i + 1}${p.ocr ? ' ✓' : ''}</span>
-      </div>
-    `).join('');
-  }
-
-  function removePage(index) {
-    capturedPages.splice(index, 1);
-    updatePhotoGrid();
+    previewEl.innerHTML = html;
   }
 
   function previewPage(index) {
-    viewerPages = capturedPages.map(p => p.image);
+    if (!importedFile) return;
+    viewerPages = importedFile.pageImages;
     viewerIndex = index;
     showViewer();
   }
@@ -1362,9 +1093,8 @@
     const commandeId = document.getElementById('form-commande').value;
     const observation = document.getElementById('form-observation').value.trim();
 
-    // Validation
     if (!fournisseurId) { showToast('Selectionnez un fournisseur', 'error'); return; }
-    if (!capturedPages.length) { showToast('Prenez au moins une photo', 'error'); return; }
+    if (!importedFile) { showToast('Importez un document', 'error'); return; }
 
     const fournisseur = fournisseurs.find(f => f.id === fournisseurId);
     if (!fournisseur) { showToast('Fournisseur invalide', 'error'); return; }
@@ -1374,11 +1104,6 @@
     btn.textContent = 'Enregistrement...';
 
     try {
-      // Combine all OCR text
-      const allOcrText = capturedPages.map(p => p.ocr).filter(Boolean).join('\n\n');
-
-      // Step 1: Insert document WITHOUT pdf_data (small payload)
-      showOcrOverlay(true, 'Enregistrement...', 50);
       const doc = await DB.insertDocument({
         type,
         fournisseur_id: fournisseurId,
@@ -1388,47 +1113,32 @@
         commande_id: type === 'facture' && commandeId ? commandeId : null,
         statut: 'en_attente',
         observation: observation || null,
-        nb_pages: capturedPages.length,
-        pdf_data: null,
-        texte_ocr: allOcrText || null,
+        nb_pages: importedFile.nbPages,
+        pdf_data: importedFile.type === 'pdf' ? importedFile.dataUri : null,
+        texte_ocr: importedFile.textContent || null,
         user_id: currentUser.id,
         user_nom: currentUser.nom,
         user_initiales: currentUser.initiales,
         etablissement: currentEtablissement
       });
 
-      // Step 2: Insert pages ONE BY ONE (avoids payload limit)
-      if (doc && capturedPages.length) {
-        for (let i = 0; i < capturedPages.length; i++) {
-          showOcrOverlay(true, `Enregistrement page ${i + 1}/${capturedPages.length}...`, 50 + Math.round(30 * i / capturedPages.length));
-          await DB.insertPages([{
-            document_id: doc.id,
-            page_num: i + 1,
-            photo_data: capturedPages[i].image,
-            texte_ocr: capturedPages[i].ocr || null
-          }]);
-        }
+      // Insert page thumbnails
+      if (doc && importedFile.pageImages.length) {
+        const pages = importedFile.pageImages.map((img, i) => ({
+          document_id: doc.id,
+          page_num: i + 1,
+          photo_data: img,
+          texte_ocr: null
+        }));
+        await DB.insertPages(pages);
       }
 
-      // Step 3: Generate PDF and update document
-      try {
-        showOcrOverlay(true, 'Generation du PDF...', 85);
-        await new Promise(r => setTimeout(r, 50));
-        const pdfDataUri = generatePDF(capturedPages);
-        await DB.updateDocument(doc.id, { pdf_data: pdfDataUri });
-      } catch (pdfErr) {
-        console.warn('PDF generation failed, document saved without PDF:', pdfErr);
-        // Document is saved, PDF will be missing but pages are there
-      }
-
-      showOcrOverlay(false);
       showToast('Document enregistre !', 'success');
       closeModal('modal-new');
       loadDocuments();
     } catch (e) {
       console.error('Erreur enregistrement:', e);
-      const msg = e.message || e.details || (typeof e === 'object' ? JSON.stringify(e) : String(e));
-      showToast('Erreur: ' + msg, 'error');
+      showToast('Erreur d\'enregistrement', 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Enregistrer';
@@ -1443,13 +1153,8 @@
     document.getElementById('modal-view-title').textContent =
       doc.type === 'facture' ? `Facture/BL - ${esc(doc.fournisseur_nom)}` : `Etiquette - ${esc(doc.fournisseur_nom)}`;
 
-    // Load pages
     let pages = [];
-    try {
-      pages = await DB.getPages(docId);
-    } catch (e) {
-      console.error('Erreur chargement pages:', e);
-    }
+    try { pages = await DB.getPages(docId); } catch (e) { console.error(e); }
 
     const statusLabel = {
       en_attente: '🟡 En attente de validation',
@@ -1474,83 +1179,72 @@
       </div>`;
 
     if (doc.reference) {
-      body += `
-        <div style="margin-bottom:12px;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Reference</div>
-          <div>${esc(doc.reference)}</div>
-        </div>`;
+      body += `<div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Reference</div>
+        <div>${esc(doc.reference)}</div>
+      </div>`;
     }
 
     if (doc.commande_id) {
       const cmd = commandes.find(c => c.id === doc.commande_id);
-      body += `
-        <div style="margin-bottom:12px;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Commande rattachee</div>
-          <div>${cmd ? esc(cmd.fournisseur_nom) + ' - ' + formatDateShort(cmd.date_creation) : doc.commande_id}</div>
-        </div>`;
+      body += `<div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Commande rattachee</div>
+        <div>${cmd ? esc(cmd.fournisseur_nom) + ' - ' + formatDateShort(cmd.date_creation) : doc.commande_id}</div>
+      </div>`;
     }
 
     if (doc.observation) {
-      body += `
-        <div style="margin-bottom:12px;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Observation</div>
-          <div>${esc(doc.observation)}</div>
-        </div>`;
+      body += `<div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Observation</div>
+        <div>${esc(doc.observation)}</div>
+      </div>`;
     }
 
-    body += `
-      <div style="margin-bottom:8px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Scanne par</div>
-        <div>${esc(doc.user_nom)} (${esc(doc.user_initiales || '')}) - ${formatTime(doc.created_at)}</div>
-      </div>`;
+    body += `<div style="margin-bottom:8px;">
+      <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Enregistre par</div>
+      <div>${esc(doc.user_nom)} (${esc(doc.user_initiales || '')}) - ${formatTime(doc.created_at)}</div>
+    </div>`;
 
     if (doc.valide_par_nom) {
-      body += `
-        <div style="margin-bottom:8px;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">${doc.statut === 'valide' ? 'Valide' : 'Rejete'} par</div>
-          <div>${esc(doc.valide_par_nom)} - ${formatTime(doc.date_validation)}</div>
-        </div>`;
-    }
-
-    // Photos
-    if (pages.length) {
-      body += `
-        <div style="margin-top:12px;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">Pages (${pages.length})</div>
-          <div class="photo-thumbs">
-            ${pages.map((p, i) => `
-              <img class="photo-thumb" src="${p.photo_data}" alt="Page ${i+1}"
-                   onclick="event.stopPropagation();openViewerFromDoc('${docId}', ${i})">
-            `).join('')}
-          </div>
-        </div>`;
+      body += `<div style="margin-bottom:8px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">${doc.statut === 'valide' ? 'Valide' : 'Rejete'} par</div>
+        <div>${esc(doc.valide_par_nom)} - ${formatTime(doc.date_validation)}</div>
+      </div>`;
     }
 
     // PDF download button
     if (doc.pdf_data) {
-      body += `
-        <div style="margin-top:12px;">
-          <button class="btn btn-primary btn-full" onclick="downloadPdf('${doc.id}')">
-            📥 Telecharger le PDF
-          </button>
-        </div>`;
+      body += `<div style="margin-top:12px;">
+        <button class="btn btn-primary btn-full" onclick="downloadPdf('${doc.id}')">📥 Telecharger le PDF original</button>
+      </div>`;
+    }
+
+    // Page thumbnails
+    if (pages.length) {
+      body += `<div style="margin-top:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">Pages (${pages.length})</div>
+        <div class="photo-thumbs">
+          ${pages.map((p, i) => `
+            <img class="photo-thumb" src="${p.photo_data}" alt="Page ${i+1}"
+                 onclick="event.stopPropagation();openViewerFromDoc('${docId}', ${i})">
+          `).join('')}
+        </div>
+      </div>`;
     }
 
     // OCR text
-    const ocrText = doc.texte_ocr || pages.map(p => p.texte_ocr).filter(Boolean).join('\n\n');
+    const ocrText = doc.texte_ocr;
     if (ocrText) {
-      body += `
-        <div style="margin-top:12px;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">
-            Texte extrait (OCR) <span class="ocr-badge">AUTO</span>
-          </div>
-          <div class="ocr-text-box">${esc(ocrText)}</div>
-        </div>`;
+      body += `<div style="margin-top:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">
+          Texte extrait <span class="ocr-badge">AUTO</span>
+        </div>
+        <div class="ocr-text-box">${esc(ocrText)}</div>
+      </div>`;
     }
 
     document.getElementById('modal-view-body').innerHTML = body;
 
-    // Footer: validation buttons for managers
     let footer = '';
     if (isManager() && doc.statut === 'en_attente') {
       footer = `
@@ -1560,16 +1254,13 @@
       footer = `<div style="width:100%;text-align:center;font-size:.8rem;color:var(--gray-400);">En attente de validation par un manager</div>`;
     }
     document.getElementById('modal-view-footer').innerHTML = footer;
-
     document.getElementById('modal-view').classList.add('show');
   }
 
-  // Store pages for viewer from doc view
+  // Page cache for viewer
   let docPagesCache = {};
   async function openViewerFromDoc(docId, pageIndex) {
-    if (!docPagesCache[docId]) {
-      docPagesCache[docId] = await DB.getPages(docId);
-    }
+    if (!docPagesCache[docId]) docPagesCache[docId] = await DB.getPages(docId);
     viewerPages = docPagesCache[docId].map(p => p.photo_data);
     viewerIndex = pageIndex;
     showViewer();
@@ -1610,60 +1301,40 @@
   // ====== HISTORIQUE ======
   async function loadHistorique() {
     const dateTo = dateStr(new Date());
-    const dateFrom = dateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // last 30 days
+    const dateFrom = dateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 
     try {
       const stats = await DB.getStats(currentEtablissement, dateFrom, dateTo);
       const allDocs = await DB.getDocumentsRange(currentEtablissement, dateFrom, dateTo);
 
-      // Stats
       const totalFactures = stats.filter(s => s.type === 'facture').length;
       const totalEtiquettes = stats.filter(s => s.type === 'etiquette').length;
       const enAttente = stats.filter(s => s.statut === 'en_attente').length;
 
       document.getElementById('stats-container').innerHTML = `
         <div class="stats-row">
-          <div class="stat-card purple">
-            <div class="number">${totalFactures}</div>
-            <div class="label">Factures/BL</div>
-          </div>
-          <div class="stat-card purple">
-            <div class="number">${totalEtiquettes}</div>
-            <div class="label">Etiquettes</div>
-          </div>
-          <div class="stat-card amber">
-            <div class="number">${enAttente}</div>
-            <div class="label">En attente</div>
-          </div>
+          <div class="stat-card purple"><div class="number">${totalFactures}</div><div class="label">Factures/BL</div></div>
+          <div class="stat-card purple"><div class="number">${totalEtiquettes}</div><div class="label">Etiquettes</div></div>
+          <div class="stat-card amber"><div class="number">${enAttente}</div><div class="label">En attente</div></div>
         </div>
-        <div style="font-size:.8rem;color:var(--gray-400);margin-bottom:12px;text-align:center;">30 derniers jours</div>
-      `;
+        <div style="font-size:.8rem;color:var(--gray-400);margin-bottom:12px;text-align:center;">30 derniers jours</div>`;
 
-      // Group docs by date
       const grouped = {};
       allDocs.forEach(d => {
-        const key = d.date;
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(d);
+        if (!grouped[d.date]) grouped[d.date] = [];
+        grouped[d.date].push(d);
       });
 
       let html = '';
       Object.keys(grouped).sort().reverse().forEach(date => {
         const dateLabel = new Date(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
         html += `<div style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin:12px 0 6px;text-transform:capitalize;">${dateLabel} (${grouped[date].length})</div>`;
-        grouped[date].forEach(d => {
-          html += renderDocCard(d);
-        });
+        grouped[date].forEach(d => html += renderDocCard(d));
       });
 
-      if (!html) {
-        html = '<div class="empty"><div class="icon">📊</div><div class="text">Aucun document sur les 30 derniers jours</div></div>';
-      }
-
-      document.getElementById('historique-list').innerHTML = html;
-    } catch (e) {
-      console.error('Erreur historique:', e);
-    }
+      document.getElementById('historique-list').innerHTML = html ||
+        '<div class="empty"><div class="icon">📊</div><div class="text">Aucun document sur les 30 derniers jours</div></div>';
+    } catch (e) { console.error('Erreur historique:', e); }
   }
 
   // ====== IMAGE VIEWER ======
@@ -1673,11 +1344,7 @@
     document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
     document.getElementById('viewer').classList.add('show');
   }
-
-  function closeViewer() {
-    document.getElementById('viewer').classList.remove('show');
-  }
-
+  function closeViewer() { document.getElementById('viewer').classList.remove('show'); }
   function viewerNav(delta) {
     viewerIndex = (viewerIndex + delta + viewerPages.length) % viewerPages.length;
     document.getElementById('viewer-img').src = viewerPages[viewerIndex];
@@ -1687,16 +1354,20 @@
   // ====== MODALS ======
   function closeModal(id) {
     document.getElementById(id).classList.remove('show');
-    // Clear cache
     if (id === 'modal-view') docPagesCache = {};
   }
-
-  // Close on overlay click
   document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('show')) {
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('show'))
       e.target.classList.remove('show');
-    }
   });
+
+  // ====== OVERLAY ======
+  function showOcrOverlay(show, status, progress) {
+    const overlay = document.getElementById('ocr-overlay');
+    overlay.style.display = show ? 'flex' : 'none';
+    if (status) document.getElementById('ocr-status').textContent = status;
+    if (progress !== undefined) document.getElementById('ocr-progress').style.width = progress + '%';
+  }
 
   // ====== TOAST ======
   let toastTimeout;
@@ -1714,12 +1385,10 @@
     const app = document.getElementById('app-screen');
     app.classList.remove('hidden');
     app.style.display = 'flex';
-
     document.getElementById('user-badge').textContent = currentUser.initiales || currentUser.nom;
     const etabName = currentEtablissement === 'freddy' ? 'Freddy' :
                      currentEtablissement === 'liesel' ? 'Liesel' : currentEtablissement;
     document.getElementById('etab-badge').textContent = etabName;
-
     updateDateDisplay();
     loadFournisseurs();
     loadCommandes();
@@ -1729,18 +1398,18 @@
   // ====== INIT ======
   document.addEventListener('DOMContentLoaded', () => {
     initSupabase();
-
     const session = checkPortalSession();
     if (session) {
       currentUser = session.user;
       currentEtablissement = session.etablissement;
       showApp();
     } else if (supabaseClient) {
-      // Show fallback login
       document.getElementById('login-screen').classList.remove('hidden');
       renderPinDots();
     }
   });
 </script>
+</content>
+</invoke>
 </body>
 </html>
