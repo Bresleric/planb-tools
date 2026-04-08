@@ -966,15 +966,15 @@
       showOcrOverlay(true, `Page ${i}/${numPages}...`, 10 + (70 * i / numPages));
       const page = await pdf.getPage(i);
 
-      // Render page to canvas (for preview thumbnails)
-      const scale = 1.5;
+      // Render page to canvas (for preview thumbnails — small size for DB)
+      const scale = 0.8;
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
       await page.render({ canvasContext: ctx, viewport }).promise;
-      pageImages.push(canvas.toDataURL('image/jpeg', 0.8));
+      pageImages.push(canvas.toDataURL('image/jpeg', 0.5));
 
       // Extract text content (if PDF has text layer — iOS scanner usually does)
       try {
@@ -1002,17 +1002,22 @@
 
   // Process image file
   async function processImageFile(file) {
-    const dataUri = await fileToDataUri(file);
+    const rawUri = await fileToDataUri(file);
 
-    // OCR on the image
+    // Compress image (iPhone photos are 3-8 MB, too large for Supabase)
+    showOcrOverlay(true, 'Compression...', 20);
+    const compressed = await compressImage(rawUri, 1400, 0.65);
+    const thumbnail = await compressImage(rawUri, 800, 0.5);
+
+    // OCR on the compressed image
     showOcrOverlay(true, 'OCR en cours...', 50);
-    const ocrText = await runOcrOnImage(dataUri);
+    const ocrText = await runOcrOnImage(compressed);
 
     importedFile = {
       type: 'image',
-      dataUri,
+      dataUri: compressed,
       name: file.name,
-      pageImages: [dataUri],
+      pageImages: [thumbnail],
       textContent: ocrText,
       nbPages: 1
     };
@@ -1024,6 +1029,24 @@
       reader.onload = () => resolve(reader.result);
       reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  }
+
+  // Compress/resize image to fit Supabase payload limits
+  function compressImage(dataUri, maxWidth = 1200, quality = 0.6) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUri); // fallback: return original
+      img.src = dataUri;
     });
   }
 
@@ -1138,7 +1161,8 @@
       loadDocuments();
     } catch (e) {
       console.error('Erreur enregistrement:', e);
-      showToast('Erreur d\'enregistrement', 'error');
+      const msg = e?.message || e?.details || JSON.stringify(e);
+      showToast('Erreur: ' + msg.substring(0, 120), 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Enregistrer';
