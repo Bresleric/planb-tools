@@ -878,8 +878,9 @@
             { id: 'approvisionnement', name: 'Appro.', icon: '📦', minRole: 'responsable' },
             { id: 'receptions', name: 'Réceptions', icon: '🚛', minRole: 'responsable' },
             { id: 'checklist', name: 'Check-Lists', icon: '✅', minRole: 'collaborateur' },
+            { id: 'temperatures', name: 'Températures', icon: '🌡️', minRole: 'collaborateur' },
             { id: 'cartons-jvr', name: 'Cartons JVR', icon: '🟡', minRole: 'manager' },
-        { id: 'admin', name: 'Admin', icon: '⚙️', minRole: 'admin' }
+            { id: 'admin', name: 'Admin', icon: '⚙️', minRole: 'admin' }
         ];
 
         const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
@@ -1308,6 +1309,11 @@
                 { name: 'Saisie', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
                 { name: 'Comptage', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
                 { name: 'Historique', roles: ['collaborateur', 'responsable', 'manager', 'admin'] }
+            ],
+            'temperatures': [
+                { name: 'Relevé', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
+                { name: 'Historique', roles: ['collaborateur', 'responsable', 'manager', 'admin'] },
+                { name: 'Admin', roles: ['admin'] }
             ]
         };
 
