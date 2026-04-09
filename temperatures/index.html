@@ -1163,11 +1163,13 @@
           ${dayReleves.map(r => {
             const frigo = frigos.find(f => f.id === r.frigo_id);
             const status = frigo ? checkTemp(r.temperature, frigo) : 'pending';
+            const heureReleve = r.created_at ? new Date(r.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
             return `<div class="histo-row">
               <span style="flex:1;font-size:0.8rem">${esc(r.frigo_nom)}</span>
               <span class="badge-temp ${status}" style="font-size:0.75rem;padding:2px 8px">${r.temperature}°</span>
               ${r.photo_data ? '<span style="font-size:0.7rem">📷</span>' : ''}
-              <span style="font-size:0.7rem;color:var(--gray-400)">${esc(r.user_initiales || '')}</span>
+              <span style="font-size:0.7rem;color:var(--gray-400);font-weight:600">${esc(r.user_initiales || '')}</span>
+              <span style="font-size:0.65rem;color:var(--gray-300)">${heureReleve}</span>
             </div>`;
           }).join('')}
         </div>`;
