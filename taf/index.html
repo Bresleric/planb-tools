@@ -285,6 +285,10 @@
     }
     .predef-item:hover, .predef-item:active { background: var(--orange-light); }
     .predef-item.selected { background: var(--orange-light); border-color: var(--orange); }
+    .btn-all-team { padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 2px solid var(--gray-200); background: white; color: var(--gray-600); transition: all 0.2s; }
+    .btn-all-team.active { border-color: var(--blue); background: #eff6ff; color: var(--blue); }
+    .btn-all-team:hover { border-color: var(--blue); }
+    .all-team-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; background: #eff6ff; border: 1px solid var(--blue); border-radius: 8px; font-size: 0.82rem; color: var(--blue); font-weight: 600; }
 
     .selected-task-display {
       padding: 10px; background: var(--orange-light); border-radius: var(--radius-sm);
@@ -697,6 +701,7 @@
   let recurrences = [];
   let selectedPredefined = null;
   let selectedAssignee = null;
+  let assignToAll = false;
   let productionLots = []; // lots du jour en cache
   let productionFiches = []; // fiches techniques en cache
   let sortColumn = 'default'; // colonne de tri active
@@ -1639,14 +1644,23 @@
         <!-- Attribution (responsable+ only) -->
         ${canAssign() ? `
         <div class="form-group">
-          <label>Attribuer à</label>
-          <div id="create-assignee-area">
-            <span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+            <label style="margin:0">Attribuer à</label>
+            <button type="button" class="btn-all-team" id="btn-all-team" onclick="toggleAssignAll()">👥 À toute l'équipe</button>
           </div>
-          <input class="search-input" type="text" id="search-user"
-                 placeholder="Rechercher un collaborateur..."
-                 oninput="filterUsersForAssign(this.value)" onfocus="filterUsersForAssign('')">
-          <div class="user-list-picker" id="user-assign-list" style="display:none"></div>
+          <div id="assign-single-area">
+            <div id="create-assignee-area">
+              <span style="font-size:0.8rem;color:var(--gray-400);font-style:italic">Non attribuée</span>
+            </div>
+            <input class="search-input" type="text" id="search-user"
+                   placeholder="Rechercher un collaborateur..."
+                   oninput="filterUsersForAssign(this.value)" onfocus="filterUsersForAssign('')">
+            <div class="user-list-picker" id="user-assign-list" style="display:none"></div>
+          </div>
+          <div id="assign-all-area" style="display:none">
+            <div class="all-team-badge">👥 <span id="assign-all-count">${users.length} collaborateur(s)</span></div>
+            <div style="font-size:0.75rem; color:var(--gray-400); margin-top:4px">1 tâche sera créée par collaborateur actif</div>
+          </div>
         </div>
         ` : ''}
 
@@ -1806,6 +1820,25 @@
     document.getElementById('search-user').value = '';
   }
 
+  function toggleAssignAll() {
+    assignToAll = !assignToAll;
+    const btn = document.getElementById('btn-all-team');
+    const singleArea = document.getElementById('assign-single-area');
+    const allArea = document.getElementById('assign-all-area');
+    if (assignToAll) {
+      btn.classList.add('active');
+      singleArea.style.display = 'none';
+      allArea.style.display = '';
+      document.getElementById('assign-all-count').textContent = users.length + ' collaborateur(s)';
+      selectedAssignee = null;
+      pickAssignee(null);
+    } else {
+      btn.classList.remove('active');
+      singleArea.style.display = '';
+      allArea.style.display = 'none';
+    }
+  }
+
   async function submitCreate() {
     if (!selectedPredefined) { showToast('Choisissez une tâche', 'error'); return; }
     const categorieSel = document.querySelector('#create-categorie .chip.active')?.dataset.val || null;
@@ -1821,7 +1854,7 @@
       const obs = document.getElementById('create-obs').value.trim();
       const echeance = document.getElementById('create-date').value;
 
-      const taskData = {
+      const baseData = {
         tache: selectedPredefined.nom,
         creneau,
         equipe,
@@ -1832,22 +1865,39 @@
         date_creation: new Date().toISOString(),
         etablissement: currentEtablissement,
         createur_id: currentUser.id,
-        createur_nom: currentUser.nom,
-        attribue_a_id: selectedAssignee?.id || null,
-        attribue_a_nom: selectedAssignee?.nom || null,
-        attribue_a_initiales: selectedAssignee?.initiales || null
+        createur_nom: currentUser.nom
       };
 
       // Propager les champs production depuis predefined_task
       if (selectedPredefined.is_production) {
-        taskData.is_production = true;
-        taskData.fiche_id = selectedPredefined.fiche_id || null;
-        taskData.categorie_production = selectedPredefined.categorie_production || null;
+        baseData.is_production = true;
+        baseData.fiche_id = selectedPredefined.fiche_id || null;
+        baseData.categorie_production = selectedPredefined.categorie_production || null;
       }
 
-      await DB.insertTask(taskData);
+      if (assignToAll) {
+        // Créer 1 tâche par collaborateur actif
+        const tasksToInsert = users.map(u => ({
+          ...baseData,
+          attribue_a_id: u.id,
+          attribue_a_nom: u.nom,
+          attribue_a_initiales: u.initiales
+        }));
+        const { error } = await supabaseClient.from('tasks').insert(tasksToInsert);
+        if (error) throw error;
+        showToast(tasksToInsert.length + ' tâches créées (toute l\'équipe) ✓', 'success');
+        assignToAll = false;
+      } else {
+        const taskData = {
+          ...baseData,
+          attribue_a_id: selectedAssignee?.id || null,
+          attribue_a_nom: selectedAssignee?.nom || null,
+          attribue_a_initiales: selectedAssignee?.initiales || null
+        };
+        await DB.insertTask(taskData);
+        showToast('Tâche créée ✓', 'success');
+      }
 
-      showToast('Tâche créée ✓', 'success');
       tasks = await DB.getTasks(filterDate);
       switchTab('taches');
     } catch (e) {
