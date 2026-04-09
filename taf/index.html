@@ -285,6 +285,7 @@
     }
     .predef-item:hover, .predef-item:active { background: var(--orange-light); }
     .predef-item.selected { background: var(--orange-light); border-color: var(--orange); }
+    .task-row.task-mine { border-left: 3px solid var(--orange); background: #fff8f0; }
     .btn-all-team { padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 2px solid var(--gray-200); background: white; color: var(--gray-600); transition: all 0.2s; }
     .btn-all-team.active { border-color: var(--blue); background: #eff6ff; color: var(--blue); }
     .btn-all-team:hover { border-color: var(--blue); }
@@ -966,8 +967,8 @@
     document.getElementById('tab-recurrences').style.display = canManageRecurrences() ? '' : 'none';
     document.getElementById('tab-admin').style.display = isAdmin() ? '' : 'none';
 
-    // Set default equipe filter
-    filterEquipe = (userRole() >= 3) ? 'all' : (currentUser.equipe || 'cuisine');
+    // Set default equipe filter : tout le monde voit toutes les tâches par défaut
+    filterEquipe = 'all';
 
     // Render equipe filters
     renderEquipeFilters();
@@ -979,13 +980,11 @@
 
   function renderEquipeFilters() {
     const row = document.getElementById('equipe-filter-row');
-    const isManagerPlus = userRole() >= 3;
     let html = '<span class="filter-label">Équipe</span>';
 
-    if (isManagerPlus) {
-      html += `<button class="filter-chip active-equipe ${filterEquipe === 'all' ? 'active-equipe' : ''}"
-                data-equipe="all" onclick="setFilterEquipe('all')">Toutes</button>`;
-    }
+    // Bouton "Toutes" visible pour tous les rôles
+    html += `<button class="filter-chip active-equipe ${filterEquipe === 'all' ? 'active-equipe' : ''}"
+              data-equipe="all" onclick="setFilterEquipe('all')">Toutes</button>`;
 
     EQUIPES.forEach(eq => {
       const icons = { cuisine: '🍴', salle: '🍽', plonge: '🫧', autre: '📦' };
@@ -1145,6 +1144,11 @@
         const ad = !!a.fait_par_id, bd = !!b.fait_par_id;
         if (ad !== bd) return ad ? 1 : -1;
 
+        // Mes tâches en premier (attribuée à moi > attribuée à un autre)
+        const aIsMine = a.attribue_a_id === currentUser.id ? 0 : 1;
+        const bIsMine = b.attribue_a_id === currentUser.id ? 0 : 1;
+        if (aIsMine !== bIsMine) return aIsMine - bIsMine;
+
         // Si tri par défaut : priorité desc puis nom asc
         if (sortColumn === 'default') {
           if (a.priorite !== b.priorite) return b.priorite - a.priorite;
@@ -1260,17 +1264,27 @@
       const createdDt = t.date_creation ? new Date(t.date_creation) : null;
       const createdDay = createdDt ? createdDt.toLocaleDateString('fr-FR', { weekday: 'short' }).substring(0, 3).toUpperCase() : '';
 
-      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}">
+      // Permissions : est-ce que cette tâche concerne l'utilisateur courant ?
+      const isMine = t.attribue_a_id === currentUser.id || t.createur_id === currentUser.id;
+      const isUnassigned = !t.attribue_a_id;
+      // Un collaborateur ne peut agir que sur ses tâches (ou non attribuées)
+      const canAct = userRole() >= 2 || isMine || isUnassigned;
+      // Droit de modifier (edit modal) : manager+ ou tâche à soi
+      const canEdit = !done && (userRole() >= 3 || isMine);
+      // Highlight "mes tâches"
+      const mineClass = (!done && t.attribue_a_id === currentUser.id) ? ' task-mine' : '';
+
+      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}">
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-main">
-          <span class="task-name ${!done && userRole() >= 3 ? 'editable' : ''}" title="${!done && userRole() >= 3 ? 'Cliquer pour modifier' : esc(t.tache)}" ${!done && userRole() >= 3 ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
+          <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
           ${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}
         </div>
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
-        <button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>
+        ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
         <div class="task-cell">${done ? `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>` : ''}</div>
         <div class="task-actions">
           ${!done && canAssign() ? `<button class="btn-action" onclick="showAssignModal('${t.id}')" title="Attribuer à quelqu'un">👤</button>` : ''}
