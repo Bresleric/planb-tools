@@ -800,9 +800,12 @@
         else if (isDone) cardClass += ' done';
 
         let tempBadge = '';
+        let releveInfo = '';
         if (isDone) {
           const status = checkTemp(releve.temperature, frigo);
           tempBadge = `<span class="badge-temp ${status}">${releve.temperature}°</span>`;
+          const heureReleve = releve.created_at ? new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+          releveInfo = `<span style="font-size:0.7rem;color:var(--gray-400)">${esc(releve.user_initiales || '')} ${heureReleve}</span>`;
         } else {
           tempBadge = `<span class="badge-temp pending">—</span>`;
         }
@@ -816,6 +819,7 @@
             </div>
             <div class="frigo-status">
               ${tempBadge}
+              ${releveInfo}
               ${needsPhoto && !isDone ? '<span class="badge-photo">📷 Photo</span>' : ''}
               ${isDone && releve.photo_data ? '<span class="badge-photo">📷</span>' : ''}
             </div>
