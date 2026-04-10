@@ -302,6 +302,24 @@
     .predef-item:hover, .predef-item:active { background: var(--orange-light); }
     .predef-item.selected { background: var(--orange-light); border-color: var(--orange); }
     .task-row.task-mine { border-left: 3px solid var(--orange); background: #fff8f0; }
+    .task-row.task-late {
+      border-left: 4px solid #dc2626 !important;
+      background: #fef2f2;
+      box-shadow: 0 0 0 1px #fecaca, var(--shadow);
+    }
+    .task-row.task-late.task-mine { background: #fff4ec; }
+    .badge-late {
+      display: inline-block;
+      background: #dc2626;
+      color: white;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 9px;
+      margin-left: 6px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
     .btn-all-team { padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 2px solid var(--gray-200); background: white; color: var(--gray-600); transition: all 0.2s; }
     .btn-all-team.active { border-color: var(--blue); background: #eff6ff; color: var(--blue); }
     .btn-all-team:hover { border-color: var(--blue); }
@@ -1056,6 +1074,12 @@
   // ====== DATA LOADING ======
   async function refreshData() {
     try {
+      // Report automatique des tâches en retard AVANT le chargement,
+      // uniquement quand on visualise aujourd'hui
+      if (isToday(filterDate)) {
+        await reportLateTasks();
+      }
+
       [tasks, users, predefinedTasks, recurrences] = await Promise.all([
         DB.getTasks(filterDate),
         DB.getUsers(currentEtablissement),
@@ -1070,6 +1094,48 @@
     } catch (e) {
       console.error('Erreur chargement:', e);
       showToast('Erreur de chargement', 'error');
+    }
+  }
+
+  // Vérifie si la date fournie correspond à aujourd'hui
+  function isToday(d) {
+    const t = new Date();
+    return d.getFullYear() === t.getFullYear()
+      && d.getMonth() === t.getMonth()
+      && d.getDate() === t.getDate();
+  }
+
+  // Reporte sur Jour J toutes les tâches non faites des jours précédents.
+  // - echeance_initiale mémorise la 1ère échéance avant tout report
+  //   (si déjà remplie, on ne la touche pas → le retard cumulé est préservé)
+  // - echeance est poussée à aujourd'hui
+  async function reportLateTasks() {
+    try {
+      const today = dateStr(new Date());
+      // 1. Récupérer les tâches candidates
+      const { data: lateTasks, error: fetchErr } = await supabaseClient
+        .from('tasks')
+        .select('id, echeance, echeance_initiale')
+        .eq('etablissement', currentEtablissement)
+        .is('fait_par_id', null)
+        .lt('echeance', today);
+
+      if (fetchErr) throw fetchErr;
+      if (!lateTasks || lateTasks.length === 0) return;
+
+      // 2. Pour chacune : set echeance_initiale (si vide) et pousser echeance à today
+      //    On fait les updates en parallèle pour limiter la latence.
+      await Promise.all(lateTasks.map(t => {
+        const updates = { echeance: today };
+        if (!t.echeance_initiale) updates.echeance_initiale = t.echeance;
+        return supabaseClient.from('tasks').update(updates).eq('id', t.id);
+      }));
+
+      if (lateTasks.length > 0) {
+        showToast(`${lateTasks.length} tâche${lateTasks.length > 1 ? 's' : ''} en retard report${lateTasks.length > 1 ? 'ées' : 'ée'} sur aujourd'hui`, 'info');
+      }
+    } catch (e) {
+      console.warn('Report des tâches en retard impossible:', e);
     }
   }
 
@@ -1303,13 +1369,17 @@
       const canEdit = !done && (userRole() >= 3 || isMine);
       // Highlight "mes tâches"
       const mineClass = (!done && t.attribue_a_id === currentUser.id) ? ' task-mine' : '';
+      // En retard : tâche reportée depuis un jour antérieur
+      const isLate = !done && t.echeance_initiale && t.echeance_initiale < t.echeance;
+      const daysLate = isLate ? Math.max(1, Math.round((new Date(t.echeance) - new Date(t.echeance_initiale)) / 86400000)) : 0;
+      const lateClass = isLate ? ' task-late' : '';
 
-      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}">
+      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}${lateClass}">
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-main">
-          <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
+          <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">En retard ${daysLate}j</span>` : ''}
           ${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}
         </div>
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
