@@ -1179,6 +1179,7 @@
 
     <script>
         // ============ INITIALIZATION & STATE ============
+        // supabase is declared globally by the SDK UMD script — do not re-declare with let/const
         var supabaseClient = null;
         let currentUser = null;
         let currentEstablishment = null;
@@ -1189,6 +1190,7 @@
         let currentItemForObservation = null;
         let currentChecklistForValidation = null;
         let currentHistoryDate = new Date().toISOString().split('T')[0];
+        let validationRenderToken = 0;
 
         // Demo data
         const demoChecklists = [
@@ -1248,8 +1250,7 @@
             }
 
             updateHeader();
-            autoSelectService();
-            loadValidation();
+            autoSelectService(); // déclenche déjà loadValidation() via selectService()
             loadHistoryDate();
         }
 
@@ -1297,6 +1298,7 @@
 
         // ============ VALIDATION TAB ============
         async function loadValidation() {
+            const myToken = ++validationRenderToken;
             const container = document.getElementById('validation-container');
             container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Chargement...</div></div>';
 
@@ -1317,14 +1319,25 @@
                     checklists = data || [];
                 }
 
+                // Deduplicate by ID (defensive — guards against race conditions / cache)
+                const seen = new Set();
+                checklists = checklists.filter(cl => {
+                    if (seen.has(cl.id)) return false;
+                    seen.add(cl.id);
+                    return true;
+                });
+
                 // Filter checklists for current service and user's equipe
+                const isManagerOrAdmin = currentUser.role === 'manager' || currentUser.role === 'admin';
                 const filtered = checklists.filter(cl => {
-                    const userEquipe = currentUser.equipe || null;
-                    const matchEquipe = !userEquipe || cl.equipe === userEquipe || cl.equipe === 'tous';
+                    const matchEquipe = isManagerOrAdmin || cl.equipe === currentUser.equipe || cl.equipe === 'tous';
                     const matchService = cl.service === currentService || cl.service === 'tous';
                     const matchFrequency = shouldShowChecklist(cl);
                     return matchEquipe && matchService && matchFrequency;
                 });
+
+                // Abort if a newer render has been requested
+                if (myToken !== validationRenderToken) return;
 
                 if (filtered.length === 0) {
                     container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✓</div><div class="empty-state-title">Aucune check-list</div><div class="empty-state-text">Aucune check-list à valider pour cette période</div></div>';
@@ -1333,7 +1346,9 @@
 
                 container.innerHTML = '';
                 for (const cl of filtered) {
+                    if (myToken !== validationRenderToken) return;
                     const completed = await getChecklistCompletion(cl);
+                    if (myToken !== validationRenderToken) return;
                     const card = createChecklistCard(cl, completed);
                     container.appendChild(card);
                 }
@@ -1615,9 +1630,10 @@
                 let pendingCount = 0;
                 const today = new Date().toISOString().split('T')[0];
 
+                const isManagerOrAdmin = currentUser.role === 'manager' || currentUser.role === 'admin';
                 for (const cl of (data || [])) {
                     // Filter by equipe and frequency visibility
-                    const matchEquipe = cl.equipe === currentUser.equipe || cl.equipe === 'tous';
+                    const matchEquipe = isManagerOrAdmin || cl.equipe === currentUser.equipe || cl.equipe === 'tous';
                     if (!matchEquipe || !shouldShowChecklist(cl)) continue;
 
                     // Check if service matches
