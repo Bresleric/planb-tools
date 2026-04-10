@@ -127,12 +127,29 @@
             cursor: pointer;
             transition: all 0.2s;
             touch-action: manipulation;
+            position: relative;
         }
 
         .tab.active {
             color: var(--orange);
             border-bottom-color: var(--orange);
         }
+
+        .tab-badge {
+            display: none;
+            margin-left: 6px;
+            min-width: 18px;
+            padding: 0 5px;
+            height: 18px;
+            border-radius: 9px;
+            background: #ef4444;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 18px;
+            vertical-align: middle;
+        }
+        .tab-badge.visible { display: inline-block; }
 
         /* Content area */
         .content {
@@ -981,7 +998,7 @@
 
     <!-- Tabs -->
     <div class="tabs">
-        <div class="tab active" data-tab="validation" onclick="switchTab('validation')">Validation</div>
+        <div class="tab active" data-tab="validation" onclick="switchTab('validation')">Validation<span class="tab-badge" id="tab-badge-validation">0</span></div>
         <div class="tab" data-tab="gestion" onclick="switchTab('gestion')">Gestion</div>
         <div class="tab" data-tab="historique" onclick="switchTab('historique')">Historique</div>
     </div>
@@ -1666,9 +1683,22 @@
                 }
 
                 sessionStorage.setItem('planb_checklist_pending_count', String(pendingCount));
+                setChecklistTabBadge(pendingCount);
             } catch (err) {
                 console.error('Error updating pending count:', err);
                 sessionStorage.setItem('planb_checklist_pending_count', '0');
+                setChecklistTabBadge(0);
+            }
+        }
+
+        function setChecklistTabBadge(count) {
+            const badge = document.getElementById('tab-badge-validation');
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.classList.add('visible');
+            } else {
+                badge.classList.remove('visible');
             }
         }
 

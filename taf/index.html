@@ -118,9 +118,25 @@
       padding: 10px 16px; border: none; background: none;
       font-size: 0.85rem; color: var(--gray-400); cursor: pointer;
       border-bottom: 2px solid transparent; font-weight: 500;
+      position: relative;
     }
     .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); font-weight: 600; }
     .tab-btn:active { background: var(--gray-50); }
+    .tab-badge {
+      display: none;
+      margin-left: 6px;
+      min-width: 18px;
+      padding: 0 5px;
+      height: 18px;
+      border-radius: 9px;
+      background: #ef4444;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 18px;
+      vertical-align: middle;
+    }
+    .tab-badge.visible { display: inline-block; }
 
     /* ====== TASK TABLE ====== */
     /* Colonnes : Créneau(72) | De(32) | À(32) | Tâche(flex) | Note(flex) | Prio(40) | ✓(30) | Statut(70) | Actions(48) */
@@ -592,7 +608,7 @@
 
   <!-- TABS -->
   <div class="tabs-bar" id="tabs-bar">
-    <button class="tab-btn active" data-tab="taches" onclick="switchTab('taches')">Tâches</button>
+    <button class="tab-btn active" data-tab="taches" onclick="switchTab('taches')">Tâches<span class="tab-badge" id="tab-badge-mine">0</span></button>
     <button class="tab-btn" data-tab="creer" onclick="switchTab('creer')">+ Créer</button>
     <button class="tab-btn" data-tab="recurrences" onclick="switchTab('recurrences')" id="tab-recurrences" style="display:none">Récurrences</button>
     <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="tab-admin" style="display:none">Admin</button>
@@ -1218,11 +1234,25 @@
   }
 
   function renderCurrentTab() {
+    updateMineBadge();
     switch (currentTab) {
       case 'taches': renderTasksTab(); break;
       case 'creer': renderCreateTab(); break;
       case 'recurrences': renderRecurrencesTab(); break;
       case 'admin': renderAdminTab(); break;
+    }
+  }
+
+  // Pastille "mes tâches" = tâches attribuées à moi et non faites
+  function updateMineBadge() {
+    const badge = document.getElementById('tab-badge-mine');
+    if (!badge || !currentUser) return;
+    const count = (tasks || []).filter(t => t.attribue_a_id === currentUser.id && !t.fait_par_id).length;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.add('visible');
+    } else {
+      badge.classList.remove('visible');
     }
   }
 

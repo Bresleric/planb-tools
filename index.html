@@ -394,6 +394,30 @@
             flex-direction: column;
             gap: 12px;
             touch-action: manipulation;
+            position: relative;
+        }
+
+        .module-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 11px;
+            background: #ef4444;
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+            line-height: 1;
+        }
+
+        .module-badge.visible {
+            display: inline-flex;
         }
 
         .module-card:active {
@@ -1041,7 +1065,9 @@
             filteredModules.forEach(module => {
                 const card = document.createElement('div');
                 card.className = 'module-card';
+                card.dataset.moduleId = module.id;
                 card.innerHTML = `
+                    <span class="module-badge" data-badge="${module.id}">0</span>
                     <span class="module-icon">${module.icon}</span>
                     <div class="module-name">${module.name}</div>
                     <div class="module-description">${module.description}</div>
@@ -1053,6 +1079,158 @@
 
                 modulesGrid.appendChild(card);
             });
+
+            // Charger les pastilles de notification (async, non-bloquant)
+            loadModuleBadges();
+        }
+
+        // ============= Module Badges (pastilles) =============
+        async function loadModuleBadges() {
+            if (!supabaseClient || !currentUser || !currentEstablishment) return;
+
+            const today = new Date().toISOString().split('T')[0];
+
+            // Reset all badges to 0
+            const setBadge = (moduleId, count) => {
+                const el = document.querySelector(`[data-badge="${moduleId}"]`);
+                if (!el) return;
+                if (count > 0) {
+                    el.textContent = count > 99 ? '99+' : count;
+                    el.classList.add('visible');
+                } else {
+                    el.classList.remove('visible');
+                }
+            };
+
+            try {
+                // 1. TAF : lignes attribuées à moi, non faites
+                const { data: tafData } = await supabaseClient
+                    .from('tasks')
+                    .select('id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('attribue_a_id', currentUser.id)
+                    .is('fait_par_id', null);
+                setBadge('taf', (tafData || []).length);
+            } catch (e) { console.warn('Badge TAF error:', e); }
+
+            try {
+                // 2. Check-Lists : checklists actives pour aujourd'hui, non complétées (tout service)
+                const { data: clData } = await supabaseClient
+                    .from('checklists')
+                    .select('id, frequence, jours_semaine, jour_mois, service, checklist_items(id)')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('actif', true);
+
+                const todayDate = new Date();
+                const dayOfWeek = todayDate.getDay() === 0 ? 7 : todayDate.getDay();
+                const dayOfMonth = todayDate.getDate();
+
+                const showToday = (cl) => {
+                    switch (cl.frequence) {
+                        case 'service': return true;
+                        case 'journaliere': return true;
+                        case 'hebdomadaire': return cl.jours_semaine && cl.jours_semaine.includes(dayOfWeek);
+                        case 'mensuelle': return cl.jour_mois && cl.jour_mois.includes(dayOfMonth);
+                        default: return false;
+                    }
+                };
+
+                let clCount = 0;
+                for (const cl of (clData || [])) {
+                    if (!showToday(cl)) continue;
+                    const totalItems = (cl.checklist_items || []).length;
+                    if (totalItems === 0) continue;
+
+                    // Période selon la fréquence
+                    let periode = today;
+                    if (cl.frequence === 'hebdomadaire') {
+                        const d = new Date(todayDate);
+                        d.setDate(d.getDate() - d.getDay() + 1);
+                        periode = d.toISOString().split('T')[0];
+                    } else if (cl.frequence === 'mensuelle') {
+                        periode = today.substring(0, 7);
+                    }
+
+                    // Services à considérer
+                    const services = cl.service === 'tous' ? ['midi', 'soir'] : [cl.service];
+                    for (const svc of services) {
+                        const { data: comps } = await supabaseClient
+                            .from('checklist_completions')
+                            .select('id')
+                            .eq('checklist_id', cl.id)
+                            .eq('etablissement', currentEstablishment)
+                            .eq('periode', periode)
+                            .eq('service', svc);
+                        if ((comps || []).length < totalItems) clCount++;
+                    }
+                }
+                setBadge('checklist', clCount);
+            } catch (e) { console.warn('Badge Check-Lists error:', e); }
+
+            try {
+                // 3. Températures : frigos sans relevé aujourd'hui
+                const { data: frigos } = await supabaseClient
+                    .from('temp_frigos')
+                    .select('id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('actif', true);
+
+                const { data: relevesToday } = await supabaseClient
+                    .from('temp_releves')
+                    .select('frigo_id, est_controle_1h')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('date', today);
+
+                const frigosRelevesIds = new Set((relevesToday || [])
+                    .filter(r => !r.est_controle_1h)
+                    .map(r => r.frigo_id));
+                const frigosMissing = (frigos || []).filter(f => !frigosRelevesIds.has(f.id)).length;
+
+                // Re-contrôles 1h en attente : relevés hors_norme sans enfant est_controle_1h
+                const { data: horsNorme } = await supabaseClient
+                    .from('temp_releves')
+                    .select('id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('date', today)
+                    .eq('hors_norme', true)
+                    .eq('est_controle_1h', false);
+
+                const { data: recontroles } = await supabaseClient
+                    .from('temp_releves')
+                    .select('releve_parent_id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('date', today)
+                    .eq('est_controle_1h', true);
+
+                const recontrolesIds = new Set((recontroles || []).map(r => r.releve_parent_id));
+                const recontrolesMissing = (horsNorme || []).filter(r => !recontrolesIds.has(r.id)).length;
+
+                setBadge('temperatures', frigosMissing + recontrolesMissing);
+            } catch (e) { console.warn('Badge Températures error:', e); }
+
+            try {
+                // 4. Briefings : briefings du jour non lus par l'utilisateur
+                const { data: briefs } = await supabaseClient
+                    .from('briefings')
+                    .select('id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('date', today)
+                    .eq('statut', 'publie');
+
+                if ((briefs || []).length === 0) {
+                    setBadge('briefings', 0);
+                } else {
+                    const briefIds = briefs.map(b => b.id);
+                    const { data: lectures } = await supabaseClient
+                        .from('briefing_lectures')
+                        .select('briefing_id')
+                        .in('briefing_id', briefIds)
+                        .eq('user_id', currentUser.id);
+                    const lusIds = new Set((lectures || []).map(l => l.briefing_id));
+                    const nonLus = briefIds.filter(id => !lusIds.has(id)).length;
+                    setBadge('briefings', nonLus);
+                }
+            } catch (e) { console.warn('Badge Briefings error:', e); }
         }
 
         function handleModuleClick(module) {

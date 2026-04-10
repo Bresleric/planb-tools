@@ -85,8 +85,24 @@
             flex: 1; padding: 12px; text-align: center; font-size: 13px; font-weight: 600;
             color: var(--gray-400); border-bottom: 3px solid transparent;
             cursor: pointer; transition: all 0.2s; touch-action: manipulation;
+            position: relative;
         }
         .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+        .tab-badge {
+            display: none;
+            margin-left: 6px;
+            min-width: 18px;
+            padding: 0 5px;
+            height: 18px;
+            border-radius: 9px;
+            background: #ef4444;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 18px;
+            vertical-align: middle;
+        }
+        .tab-badge.visible { display: inline-block; }
 
         /* Content */
         .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
@@ -480,7 +496,7 @@
 
     <!-- Tabs -->
     <div class="tabs" id="main-tabs">
-        <div class="tab active" data-tab="consultation" onclick="switchTab('consultation')">Briefing</div>
+        <div class="tab active" data-tab="consultation" onclick="switchTab('consultation')">Briefing<span class="tab-badge" id="tab-badge-consultation">0</span></div>
         <div class="tab" data-tab="creation" onclick="switchTab('creation')">Redaction</div>
         <div class="tab" data-tab="previsions" onclick="switchTab('previsions')">Previsions</div>
         <div class="tab" data-tab="historique" onclick="switchTab('historique')">Historique</div>
@@ -1070,9 +1086,50 @@
                 renderBriefing(container, briefing);
                 await loadLectureBar(briefing);
 
+                // Mise à jour de la pastille "briefings non lus"
+                updateBriefingBadge();
+
             } catch (err) {
                 console.error('Error loading briefing:', err);
                 showToast('Erreur au chargement', 'error');
+            }
+        }
+
+        async function updateBriefingBadge() {
+            const badge = document.getElementById('tab-badge-consultation');
+            if (!badge || !currentUser || !currentEstablishment || isDemo) return;
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const { data: briefs } = await supabaseClient
+                    .from('briefings')
+                    .select('id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('date', today)
+                    .eq('statut', 'publie');
+
+                if (!briefs || briefs.length === 0) {
+                    badge.classList.remove('visible');
+                    return;
+                }
+
+                const briefIds = briefs.map(b => b.id);
+                const { data: lectures } = await supabaseClient
+                    .from('briefing_lectures')
+                    .select('briefing_id')
+                    .in('briefing_id', briefIds)
+                    .eq('user_id', currentUser.id);
+
+                const lusIds = new Set((lectures || []).map(l => l.briefing_id));
+                const nonLus = briefIds.filter(id => !lusIds.has(id)).length;
+
+                if (nonLus > 0) {
+                    badge.textContent = nonLus > 99 ? '99+' : nonLus;
+                    badge.classList.add('visible');
+                } else {
+                    badge.classList.remove('visible');
+                }
+            } catch (e) {
+                console.warn('Badge briefing error:', e);
             }
         }
 
