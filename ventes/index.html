@@ -1337,5 +1337,93 @@ function showLoading(on) {
   document.getElementById('loading').classList.toggle('active', on);
 }
   </script>
+<!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
+<style id="taf-header-style">
+.header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
+.header .header-left { display: flex !important; align-items: center !important; gap: 10px !important; flex: 0 1 auto !important; }
+.header .header-left h1, .header .header-left .header-title, .header .title { font-size: 1.2rem !important; color: #f97316 !important; font-weight: 700 !important; margin: 0 !important; }
+.header .header-right { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 0.85rem !important; color: #6b7280 !important; flex-wrap: wrap !important; justify-content: flex-end !important; }
+.header .btn-back, .header .btn-logout { padding: 6px 12px !important; border-radius: 6px !important; border: 1px solid #e5e7eb !important; background: white !important; color: #4b5563 !important; font-size: 0.8rem !important; cursor: pointer !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; }
+.header .btn-back:hover, .header .btn-logout:hover { background: #f3f4f6 !important; }
+.header .btn-logout { border-color: #fecaca !important; color: #dc2626 !important; }
+.header .btn-logout:hover { background: #fef2f2 !important; }
+</style>
+<script id="taf-header-script">
+(function() {
+  // Global logout helpers
+  window.__tafGoBackToPortal = function() { window.location.href = '../'; };
+  window.__tafLogout = function() { try { sessionStorage.clear(); } catch(e){} window.location.href = '../'; };
+  if (typeof window.goBackToPortal !== 'function') window.goBackToPortal = window.__tafGoBackToPortal;
+  if (typeof window.logout !== 'function') window.logout = window.__tafLogout;
+
+  // 2-minute inactivity auto-logout
+  var inactivityTimer = null;
+  var INACTIVITY_MS = 2 * 60 * 1000;
+  function resetInactivity() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(function() {
+      try { sessionStorage.clear(); } catch(e){}
+      window.location.href = '../';
+    }, INACTIVITY_MS);
+  }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(function(evt){
+    document.addEventListener(evt, resetInactivity, { passive: true, capture: true });
+  });
+
+  // Patch header on DOM ready: ensure header-right has Portail + Déconnexion
+  function patchHeader() {
+    var header = document.querySelector('.header, header.header, header');
+    if (!header) { resetInactivity(); return; }
+    header.classList.add('header');
+
+    // Ensure header-right exists
+    var right = header.querySelector('.header-right');
+    if (!right) {
+      right = document.createElement('div');
+      right.className = 'header-right';
+      header.appendChild(right);
+    }
+
+    // Add Portail button if missing
+    if (!right.querySelector('.btn-back')) {
+      var btnBack = document.createElement('a');
+      btnBack.className = 'btn-back';
+      btnBack.href = 'javascript:void(0)';
+      btnBack.textContent = '← Portail';
+      btnBack.onclick = window.__tafGoBackToPortal;
+      right.appendChild(btnBack);
+    } else {
+      // Normalise existing back button text
+      var existingBack = right.querySelector('.btn-back');
+      if (existingBack && /retour|accueil|portail/i.test(existingBack.textContent)) {
+        existingBack.textContent = '← Portail';
+      }
+    }
+
+    // Add Déconnexion button if missing
+    if (!right.querySelector('.btn-logout')) {
+      var btnLogout = document.createElement('button');
+      btnLogout.className = 'btn-logout';
+      btnLogout.type = 'button';
+      btnLogout.textContent = 'Déconnexion';
+      btnLogout.onclick = window.__tafLogout;
+      right.appendChild(btnLogout);
+    }
+
+    // Remove duplicate back buttons from header-left
+    var leftBacks = header.querySelectorAll('.header-left .btn-back, .header-left .back-btn, .header > .back-btn');
+    leftBacks.forEach(function(b){ b.remove(); });
+
+    resetInactivity();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', patchHeader);
+  } else {
+    patchHeader();
+  }
+})();
+</script>
+
 </body>
 </html>

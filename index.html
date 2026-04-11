@@ -1496,5 +1496,25 @@
         // Start app
         init();
     </script>
+<!-- PORTAL INACTIVITY LOGOUT -->
+<script id="taf-portal-inactivity">
+(function() {
+  var inactivityTimer = null;
+  var INACTIVITY_MS = 2 * 60 * 1000;
+  function resetInactivity() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(function() {
+      try { sessionStorage.clear(); } catch(e){}
+      window.location.reload();
+    }, INACTIVITY_MS);
+  }
+  ["mousemove","mousedown","keydown","touchstart","scroll","click","wheel"].forEach(function(evt){
+    document.addEventListener(evt, resetInactivity, { passive: true, capture: true });
+  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", resetInactivity);
+  else resetInactivity();
+})();
+</script>
+
 </body>
 </html>
