@@ -144,13 +144,13 @@
 
     .taf-grid {
       display: grid;
-      grid-template-columns: 72px 32px 32px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 32px 32px 52px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: 72px 32px 32px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 32px 32px 52px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -169,7 +169,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: 72px 32px 32px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 32px 32px 52px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -1264,6 +1264,12 @@
             va = a.priorite || 0;
             vb = b.priorite || 0;
             break;
+          case 'retard':
+            va = (a.echeance_initiale && a.echeance_initiale < a.echeance)
+              ? Math.round((new Date(a.echeance) - new Date(a.echeance_initiale)) / 86400000) : 0;
+            vb = (b.echeance_initiale && b.echeance_initiale < b.echeance)
+              ? Math.round((new Date(b.echeance) - new Date(b.echeance_initiale)) / 86400000) : 0;
+            break;
           case 'statut':
             va = a.date_validation || '';
             vb = b.date_validation || '';
@@ -1343,6 +1349,7 @@
       <span class="th-sort ${sa('creneau')}" onclick="toggleSort('creneau')">Crén.<span class="sort-arrow">${arrow('creneau')}</span></span>
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
+      <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
       <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
       <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
       <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
@@ -1378,8 +1385,9 @@
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
+        <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
         <div class="task-main">
-          <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">En retard ${daysLate}j</span>` : ''}
+          <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
           ${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}
         </div>
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
