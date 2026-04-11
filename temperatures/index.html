@@ -138,26 +138,29 @@
     .frigo-card.attente-controle { border-left-color: var(--amber); }
 
     .frigo-header {
-      padding: 10px 12px;
-      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px;
+      display: grid;
+      grid-template-columns: 28px 1fr 60px 60px 20px;
+      align-items: center; gap: 8px;
       cursor: pointer;
     }
     .frigo-header:active { background: var(--gray-50); }
 
     .frigo-icon {
-      width: 36px; height: 36px; border-radius: 8px;
+      width: 28px; height: 28px; border-radius: 6px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.2rem; flex-shrink: 0;
+      font-size: 1rem; flex-shrink: 0;
     }
     .frigo-icon.cave { background: #fae8ff; }
     .frigo-icon.cuisine { background: #fef3c7; }
     .frigo-icon.labo { background: #dbeafe; }
 
-    .frigo-info { flex: 1; min-width: 0; }
-    .frigo-name { font-size: 0.9rem; font-weight: 600; }
-    .frigo-detail { font-size: 0.7rem; color: var(--gray-400); margin-top: 1px; }
+    .frigo-info { min-width: 0; text-align: left; }
+    .frigo-name { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .frigo-detail { font-size: 0.68rem; color: var(--gray-400); margin-top: 1px; }
 
-    .frigo-status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .frigo-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+    .frigo-col-info { font-size: 0.65rem; color: var(--gray-400); line-height: 1.1; }
 
     .badge-temp {
       padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 700;
@@ -831,12 +834,14 @@
         else if (isDone) cardClass += ' done';
 
         let tempBadge = '';
-        let releveInfo = '';
+        let heureCol = '';
+        let initCol = '';
         if (isDone) {
           const status = checkTemp(releve.temperature, frigo);
           tempBadge = `<span class="badge-temp ${status}">${releve.temperature}°</span>`;
           const heureReleve = releve.created_at ? new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-          releveInfo = `<span style="font-size:0.7rem;color:var(--gray-400)">${esc(releve.user_initiales || '')} ${heureReleve}</span>`;
+          heureCol = `<div class="frigo-col-info">${heureReleve}</div>`;
+          initCol = `<div class="frigo-col-info"><strong>${esc(releve.user_initiales || '')}</strong></div>`;
         } else {
           tempBadge = `<span class="badge-temp pending">—</span>`;
         }
@@ -846,14 +851,10 @@
             <div class="frigo-icon ${cat.toLowerCase()}">${CAT_ICONS[cat] || '❄️'}</div>
             <div class="frigo-info">
               <div class="frigo-name">${esc(frigo.nom)}</div>
-              <div class="frigo-detail">${frigo.temp_min}° / ${frigo.temp_max}° — Limite : ${frigo.temp_limite}°</div>
+              <div class="frigo-detail">${frigo.temp_min}° / ${frigo.temp_max}° — Lim ${frigo.temp_limite}°</div>
             </div>
-            <div class="frigo-status">
-              ${tempBadge}
-              ${releveInfo}
-              ${needsPhoto && !isDone ? '<span class="badge-photo">📷 Photo</span>' : ''}
-              ${isDone && releve.photo_data ? '<span class="badge-photo">📷</span>' : ''}
-            </div>
+            <div class="frigo-col">${tempBadge}${heureCol}</div>
+            <div class="frigo-col">${initCol}</div>
             <div class="check-icon ${isDone ? 'done' : 'pending'}">${isDone ? '✓' : ''}</div>
           </div>
 
@@ -877,20 +878,18 @@
   }
 
   function renderFrigoForm(frigo, needsPhoto) {
-    const photoRequired = needsPhoto;
     return `
       <div class="temp-input-row">
         <input type="number" step="0.5" class="temp-input" id="temp-${frigo.id}"
                placeholder="—" oninput="onTempInput('${frigo.id}', this)"
+               data-needs-photo="${needsPhoto ? '1' : '0'}"
                min="${frigo.temp_min - 10}" max="${frigo.temp_max + 20}">
         <span class="temp-unit">°C</span>
         <span class="temp-range">Norme : ${frigo.temp_min}° a ${frigo.temp_max}° — Limite : ${frigo.temp_limite}°</span>
       </div>
 
-      <div class="photo-section ${photoRequired ? 'required' : ''}" id="photo-section-${frigo.id}">
-        <div class="photo-label ${photoRequired ? 'required' : ''}">
-          ${photoRequired ? '📷 Photo de verification obligatoire' : '📷 Photo (optionnelle)'}
-        </div>
+      <div class="photo-section" id="photo-section-${frigo.id}" style="display:none">
+        <div class="photo-label">📷 Photo (optionnelle)</div>
         <button class="btn-photo" onclick="takePhoto('${frigo.id}')">Prendre une photo</button>
         <div id="photo-preview-${frigo.id}"></div>
       </div>
@@ -914,18 +913,42 @@
     const frigo = frigos.find(f => f.id === frigoId);
     if (!frigo) return;
     const val = parseFloat(input.value);
-    const status = checkTemp(val, frigo);
+    const hasValue = input.value !== '' && !isNaN(val);
+    const status = hasValue ? checkTemp(val, frigo) : 'ok';
 
     input.classList.toggle('hors-norme', status === 'danger');
 
-    // If out of range, make photo mandatory
-    if (status === 'danger') {
-      const section = document.getElementById(`photo-section-${frigoId}`);
-      if (section) {
-        section.classList.add('required');
-        section.querySelector('.photo-label').textContent = '📷 Photo OBLIGATOIRE - Temperature hors norme !';
-        section.querySelector('.photo-label').classList.add('required');
-      }
+    const section = document.getElementById(`photo-section-${frigoId}`);
+    if (!section) return;
+
+    if (!hasValue) {
+      // Hide photo section until a value is entered
+      section.style.display = 'none';
+      return;
+    }
+
+    const needsPhotoRandom = input.dataset.needsPhoto === '1';
+    const horsNorme = status === 'danger';
+    const label = section.querySelector('.photo-label');
+
+    if (horsNorme) {
+      // Mandatory photo because out of range
+      section.style.display = 'block';
+      section.classList.add('required');
+      label.textContent = '📷 Photo OBLIGATOIRE - Temperature hors norme !';
+      label.classList.add('required');
+    } else if (needsPhotoRandom) {
+      // Surprise random photo check
+      section.style.display = 'block';
+      section.classList.add('required');
+      label.textContent = '📷 Controle aleatoire : photo de verification obligatoire';
+      label.classList.add('required');
+    } else {
+      // Optional photo
+      section.style.display = 'block';
+      section.classList.remove('required');
+      label.textContent = '📷 Photo (optionnelle)';
+      label.classList.remove('required');
     }
   }
 
