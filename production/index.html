@@ -328,33 +328,60 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ====== PRODUCTIONS ====== */
-    .productions-container { padding: 12px; }
-    .productions-by-lot { margin-bottom: 16px; }
-    .lot-header {
-      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--gray-400); font-weight: 700; padding: 12px 8px 8px;
-      border-top: 1px solid var(--gray-200); margin-top: 8px;
-    }
-    .productions-by-lot:first-child .lot-header { border-top: none; margin-top: 0; }
-
-    .production-card {
+    /* ====== PRODUCTIONS (table layout) ====== */
+    .productions-container { padding: 8px; }
+    .productions-table-wrap {
       background: white; border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 12px; margin-bottom: 8px; cursor: pointer;
-      border-left: 4px solid var(--purple);
-      display: flex; align-items: center; gap: 10px;
-      transition: box-shadow .15s;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
-    .production-card:active { box-shadow: var(--shadow-md); }
-    .production-card.cat-mise_en_place { border-left-color: var(--blue); }
-    .production-card.cat-produit_intermediaire { border-left-color: var(--orange); }
-    .production-card.cat-produit_fini { border-left-color: var(--green); }
-
-    .production-icon { font-size: 1.5rem; flex-shrink: 0; }
-    .production-info { flex: 1; min-width: 0; }
-    .production-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .production-meta { font-size: 0.75rem; color: var(--gray-500); display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
-    .production-meta span { display: flex; align-items: center; gap: 2px; }
+    .productions-table {
+      width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 900px;
+    }
+    .productions-table thead th {
+      background: var(--gray-50, #f9fafb);
+      color: var(--gray-600, #4b5563);
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px;
+      font-weight: 700; text-align: left;
+      padding: 10px 8px; border-bottom: 1px solid var(--gray-200, #e5e7eb);
+      white-space: nowrap; position: sticky; top: 0; z-index: 2;
+    }
+    .productions-table thead th.num { text-align: right; }
+    .productions-table tbody tr {
+      border-bottom: 1px solid var(--gray-100, #f3f4f6);
+      cursor: pointer; transition: background .1s;
+    }
+    .productions-table tbody tr:hover { background: var(--gray-50, #f9fafb); }
+    .productions-table tbody tr:last-child { border-bottom: none; }
+    .productions-table td {
+      padding: 9px 8px; vertical-align: middle; white-space: nowrap;
+      color: var(--gray-800, #1f2937);
+    }
+    .productions-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .productions-table td.nom { font-weight: 600; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+    .productions-table td.cat-cell { width: 28px; font-size: 1.1rem; text-align: center; padding-right: 0; }
+    .productions-table td.lot-cell {
+      font-family: ui-monospace, Menlo, monospace; font-size: 0.72rem;
+      color: var(--gray-600); background: var(--gray-50, #f9fafb);
+      padding: 4px 8px; border-radius: 4px;
+    }
+    .productions-table td.dlc-cell { font-size: 0.78rem; color: var(--gray-600); }
+    .productions-table td.dlc-cell.warn { color: #b45309; font-weight: 600; }
+    .productions-table td.dlc-cell.alert { color: #dc2626; font-weight: 700; }
+    .productions-table td.obs-cell {
+      color: var(--gray-500); font-style: italic; font-size: 0.76rem;
+      max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+    }
+    .productions-table tr.row-mise_en_place td.cat-cell { color: var(--blue); }
+    .productions-table tr.row-produit_intermediaire td.cat-cell { color: var(--orange); }
+    .productions-table tr.row-produit_fini td.cat-cell { color: var(--green); }
+    .productions-table tr.row-mise_en_place { border-left: 3px solid var(--blue); }
+    .productions-table tr.row-produit_intermediaire { border-left: 3px solid var(--orange); }
+    .productions-table tr.row-produit_fini { border-left: 3px solid var(--green); }
+    @media (max-width: 640px) {
+      .productions-table { font-size: 0.76rem; min-width: 780px; }
+      .productions-table thead th,
+      .productions-table td { padding: 7px 6px; }
+    }
 
     .production-form { padding: 0; }
     .production-form .form-group { margin-bottom: 12px; }
@@ -1331,44 +1358,80 @@ function renderProductions() {
     return;
   }
 
-  // Group by lot
-  const byLot = {};
-  productions.forEach(p => {
-    const lotId = p.lot_id || 'sans_lot';
-    if (!byLot[lotId]) byLot[lotId] = [];
-    byLot[lotId].push(p);
+  // Sort: by lot then by nom
+  productions.sort((a, b) => {
+    const la = (allLots.find(l => l.id === a.lot_id)?.numero_lot) || 'zzz';
+    const lb = (allLots.find(l => l.id === b.lot_id)?.numero_lot) || 'zzz';
+    if (la !== lb) return la.localeCompare(lb);
+    return (a.nom_produit || '').localeCompare(b.nom_produit || '');
   });
 
-  let html = '<div class="productions-container">';
-  Object.entries(byLot).forEach(([lotId, prods]) => {
-    const lot = allLots.find(l => l.id === lotId);
-    const lotNum = lot?.numero_lot || 'Lot en attente';
+  const now = Date.now();
+  const rows = productions.map(p => {
+    const icon = CAT_ICONS[p.categorie] || '📦';
+    const rowClass = `row-${p.categorie || ''}`;
+    const lot = allLots.find(l => l.id === p.lot_id);
+    const lotNum = lot?.numero_lot || '—';
 
-    html += `<div class="productions-by-lot">
-      <div class="lot-header">📍 ${lotNum}</div>`;
+    // DLC formatting + alert state
+    let dlcTxt = '—';
+    let dlcClass = '';
+    if (p.dlc) {
+      const dlcDate = new Date(p.dlc);
+      const diffH = (dlcDate.getTime() - now) / 3600000;
+      dlcTxt = dlcDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+             + ' ' + dlcDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      if (diffH < 0) dlcClass = 'alert';
+      else if (diffH < 24) dlcClass = 'warn';
+    }
 
-    prods.forEach(p => {
-      const icon = CAT_ICONS[p.categorie] || '📦';
-      const catClass = `cat-${p.categorie}`;
-      const metaParts = [];
-      if (p.quantite_produite) metaParts.push(`<span>📊 ${p.quantite_produite} ${p.unite}</span>`);
-      if (p.dlc) metaParts.push(`<span>⏱️ DLC ${new Date(p.dlc).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</span>`);
-      if (p.producteur_initiales) metaParts.push(`<span>👨‍🍳 ${p.producteur_initiales}</span>`);
+    // Date production
+    const dProd = p.date_production
+      ? new Date(p.date_production).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+      : '—';
 
-      html += `
-        <div class="production-card ${catClass}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))" style="cursor:pointer">
-          <div class="production-icon">${icon}</div>
-          <div class="production-info">
-            <div class="production-name">${p.nom_produit}</div>
-            <div class="production-meta">${metaParts.join('')}</div>
-          </div>
-        </div>
-      `;
-    });
+    const qte = p.quantite_produite ?? '';
+    const unite = p.unite || '';
+    const producteur = p.producteur_initiales || p.producteur_nom || '—';
+    const obs = (p.observation || '').replace(/"/g, '&quot;');
 
-    html += '</div>';
-  });
-  html += '</div>';
+    return `
+      <tr class="${rowClass}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">
+        <td class="cat-cell" title="${p.categorie || ''}">${icon}</td>
+        <td class="nom" title="${(p.nom_produit || '').replace(/"/g, '&quot;')}">${p.nom_produit || ''}</td>
+        <td class="num">${qte}</td>
+        <td>${unite}</td>
+        <td><span class="lot-cell">${lotNum}</span></td>
+        <td>${dProd}</td>
+        <td class="dlc-cell ${dlcClass}">${dlcTxt}</td>
+        <td>${producteur}</td>
+        <td class="obs-cell" title="${obs}">${obs || ''}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <div class="productions-container">
+      <div class="productions-table-wrap">
+        <table class="productions-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Produit</th>
+              <th class="num">Qté</th>
+              <th>Unité</th>
+              <th>Lot</th>
+              <th>Produit le</th>
+              <th>DLC</th>
+              <th>Par</th>
+              <th>Observation</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
 
   container.innerHTML = html;
 }
