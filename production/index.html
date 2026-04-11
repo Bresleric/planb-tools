@@ -849,7 +849,9 @@ function init() {
   loadProductions();
 
   // Initialise l'onglet actif (affiche notamment le bouton FAB +)
-  switchTab('fiches');
+  const activeTabBtn = document.querySelector('.tab-btn.active');
+  const initialTab = activeTabBtn?.dataset.tab || 'productions';
+  switchTab(initialTab);
 }
 
 function logout() {
