@@ -1182,6 +1182,22 @@
         </div>
     </div>
 
+    <!-- PIN MODAL -->
+    <div class="modal-overlay" id="pin-modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
+      <div class="modal" style="background:white;border-radius:14px;padding:24px;width:90%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="text-align:center;font-size:2rem;margin-bottom:8px;">🔒</div>
+        <div id="pin-modal-title" style="text-align:center;font-weight:700;font-size:1.05rem;color:#1f2937;margin-bottom:6px;">Code d'authentification</div>
+        <div id="pin-modal-subtitle" style="text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Saisissez votre code personnel</div>
+        <input type="password" id="pin-modal-input" inputmode="numeric" maxlength="6" placeholder="••••"
+          style="width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:10px;font-size:1.6rem;text-align:center;letter-spacing:0.4rem;font-weight:700;color:#1f2937;margin-bottom:10px;" />
+        <div id="pin-modal-error" style="display:none;color:#dc2626;font-size:0.82rem;text-align:center;margin-bottom:10px;">Code incorrect</div>
+        <div style="display:flex;gap:10px;">
+          <button id="pin-modal-cancel" style="flex:1;padding:12px;border:none;background:#e5e7eb;color:#374151;border-radius:10px;font-weight:600;cursor:pointer;">Annuler</button>
+          <button id="pin-modal-ok" style="flex:1;padding:12px;border:none;background:#f97316;color:white;border-radius:10px;font-weight:600;cursor:pointer;">Valider</button>
+        </div>
+      </div>
+    </div>
+
     <!-- POPUP CONFIRMATION -->
     <div id="confirmation-popup" class="popup">
         <div class="popup-content" id="popup-message"></div>
@@ -1279,7 +1295,26 @@
         }
 
         function goBack() {
-            window.location.href = '../';
+            // Cas de redirection interne (ex: session invalide au chargement) : pas de PIN
+            if (!currentUser) {
+                window.location.href = '../';
+                return;
+            }
+            // Verrouillage : seul l'utilisateur qui a ouvert la session peut revenir.
+            // Tout autre code valide → déconnexion forcée.
+            askPIN({
+                title: "Retour à l'accueil",
+                subtitle: `Code de ${currentUser.nom || currentUser.initiales || 'la session'} requis`,
+                mode: 'any'
+            }, (user) => {
+                if (!user) return; // annulé
+                if (user.id === currentUser.id) {
+                    window.location.href = '../';
+                } else {
+                    showToast("Session différente : déconnexion", 'error');
+                    setTimeout(logoutAndGoHome, 700);
+                }
+            });
         }
 
         function switchTab(tabName) {
@@ -1498,16 +1533,28 @@
             const isCurrentlyChecked = checkbox.classList.contains('checked');
 
             if (isCurrentlyChecked) {
-                // Show uncheck confirmation popup
-                showConfirmation('Décrocher cet élément?', () => {
-                    uncheckItem(checklistId, itemId, frequence);
+                // Décochage : on demande le code PIN puis on confirme
+                askPIN({
+                    title: 'Décocher cet élément',
+                    subtitle: 'Code personnel requis'
+                }, (validator) => {
+                    if (!validator) return;
+                    uncheckItem(checklistId, itemId, frequence, validator);
                 });
             } else {
-                checkItem(checklistId, itemId, frequence);
+                // Cochage : on demande le code PIN avant d'enregistrer
+                askPIN({
+                    title: 'Valider cet élément',
+                    subtitle: 'Code personnel requis'
+                }, (validator) => {
+                    if (!validator) return;
+                    checkItem(checklistId, itemId, frequence, validator);
+                });
             }
         }
 
-        async function checkItem(checklistId, itemId, frequence) {
+        async function checkItem(checklistId, itemId, frequence, validator) {
+            if (!validator) validator = currentUser;
             try {
                 const today = new Date().toISOString().split('T')[0];
                 let periode = today;
@@ -1535,9 +1582,9 @@
                         etablissement: currentEstablishment,
                         periode: periode,
                         service: currentService,
-                        valide_par_id: currentUser.id,
-                        valide_par_nom: currentUser.nom,
-                        valide_par_initiales: currentUser.initiales,
+                        valide_par_id: validator.id,
+                        valide_par_nom: validator.nom,
+                        valide_par_initiales: validator.initiales,
                         valide_at: new Date().toISOString(),
                         observation: null
                     });
@@ -1552,7 +1599,8 @@
             }
         }
 
-        async function uncheckItem(checklistId, itemId, frequence) {
+        async function uncheckItem(checklistId, itemId, frequence, validator) {
+            if (!validator) validator = currentUser;
             try {
                 const today = new Date().toISOString().split('T')[0];
                 let periode = today;
@@ -2177,6 +2225,17 @@
                 return;
             }
 
+            // Demande du code PIN avant d'enregistrer la validation manager
+            askPIN({
+                title: 'Valider cette check-list',
+                subtitle: 'Code personnel requis'
+            }, async (validator) => {
+                if (!validator) return;
+                await doSubmitValidation(status, commentaire, validator);
+            });
+        }
+
+        async function doSubmitValidation(status, commentaire, validator) {
             try {
                 if (isDemo) {
                     showToast('✓ Validation enregistrée (mode démo)', 'success');
@@ -2194,9 +2253,9 @@
                         service: currentService,
                         statut: status,
                         commentaire,
-                        valide_par_id: currentUser.id,
-                        valide_par_nom: currentUser.nom,
-                        valide_par_initiales: currentUser.initiales
+                        valide_par_id: validator.id,
+                        valide_par_nom: validator.nom,
+                        valide_par_initiales: validator.initiales
                     });
 
                 if (error) throw error;
@@ -2232,6 +2291,102 @@
 
         function closePopup() {
             document.getElementById('confirmation-popup').classList.remove('active');
+        }
+
+        // ============ PIN AUTHENTICATION ============
+        // Demande le code PIN puis appelle callback(user) si valide, ou callback(null) si annulé.
+        // mode: 'any' = n'importe quel utilisateur de l'établissement
+        //       'session' = doit être l'utilisateur qui a ouvert la session (currentUser)
+        function askPIN(options, callback) {
+            const opts = options || {};
+            const title = opts.title || "Code d'authentification";
+            const subtitle = opts.subtitle || 'Saisissez votre code personnel';
+            const mode = opts.mode || 'any';
+
+            const overlay = document.getElementById('pin-modal-overlay');
+            const input = document.getElementById('pin-modal-input');
+            const err = document.getElementById('pin-modal-error');
+            const okBtn = document.getElementById('pin-modal-ok');
+            const cancelBtn = document.getElementById('pin-modal-cancel');
+
+            document.getElementById('pin-modal-title').textContent = title;
+            document.getElementById('pin-modal-subtitle').textContent = subtitle;
+            input.value = '';
+            err.style.display = 'none';
+            overlay.style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+
+            const cleanup = () => {
+                overlay.style.display = 'none';
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+                input.onkeydown = null;
+            };
+
+            const validate = async () => {
+                const code = (input.value || '').trim();
+                if (!code || code.length < 4) {
+                    err.textContent = 'Code invalide (4-6 chiffres)';
+                    err.style.display = 'block';
+                    return;
+                }
+
+                // Mode démo : accepte n'importe quel code et renvoie currentUser
+                if (isDemo) {
+                    cleanup();
+                    callback(currentUser);
+                    return;
+                }
+
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('users')
+                        .select('id, nom, initiales, code, role, equipe, etablissement, actif')
+                        .eq('code', code)
+                        .eq('etablissement', currentEstablishment)
+                        .eq('actif', true)
+                        .maybeSingle();
+
+                    if (error || !data) {
+                        err.textContent = 'Code incorrect';
+                        err.style.display = 'block';
+                        input.value = '';
+                        input.focus();
+                        return;
+                    }
+
+                    if (mode === 'session' && data.id !== currentUser.id) {
+                        err.textContent = "Seul l'utilisateur qui a ouvert la session peut revenir";
+                        err.style.display = 'block';
+                        input.value = '';
+                        input.focus();
+                        return;
+                    }
+
+                    cleanup();
+                    callback(data);
+                } catch (e) {
+                    console.error('PIN check error', e);
+                    err.textContent = 'Erreur de vérification';
+                    err.style.display = 'block';
+                }
+            };
+
+            okBtn.onclick = validate;
+            cancelBtn.onclick = () => { cleanup(); callback(null); };
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); validate(); }
+                else if (e.key === 'Escape') { e.preventDefault(); cleanup(); callback(null); }
+            };
+        }
+
+        // Déconnexion : vide la session et redirige vers l'accueil (login PIN)
+        function logoutAndGoHome() {
+            try {
+                sessionStorage.removeItem('planb_user');
+                sessionStorage.removeItem('planb_etablissement');
+            } catch (e) {}
+            window.location.href = '../';
         }
 
         function escapeHtml(text) {
