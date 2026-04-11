@@ -1379,8 +1379,7 @@ function renderProductions() {
     if (p.dlc) {
       const dlcDate = new Date(p.dlc);
       const diffH = (dlcDate.getTime() - now) / 3600000;
-      dlcTxt = dlcDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-             + ' ' + dlcDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      dlcTxt = dlcDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
       if (diffH < 0) dlcClass = 'alert';
       else if (diffH < 24) dlcClass = 'warn';
     }
@@ -1499,23 +1498,24 @@ function closeProductionModal() {
 function updateDlcAutoDisplay(fiche) {
   const dlcAutoDiv = document.getElementById('p-dlc-auto');
   const dlcAutoVal = document.getElementById('p-dlc-auto-value');
-  if (fiche && (fiche.dlc_jours || fiche.dlc_heures)) {
-    const now = new Date();
-    let dlcDate;
-    if (fiche.dlc_jours) {
-      dlcDate = new Date(now.getTime() + fiche.dlc_jours * 86400000);
-    } else {
-      dlcDate = new Date(now.getTime() + fiche.dlc_heures * 3600000);
-    }
-    dlcAutoVal.textContent = dlcDate.toLocaleDateString('fr-FR', {
-      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-    dlcAutoDiv.style.display = '';
-    // Pré-remplir aussi le champ manuel avec la valeur calculée
-    document.getElementById('p-dlc-manual').value = formatDateTimeLocal(dlcDate);
+  const now = new Date();
+  let dlcDate = null;
+  let fromDefault = false;
+  if (fiche && fiche.dlc_jours) {
+    dlcDate = new Date(now.getTime() + fiche.dlc_jours * 86400000);
+  } else if (fiche && fiche.dlc_heures) {
+    dlcDate = new Date(now.getTime() + fiche.dlc_heures * 3600000);
   } else {
-    dlcAutoDiv.style.display = 'none';
+    // Aucune DLC paramétrée sur la fiche → défaut +3 jours
+    dlcDate = new Date(now.getTime() + 3 * 86400000);
+    fromDefault = true;
   }
+  dlcAutoVal.textContent = dlcDate.toLocaleDateString('fr-FR', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+  }) + (fromDefault ? ' (défaut +3 j)' : '');
+  dlcAutoDiv.style.display = '';
+  // Pré-remplir aussi le champ manuel avec la valeur calculée
+  document.getElementById('p-dlc-manual').value = formatDateTimeLocal(dlcDate);
 }
 
 function formatDateTimeLocal(date) {
@@ -1554,18 +1554,19 @@ async function saveProduction() {
     const ficheId = ficheSelect.value || null;
     let fiche = ficheId ? allFiches.find(f => f.id === ficheId) : null;
 
-    // DLC : priorité au champ manuel, sinon calcul depuis la fiche
+    // DLC : priorité au champ manuel, sinon calcul depuis la fiche, sinon défaut +3 jours
     const now = new Date();
     let dlc = null;
     const dlcManualVal = document.getElementById('p-dlc-manual').value;
     if (dlcManualVal) {
       dlc = new Date(dlcManualVal).toISOString();
-    } else if (fiche) {
-      if (fiche.dlc_jours) {
-        dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
-      } else if (fiche.dlc_heures) {
-        dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
-      }
+    } else if (fiche && fiche.dlc_jours) {
+      dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
+    } else if (fiche && fiche.dlc_heures) {
+      dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
+    } else {
+      // Aucune DLC paramétrée (ou pas de fiche) → défaut +3 jours
+      dlc = new Date(now.getTime() + 3 * 86400000).toISOString();
     }
 
     // Code produit : code_court de la fiche, ou généré depuis le nom
