@@ -144,13 +144,13 @@
 
     .taf-grid {
       display: grid;
-      grid-template-columns: 72px 32px 32px 52px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: 72px 32px 32px 52px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -169,7 +169,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: 72px 32px 32px 52px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -733,6 +733,8 @@
   let tasks = [];
   let users = [];
   let predefinedTasks = [];
+  let planningToday = []; // [{ employe_nom, employe_initiales, equipe, heure_debut, heure_fin, service }]
+  let planningInitiales = new Set(); // Set of initiales (upper) présentes aujourd'hui
   let recurrences = [];
   let selectedPredefined = null;
   let selectedAssignee = null;
@@ -752,6 +754,14 @@
     return `<span class="day-name">${parts[0]}</span> ${parts.slice(1).join(' ')}`;
   }
   function userRole() { return ROLE_HIERARCHY[currentUser?.role] || 0; }
+
+  // Retourne la liste des users filtrée par le planning du jour.
+  // Si aucun planning n'est disponible, renvoie tous les users (fallback).
+  function usersPresentToday() {
+    if (!planningInitiales || planningInitiales.size === 0) return users;
+    return users.filter(u => planningInitiales.has((u.initiales || '').trim().toUpperCase()));
+  }
+  function hasPlanning() { return planningInitiales && planningInitiales.size > 0; }
   function canAssign() { return userRole() >= 2; } // responsable+
   function canManageRecurrences() { return userRole() >= 3; } // manager+
   function isAdmin() { return userRole() >= 4; }
@@ -765,6 +775,16 @@
 
   // ====== DB LAYER ======
   const DB = {
+    async getPlanning(dateFilter, etab) {
+      const ds = dateStr(dateFilter);
+      const { data, error } = await supabaseClient.from('planning_equipes')
+        .select('*')
+        .eq('date', ds)
+        .eq('etablissement', etab);
+      if (error) { console.warn('Planning load error', error); return []; }
+      return data || [];
+    },
+
     async getUsers(etab) {
       const { data } = await supabaseClient.from('users').select('*')
         .eq('actif', true).order('nom');
@@ -1080,12 +1100,19 @@
         await reportLateTasks();
       }
 
-      [tasks, users, predefinedTasks, recurrences] = await Promise.all([
+      [tasks, users, predefinedTasks, recurrences, planningToday] = await Promise.all([
         DB.getTasks(filterDate),
         DB.getUsers(currentEtablissement),
         DB.getPredefined(currentEtablissement),
-        DB.getRecurrences(currentEtablissement)
+        DB.getRecurrences(currentEtablissement),
+        DB.getPlanning(filterDate, currentEtablissement)
       ]);
+      // Construire le Set des initiales présentes aujourd'hui (upper case, trim)
+      planningInitiales = new Set(
+        (planningToday || [])
+          .map(p => (p.employe_initiales || '').trim().toUpperCase())
+          .filter(Boolean)
+      );
       // Generate recurring tasks for today
       await generateRecurringTasks();
       // Reload tasks after generation
@@ -1252,6 +1279,10 @@
             va = (a.attribue_a_nom || a.attribue_a_initiales || 'zzz').toLowerCase();
             vb = (b.attribue_a_nom || b.attribue_a_initiales || 'zzz').toLowerCase();
             return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          case 'categorie':
+            va = (a.categorie || 'zzz').toLowerCase();
+            vb = (b.categorie || 'zzz').toLowerCase();
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
           case 'tache':
             va = (a.tache || '').toLowerCase();
             vb = (b.tache || '').toLowerCase();
@@ -1350,6 +1381,7 @@
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
       <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
+      <span class="th-sort ${sa('categorie')}" onclick="toggleSort('categorie')">Catégorie<span class="sort-arrow">${arrow('categorie')}</span></span>
       <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
       <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
       <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
@@ -1386,9 +1418,9 @@
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
+        <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
         <div class="task-main">
           <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
-          ${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}
         </div>
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
@@ -1497,11 +1529,15 @@
   // ====== ASSIGN MODAL ======
   function showAssignModal(taskId) {
     const task = tasks.find(t => t.id === taskId);
-    // Group all users by equipe, task's equipe first
+    // Group users PRÉSENTS AU PLANNING by equipe, task's equipe first
     const taskEquipe = task?.equipe || '';
     const equipeOrder = [taskEquipe, ...EQUIPES.filter(e => e !== taskEquipe)];
     const grouped = {};
-    users.forEach(u => {
+    const presentList = usersPresentToday();
+    // S'assurer que l'attributaire actuel reste sélectionnable même s'il n'est pas au planning
+    const extra = (task?.attribue_a_id && !presentList.find(u => u.id === task.attribue_a_id))
+      ? users.filter(u => u.id === task.attribue_a_id) : [];
+    [...presentList, ...extra].forEach(u => {
       const eq = u.equipe || 'autre';
       if (!grouped[eq]) grouped[eq] = [];
       grouped[eq].push(u);
@@ -1524,9 +1560,10 @@
     });
 
     openModal('Attribuer la tâche', `
-      <p style="margin-bottom:8px;font-size:0.85rem;color:var(--gray-500)">
+      <p style="margin-bottom:4px;font-size:0.85rem;color:var(--gray-500)">
         ${esc(task?.tache)} — ${esc(taskEquipe.charAt(0).toUpperCase() + taskEquipe.slice(1))}
       </p>
+      ${hasPlanning() ? `<p style="margin-bottom:8px;font-size:0.72rem;color:var(--blue);font-style:italic">👥 ${presentList.length} collaborateur(s) présent(s) au planning</p>` : `<p style="margin-bottom:8px;font-size:0.72rem;color:var(--gray-400);font-style:italic">⚠ Aucun planning pour cette date</p>`}
       <div class="user-list-picker" style="max-height:300px;overflow-y:auto">
         <div class="user-pick-item" onclick="doAssignTask('${taskId}', null, null, null)" style="color:var(--gray-400);font-style:italic">
           Non attribuée
@@ -1571,11 +1608,15 @@
       { val: 4, label: '!!!! Urgente' }
     ];
 
-    // Build indexed user list for safe onclick
+    // Build indexed user list for safe onclick (présents au planning)
     editUsersList = [];
     const equipeOrder = [task.equipe || 'cuisine', ...EQUIPES.filter(e => e !== (task.equipe || 'cuisine'))];
     const grouped = {};
-    users.forEach(u => {
+    const presentList = usersPresentToday();
+    // Inclure l'attributaire actuel s'il n'est pas au planning
+    const extra = (task.attribue_a_id && !presentList.find(u => u.id === task.attribue_a_id))
+      ? users.filter(u => u.id === task.attribue_a_id) : [];
+    [...presentList, ...extra].forEach(u => {
       const eq = u.equipe || 'autre';
       if (!grouped[eq]) grouped[eq] = [];
       grouped[eq].push(u);
@@ -1780,8 +1821,8 @@
             <div class="user-list-picker" id="user-assign-list" style="display:none"></div>
           </div>
           <div id="assign-all-area" style="display:none">
-            <div class="all-team-badge">👥 <span id="assign-all-count">${users.length} collaborateur(s)</span></div>
-            <div style="font-size:0.75rem; color:var(--gray-400); margin-top:4px">1 tâche sera créée par collaborateur actif</div>
+            <div class="all-team-badge">👥 <span id="assign-all-count">${usersPresentToday().length} collaborateur(s) présent(s)</span></div>
+            <div style="font-size:0.75rem; color:var(--gray-400); margin-top:4px">${hasPlanning() ? '1 tâche sera créée par collaborateur présent au planning' : 'Aucun planning pour cette date — toutes les personnes actives seront prises'}</div>
           </div>
         </div>
         ` : ''}
@@ -1901,7 +1942,8 @@
     list.style.display = '';
     const s = (search || '').toLowerCase();
     const selectedEquipe = document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
-    const filtered = users.filter(u => !s || u.nom.toLowerCase().includes(s));
+    const present = usersPresentToday();
+    const filtered = present.filter(u => !s || u.nom.toLowerCase().includes(s));
     // Group by equipe, selected equipe first
     const equipeOrder = [selectedEquipe, ...EQUIPES.filter(e => e !== selectedEquipe)];
     const grouped = {};
@@ -1951,7 +1993,8 @@
       btn.classList.add('active');
       singleArea.style.display = 'none';
       allArea.style.display = '';
-      document.getElementById('assign-all-count').textContent = users.length + ' collaborateur(s)';
+      const present = usersPresentToday();
+      document.getElementById('assign-all-count').textContent = present.length + (hasPlanning() ? ' collaborateur(s) présent(s)' : ' collaborateur(s)');
       selectedAssignee = null;
       pickAssignee(null);
     } else {
@@ -1998,8 +2041,9 @@
       }
 
       if (assignToAll) {
-        // Créer 1 tâche par collaborateur actif
-        const tasksToInsert = users.map(u => ({
+        // Créer 1 tâche par collaborateur présent au planning (fallback: tous les actifs)
+        const targetUsers = usersPresentToday();
+        const tasksToInsert = targetUsers.map(u => ({
           ...baseData,
           attribue_a_id: u.id,
           attribue_a_nom: u.nom,
