@@ -847,6 +847,9 @@ function init() {
   setupIngredientForm();
   loadFiches();
   loadProductions();
+
+  // Initialise l'onglet actif (affiche notamment le bouton FAB +)
+  switchTab('fiches');
 }
 
 function logout() {
