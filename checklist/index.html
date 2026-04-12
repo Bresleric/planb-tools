@@ -810,6 +810,54 @@
         .ordre-badge.level-3 { background: #dbeafe; color: #1e40af; }
         .ordre-badge.level-4 { background: #ede9fe; color: #5b21b6; }
 
+        /* Items en attente de validation (cochés localement, pas encore enregistrés) */
+        .item-checkbox.pending {
+            background: #fb923c !important;
+            border-color: #ea580c !important;
+            color: white;
+            animation: pendingPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pendingPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0.3); }
+            50% { box-shadow: 0 0 0 6px rgba(249,115,22,0); }
+        }
+
+        /* Bouton flottant "Valider" */
+        #pending-validate-bar {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5000;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 700;
+            box-shadow: 0 6px 24px rgba(249,115,22,0.4);
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        #pending-validate-bar:active {
+            transform: translateX(-50%) scale(0.96);
+        }
+        #pending-validate-bar .pending-count {
+            display: inline-block;
+            background: white;
+            color: #ea580c;
+            font-weight: 800;
+            width: 26px;
+            height: 26px;
+            line-height: 26px;
+            border-radius: 50%;
+            text-align: center;
+            margin-right: 10px;
+            font-size: 0.9rem;
+        }
+
         .btn-small {
             background: var(--gray-100);
             border: none;
@@ -1210,6 +1258,11 @@
         </div>
     </div>
 
+    <!-- BOUTON FLOTTANT VALIDER -->
+    <button id="pending-validate-bar" onclick="validatePendingChecks()">
+        <span class="pending-count" id="pending-count-badge">0</span> Valider mes cochages
+    </button>
+
     <!-- PIN MODAL -->
     <div class="modal-overlay" id="pin-modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
       <div class="modal" style="background:white;border-radius:14px;padding:24px;width:90%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
@@ -1252,6 +1305,10 @@
         let currentChecklistForValidation = null;
         let currentHistoryDate = new Date().toISOString().split('T')[0];
         let validationRenderToken = 0;
+
+        // Cochages en attente : l'utilisateur coche librement (max 3), puis valide d'un coup
+        const MAX_PENDING_CHECKS = 3;
+        let pendingChecks = []; // [{ checklistId, itemId, frequence }]
 
         // Demo data
         const demoChecklists = [
@@ -1378,6 +1435,9 @@
 
         // ============ VALIDATION TAB ============
         async function loadValidation() {
+            // Vider les cochages en attente (changement de service, rechargement, etc.)
+            pendingChecks = [];
+            updatePendingBar();
             const myToken = ++validationRenderToken;
             const container = document.getElementById('validation-container');
             container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Chargement...</div></div>';
@@ -1571,10 +1631,20 @@
         async function toggleItem(event, checklistId, itemId, frequence) {
             event.stopPropagation();
             const checkbox = event.currentTarget;
-            const isCurrentlyChecked = checkbox.classList.contains('checked');
+            const isAlreadySaved = checkbox.classList.contains('checked');
+            const isPending = checkbox.classList.contains('pending');
 
-            if (isCurrentlyChecked) {
-                // Décochage : on demande le code PIN puis on confirme
+            if (isPending) {
+                // Retirer du panier en attente (l'utilisateur se ravise)
+                pendingChecks = pendingChecks.filter(p => p.itemId !== itemId);
+                checkbox.classList.remove('pending');
+                checkbox.textContent = '';
+                updatePendingBar();
+                return;
+            }
+
+            if (isAlreadySaved) {
+                // Décochage d'un item déjà enregistré : PIN requis
                 askPIN({
                     title: 'Décocher cet élément',
                     subtitle: 'Code personnel requis'
@@ -1582,62 +1652,122 @@
                     if (!validator) return;
                     uncheckItem(checklistId, itemId, frequence, validator);
                 });
+                return;
+            }
+
+            // Cochage libre (pas encore enregistré) → ajouter aux pending
+            if (pendingChecks.length >= MAX_PENDING_CHECKS) {
+                showCheckLimitMessage();
+                return;
+            }
+
+            pendingChecks.push({ checklistId, itemId, frequence });
+            checkbox.classList.add('pending');
+            checkbox.textContent = '✓';
+            updatePendingBar();
+        }
+
+        // Met à jour le bouton flottant "Valider mes cochages"
+        function updatePendingBar() {
+            const bar = document.getElementById('pending-validate-bar');
+            const badge = document.getElementById('pending-count-badge');
+            if (pendingChecks.length > 0) {
+                bar.style.display = 'block';
+                badge.textContent = pendingChecks.length;
             } else {
-                // Cochage : on demande le code PIN avant d'enregistrer
-                askPIN({
-                    title: 'Valider cet élément',
-                    subtitle: 'Code personnel requis'
-                }, (validator) => {
-                    if (!validator) return;
-                    checkItem(checklistId, itemId, frequence, validator);
-                });
+                bar.style.display = 'none';
             }
         }
 
-        async function checkItem(checklistId, itemId, frequence, validator) {
-            if (!validator) validator = currentUser;
+        // Validation groupée : PIN → enregistrement de tous les items en attente
+        function validatePendingChecks() {
+            if (pendingChecks.length === 0) return;
+
+            askPIN({
+                title: `Valider ${pendingChecks.length} élément${pendingChecks.length > 1 ? 's' : ''}`,
+                subtitle: 'Identifiez-vous pour enregistrer'
+            }, async (validator) => {
+                if (!validator) return;
+                await savePendingChecks(validator);
+            });
+        }
+
+        async function savePendingChecks(validator) {
             try {
                 const today = new Date().toISOString().split('T')[0];
-                let periode = today;
+                const saved = [];
 
-                if (frequence === 'hebdomadaire') {
-                    const d = new Date(today);
-                    d.setDate(d.getDate() - d.getDay() + 1);
-                    periode = d.toISOString().split('T')[0];
-                } else if (frequence === 'mensuelle') {
-                    periode = today.substring(0, 7);
+                for (const p of pendingChecks) {
+                    let periode = today;
+                    if (p.frequence === 'hebdomadaire') {
+                        const d = new Date(today);
+                        d.setDate(d.getDate() - d.getDay() + 1);
+                        periode = d.toISOString().split('T')[0];
+                    } else if (p.frequence === 'mensuelle') {
+                        periode = today.substring(0, 7);
+                    }
+
+                    if (isDemo) {
+                        saved.push(p);
+                        continue;
+                    }
+
+                    const { error } = await supabaseClient
+                        .from('checklist_completions')
+                        .upsert({
+                            checklist_id: p.checklistId,
+                            item_id: p.itemId,
+                            etablissement: currentEstablishment,
+                            periode: periode,
+                            service: currentService,
+                            valide_par_id: validator.id,
+                            valide_par_nom: validator.nom,
+                            valide_par_initiales: validator.initiales,
+                            valide_at: new Date().toISOString(),
+                            observation: null
+                        });
+
+                    if (error) {
+                        console.error('Error saving item:', p.itemId, error);
+                    } else {
+                        saved.push(p);
+                    }
                 }
 
-                if (isDemo) {
-                    showToast('✓ Item marqué comme complété', 'success');
-                    await new Promise(r => setTimeout(r, 500));
-                    loadValidation();
-                    return;
-                }
+                // Vider les pending et rafraîchir
+                pendingChecks = [];
+                updatePendingBar();
 
-                const { error } = await supabaseClient
-                    .from('checklist_completions')
-                    .upsert({
-                        checklist_id: checklistId,
-                        item_id: itemId,
-                        etablissement: currentEstablishment,
-                        periode: periode,
-                        service: currentService,
-                        valide_par_id: validator.id,
-                        valide_par_nom: validator.nom,
-                        valide_par_initiales: validator.initiales,
-                        valide_at: new Date().toISOString(),
-                        observation: null
-                    });
-
-                if (error) throw error;
-
-                showToast('✓ Élément marqué', 'success');
+                showToast(`✓ ${saved.length} élément${saved.length > 1 ? 's' : ''} validé${saved.length > 1 ? 's' : ''} par ${validator.initiales}`, 'success');
                 loadValidation();
             } catch (err) {
-                console.error('Error checking item:', err);
-                showToast('Erreur', 'error');
+                console.error('Error saving pending checks:', err);
+                showToast('Erreur lors de la validation', 'error');
             }
+        }
+
+        function showCheckLimitMessage() {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:10001;display:flex;align-items:center;justify-content:center;';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:white;border-radius:16px;padding:28px 24px;width:90%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;';
+            box.innerHTML = `
+                <div style="font-size:2.5rem;margin-bottom:10px;">🌟</div>
+                <div style="font-weight:700;font-size:1.1rem;color:#1f2937;margin-bottom:12px;">Impressionnant !</div>
+                <div style="font-size:0.92rem;color:#4b5563;line-height:1.5;margin-bottom:20px;">
+                    Vous êtes une personne exceptionnelle, mais 3 tâches d'un coup c'est déjà pas mal…<br><br>
+                    Revenez cocher les suivantes quand elles seront achevées ? Merci 🙏
+                </div>
+                <button id="check-limit-ok-btn" style="padding:12px 32px;border:none;background:#f97316;color:white;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;">C'est noté !</button>
+            `;
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+            box.querySelector('#check-limit-ok-btn').onclick = () => {
+                document.body.removeChild(overlay);
+            };
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) document.body.removeChild(overlay);
+            });
         }
 
         async function uncheckItem(checklistId, itemId, frequence, validator) {
