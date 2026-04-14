@@ -2456,13 +2456,13 @@ function printEtiquette(productionId) {
   // Remplacer complètement le document par une page minimale contenant UNIQUEMENT
   // l'étiquette. C'est la seule méthode fiable avec iOS Safari AirPrint, qui ignore
   // @page dans un iframe et paginait le contenu. Après impression, rechargement.
-  const fullDoc = printDoc.replace(
-    '</body>',
-    `<script>
-       window.onafterprint = function() { window.location.reload(); };
-       setTimeout(function() { window.print(); }, 300);
-     </script></body>`
-  );
+  // NB : on construit le tag script par concaténation pour éviter que le parser HTML
+  // de la page courante ne voie une balise de fermeture littérale et ferme le bloc trop tôt.
+  const scriptTag = '<' + 'script>' +
+    'window.onafterprint = function() { window.location.reload(); };' +
+    'setTimeout(function() { window.print(); }, 300);' +
+    '</' + 'script>';
+  const fullDoc = printDoc.replace('</body>', scriptTag + '</body>');
 
   document.open();
   document.write(fullDoc);
