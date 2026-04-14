@@ -2328,224 +2328,258 @@ function closeEtiquette() {
   if (el) el.remove();
 }
 
-function printEtiquette(productionId) {
+// ============= GÉNÉRATION ÉTIQUETTE CANVAS =============
+// Dessine l'étiquette sur un canvas à 300 DPI en orientation paysage
+// (90.3mm × 29mm => 1067 × 342 pixels). Brother iPrint&Label importe
+// correctement ce format.
+function drawEtiquetteCanvas(data) {
+  // DK-11201 : 29mm × 90.3mm. On dessine en PAYSAGE : long axe horizontal.
+  const DPI = 300;
+  const MM = DPI / 25.4;
+  const W = Math.round(90.3 * MM);  // 1067 px
+  const H = Math.round(29 * MM);     // 342 px
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Fond blanc
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  // Marge intérieure
+  const PAD = Math.round(4 * MM);
+  const INNER_W = W - PAD * 2;
+  const INNER_H = H - PAD * 2;
+
+  // === Mise en page : 2 zones verticales ===
+  // GAUCHE (55%) : jour + produit + établissement
+  // DROITE (45%) : lot, qté·initiales, prod, DLC
+  const SPLIT = Math.round(INNER_W * 0.55);
+  const LEFT_X = PAD;
+  const LEFT_W = SPLIT - Math.round(2 * MM);
+  const RIGHT_X = PAD + SPLIT + Math.round(2 * MM);
+  const RIGHT_W = INNER_W - SPLIT - Math.round(2 * MM);
+
+  // Séparateur vertical
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = Math.max(1, Math.round(1 * MM * 0.4));
+  ctx.beginPath();
+  ctx.moveTo(PAD + SPLIT, PAD + Math.round(2 * MM));
+  ctx.lineTo(PAD + SPLIT, H - PAD - Math.round(2 * MM));
+  ctx.stroke();
+
+  // === COLONNE GAUCHE ===
+  let y = PAD + Math.round(2 * MM);
+  const fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+  // Badge jour de la semaine
+  const dayFontSize = Math.round(10 * MM);  // ~28pt
+  ctx.font = `900 ${dayFontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const dayTxt = data.dayName;
+  const dayBoxH = dayFontSize + Math.round(3 * MM);
+  const dayBoxY = y;
+  if (data.dayIsRed) {
+    // Bordure rouge, texte rouge
+    ctx.strokeStyle = '#d00000';
+    ctx.lineWidth = Math.round(0.6 * MM);
+    const rx = Math.round(1.5 * MM);
+    roundRect(ctx, LEFT_X, dayBoxY, LEFT_W, dayBoxH, rx);
+    ctx.stroke();
+    ctx.fillStyle = '#d00000';
+  } else {
+    // Fond noir, texte blanc
+    ctx.fillStyle = '#000000';
+    const rx = Math.round(1.5 * MM);
+    roundRect(ctx, LEFT_X, dayBoxY, LEFT_W, dayBoxH, rx);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+  }
+  ctx.fillText(dayTxt, LEFT_X + LEFT_W / 2, dayBoxY + Math.round(1.5 * MM));
+  y = dayBoxY + dayBoxH + Math.round(3 * MM);
+
+  // Nom du produit (multi-lignes, auto-fit)
+  ctx.fillStyle = '#000000';
+  const productMaxH = Math.round(10 * MM);
+  const productLines = wrapText(ctx, data.produit, LEFT_W, Math.round(8 * MM), fontFamily, '800', 2);
+  const lineH = productLines.size * 1.1;
+  productLines.lines.forEach((line, i) => {
+    ctx.font = `800 ${productLines.size}px ${fontFamily}`;
+    ctx.fillText(line, LEFT_X + LEFT_W / 2, y + i * lineH);
+  });
+  y += productLines.lines.length * lineH + Math.round(2 * MM);
+
+  // Établissement (au bas de la colonne gauche)
+  const etabFont = Math.round(7 * MM);
+  ctx.font = `800 ${etabFont}px ${fontFamily}`;
+  ctx.fillStyle = '#000000';
+  const etabY = H - PAD - Math.round(3 * MM) - etabFont;
+  ctx.fillText(data.etab, LEFT_X + LEFT_W / 2, etabY);
+
+  // === COLONNE DROITE ===
+  let ry = PAD + Math.round(2 * MM);
+
+  // Lot
+  const lotFont = Math.round(5 * MM);
+  ctx.font = `700 ${lotFont}px 'Courier New', monospace`;
+  ctx.fillStyle = '#000000';
+  ctx.fillText('Lot:' + data.lot, RIGHT_X + RIGHT_W / 2, ry);
+  ry += lotFont + Math.round(2 * MM);
+
+  // Quantité + initiales
+  const qteFont = Math.round(6 * MM);
+  ctx.font = `700 ${qteFont}px ${fontFamily}`;
+  ctx.fillText(data.qteInit, RIGHT_X + RIGHT_W / 2, ry);
+  ry += qteFont + Math.round(2 * MM);
+
+  // Date de production
+  const prodFont = Math.round(4.5 * MM);
+  ctx.font = `600 ${prodFont}px ${fontFamily}`;
+  ctx.fillText('Prod: ' + data.prodDate, RIGHT_X + RIGHT_W / 2, ry);
+  ry += prodFont + Math.round(2 * MM);
+
+  // DLC (rouge, séparée par une ligne)
+  const dlcLineY = H - PAD - Math.round(9 * MM);
+  ctx.strokeStyle = '#d00000';
+  ctx.lineWidth = Math.round(0.6 * MM);
+  ctx.beginPath();
+  ctx.moveTo(RIGHT_X, dlcLineY);
+  ctx.lineTo(RIGHT_X + RIGHT_W, dlcLineY);
+  ctx.stroke();
+
+  ctx.fillStyle = '#d00000';
+  const dlcLabelFont = Math.round(3.5 * MM);
+  ctx.font = `700 ${dlcLabelFont}px ${fontFamily}`;
+  ctx.fillText('DLC', RIGHT_X + RIGHT_W / 2, dlcLineY + Math.round(1 * MM));
+  const dlcFont = Math.round(5.5 * MM);
+  ctx.font = `900 ${dlcFont}px ${fontFamily}`;
+  ctx.fillText(data.dlc, RIGHT_X + RIGHT_W / 2, dlcLineY + Math.round(1 * MM) + dlcLabelFont + Math.round(0.5 * MM));
+
+  return canvas;
+}
+
+// Helper : rectangle à coins arrondis
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// Helper : retour à la ligne et auto-fit du texte
+function wrapText(ctx, text, maxWidth, maxFontSize, fontFamily, weight, maxLines) {
+  let size = maxFontSize;
+  while (size > maxFontSize * 0.5) {
+    ctx.font = `${weight} ${size}px ${fontFamily}`;
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let current = '';
+    for (const w of words) {
+      const test = current ? current + ' ' + w : w;
+      if (ctx.measureText(test).width <= maxWidth) {
+        current = test;
+      } else {
+        if (current) lines.push(current);
+        current = w;
+      }
+    }
+    if (current) lines.push(current);
+    if (lines.length <= maxLines) {
+      return { lines, size };
+    }
+    size = Math.round(size * 0.9);
+  }
+  ctx.font = `${weight} ${size}px ${fontFamily}`;
+  return { lines: [String(text || '')], size };
+}
+
+async function printEtiquette(productionId) {
   const production = allProductions.find(p => p.id === productionId);
   if (!production) { showToast('Production introuvable', 'error'); return; }
 
   const lot = allLots.find(l => l.id === production.lot_id);
   const lotNum = lot?.numero_lot || '—';
-  const etabNames = { freddy: 'FR', liesel: 'LI' };
-  const etabShort = etabNames[currentEtablissement] || currentEtablissement.substring(0, 2).toUpperCase();
+  const etabNames = { freddy: 'FREDDY', liesel: 'LIESEL' };
+  const etabShort = etabNames[currentEtablissement] || currentEtablissement.toUpperCase();
 
   const prodDate = new Date(production.date_production || production.created_at);
   const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
   const dayName = JOURS[prodDate.getDay()];
-  const dayClass = prodDate.getDay() % 2 === 0 ? 'day-red' : 'day-black';
+  const dayIsRed = prodDate.getDay() % 2 === 0;
   const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
   let dlcStr = '—';
   if (production.dlc) {
     const dlcDate = new Date(production.dlc);
-    dlcStr = dlcDate.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' });
+    dlcStr = dlcDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   }
 
   const qte = production.quantite_produite ?? '';
   const unite = production.unite || '';
   const producteur = production.producteur_initiales || '—';
-  const produitEsc = escapeHtml(production.nom_produit || '');
+  const qteInit = `${qte}${unite} · ${producteur}`;
 
-  // ===== IMPRESSION VIA IFRAME CACHÉ =====
-  // Le document principal n'est JAMAIS remplacé : le user gesture est préservé
-  // (pas de popup iOS "L'impression automatique n'est pas autorisée").
-  // Le contenu de l'étiquette est écrit dans un iframe isolé, ses styles ne sont
-  // pas pollués par la page Production, et on appelle print() sur son contentWindow.
+  // Générer l'étiquette sur canvas
+  const canvas = drawEtiquetteCanvas({
+    dayName,
+    dayIsRed,
+    produit: production.nom_produit || '',
+    etab: etabShort,
+    lot: lotNum,
+    qteInit,
+    prodDate: prodDateStr,
+    dlc: dlcStr,
+  });
 
-  const printDoc = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=235, initial-scale=1">
-<title> </title>
-<style>
-  @page { size: 29mm 90.3mm; margin: 0; }
-  * { box-sizing: border-box; min-width: 0; }
-  html, body {
-    margin: 0 !important; padding: 0 !important;
-    background: #f3f4f6; color: #000;
-    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  @media screen {
-    body {
-      min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: flex-start;
-      padding: 20px;
-    }
-    .screen-wrap {
-      max-width: 480px; width: 100%; display: flex;
-      flex-direction: column; align-items: center; gap: 20px;
-    }
-    .screen-wrap h1 {
-      font-size: 1.1rem; color: #374151; margin: 0;
-      font-weight: 600; text-align: center;
-    }
-    .preview-frame {
-      background: white; border: 2px dashed #9ca3af;
-      padding: 4mm; border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .screen-actions {
-      display: flex; gap: 10px; width: 100%;
-      flex-direction: column;
-    }
-    .screen-btn {
-      padding: 16px 20px; border: 0; border-radius: 10px;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .screen-btn.print { background: #9333ea; color: white; }
-    .screen-btn.back { background: #e5e7eb; color: #374151; }
-    .screen-hint { font-size: 0.85rem; color: #6b7280; text-align: center; }
-  }
-  /* Impression : masquer tout via visibility + sortir .label du flow via fixed.
-     Visibility préserve le DOM tree (pour atteindre .label), fixed le découple du body. */
-  @media print {
-    html, body {
-      width: 29mm !important; height: 90.3mm !important;
-      min-width: 0 !important; min-height: 0 !important;
-      max-width: 29mm !important; max-height: 90.3mm !important;
-      margin: 0 !important; padding: 0 !important;
-      background: white !important;
-      overflow: hidden !important;
-    }
-    body { display: block !important; }
-    body * { visibility: hidden !important; }
-    .screen-wrap, .preview-frame {
-      display: block !important; padding: 0 !important; margin: 0 !important;
-      border: 0 !important; background: transparent !important;
-      width: auto !important; height: auto !important;
-    }
-    .label, .label * { visibility: visible !important; }
-    .label {
-      display: flex !important;
-      position: fixed !important;
-      top: 0 !important; left: 0 !important;
-      width: 29mm !important; height: 90.3mm !important;
-      margin: 0 !important;
-      background: white !important;
-      page-break-inside: avoid !important;
-      page-break-after: avoid !important;
-    }
-  }
-  /* ÉTIQUETTE PORTRAIT 29mm × 90.3mm (DK-11201 Standard Address Label) */
-  .label {
-    width: 29mm; height: 90.3mm;
-    max-width: 29mm; max-height: 90.3mm;
-    padding: 3mm 2mm;
-    position: relative;
-    overflow: hidden;
-    display: flex; flex-direction: column;
-  }
-  .label * { margin: 0; padding: 0; }
-  .lbl-day {
-    font-size: 14pt; font-weight: 900; text-transform: uppercase;
-    padding: 1.5mm 0; letter-spacing: 1px;
-    text-align: center; white-space: nowrap;
-    border-radius: 1.5mm; margin-bottom: 2.5mm;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
-  .lbl-day.day-red { color: #d00; border: 0.6mm solid #d00; }
-  .lbl-day.day-black { color: white; background: #000; }
-  .lbl-product {
-    font-size: 15pt; font-weight: 800; color: #000;
-    line-height: 1.1; text-align: center;
-    overflow: hidden; word-wrap: break-word;
-    margin-bottom: 2.5mm;
-  }
-  .lbl-etab {
-    font-size: 12pt; font-weight: 800; color: #000;
-    text-align: center; margin-bottom: 3mm;
-    border-bottom: 0.5mm solid #000; padding-bottom: 2mm;
-  }
-  .lbl-lot {
-    font-size: 10pt; font-weight: 700;
-    font-family: 'Courier New', monospace;
-    text-align: center; white-space: nowrap;
-    margin-bottom: 2mm;
-  }
-  .lbl-meta {
-    font-size: 12pt; color: #000; font-weight: 700;
-    text-align: center; line-height: 1.3;
-    margin-bottom: 2mm;
-  }
-  .lbl-prod {
-    font-size: 10pt; color: #000; font-weight: 600;
-    text-align: center; margin-bottom: 1.5mm;
-    margin-top: auto;
-  }
-  .lbl-dlc {
-    font-size: 14pt; font-weight: 900; color: #d00;
-    text-align: center; white-space: nowrap;
-    border-top: 0.6mm solid #d00;
-    padding-top: 1.5mm;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
-  .lbl-dlc small { font-size: 8pt; display: block; font-weight: 700; margin-bottom: 0.5mm; }
-</style>
-</head>
-<body>
-  <div class="screen-wrap">
-    <div class="preview-frame">
-      <div class="label">
-        <div class="lbl-day ${dayClass}">${dayName}</div>
-        <div class="lbl-product">${produitEsc}</div>
-        <div class="lbl-etab">${etabShort}</div>
-        <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
-        <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
-        <div class="lbl-prod">Prod: ${prodDateStr}</div>
-        <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
-      </div>
-    </div>
-    <div class="screen-hint">Impression en cours… Si rien ne se passe, touchez le bouton ci-dessous.</div>
-    <div class="screen-actions">
-      <button class="screen-btn print" onclick="window.print()">🖨 Réimprimer</button>
-      <button class="screen-btn back" onclick="history.back()">← Retour aux productions</button>
-    </div>
-  </div>
-</body>
-</html>`;
+  // Convertir en Blob PNG
+  canvas.toBlob(async (blob) => {
+    if (!blob) { showToast('Erreur génération étiquette', 'error'); return; }
 
-  // Marquer comme imprimée (async, non bloquant)
-  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+    const safeLot = String(lotNum).replace(/[^\w-]/g, '_');
+    const filename = `etiquette-${safeLot}.png`;
+    const file = new File([blob], filename, { type: 'image/png' });
 
-  // Nettoyer un éventuel iframe précédent
-  const old = document.getElementById('print-iframe');
-  if (old) old.remove();
+    DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  // Créer iframe caché et y écrire le HTML de l'étiquette
-  const iframe = document.createElement('iframe');
-  iframe.id = 'print-iframe';
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
-  document.body.appendChild(iframe);
+    // Essayer Web Share API (iOS 15+) : ouvre la feuille de partage iOS
+    // → l'utilisateur choisit "Brother iPrint&Label" et l'app ouvre l'image
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Étiquette production',
+          text: production.nom_produit || '',
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return; // Utilisateur a annulé
+        console.error('Partage échoué:', err);
+        // Fallback : téléchargement
+      }
+    }
 
-  const idoc = iframe.contentDocument || iframe.contentWindow.document;
-  idoc.open();
-  idoc.write(printDoc);
-  idoc.close();
-
-  // Appel SYNCHRONE dans la chaîne du user gesture : iOS accepte sans popup
-  // parce que le document principal n'a PAS été remplacé.
-  iframe.contentWindow.focus();
-  iframe.contentWindow.print();
-
-  // Nettoyer l'iframe après impression
-  setTimeout(() => {
-    const el = document.getElementById('print-iframe');
-    if (el) el.remove();
-  }, 30000);
+    // Fallback : télécharger l'image (sur iPad : "Enregistrer dans Fichiers" puis
+    // ouvrir depuis Brother iPrint&Label)
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast('Étiquette téléchargée', 'success');
+  }, 'image/png');
 }
 
 async function markEtiquetteOk(productionId) {
