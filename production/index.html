@@ -2376,32 +2376,34 @@ function printEtiquette(productionId) {
     body {
       min-height: 100vh;
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
+      align-items: center; justify-content: flex-start;
       padding: 20px;
     }
     .screen-wrap {
       max-width: 480px; width: 100%; display: flex;
-      flex-direction: column; align-items: center; gap: 16px;
+      flex-direction: column; align-items: center; gap: 20px;
     }
     .screen-wrap h1 {
-      font-size: 1rem; color: #374151; margin: 0;
+      font-size: 1.1rem; color: #374151; margin: 0;
       font-weight: 600; text-align: center;
     }
     .preview-frame {
       background: white; border: 2px dashed #9ca3af;
       padding: 4mm; border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .screen-actions {
       display: flex; gap: 10px; width: 100%;
       flex-direction: column;
     }
     .screen-btn {
-      padding: 14px 20px; border: 0; border-radius: 10px;
+      padding: 16px 20px; border: 0; border-radius: 10px;
       font-size: 1rem; font-weight: 600; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
     .screen-btn.print { background: #9333ea; color: white; }
     .screen-btn.back { background: #e5e7eb; color: #374151; }
+    .screen-hint { font-size: 0.85rem; color: #6b7280; text-align: center; }
   }
   /* Impression : masquer tout via visibility + sortir .label du flow via fixed.
      Visibility préserve le DOM tree (pour atteindre .label), fixed le découple du body. */
@@ -2444,54 +2446,53 @@ function printEtiquette(productionId) {
   }
   .label * { margin: 0; padding: 0; }
   .lbl-day {
-    font-size: 7pt; font-weight: 900; text-transform: uppercase;
-    padding: 0.6mm 0; letter-spacing: 0.5px;
+    font-size: 11pt; font-weight: 900; text-transform: uppercase;
+    padding: 1mm 0; letter-spacing: 0.8px;
     text-align: center; white-space: nowrap;
-    border-radius: 0.8mm; margin-bottom: 1mm;
+    border-radius: 1mm; margin-bottom: 1.5mm;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .lbl-day.day-red { color: #d00; border: 0.3mm solid #d00; }
+  .lbl-day.day-red { color: #d00; border: 0.5mm solid #d00; }
   .lbl-day.day-black { color: white; background: #000; }
   .lbl-product {
-    font-size: 8pt; font-weight: 800; color: #000;
+    font-size: 12pt; font-weight: 800; color: #000;
     line-height: 1.15; text-align: center;
     overflow: hidden; word-wrap: break-word;
-    margin-bottom: 1mm;
+    margin-bottom: 1.5mm;
   }
   .lbl-etab {
-    font-size: 6pt; font-weight: 800; color: #000;
-    text-align: center; margin-bottom: 1.5mm;
-    border-bottom: 0.3mm solid #000; padding-bottom: 1mm;
+    font-size: 9pt; font-weight: 800; color: #000;
+    text-align: center; margin-bottom: 2mm;
+    border-bottom: 0.4mm solid #000; padding-bottom: 1.2mm;
   }
   .lbl-lot {
-    font-size: 6pt; font-weight: 700;
+    font-size: 8pt; font-weight: 700;
     font-family: 'Courier New', monospace;
     text-align: center; white-space: nowrap;
-    margin-bottom: 0.8mm;
+    margin-bottom: 1mm;
   }
   .lbl-meta {
-    font-size: 6pt; color: #000;
+    font-size: 9pt; color: #000; font-weight: 700;
     text-align: center; line-height: 1.3;
     margin-bottom: 1mm;
   }
   .lbl-prod {
-    font-size: 6pt; color: #000;
-    text-align: center; margin-bottom: 0.5mm;
+    font-size: 8pt; color: #000; font-weight: 600;
+    text-align: center; margin-bottom: 0.8mm;
     margin-top: auto;
   }
   .lbl-dlc {
-    font-size: 8pt; font-weight: 900; color: #d00;
+    font-size: 12pt; font-weight: 900; color: #d00;
     text-align: center; white-space: nowrap;
-    border-top: 0.3mm solid #d00;
-    padding-top: 0.8mm;
+    border-top: 0.5mm solid #d00;
+    padding-top: 1mm;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .lbl-dlc small { font-size: 5pt; display: block; font-weight: 700; }
+  .lbl-dlc small { font-size: 7pt; display: block; font-weight: 700; }
 </style>
 </head>
 <body>
   <div class="screen-wrap">
-    <h1>Aperçu étiquette — DK-11209 (29×62mm)</h1>
     <div class="preview-frame">
       <div class="label">
         <div class="lbl-day ${dayClass}">${dayName}</div>
@@ -2503,9 +2504,10 @@ function printEtiquette(productionId) {
         <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
       </div>
     </div>
+    <div class="screen-hint">Impression en cours… Si rien ne se passe, touchez le bouton ci-dessous.</div>
     <div class="screen-actions">
-      <button class="screen-btn print" onclick="window.print()">🖨 Imprimer l'étiquette</button>
-      <button class="screen-btn back" onclick="history.back()">← Retour</button>
+      <button class="screen-btn print" onclick="window.print()">🖨 Réimprimer</button>
+      <button class="screen-btn back" onclick="history.back()">← Retour aux productions</button>
     </div>
   </div>
 </body>
@@ -2514,12 +2516,15 @@ function printEtiquette(productionId) {
   // Marquer comme imprimée AVANT de remplacer le document (la requête persiste).
   DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  // Remplacer complètement le document par une page minimale contenant l'étiquette
-  // et un bouton "Imprimer". L'utilisateur déclenche lui-même l'impression et
-  // revient avec history.back() — évite la race condition du popup "autoriser" iOS.
+  // Remplacer complètement le document par une page minimale contenant l'étiquette,
+  // puis déclencher l'impression SYNCHRONEMENT dans le même user gesture que le clic
+  // initial (bouton "Imprimer" du modal) — iOS Safari accepte window.print() sans
+  // popup "autoriser" si la chaîne d'événement utilisateur n'est pas brisée.
   document.open();
   document.write(printDoc);
   document.close();
+  // Appel sync : pas de setTimeout, pas d'await — le user gesture reste actif.
+  window.print();
 }
 
 async function markEtiquetteOk(productionId) {
