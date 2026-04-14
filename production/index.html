@@ -2450,41 +2450,23 @@ function printEtiquette(productionId) {
 </body>
 </html>`;
 
-  // Supprimer tout iframe d'impression précédent
-  document.querySelectorAll('iframe.print-frame').forEach(f => f.remove());
+  // Marquer comme imprimée AVANT de remplacer le document (la requête persiste).
+  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  // Créer l'iframe dimensionné aux dimensions exactes de l'étiquette (62×29mm)
-  // Positionné hors-écran mais avec visibilité réelle pour que Safari le rende correctement.
-  const iframe = document.createElement('iframe');
-  iframe.className = 'print-frame';
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed; left:-10000px; top:0; width:62mm; height:29mm; border:0;';
-  document.body.appendChild(iframe);
+  // Remplacer complètement le document par une page minimale contenant UNIQUEMENT
+  // l'étiquette. C'est la seule méthode fiable avec iOS Safari AirPrint, qui ignore
+  // @page dans un iframe et paginait le contenu. Après impression, rechargement.
+  const fullDoc = printDoc.replace(
+    '</body>',
+    `<script>
+       window.onafterprint = function() { window.location.reload(); };
+       setTimeout(function() { window.print(); }, 300);
+     </script></body>`
+  );
 
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open();
-  doc.write(printDoc);
-  doc.close();
-
-  const doPrint = () => {
-    try {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
-    } catch (e) {
-      console.error('Erreur impression:', e);
-      showToast('Erreur impression', 'error');
-    }
-    // Nettoyer l'iframe après un délai
-    setTimeout(() => iframe.remove(), 3000);
-  };
-
-  if (iframe.contentDocument.readyState === 'complete') {
-    setTimeout(doPrint, 250);
-  } else {
-    iframe.onload = () => setTimeout(doPrint, 250);
-    setTimeout(doPrint, 700); // Fallback
-  }
+  document.open();
+  document.write(fullDoc);
+  document.close();
 }
 
 async function markEtiquetteOk(productionId) {
