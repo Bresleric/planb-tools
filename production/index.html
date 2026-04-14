@@ -2570,15 +2570,13 @@ async function printEtiquette(productionId) {
     dlcDay,
   });
 
-  // === IMPRESSION DIRECTE via iframe caché ===
-  // On injecte un iframe contenant une page HTML avec :
-  //  - @page { size: 62mm 29mm; margin: 0 } pour forcer la taille exacte
-  //  - <img> pleine page (62mm × 29mm, object-fit: fill) pour remplir l'étiquette
-  // iOS AirPrint va ouvrir le dialogue d'impression directement sur l'iframe,
-  // sans passer par la feuille de partage (1 clic au lieu de 4).
+  // === IMPRESSION DIRECTE via iframe caché + SVG ===
+  // iOS Safari rend les <img> de manière aléatoire en impression, mais respecte
+  // toujours les SVG (vectoriel). On embarque le PNG du canvas dans une balise
+  // <image> SVG dont le conteneur <svg> a des dimensions physiques explicites
+  // (width="62mm" height="29mm"). iOS honore ces mm et remplit l'étiquette.
   const dataURL = canvas.toDataURL('image/png');
 
-  // Supprime un éventuel iframe précédent
   const oldFrame = document.getElementById('print-label-frame');
   if (oldFrame) oldFrame.remove();
 
@@ -2588,6 +2586,15 @@ async function printEtiquette(productionId) {
   iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:80mm;height:40mm;border:0;opacity:0;pointer-events:none;';
   document.body.appendChild(iframe);
 
+  const svgStr =
+    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+    'width="62mm" height="29mm" viewBox="0 0 ' + canvas.width + ' ' + canvas.height + '" ' +
+    'preserveAspectRatio="none">' +
+    '<image xlink:href="' + dataURL + '" x="0" y="0" ' +
+    'width="' + canvas.width + '" height="' + canvas.height + '" ' +
+    'preserveAspectRatio="none"/>' +
+    '</svg>';
+
   const idoc = iframe.contentDocument || iframe.contentWindow.document;
   idoc.open();
   idoc.write(
@@ -2596,17 +2603,17 @@ async function printEtiquette(productionId) {
     '@page { size: 62mm 29mm; margin: 0; }' +
     '@media print { @page { size: 62mm 29mm; margin: 0; } html, body { margin:0; padding:0; } }' +
     '* { margin:0; padding:0; box-sizing:border-box; }' +
-    'html, body { width: 62mm; height: 29mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
-    'img { display:block; width: 62mm; height: 29mm; margin:0; padding:0; object-fit: fill; }' +
+    'html, body { width:62mm; height:29mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
+    'svg { display:block; width:62mm; height:29mm; margin:0; padding:0; }' +
     '</style></head><body>' +
-    '<img id="lbl" src="' + dataURL + '">' +
+    svgStr +
     '</body></html>'
   );
   idoc.close();
 
   DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  // Lance l'impression dès que l'image est chargée (data URL : quasi-instantané)
+  // Lance l'impression — le SVG est inline, pas de chargement réseau à attendre
   const doPrint = () => {
     try {
       iframe.contentWindow.focus();
@@ -2616,17 +2623,8 @@ async function printEtiquette(productionId) {
       showToast('Erreur impression : ' + e.message, 'error');
     }
   };
-  const img = idoc.getElementById('lbl');
-  if (img && img.complete && img.naturalWidth > 0) {
-    doPrint();
-  } else if (img) {
-    img.addEventListener('load', doPrint, { once: true });
-    img.addEventListener('error', () => {
-      showToast('Erreur chargement étiquette', 'error');
-    }, { once: true });
-  } else {
-    doPrint();
-  }
+  // Laisse le temps à l'iframe d'exécuter le layout
+  setTimeout(doPrint, 50);
 }
 
 async function markEtiquetteOk(productionId) {
