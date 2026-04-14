@@ -497,77 +497,91 @@
     .dlc-stat-dep { background: #fef2f2; }
     .dlc-stat-dep .num { color: #dc2626; }
 
-    /* ============ IMPRESSION ÉTIQUETTE DK-11209 (29×62mm) ============
+    /* ============ IMPRESSION ÉTIQUETTE DK-11209 PAYSAGE (62×29mm) ============
        Règles dans le document principal pour éviter document.write (qui casse
        la chaîne de user gesture iOS et déclenche le popup "autoriser"). */
-    @page etiquette { size: 29mm 62mm; margin: 0; }
+    @page etiquette { size: 62mm 29mm; margin: 0; }
     #print-label-host {
       position: fixed; left: -9999px; top: -9999px;
-      width: 29mm; height: 62mm; background: white;
+      width: 62mm; height: 29mm; background: white;
       font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
       color: #000;
     }
     #print-label-host.printing { left: 0; top: 0; z-index: 99999; }
     #print-label-host .lbl-inner {
-      width: 29mm; height: 62mm;
-      padding: 2mm 1.5mm;
+      width: 62mm; height: 29mm;
+      padding: 1.5mm 2mm;
       box-sizing: border-box;
-      display: flex; flex-direction: column;
+      display: flex; flex-direction: row;
+      gap: 2mm;
       overflow: hidden;
     }
     #print-label-host .lbl-inner * { margin: 0; padding: 0; }
+    #print-label-host .lbl-col-left {
+      flex: 1 1 58%;
+      display: flex; flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+    #print-label-host .lbl-col-right {
+      flex: 0 0 38%;
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      border-left: 0.4mm solid #000;
+      padding-left: 1.5mm;
+      min-width: 0;
+    }
     #print-label-host .lbl-day {
-      font-size: 11pt; font-weight: 900; text-transform: uppercase;
-      padding: 1mm 0; letter-spacing: 0.8px;
+      font-size: 10pt; font-weight: 900; text-transform: uppercase;
+      padding: 0.5mm 1mm; letter-spacing: 0.5px;
       text-align: center; white-space: nowrap;
-      border-radius: 1mm; margin-bottom: 1.5mm;
+      border-radius: 1mm; margin-bottom: 1mm;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    #print-label-host .lbl-day.day-red { color: #d00; border: 0.5mm solid #d00; }
+    #print-label-host .lbl-day.day-red { color: #d00; border: 0.4mm solid #d00; }
     #print-label-host .lbl-day.day-black { color: white; background: #000; }
     #print-label-host .lbl-product {
-      font-size: 12pt; font-weight: 800; line-height: 1.15;
-      text-align: center; word-wrap: break-word; margin-bottom: 1.5mm;
+      font-size: 11pt; font-weight: 800; line-height: 1.1;
+      text-align: center; word-wrap: break-word;
     }
     #print-label-host .lbl-etab {
       font-size: 9pt; font-weight: 800; text-align: center;
-      margin-bottom: 2mm; border-bottom: 0.4mm solid #000; padding-bottom: 1.2mm;
+      margin-top: 0.8mm;
     }
     #print-label-host .lbl-lot {
-      font-size: 8pt; font-weight: 700;
+      font-size: 7pt; font-weight: 700;
       font-family: 'Courier New', monospace;
-      text-align: center; white-space: nowrap; margin-bottom: 1mm;
+      text-align: center; white-space: nowrap;
     }
     #print-label-host .lbl-meta {
-      font-size: 9pt; font-weight: 700; text-align: center;
-      line-height: 1.3; margin-bottom: 1mm;
+      font-size: 8pt; font-weight: 700; text-align: center;
+      line-height: 1.2;
     }
     #print-label-host .lbl-prod {
-      font-size: 8pt; font-weight: 600; text-align: center;
-      margin-bottom: 0.8mm; margin-top: auto;
+      font-size: 7pt; font-weight: 600; text-align: center;
     }
     #print-label-host .lbl-dlc {
-      font-size: 12pt; font-weight: 900; color: #d00;
+      font-size: 10pt; font-weight: 900; color: #d00;
       text-align: center; white-space: nowrap;
-      border-top: 0.5mm solid #d00; padding-top: 1mm;
+      border-top: 0.4mm solid #d00; padding-top: 0.5mm;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    #print-label-host .lbl-dlc small { font-size: 7pt; display: block; font-weight: 700; }
+    #print-label-host .lbl-dlc small { font-size: 6pt; display: block; font-weight: 700; }
 
     @media print {
       /* Masquer toute l'UI de la page Production */
       body > *:not(#print-label-host) { display: none !important; visibility: hidden !important; }
       body { background: white !important; margin: 0 !important; padding: 0 !important; }
       html, body {
-        width: 29mm !important; height: 62mm !important;
+        width: 62mm !important; height: 29mm !important;
         min-width: 0 !important; min-height: 0 !important;
-        max-width: 29mm !important; max-height: 62mm !important;
+        max-width: 62mm !important; max-height: 29mm !important;
         overflow: hidden !important;
       }
       #print-label-host {
         display: block !important; visibility: visible !important;
         position: fixed !important; left: 0 !important; top: 0 !important;
-        width: 29mm !important; height: 62mm !important;
+        width: 62mm !important; height: 29mm !important;
         z-index: 99999 !important;
         page: etiquette;
         page-break-inside: avoid !important; page-break-after: avoid !important;
@@ -2444,13 +2458,17 @@ function printEtiquette(productionId) {
   host.id = 'print-label-host';
   host.innerHTML = `
     <div class="lbl-inner">
-      <div class="lbl-day ${dayClass}">${dayName}</div>
-      <div class="lbl-product">${produitEsc}</div>
-      <div class="lbl-etab">${etabShort}</div>
-      <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
-      <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
-      <div class="lbl-prod">Prod: ${prodDateStr}</div>
-      <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
+      <div class="lbl-col-left">
+        <div class="lbl-day ${dayClass}">${dayName}</div>
+        <div class="lbl-product">${produitEsc}</div>
+        <div class="lbl-etab">${etabShort}</div>
+      </div>
+      <div class="lbl-col-right">
+        <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
+        <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
+        <div class="lbl-prod">Prod: ${prodDateStr}</div>
+        <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
+      </div>
     </div>
   `;
   document.body.appendChild(host);
