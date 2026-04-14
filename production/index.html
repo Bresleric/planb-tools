@@ -2367,13 +2367,52 @@ function printEtiquette(productionId) {
   * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0 !important; padding: 0 !important;
-    width: 62mm !important; height: 29mm !important;
-    max-width: 62mm !important; max-height: 29mm !important;
-    overflow: hidden !important;
-    background: white; color: #000;
+    background: #f3f4f6; color: #000;
     font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  @media screen {
+    body {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .screen-wrap {
+      max-width: 480px; width: 100%; display: flex;
+      flex-direction: column; align-items: center; gap: 16px;
+    }
+    .screen-wrap h1 {
+      font-size: 1rem; color: #374151; margin: 0;
+      font-weight: 600; text-align: center;
+    }
+    .preview-frame {
+      background: white; border: 2px dashed #9ca3af;
+      padding: 4mm; border-radius: 8px;
+    }
+    .screen-actions {
+      display: flex; gap: 10px; width: 100%;
+      flex-direction: column;
+    }
+    .screen-btn {
+      padding: 14px 20px; border: 0; border-radius: 10px;
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .screen-btn.print { background: #9333ea; color: white; }
+    .screen-btn.back { background: #e5e7eb; color: #374151; }
+  }
+  @media print {
+    body { background: white !important; padding: 0 !important; display: block !important; }
+    .screen-wrap > :not(.preview-frame) { display: none !important; }
+    .preview-frame { border: 0 !important; padding: 0 !important; margin: 0 !important; background: white !important; }
+    .screen-wrap { display: block !important; gap: 0 !important; }
+    html, body {
+      width: 62mm !important; height: 29mm !important;
+      max-width: 62mm !important; max-height: 29mm !important;
+      overflow: hidden !important;
+    }
   }
   .label {
     width: 62mm; height: 29mm;
@@ -2431,20 +2470,29 @@ function printEtiquette(productionId) {
 </style>
 </head>
 <body>
-  <div class="label">
-    <div class="row1">
-      <span class="day ${dayClass}">${dayName}</span>
-      <span class="product">${produitEsc}</span>
-      <span class="etab">${etabShort}</span>
+  <div class="screen-wrap">
+    <h1>Aperçu étiquette — DK-11209 (62×29mm)</h1>
+    <div class="preview-frame">
+      <div class="label">
+        <div class="row1">
+          <span class="day ${dayClass}">${dayName}</span>
+          <span class="product">${produitEsc}</span>
+          <span class="etab">${etabShort}</span>
+        </div>
+        <div class="row2">
+          <span class="lot">Lot:${escapeHtml(lotNum)}</span>
+          <span class="qty">${qte}${escapeHtml(unite)}</span>
+          <span class="by">${escapeHtml(producteur)}</span>
+        </div>
+        <div class="row3">
+          <span class="prod-date">P:${prodDateStr}</span>
+          <span class="dlc"><small>DLC </small>${dlcStr}</span>
+        </div>
+      </div>
     </div>
-    <div class="row2">
-      <span class="lot">Lot:${escapeHtml(lotNum)}</span>
-      <span class="qty">${qte}${escapeHtml(unite)}</span>
-      <span class="by">${escapeHtml(producteur)}</span>
-    </div>
-    <div class="row3">
-      <span class="prod-date">P:${prodDateStr}</span>
-      <span class="dlc"><small>DLC </small>${dlcStr}</span>
+    <div class="screen-actions">
+      <button class="screen-btn print" onclick="window.print()">🖨 Imprimer l'étiquette</button>
+      <button class="screen-btn back" onclick="history.back()">← Retour</button>
     </div>
   </div>
 </body>
@@ -2453,19 +2501,11 @@ function printEtiquette(productionId) {
   // Marquer comme imprimée AVANT de remplacer le document (la requête persiste).
   DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  // Remplacer complètement le document par une page minimale contenant UNIQUEMENT
-  // l'étiquette. C'est la seule méthode fiable avec iOS Safari AirPrint, qui ignore
-  // @page dans un iframe et paginait le contenu. Après impression, rechargement.
-  // NB : on construit le tag script par concaténation pour éviter que le parser HTML
-  // de la page courante ne voie une balise de fermeture littérale et ferme le bloc trop tôt.
-  const scriptTag = '<' + 'script>' +
-    'window.onafterprint = function() { window.location.reload(); };' +
-    'setTimeout(function() { window.print(); }, 300);' +
-    '</' + 'script>';
-  const fullDoc = printDoc.replace('</body>', scriptTag + '</body>');
-
+  // Remplacer complètement le document par une page minimale contenant l'étiquette
+  // et un bouton "Imprimer". L'utilisateur déclenche lui-même l'impression et
+  // revient avec history.back() — évite la race condition du popup "autoriser" iOS.
   document.open();
-  document.write(fullDoc);
+  document.write(printDoc);
   document.close();
 }
 
