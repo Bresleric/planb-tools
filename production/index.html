@@ -2363,7 +2363,7 @@ function printEtiquette(productionId) {
 <meta name="viewport" content="width=235, initial-scale=1">
 <title> </title>
 <style>
-  @page { size: 62mm 29mm; margin: 0; }
+  @page { size: 29mm 62mm; margin: 0; }
   * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0 !important; padding: 0 !important;
@@ -2403,108 +2403,104 @@ function printEtiquette(productionId) {
     .screen-btn.print { background: #9333ea; color: white; }
     .screen-btn.back { background: #e5e7eb; color: #374151; }
   }
+  /* Impression : masquer tout via visibility + sortir .label du flow via fixed.
+     Visibility préserve le DOM tree (pour atteindre .label), fixed le découple du body. */
   @media print {
-    body { background: white !important; padding: 0 !important; display: block !important; }
-    .screen-wrap > :not(.preview-frame) { display: none !important; }
-    .preview-frame { border: 0 !important; padding: 0 !important; margin: 0 !important; background: white !important; }
-    .screen-wrap { display: block !important; gap: 0 !important; }
     html, body {
+      width: 29mm !important; height: 62mm !important;
+      min-width: 0 !important; min-height: 0 !important;
+      max-width: 29mm !important; max-height: 62mm !important;
       margin: 0 !important; padding: 0 !important;
+      background: white !important;
       overflow: hidden !important;
     }
-  }
-  /* Impression PAYSAGE (62w × 29h) : layout naturel */
-  @media print and (orientation: landscape) {
-    html, body { width: 62mm !important; height: 29mm !important; }
-    .preview-frame { width: 62mm; height: 29mm; }
-    .label { width: 62mm; height: 29mm; }
-  }
-  /* Impression PORTRAIT (29w × 62h) = default iOS : on pivote le contenu de 90°
-     pour que l'étiquette s'imprime dans le bon sens sur le rouleau DK-11209. */
-  @media print and (orientation: portrait) {
-    html, body { width: 29mm !important; height: 62mm !important; }
-    .preview-frame {
-      position: absolute; top: 0; left: 29mm;
-      width: 62mm; height: 29mm;
-      transform: rotate(90deg);
-      transform-origin: 0 0;
+    body { display: block !important; }
+    body * { visibility: hidden !important; }
+    .screen-wrap, .preview-frame {
+      display: block !important; padding: 0 !important; margin: 0 !important;
+      border: 0 !important; background: transparent !important;
+      width: auto !important; height: auto !important;
     }
-    .label { width: 62mm; height: 29mm; }
+    .label, .label * { visibility: visible !important; }
+    .label {
+      display: flex !important;
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 29mm !important; height: 62mm !important;
+      margin: 0 !important;
+      background: white !important;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+    }
   }
+  /* ÉTIQUETTE PORTRAIT 29mm × 62mm (iOS Safari impose portrait par défaut) */
   .label {
-    width: 62mm; height: 29mm;
-    max-width: 62mm; max-height: 29mm;
-    padding: 1mm 1.5mm;
+    width: 29mm; height: 62mm;
+    max-width: 29mm; max-height: 62mm;
+    padding: 2mm 1.5mm;
     position: relative;
     overflow: hidden;
+    display: flex; flex-direction: column;
   }
   .label * { margin: 0; padding: 0; }
-  .row1 {
-    display: flex; align-items: center; gap: 1mm;
-    border-bottom: 0.3mm solid #000;
-    padding-bottom: 0.5mm; margin-bottom: 0.8mm;
-    width: 59mm; max-width: 59mm;
-  }
-  .day {
+  .lbl-day {
     font-size: 7pt; font-weight: 900; text-transform: uppercase;
-    padding: 0.3mm 1mm; letter-spacing: 0.2px;
-    white-space: nowrap; flex: 0 0 auto;
+    padding: 0.6mm 0; letter-spacing: 0.5px;
+    text-align: center; white-space: nowrap;
+    border-radius: 0.8mm; margin-bottom: 1mm;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .day-red { color: #d00; border: 0.3mm solid #d00; border-radius: 0.5mm; }
-  .day-black { color: white; background: #000; border-radius: 0.5mm; }
-  .product {
-    font-size: 8pt; font-weight: 800;
-    flex: 1 1 0; min-width: 0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    color: #000;
+  .lbl-day.day-red { color: #d00; border: 0.3mm solid #d00; }
+  .lbl-day.day-black { color: white; background: #000; }
+  .lbl-product {
+    font-size: 8pt; font-weight: 800; color: #000;
+    line-height: 1.15; text-align: center;
+    overflow: hidden; word-wrap: break-word;
+    margin-bottom: 1mm;
   }
-  .etab {
+  .lbl-etab {
     font-size: 6pt; font-weight: 800; color: #000;
-    white-space: nowrap; flex: 0 0 auto;
+    text-align: center; margin-bottom: 1.5mm;
+    border-bottom: 0.3mm solid #000; padding-bottom: 1mm;
   }
-  .row2 {
-    display: flex; align-items: baseline; gap: 1.5mm;
-    font-size: 6.5pt; margin-bottom: 0.8mm;
-    width: 59mm; max-width: 59mm;
+  .lbl-lot {
+    font-size: 6pt; font-weight: 700;
+    font-family: 'Courier New', monospace;
+    text-align: center; white-space: nowrap;
+    margin-bottom: 0.8mm;
   }
-  .row2 > *, .row3 > * { min-width: 0; }
-  .lot { font-weight: 700; font-family: 'Courier New', monospace; white-space: nowrap; }
-  .qty { font-weight: 600; white-space: nowrap; }
-  .by { font-weight: 600; margin-left: auto; white-space: nowrap; }
-  .row3 {
-    display: flex; align-items: baseline; gap: 2mm;
-    font-size: 6.5pt;
-    width: 59mm; max-width: 59mm;
+  .lbl-meta {
+    font-size: 6pt; color: #000;
+    text-align: center; line-height: 1.3;
+    margin-bottom: 1mm;
   }
-  .prod-date { color: #000; font-weight: 600; white-space: nowrap; }
-  .dlc {
-    margin-left: auto; font-size: 9pt; font-weight: 900;
-    color: #d00; white-space: nowrap;
+  .lbl-prod {
+    font-size: 6pt; color: #000;
+    text-align: center; margin-bottom: 0.5mm;
+    margin-top: auto;
+  }
+  .lbl-dlc {
+    font-size: 8pt; font-weight: 900; color: #d00;
+    text-align: center; white-space: nowrap;
+    border-top: 0.3mm solid #d00;
+    padding-top: 0.8mm;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .dlc small { font-size: 5pt; font-weight: 700; }
+  .lbl-dlc small { font-size: 5pt; display: block; font-weight: 700; }
 </style>
 </head>
 <body>
   <div class="screen-wrap">
-    <h1>Aperçu étiquette — DK-11209 (62×29mm)</h1>
+    <h1>Aperçu étiquette — DK-11209 (29×62mm)</h1>
     <div class="preview-frame">
       <div class="label">
-        <div class="row1">
-          <span class="day ${dayClass}">${dayName}</span>
-          <span class="product">${produitEsc}</span>
-          <span class="etab">${etabShort}</span>
-        </div>
-        <div class="row2">
-          <span class="lot">Lot:${escapeHtml(lotNum)}</span>
-          <span class="qty">${qte}${escapeHtml(unite)}</span>
-          <span class="by">${escapeHtml(producteur)}</span>
-        </div>
-        <div class="row3">
-          <span class="prod-date">P:${prodDateStr}</span>
-          <span class="dlc"><small>DLC </small>${dlcStr}</span>
-        </div>
+        <div class="lbl-day ${dayClass}">${dayName}</div>
+        <div class="lbl-product">${produitEsc}</div>
+        <div class="lbl-etab">${etabShort}</div>
+        <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
+        <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
+        <div class="lbl-prod">Prod: ${prodDateStr}</div>
+        <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
       </div>
     </div>
     <div class="screen-actions">
