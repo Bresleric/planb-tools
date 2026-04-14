@@ -2330,17 +2330,16 @@ function closeEtiquette() {
 
 // ============= GÉNÉRATION ÉTIQUETTE CANVAS =============
 // DK-11209 : 29mm × 62mm. Dessin en PAYSAGE à 300 DPI : 732 × 342 px.
-// Layout en grille stricte pour éviter tout chevauchement :
-//   +--------------------+--------------------------------+
-//   |                    |                                |
-//   |     [DAY BADGE]    |     NOM DU PRODUIT             |
-//   |                    |     (2 lignes, auto-fit)       |
-//   |                    |                                |
-//   +--------------------+----------------+---------------+
-//   |      ETAB          | Lot: XXXXX     |   DLC (rouge) |
-//   |                    | Prod: JJ/MM    |   JJ/MM/AA    |
-//   |    Qte · Init      |                |               |
-//   +--------------------+----------------+---------------+
+// Layout 3 lignes :
+//   +---------------------------------------------+
+//   |  NOM DU PRODUIT                     (Prod)  |  R1 : produit GROS + prod JJMM petit
+//   |  (grand, 2 lignes auto-fit)                 |
+//   +---------------------------------------------+
+//   |  Lot: XXXX-XX             |     EB          |  R2 : lot + initiales
+//   +---------------+-----------+-----------------+
+//   |  10kg         |  DLC      |      MER        |  R3 : qte | DLC JJMM | JOUR GROS
+//   |               |  1804     |                 |
+//   +---------------+-----------+-----------------+
 function drawEtiquetteCanvas(data) {
   const DPI = 300;
   const MM = DPI / 25.4;
@@ -2359,126 +2358,126 @@ function drawEtiquetteCanvas(data) {
   const PAD = Math.round(2 * MM);
   const fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-  // === GRILLE ===
-  // Top row 55%, bottom row 45%
-  const TOP_H = Math.round((H - PAD * 2) * 0.55);
-  const BOT_H = (H - PAD * 2) - TOP_H;
-  const TOP_Y = PAD;
-  const BOT_Y = PAD + TOP_H;
+  const INNER_W = W - PAD * 2;
+  const INNER_H = H - PAD * 2;
 
-  // Colonne gauche (jour/etab) 32% ; droite = produit / info
-  const COL_L_W = Math.round((W - PAD * 2) * 0.32);
-  const COL_L_X = PAD;
-  const COL_R_X = PAD + COL_L_W;
-  const COL_R_W = (W - PAD * 2) - COL_L_W;
+  // === 3 LIGNES ===
+  const R1_H = Math.round(INNER_H * 0.44);  // nom produit (gros)
+  const R2_H = Math.round(INNER_H * 0.20);  // lot + initiales
+  const R3_H = INNER_H - R1_H - R2_H;       // qte + DLC + jour (gros)
 
-  // Bottom : 3 cellules (etab | lot+prod | DLC)
-  const BOT_C1_W = COL_L_W;
-  const BOT_C3_W = Math.round((W - PAD * 2) * 0.28);
-  const BOT_C2_W = (W - PAD * 2) - BOT_C1_W - BOT_C3_W;
-  const BOT_C1_X = PAD;
-  const BOT_C2_X = PAD + BOT_C1_W;
-  const BOT_C3_X = PAD + BOT_C1_W + BOT_C2_W;
+  const R1_Y = PAD;
+  const R2_Y = R1_Y + R1_H;
+  const R3_Y = R2_Y + R2_H;
 
-  // Séparateur horizontal entre top et bottom
+  // Séparateurs horizontaux
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = Math.max(1, Math.round(0.4 * MM));
+  ctx.lineWidth = Math.max(1, Math.round(0.3 * MM));
   ctx.beginPath();
-  ctx.moveTo(PAD, BOT_Y);
-  ctx.lineTo(W - PAD, BOT_Y);
+  ctx.moveTo(PAD, R2_Y);
+  ctx.lineTo(W - PAD, R2_Y);
+  ctx.moveTo(PAD, R3_Y);
+  ctx.lineTo(W - PAD, R3_Y);
   ctx.stroke();
 
-  // Séparateur vertical top : entre day et produit
-  ctx.beginPath();
-  ctx.moveTo(COL_R_X, TOP_Y + Math.round(1 * MM));
-  ctx.lineTo(COL_R_X, BOT_Y - Math.round(1 * MM));
-  ctx.stroke();
+  // === ROW 1 : NOM PRODUIT (gros) + Date de production (petit coin haut droit) ===
+  // Date de production en petit en haut à droite
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  const prodDateFont = Math.round(3.5 * MM);
+  ctx.font = `600 ${prodDateFont}px ${fontFamily}`;
+  ctx.fillStyle = '#555555';
+  ctx.fillText('Prod ' + data.prodDate, W - PAD - Math.round(1 * MM), R1_Y + Math.round(1 * MM));
 
-  // Séparateurs verticaux bottom : entre c1/c2 et c2/c3
-  ctx.beginPath();
-  ctx.moveTo(BOT_C2_X, BOT_Y + Math.round(1 * MM));
-  ctx.lineTo(BOT_C2_X, H - PAD - Math.round(1 * MM));
-  ctx.moveTo(BOT_C3_X, BOT_Y + Math.round(1 * MM));
-  ctx.lineTo(BOT_C3_X, H - PAD - Math.round(1 * MM));
-  ctx.stroke();
-
-  // === TOP LEFT : BADGE JOUR ===
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const dayBoxPad = Math.round(1.5 * MM);
-  const dayBoxX = COL_L_X + dayBoxPad;
-  const dayBoxY = TOP_Y + dayBoxPad;
-  const dayBoxW = COL_L_W - dayBoxPad * 2;
-  const dayBoxH = TOP_H - dayBoxPad * 2;
-  const dayRx = Math.round(1.5 * MM);
-  if (data.dayIsRed) {
-    ctx.strokeStyle = '#d00000';
-    ctx.lineWidth = Math.round(0.6 * MM);
-    roundRect(ctx, dayBoxX, dayBoxY, dayBoxW, dayBoxH, dayRx);
-    ctx.stroke();
-    ctx.fillStyle = '#d00000';
-  } else {
-    ctx.fillStyle = '#000000';
-    roundRect(ctx, dayBoxX, dayBoxY, dayBoxW, dayBoxH, dayRx);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-  }
-  // Auto-fit jour dans la boîte
-  const dayFit = fitSingleLine(ctx, data.dayName, dayBoxW - Math.round(2 * MM), dayBoxH - Math.round(2 * MM), fontFamily, '900');
-  ctx.font = `900 ${dayFit}px ${fontFamily}`;
-  ctx.fillText(data.dayName, dayBoxX + dayBoxW / 2, dayBoxY + dayBoxH / 2 + Math.round(0.3 * MM));
-
-  // === TOP RIGHT : NOM PRODUIT ===
+  // Nom produit : centré, prend la zone R1 moins la zone date
+  const prodTopOffset = prodDateFont + Math.round(1 * MM);
+  const nameBoxX = PAD + Math.round(1 * MM);
+  const nameBoxW = INNER_W - Math.round(2 * MM);
+  const nameBoxY = R1_Y + prodTopOffset;
+  const nameBoxH = R1_H - prodTopOffset - Math.round(1 * MM);
   ctx.fillStyle = '#000000';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const prodBoxX = COL_R_X + Math.round(2 * MM);
-  const prodBoxW = COL_R_W - Math.round(4 * MM);
-  const prodBoxY = TOP_Y + Math.round(1 * MM);
-  const prodBoxH = TOP_H - Math.round(2 * MM);
-  const prodWrap = wrapText(ctx, data.produit, prodBoxW, Math.round(8 * MM), fontFamily, '800', 2);
-  const prodLineH = prodWrap.size * 1.1;
-  const prodTotalH = prodWrap.lines.length * prodLineH;
-  const prodStartY = prodBoxY + (prodBoxH - prodTotalH) / 2 + prodLineH / 2;
-  ctx.font = `800 ${prodWrap.size}px ${fontFamily}`;
-  prodWrap.lines.forEach((line, i) => {
-    ctx.fillText(line, prodBoxX + prodBoxW / 2, prodStartY + i * prodLineH);
+  const nameWrap = wrapText(ctx, data.produit, nameBoxW, Math.round(10 * MM), fontFamily, '900', 2);
+  const nameLineH = nameWrap.size * 1.1;
+  const nameTotalH = nameWrap.lines.length * nameLineH;
+  const nameStartY = nameBoxY + (nameBoxH - nameTotalH) / 2 + nameLineH / 2;
+  ctx.font = `900 ${nameWrap.size}px ${fontFamily}`;
+  nameWrap.lines.forEach((line, i) => {
+    ctx.fillText(line, nameBoxX + nameBoxW / 2, nameStartY + i * nameLineH);
   });
 
-  // === BOTTOM C1 : ETAB + Qte·Init ===
+  // === ROW 2 : Lot + Initiales ===
+  const r2SplitX = PAD + Math.round(INNER_W * 0.68);
+  // Séparateur vertical R2
+  ctx.beginPath();
+  ctx.moveTo(r2SplitX, R2_Y + Math.round(0.5 * MM));
+  ctx.lineTo(r2SplitX, R3_Y - Math.round(0.5 * MM));
+  ctx.stroke();
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const c1CenterX = BOT_C1_X + BOT_C1_W / 2;
-  // Etab en haut de la cellule
-  const etabFont = fitSingleLine(ctx, data.etab, BOT_C1_W - Math.round(2 * MM), Math.round(BOT_H * 0.45), fontFamily, '900');
-  ctx.font = `900 ${etabFont}px ${fontFamily}`;
   ctx.fillStyle = '#000000';
-  ctx.fillText(data.etab, c1CenterX, BOT_Y + BOT_H * 0.28);
-  // Qte·Init en bas de la cellule
-  const qteFont = fitSingleLine(ctx, data.qteInit, BOT_C1_W - Math.round(2 * MM), Math.round(BOT_H * 0.35), fontFamily, '700');
-  ctx.font = `700 ${qteFont}px ${fontFamily}`;
-  ctx.fillText(data.qteInit, c1CenterX, BOT_Y + BOT_H * 0.72);
+  const r2Mid = R2_Y + R2_H / 2;
 
-  // === BOTTOM C2 : Lot + Prod ===
-  const c2CenterX = BOT_C2_X + BOT_C2_W / 2;
+  // Lot (monospace, bold)
   const lotTxt = 'Lot: ' + data.lot;
-  const lotFont = fitSingleLine(ctx, lotTxt, BOT_C2_W - Math.round(2 * MM), Math.round(BOT_H * 0.4), fontFamily, '700');
+  const lotMaxW = r2SplitX - PAD - Math.round(3 * MM);
+  const lotFont = fitSingleLine(ctx, lotTxt, lotMaxW, R2_H - Math.round(2 * MM), fontFamily, '700');
   ctx.font = `700 ${lotFont}px 'Courier New', monospace`;
-  ctx.fillText(lotTxt, c2CenterX, BOT_Y + BOT_H * 0.28);
-  const prodTxt = 'Prod: ' + data.prodDate;
-  const prodFont = fitSingleLine(ctx, prodTxt, BOT_C2_W - Math.round(2 * MM), Math.round(BOT_H * 0.35), fontFamily, '600');
-  ctx.font = `600 ${prodFont}px ${fontFamily}`;
-  ctx.fillText(prodTxt, c2CenterX, BOT_Y + BOT_H * 0.72);
+  ctx.fillText(lotTxt, PAD + (r2SplitX - PAD) / 2, r2Mid);
 
-  // === BOTTOM C3 : DLC (rouge) ===
-  const c3CenterX = BOT_C3_X + BOT_C3_W / 2;
+  // Initiales
+  const initMaxW = (W - PAD) - r2SplitX - Math.round(3 * MM);
+  const initFont = fitSingleLine(ctx, data.init, initMaxW, R2_H - Math.round(2 * MM), fontFamily, '800');
+  ctx.font = `800 ${initFont}px ${fontFamily}`;
+  ctx.fillText(data.init, r2SplitX + (W - PAD - r2SplitX) / 2, r2Mid);
+
+  // === ROW 3 : Qté + DLC JJMM + Jour DLC (gros) ===
+  const r3C1W = Math.round(INNER_W * 0.28);
+  const r3C3W = Math.round(INNER_W * 0.38);
+  const r3C2W = INNER_W - r3C1W - r3C3W;
+  const r3C1X = PAD;
+  const r3C2X = PAD + r3C1W;
+  const r3C3X = PAD + r3C1W + r3C2W;
+
+  // Séparateurs verticaux R3
+  ctx.beginPath();
+  ctx.moveTo(r3C2X, R3_Y + Math.round(0.5 * MM));
+  ctx.lineTo(r3C2X, H - PAD - Math.round(0.5 * MM));
+  ctx.moveTo(r3C3X, R3_Y + Math.round(0.5 * MM));
+  ctx.lineTo(r3C3X, H - PAD - Math.round(0.5 * MM));
+  ctx.stroke();
+
+  const r3Mid = R3_Y + R3_H / 2;
+
+  // --- C1 : Quantité ---
+  ctx.fillStyle = '#000000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const qteFont = fitSingleLine(ctx, data.qte, r3C1W - Math.round(2 * MM), R3_H - Math.round(3 * MM), fontFamily, '800');
+  ctx.font = `800 ${qteFont}px ${fontFamily}`;
+  ctx.fillText(data.qte, r3C1X + r3C1W / 2, r3Mid);
+
+  // --- C2 : DLC JJMM (label + nombre, en rouge) ---
   ctx.fillStyle = '#d00000';
   const dlcLabelFont = Math.round(3 * MM);
+  ctx.textBaseline = 'top';
   ctx.font = `700 ${dlcLabelFont}px ${fontFamily}`;
-  ctx.fillText('DLC', c3CenterX, BOT_Y + BOT_H * 0.25);
-  const dlcFont = fitSingleLine(ctx, data.dlc, BOT_C3_W - Math.round(2 * MM), Math.round(BOT_H * 0.45), fontFamily, '900');
-  ctx.font = `900 ${dlcFont}px ${fontFamily}`;
-  ctx.fillText(data.dlc, c3CenterX, BOT_Y + BOT_H * 0.62);
+  ctx.fillText('DLC', r3C2X + r3C2W / 2, R3_Y + Math.round(1 * MM));
+  // Nombre (JJMM) — auto-fit sous le label
+  const dlcNumAvailH = R3_H - dlcLabelFont - Math.round(3 * MM);
+  const dlcNumFont = fitSingleLine(ctx, data.dlcJJMM, r3C2W - Math.round(2 * MM), dlcNumAvailH, fontFamily, '900');
+  ctx.font = `900 ${dlcNumFont}px ${fontFamily}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(data.dlcJJMM, r3C2X + r3C2W / 2, R3_Y + dlcLabelFont + Math.round(2 * MM) + dlcNumAvailH / 2);
+
+  // --- C3 : Jour DLC (GROS, rouge) ---
+  ctx.fillStyle = '#d00000';
+  ctx.textBaseline = 'middle';
+  const dayDlcFont = fitSingleLine(ctx, data.dlcDay, r3C3W - Math.round(3 * MM), R3_H - Math.round(3 * MM), fontFamily, '900');
+  ctx.font = `900 ${dayDlcFont}px ${fontFamily}`;
+  ctx.fillText(data.dlcDay, r3C3X + r3C3W / 2, r3Mid);
 
   return canvas;
 }
@@ -2543,36 +2542,40 @@ async function printEtiquette(productionId) {
 
   const lot = allLots.find(l => l.id === production.lot_id);
   const lotNum = lot?.numero_lot || '—';
-  const etabNames = { freddy: 'FREDDY', liesel: 'LIESEL' };
-  const etabShort = etabNames[currentEtablissement] || currentEtablissement.toUpperCase();
 
+  // Helpers de date
+  const JOURS_ABBR = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const jjmm = (d) => pad2(d.getDate()) + pad2(d.getMonth() + 1);
+
+  // Date de production (JJMM)
   const prodDate = new Date(production.date_production || production.created_at);
-  const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
-  const dayName = JOURS[prodDate.getDay()];
-  const dayIsRed = prodDate.getDay() % 2 === 0;
-  const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const prodDateStr = jjmm(prodDate);
 
-  let dlcStr = '—';
+  // DLC : JJMM + jour 3 lettres
+  let dlcJJMM = '—';
+  let dlcDay = '';
   if (production.dlc) {
     const dlcDate = new Date(production.dlc);
-    dlcStr = dlcDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    dlcJJMM = jjmm(dlcDate);
+    dlcDay = JOURS_ABBR[dlcDate.getDay()];
   }
 
+  // Quantité (avec unité) et initiales séparées
   const qte = production.quantite_produite ?? '';
   const unite = production.unite || '';
-  const producteur = production.producteur_initiales || '—';
-  const qteInit = `${qte}${unite} · ${producteur}`;
+  const qteStr = `${qte}${unite}`.trim() || '—';
+  const initStr = production.producteur_initiales || '—';
 
   // Générer l'étiquette sur canvas
   const canvas = drawEtiquetteCanvas({
-    dayName,
-    dayIsRed,
     produit: production.nom_produit || '',
-    etab: etabShort,
-    lot: lotNum,
-    qteInit,
     prodDate: prodDateStr,
-    dlc: dlcStr,
+    lot: lotNum,
+    init: initStr,
+    qte: qteStr,
+    dlcJJMM,
+    dlcDay,
   });
 
   // Convertir en Blob PNG
