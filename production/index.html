@@ -439,71 +439,6 @@
     .etiquette-btn.print:active { background: #7c3aed; }
     .etiquette-btn.mark { background: #22c55e; color: white; }
 
-    /* ====== IMPRESSION ÉTIQUETTE DK-11209 (62×29mm) ====== */
-    @media print {
-      @page { size: 62mm 29mm; margin: 1mm 2mm; }
-      html, body { margin: 0 !important; padding: 0 !important; background: white !important; width: 62mm !important; height: 29mm !important; }
-      body > *:not(#print-label) { display: none !important; }
-      #print-label { display: block !important; }
-    }
-    #print-label {
-      display: none;
-      width: 58mm; height: 27mm;
-      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
-      color: #000; background: white;
-      padding: 1mm 1.5mm;
-      overflow: hidden;
-      position: relative;
-    }
-    #print-label * { margin: 0; padding: 0; }
-    .lbl-row1 {
-      display: flex; align-items: baseline; gap: 1mm;
-      border-bottom: 0.3mm solid #000; padding-bottom: 0.5mm; margin-bottom: 0.5mm;
-    }
-    .lbl-day {
-      font-size: 7pt; font-weight: 900; text-transform: uppercase;
-      padding: 0.3mm 1.5mm; border-radius: 0.5mm;
-      letter-spacing: 0.3px; white-space: nowrap; flex-shrink: 0;
-    }
-    .lbl-day.day-red { color: red; border: 0.3mm solid red; }
-    .lbl-day.day-black { color: #000; background: #000; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .lbl-product {
-      font-size: 8pt; font-weight: 800; flex: 1;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .lbl-etab {
-      font-size: 5.5pt; font-weight: 700; color: #000;
-      white-space: nowrap; flex-shrink: 0;
-    }
-    .lbl-row2 {
-      display: flex; align-items: baseline; gap: 1.5mm;
-      margin-bottom: 0.5mm;
-    }
-    .lbl-lot {
-      font-size: 6pt; font-weight: 700; font-family: 'Courier New', monospace;
-      letter-spacing: 0.2px;
-    }
-    .lbl-qty {
-      font-size: 6pt; font-weight: 600;
-    }
-    .lbl-by {
-      font-size: 6pt; font-weight: 600; margin-left: auto;
-    }
-    .lbl-row3 {
-      display: flex; align-items: baseline; gap: 2mm;
-    }
-    .lbl-prod-date {
-      font-size: 6.5pt; color: #000;
-    }
-    .lbl-dlc {
-      font-size: 8pt; font-weight: 900; color: red;
-      margin-left: auto; white-space: nowrap;
-    }
-    .lbl-dlc-label {
-      font-size: 5pt; font-weight: 700; color: red;
-      text-transform: uppercase;
-    }
-
     /* ====== DLC SUIVI ====== */
     .dlc-filters {
       display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap; align-items: center;
@@ -562,6 +497,13 @@
     .dlc-stat-dep { background: #fef2f2; }
     .dlc-stat-dep .num { color: #dc2626; }
 
+    @media print {
+      body * { visibility: hidden; }
+      .etiquette-card, .etiquette-card * { visibility: visible; }
+      .etiquette-card { position: absolute; top: 0; left: 0; border: 2px solid #000; max-width: 100%; }
+      .etiquette-actions { display: none; }
+      .etiquette-header-bar { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -853,9 +795,6 @@
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
-
-  <!-- PRINT LABEL (hidden, rendered only for @media print) -->
-  <div id="print-label"></div>
 
   <!-- LOADING -->
   <div class="loading-overlay" id="loading">
@@ -1466,7 +1405,6 @@ function renderProductions() {
         <td class="dlc-cell ${dlcClass}">${dlcTxt}</td>
         <td>${producteur}</td>
         <td class="obs-cell" title="${obs}">${obs || ''}</td>
-        <td style="text-align:center;padding:2px"><button onclick="event.stopPropagation();printEtiquette('${p.id}')" title="Imprimer étiquette" style="border:none;background:none;cursor:pointer;font-size:1rem;padding:4px">🖨️</button></td>
       </tr>
     `;
   }).join('');
@@ -1486,7 +1424,6 @@ function renderProductions() {
               <th>DLC</th>
               <th>Par</th>
               <th>Observation</th>
-              <th style="width:36px">🖨️</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -1520,6 +1457,9 @@ function openProductionModal() {
   document.getElementById('p-dlc-auto').style.display = 'none';
   document.getElementById('p-dlc-auto-value').textContent = '';
 
+  // Initialiser la DLC au défaut +3 jours (pas de fiche encore sélectionnée)
+  updateDlcAutoDisplay(null);
+
   // Setup fiche change handler
   ficheSelect.onchange = () => {
     const ficheId = ficheSelect.value;
@@ -1535,11 +1475,12 @@ function openProductionModal() {
           chip.classList.toggle('active', chip.dataset.val === fiche.categorie);
         });
 
-        // Calculer et afficher DLC auto
+        // Calculer et afficher DLC auto (fiche paramétrée ou défaut +3 j)
         updateDlcAutoDisplay(fiche);
       }
     } else {
-      document.getElementById('p-dlc-auto').style.display = 'none';
+      // Pas de fiche → défaut +3 jours
+      updateDlcAutoDisplay(null);
     }
   };
 
@@ -2393,61 +2334,9 @@ function closeEtiquette() {
 }
 
 function printEtiquette(productionId) {
-  const production = allProductions.find(p => p.id === productionId);
-  if (!production) { showToast('Production introuvable', 'error'); return; }
-
-  const lot = allLots.find(l => l.id === production.lot_id);
-  const lotNum = lot?.numero_lot || '—';
-  const etabNames = { freddy: 'FR', liesel: 'LI' };
-  const etabShort = etabNames[currentEtablissement] || currentEtablissement.substring(0, 2).toUpperCase();
-
-  // Day of production — color alternates red/black per day
-  const prodDate = new Date(production.date_production || production.created_at);
-  const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
-  const dayName = JOURS[prodDate.getDay()];
-  // Lundi=red, Mardi=black, Mercredi=red, Jeudi=black, Vendredi=red, Samedi=black, Dimanche=red
-  const dayClass = prodDate.getDay() % 2 === 0 ? 'day-red' : 'day-black';
-
-  const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-
-  // DLC
-  let dlcStr = '—';
-  if (production.dlc) {
-    const dlcDate = new Date(production.dlc);
-    dlcStr = dlcDate.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' });
-  }
-
-  const qte = production.quantite_produite ?? '';
-  const unite = production.unite || '';
-  const producteur = production.producteur_initiales || '—';
-
-  // Build label HTML for DK-11209 (62×29mm)
-  const labelEl = document.getElementById('print-label');
-  labelEl.innerHTML = `
-    <div class="lbl-row1">
-      <span class="lbl-day ${dayClass}">${dayName}</span>
-      <span class="lbl-product">${escapeHtml(production.nom_produit)}</span>
-      <span class="lbl-etab">${etabShort}</span>
-    </div>
-    <div class="lbl-row2">
-      <span class="lbl-lot">Lot: ${escapeHtml(lotNum)}</span>
-      <span class="lbl-qty">${qte} ${escapeHtml(unite)}</span>
-      <span class="lbl-by">Par: ${escapeHtml(producteur)}</span>
-    </div>
-    <div class="lbl-row3">
-      <span class="lbl-prod-date">Prod: ${prodDateStr}</span>
-      <span class="lbl-dlc">
-        <span class="lbl-dlc-label">DLC </span>${dlcStr}
-      </span>
-    </div>
-  `;
-
-  // Trigger print dialog (AirPrint on iPad)
-  setTimeout(() => {
-    window.print();
-    // Mark as printed in background
-    DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
-  }, 100);
+  window.print();
+  // Marquer comme imprimée en arrière-plan
+  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 }
 
 async function markEtiquetteOk(productionId) {
