@@ -497,13 +497,8 @@
     .dlc-stat-dep { background: #fef2f2; }
     .dlc-stat-dep .num { color: #dc2626; }
 
-    @media print {
-      body * { visibility: hidden; }
-      .etiquette-card, .etiquette-card * { visibility: visible; }
-      .etiquette-card { position: absolute; top: 0; left: 0; border: 2px solid #000; max-width: 100%; }
-      .etiquette-actions { display: none; }
-      .etiquette-header-bar { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
+    /* Impression étiquette : réalisée via iframe isolé créé dans printEtiquette().
+       Aucune règle @media print ici — tout est dans le document de l'iframe. */
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -2334,9 +2329,162 @@ function closeEtiquette() {
 }
 
 function printEtiquette(productionId) {
-  window.print();
-  // Marquer comme imprimée en arrière-plan
-  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+  const production = allProductions.find(p => p.id === productionId);
+  if (!production) { showToast('Production introuvable', 'error'); return; }
+
+  const lot = allLots.find(l => l.id === production.lot_id);
+  const lotNum = lot?.numero_lot || '—';
+  const etabNames = { freddy: 'FR', liesel: 'LI' };
+  const etabShort = etabNames[currentEtablissement] || currentEtablissement.substring(0, 2).toUpperCase();
+
+  const prodDate = new Date(production.date_production || production.created_at);
+  const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+  const dayName = JOURS[prodDate.getDay()];
+  const dayClass = prodDate.getDay() % 2 === 0 ? 'day-red' : 'day-black';
+  const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+  let dlcStr = '—';
+  if (production.dlc) {
+    const dlcDate = new Date(production.dlc);
+    dlcStr = dlcDate.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+
+  const qte = production.quantite_produite ?? '';
+  const unite = production.unite || '';
+  const producteur = production.producteur_initiales || '—';
+  const produitEsc = escapeHtml(production.nom_produit || '');
+
+  // Document HTML complet isolé pour l'impression dans un iframe.
+  // Titre vide (un espace) pour minimiser les en-têtes Safari iOS.
+  const printDoc = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=235, initial-scale=1">
+<title> </title>
+<style>
+  @page { size: 62mm 29mm; margin: 0; }
+  * { box-sizing: border-box; min-width: 0; }
+  html, body {
+    margin: 0 !important; padding: 0 !important;
+    width: 62mm !important; height: 29mm !important;
+    max-width: 62mm !important; max-height: 29mm !important;
+    overflow: hidden !important;
+    background: white; color: #000;
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .label {
+    width: 62mm; height: 29mm;
+    max-width: 62mm; max-height: 29mm;
+    padding: 1mm 1.5mm;
+    position: relative;
+    overflow: hidden;
+  }
+  .label * { margin: 0; padding: 0; }
+  .row1 {
+    display: flex; align-items: center; gap: 1mm;
+    border-bottom: 0.3mm solid #000;
+    padding-bottom: 0.5mm; margin-bottom: 0.8mm;
+    width: 59mm; max-width: 59mm;
+  }
+  .day {
+    font-size: 7pt; font-weight: 900; text-transform: uppercase;
+    padding: 0.3mm 1mm; letter-spacing: 0.2px;
+    white-space: nowrap; flex: 0 0 auto;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .day-red { color: #d00; border: 0.3mm solid #d00; border-radius: 0.5mm; }
+  .day-black { color: white; background: #000; border-radius: 0.5mm; }
+  .product {
+    font-size: 8pt; font-weight: 800;
+    flex: 1 1 0; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: #000;
+  }
+  .etab {
+    font-size: 6pt; font-weight: 800; color: #000;
+    white-space: nowrap; flex: 0 0 auto;
+  }
+  .row2 {
+    display: flex; align-items: baseline; gap: 1.5mm;
+    font-size: 6.5pt; margin-bottom: 0.8mm;
+    width: 59mm; max-width: 59mm;
+  }
+  .row2 > *, .row3 > * { min-width: 0; }
+  .lot { font-weight: 700; font-family: 'Courier New', monospace; white-space: nowrap; }
+  .qty { font-weight: 600; white-space: nowrap; }
+  .by { font-weight: 600; margin-left: auto; white-space: nowrap; }
+  .row3 {
+    display: flex; align-items: baseline; gap: 2mm;
+    font-size: 6.5pt;
+    width: 59mm; max-width: 59mm;
+  }
+  .prod-date { color: #000; font-weight: 600; white-space: nowrap; }
+  .dlc {
+    margin-left: auto; font-size: 9pt; font-weight: 900;
+    color: #d00; white-space: nowrap;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .dlc small { font-size: 5pt; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="label">
+    <div class="row1">
+      <span class="day ${dayClass}">${dayName}</span>
+      <span class="product">${produitEsc}</span>
+      <span class="etab">${etabShort}</span>
+    </div>
+    <div class="row2">
+      <span class="lot">Lot:${escapeHtml(lotNum)}</span>
+      <span class="qty">${qte}${escapeHtml(unite)}</span>
+      <span class="by">${escapeHtml(producteur)}</span>
+    </div>
+    <div class="row3">
+      <span class="prod-date">P:${prodDateStr}</span>
+      <span class="dlc"><small>DLC </small>${dlcStr}</span>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  // Supprimer tout iframe d'impression précédent
+  document.querySelectorAll('iframe.print-frame').forEach(f => f.remove());
+
+  // Créer l'iframe dimensionné aux dimensions exactes de l'étiquette (62×29mm)
+  // Positionné hors-écran mais avec visibilité réelle pour que Safari le rende correctement.
+  const iframe = document.createElement('iframe');
+  iframe.className = 'print-frame';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed; left:-10000px; top:0; width:62mm; height:29mm; border:0;';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(printDoc);
+  doc.close();
+
+  const doPrint = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+    } catch (e) {
+      console.error('Erreur impression:', e);
+      showToast('Erreur impression', 'error');
+    }
+    // Nettoyer l'iframe après un délai
+    setTimeout(() => iframe.remove(), 3000);
+  };
+
+  if (iframe.contentDocument.readyState === 'complete') {
+    setTimeout(doPrint, 250);
+  } else {
+    iframe.onload = () => setTimeout(doPrint, 250);
+    setTimeout(doPrint, 700); // Fallback
+  }
 }
 
 async function markEtiquetteOk(productionId) {
