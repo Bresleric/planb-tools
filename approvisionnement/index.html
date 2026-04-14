@@ -1205,6 +1205,7 @@
         let besoins = [];
         let commandes = [];
         let articles = [];
+        let ingredients = [];
         let fournisseurs = [];
         let prix = [];
         let articlesCache = {};
@@ -1251,10 +1252,11 @@
         async function loadData() {
             try {
                 if (!isDemo) {
-                    const [besoinsRes, commandesRes, articlesRes, fournisseursRes, prixRes, lignesRes] = await Promise.all([
+                    const [besoinsRes, commandesRes, articlesRes, ingredientsRes, fournisseursRes, prixRes, lignesRes] = await Promise.all([
                         supabase.from('appro_besoins').select('*').eq('etablissement', currentEstablishment).in('statut', ['demande', 'valide']).order('date_demande', { ascending: false }),
                         supabase.from('appro_commandes').select('*').eq('etablissement', currentEstablishment).in('statut', ['brouillon', 'validee', 'envoyee']).order('date_creation', { ascending: false }),
                         supabase.from('appro_catalogue').select('*').eq('actif', true),
+                        supabase.from('appro_ingredients').select('*').eq('actif', true).order('nom'),
                         supabase.from('appro_fournisseurs').select('*').eq('actif', true),
                         supabase.from('appro_prix').select('*').eq('actif', true),
                         supabase.from('appro_commande_lignes').select('*'),
@@ -1262,6 +1264,7 @@
 
                     besoins = besoinsRes.data || [];
                     articles = articlesRes.data || [];
+                    ingredients = ingredientsRes.data || [];
                     fournisseurs = fournisseursRes.data || [];
                     prix = prixRes.data || [];
 
@@ -1338,25 +1341,35 @@
                 document.getElementById('search-dropdown').classList.remove('show');
                 return;
             }
-            debounceTimer = setTimeout(() => searchArticles(term), 300);
+            debounceTimer = setTimeout(() => searchIngredients(term), 300);
         }
 
-        async function searchArticles(term) {
+        async function searchIngredients(term) {
             try {
                 const normalized = normalizeSearch(term);
-                let results = articles.filter(a =>
-                    a.nom_recherche && a.nom_recherche.includes(normalized) && a.actif
+                // Recherche dans la table ingrédients (liste générique)
+                let results = ingredients.filter(i =>
+                    i.actif !== false && i.nom_recherche && i.nom_recherche.includes(normalized)
                 );
 
-                if (results.length > 10) results = results.slice(0, 10);
+                if (results.length > 15) results = results.slice(0, 15);
 
                 const dropdown = document.getElementById('search-dropdown');
-                dropdown.innerHTML = results.map(a => `
-                    <div class="dropdown-item" onclick="addBesoin('${a.id}', '${a.nom.replace(/'/g, "\\'")}', '${a.unite}')">
-                        <div class="dropdown-item-title">${a.nom}</div>
-                        <div class="dropdown-item-subtitle">${a.categorie} • ${a.unite}</div>
-                    </div>
-                `).join('');
+                if (results.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-item" style="color:#999;font-style:italic;">Aucun ingrédient trouvé</div>';
+                } else {
+                    dropdown.innerHTML = results.map(i => {
+                        // Compter combien d'articles fournisseurs sont rattachés
+                        const nbFourn = articles.filter(a => a.ingredient_id === i.id).length;
+                        const nomEsc = (i.nom || '').replace(/'/g, "\\'");
+                        return `
+                            <div class="dropdown-item" onclick="addBesoin('${i.id}', '${nomEsc}', '${i.unite || 'kg'}')">
+                                <div class="dropdown-item-title">${i.nom}</div>
+                                <div class="dropdown-item-subtitle">${i.categorie || ''} • ${i.unite || 'kg'}${nbFourn > 0 ? ' • ' + nbFourn + ' fourn.' : ''}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
 
                 dropdown.classList.add('show');
             } catch (e) {
@@ -1364,11 +1377,12 @@
             }
         }
 
-        async function addBesoin(articleId, articleName, unite) {
+        async function addBesoin(ingredientId, ingredientName, unite) {
             try {
                 const newBesoin = {
-                    article_id: articleId,
-                    article_nom: articleName,
+                    ingredient_id: ingredientId,
+                    ingredient_nom: ingredientName,
+                    article_nom: ingredientName, // compat ancienne colonne
                     unite: unite,
                     demandeur_nom: currentUser.nom,
                     demandeur_initiales: currentUser.initiales,
@@ -1429,7 +1443,7 @@
                         return `
                             <div class="item-card">
                                 <div class="item-info">
-                                    <div class="item-name">${b.article_nom}</div>
+                                    <div class="item-name">${b.ingredient_nom || b.article_nom}</div>
                                     <div class="item-meta">
                                         ${b.urgence ? '<span class="badge badge-urgent">🔴 Urgent</span>' : ''}
                                         Demandé par ${b.demandeur_initiales || '?'} le ${b.date_demande ? new Date(b.date_demande).toLocaleDateString('fr-FR') : 'aujourd\'hui'}
@@ -1451,7 +1465,7 @@
                     html += valideBesoin.map(b => `
                         <div class="item-card" style="border-left:3px solid var(--green)">
                             <div class="item-info">
-                                <div class="item-name">${b.article_nom}</div>
+                                <div class="item-name">${b.ingredient_nom || b.article_nom}</div>
                                 <div class="item-meta">${b.quantite || '?'} ${b.unite || ''} — validé par ${b.valide_par_nom || '—'}</div>
                             </div>
                         </div>
@@ -1477,7 +1491,7 @@
             container.innerHTML = demandes.map(b => `
                 <div class="validation-item" data-besoin-id="${b.id}">
                     <div class="validation-item-name">
-                        ${b.article_nom}
+                        ${b.ingredient_nom || b.article_nom}
                         ${b.urgence ? '<span class="badge badge-urgent" style="font-size:10px">🔴</span>' : ''}
                     </div>
                     <div class="validation-item-inputs">
@@ -1655,12 +1669,23 @@
                 const besoinsSansPrix = [];
 
                 for (const besoin of validated) {
+                    // 1) Récupérer tous les articles du catalogue liés à cet ingrédient
+                    //    (fallback: si pas d'ingredient_id, utiliser l'ancien article_id)
+                    let articlesLies = [];
+                    if (besoin.ingredient_id) {
+                        articlesLies = articles.filter(a => a.ingredient_id === besoin.ingredient_id);
+                    } else if (besoin.article_id) {
+                        articlesLies = articles.filter(a => a.id === besoin.article_id);
+                    }
+                    const articleIds = articlesLies.map(a => a.id);
+
+                    // 2) Trouver tous les prix actifs pour ces articles, et garder le moins cher
                     const bestPrice = prix.filter(p =>
-                        p.article_id === besoin.article_id && p.actif
+                        articleIds.includes(p.article_id) && p.actif
                     ).sort((a, b) => a.pu_ht - b.pu_ht)[0];
 
                     if (!bestPrice) {
-                        besoinsSansPrix.push(besoin.article_nom);
+                        besoinsSansPrix.push(besoin.ingredient_nom || besoin.article_nom);
                         continue;
                     }
 
@@ -1687,9 +1712,9 @@
                     const montant_ttc = Math.round(montant_ht * (1 + tva) * 100) / 100;
 
                     newOrders[supplierId].lignes.push({
-                        article_id: besoin.article_id,
+                        article_id: bestPrice.article_id,
                         prix_id: bestPrice.id,
-                        designation: bestPrice.designation || besoin.article_nom,
+                        designation: bestPrice.designation || besoin.ingredient_nom || besoin.article_nom,
                         quantite: qty,
                         unite: besoin.unite || bestPrice.unite,
                         pu_ht: bestPrice.pu_ht,
