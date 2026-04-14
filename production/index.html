@@ -497,92 +497,8 @@
     .dlc-stat-dep { background: #fef2f2; }
     .dlc-stat-dep .num { color: #dc2626; }
 
-    /* ============ IMPRESSION ÉTIQUETTE DK-11209 PORTRAIT (29×62mm) ============
-       iOS Safari ne supporte pas correctement transform: rotate en impression,
-       donc on reste en portrait natif. Pas de document.write : préserve le user
-       gesture iOS (pas de popup "L'impression automatique n'est pas autorisée"). */
-    @page etiquette { size: 29mm 62mm; margin: 0; }
-    #print-label-host {
-      position: fixed; left: -9999px; top: -9999px;
-      width: 29mm; height: 62mm; background: white;
-      overflow: hidden;
-      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
-      color: #000;
-    }
-    #print-label-host.printing { left: 0; top: 0; z-index: 99999; }
-    #print-label-host .lbl-inner {
-      width: 29mm; height: 62mm;
-      padding: 2mm 1.5mm;
-      box-sizing: border-box;
-      display: flex; flex-direction: column;
-      overflow: hidden;
-      background: white;
-    }
-    #print-label-host .lbl-inner * { margin: 0; padding: 0; }
-    #print-label-host .lbl-day {
-      font-size: 11pt; font-weight: 900; text-transform: uppercase;
-      padding: 1mm 0; letter-spacing: 0.8px;
-      text-align: center; white-space: nowrap;
-      border-radius: 1mm; margin-bottom: 1.5mm;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    }
-    #print-label-host .lbl-day.day-red { color: #d00; border: 0.5mm solid #d00; }
-    #print-label-host .lbl-day.day-black { color: white; background: #000; }
-    #print-label-host .lbl-product {
-      font-size: 12pt; font-weight: 800; line-height: 1.15;
-      text-align: center; word-wrap: break-word; margin-bottom: 1.5mm;
-    }
-    #print-label-host .lbl-etab {
-      font-size: 9pt; font-weight: 800; text-align: center;
-      margin-bottom: 2mm; border-bottom: 0.4mm solid #000; padding-bottom: 1.2mm;
-    }
-    #print-label-host .lbl-lot {
-      font-size: 8pt; font-weight: 700;
-      font-family: 'Courier New', monospace;
-      text-align: center; white-space: nowrap; margin-bottom: 1mm;
-    }
-    #print-label-host .lbl-meta {
-      font-size: 9pt; font-weight: 700; text-align: center;
-      line-height: 1.3; margin-bottom: 1mm;
-    }
-    #print-label-host .lbl-prod {
-      font-size: 8pt; font-weight: 600; text-align: center;
-      margin-bottom: 0.8mm; margin-top: auto;
-    }
-    #print-label-host .lbl-dlc {
-      font-size: 12pt; font-weight: 900; color: #d00;
-      text-align: center; white-space: nowrap;
-      border-top: 0.5mm solid #d00; padding-top: 1mm;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    }
-    #print-label-host .lbl-dlc small { font-size: 7pt; display: block; font-weight: 700; }
-
-    @media print {
-      /* Masquer toute l'UI de la page Production */
-      body > *:not(#print-label-host) { display: none !important; visibility: hidden !important; }
-      body { background: white !important; margin: 0 !important; padding: 0 !important; }
-      html, body {
-        width: 29mm !important; height: 62mm !important;
-        min-width: 0 !important; min-height: 0 !important;
-        max-width: 29mm !important; max-height: 62mm !important;
-        margin: 0 !important; padding: 0 !important;
-        overflow: hidden !important;
-      }
-      /* Le host occupe la page portrait 29×62mm, et c'est .lbl-inner qui
-         contient la rotation via son propre transform (défini hors @media print). */
-      #print-label-host {
-        display: block !important; visibility: visible !important;
-        position: fixed !important;
-        top: 0 !important; left: 0 !important;
-        width: 29mm !important; height: 62mm !important;
-        z-index: 99999 !important;
-        page: etiquette;
-        page-break-inside: avoid !important; page-break-after: avoid !important;
-        background: white !important;
-        overflow: hidden !important;
-      }
-      #print-label-host * { visibility: visible !important; }
-    }
+    /* L'impression de l'étiquette est gérée dans un iframe caché (voir printEtiquette).
+       Le document principal n'a donc aucune règle @media print pour l'étiquette. */
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -2438,50 +2354,12 @@ function printEtiquette(productionId) {
   const producteur = production.producteur_initiales || '—';
   const produitEsc = escapeHtml(production.nom_produit || '');
 
-  // ===== IMPRESSION SANS document.write =====
-  // Pour éviter le popup iOS "L'impression automatique n'est pas autorisée",
-  // on NE remplace PAS le document. On injecte un div #print-label-host
-  // directement dans le document courant et on appelle window.print()
-  // SYNCHRONEMENT depuis le handler onclick — la chaîne du user gesture
-  // est préservée, donc iOS accepte l'impression sans demander confirmation.
+  // ===== IMPRESSION VIA IFRAME CACHÉ =====
+  // Le document principal n'est JAMAIS remplacé : le user gesture est préservé
+  // (pas de popup iOS "L'impression automatique n'est pas autorisée").
+  // Le contenu de l'étiquette est écrit dans un iframe isolé, ses styles ne sont
+  // pas pollués par la page Production, et on appelle print() sur son contentWindow.
 
-  // Nettoyer un éventuel reliquat d'une impression précédente
-  const existingHost = document.getElementById('print-label-host');
-  if (existingHost) existingHost.remove();
-
-  const host = document.createElement('div');
-  host.id = 'print-label-host';
-  host.innerHTML = `
-    <div class="lbl-inner">
-      <div class="lbl-day ${dayClass}">${dayName}</div>
-      <div class="lbl-product">${produitEsc}</div>
-      <div class="lbl-etab">${etabShort}</div>
-      <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
-      <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
-      <div class="lbl-prod">Prod: ${prodDateStr}</div>
-      <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
-    </div>
-  `;
-  document.body.appendChild(host);
-
-  // Marquer comme imprimée (async, non bloquant)
-  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
-
-  // Nettoyer après impression (ou si l'utilisateur annule)
-  const cleanup = () => {
-    const h = document.getElementById('print-label-host');
-    if (h) h.remove();
-    window.removeEventListener('afterprint', cleanup);
-  };
-  window.addEventListener('afterprint', cleanup);
-  // Filet de sécurité : nettoyage forcé au bout de 30s
-  setTimeout(cleanup, 30000);
-
-  // Appel SYNCHRONE dans la chaîne du user gesture — pas de popup iOS
-  window.print();
-  return;
-
-  // ===== CODE LEGACY (plus utilisé) =====
   const printDoc = `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -2639,18 +2517,35 @@ function printEtiquette(productionId) {
 </body>
 </html>`;
 
-  // Marquer comme imprimée AVANT de remplacer le document (la requête persiste).
+  // Marquer comme imprimée (async, non bloquant)
   DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  // Remplacer complètement le document par une page minimale contenant l'étiquette,
-  // puis déclencher l'impression SYNCHRONEMENT dans le même user gesture que le clic
-  // initial (bouton "Imprimer" du modal) — iOS Safari accepte window.print() sans
-  // popup "autoriser" si la chaîne d'événement utilisateur n'est pas brisée.
-  document.open();
-  document.write(printDoc);
-  document.close();
-  // Appel sync : pas de setTimeout, pas d'await — le user gesture reste actif.
-  window.print();
+  // Nettoyer un éventuel iframe précédent
+  const old = document.getElementById('print-iframe');
+  if (old) old.remove();
+
+  // Créer iframe caché et y écrire le HTML de l'étiquette
+  const iframe = document.createElement('iframe');
+  iframe.id = 'print-iframe';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(iframe);
+
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(printDoc);
+  idoc.close();
+
+  // Appel SYNCHRONE dans la chaîne du user gesture : iOS accepte sans popup
+  // parce que le document principal n'a PAS été remplacé.
+  iframe.contentWindow.focus();
+  iframe.contentWindow.print();
+
+  // Nettoyer l'iframe après impression
+  setTimeout(() => {
+    const el = document.getElementById('print-iframe');
+    if (el) el.remove();
+  }, 30000);
 }
 
 async function markEtiquetteOk(productionId) {
