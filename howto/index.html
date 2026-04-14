@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HowTo">
+    <meta name="theme-color" content="#f97316">
+    <title>HowTo — PlanB Tools</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --orange: #f97316;
+            --orange-light: #fff7ed;
+            --orange-dark: #ea580c;
+            --green: #22c55e;
+            --green-light: #f0fdf4;
+            --red: #ef4444;
+            --red-light: #fef2f2;
+            --blue: #3b82f6;
+            --blue-light: #eff6ff;
+            --purple: #8b5cf6;
+            --amber: #f59e0b;
+            --amber-light: #fffbeb;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius: 14px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { width: 100%; height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+        .header .back-btn {
+            background: none; border: none; font-size: 22px; cursor: pointer;
+            padding: 4px 10px; color: var(--orange); flex-shrink: 0; transition: transform 0.15s;
+        }
+        .header .back-btn:active { transform: scale(0.85); }
+        .header .title { font-size: 17px; font-weight: 700; flex: 1; }
+        .header .etab-badge {
+            background: var(--orange-light); color: var(--orange-dark);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; flex-shrink: 0;
+        }
+        .header .user-badge {
+            background: var(--gray-100); color: var(--gray-600);
+            padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; flex-shrink: 0;
+        }
+
+        /* Content wrapper */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            background: white;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            flex-shrink: 0;
+            scrollbar-width: none;
+        }
+        .filter-bar::-webkit-scrollbar { display: none; }
+        .chip {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .chip:active { transform: scale(0.95); }
+        .chip.active {
+            background: var(--orange);
+            color: white;
+            border-color: var(--orange);
+        }
+
+        /* Hero / intro */
+        .hero {
+            background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%);
+            color: white;
+            padding: 20px 18px;
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-lg);
+        }
+        .hero h2 { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+        .hero p { font-size: 14px; opacity: 0.95; line-height: 1.5; }
+        .hero .stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 14px;
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.95;
+        }
+        .hero .stats span { display: flex; align-items: center; gap: 4px; }
+
+        /* Tuto cards grid */
+        .tuto-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .tuto-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            border: 2px solid transparent;
+            position: relative;
+        }
+        .tuto-card:active { transform: scale(0.98); }
+        .tuto-card.vu { border-color: var(--green); }
+        .tuto-card .icon {
+            font-size: 36px;
+            width: 58px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--orange-light);
+            border-radius: 14px;
+            flex-shrink: 0;
+        }
+        .tuto-card.vu .icon { background: var(--green-light); }
+        .tuto-card .info { flex: 1; min-width: 0; }
+        .tuto-card h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+        .tuto-card p {
+            font-size: 13px;
+            color: var(--gray-600);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .tuto-card .meta {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--gray-500);
+            font-weight: 600;
+        }
+        .tuto-card .meta span { display: flex; align-items: center; gap: 3px; }
+        .tuto-card .badge-vu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--green);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+        .tuto-card .niveau {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .niveau.debutant { background: var(--green-light); color: var(--green); }
+        .niveau.intermediaire { background: var(--amber-light); color: var(--amber); }
+        .niveau.avance { background: var(--red-light); color: var(--red); }
+
+        /* Empty state */
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray-500);
+        }
+        .empty .icon { font-size: 56px; margin-bottom: 12px; }
+        .empty p { font-size: 15px; }
+
+        /* Loader */
+        .loader {
+            text-align: center;
+            padding: 40px;
+            color: var(--gray-500);
+        }
+        .spinner {
+            display: inline-block;
+            width: 32px; height: 32px;
+            border: 3px solid var(--gray-200);
+            border-top-color: var(--orange);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ==== Player screen ==== */
+        .player {
+            position: fixed;
+            inset: 0;
+            background: white;
+            display: none;
+            flex-direction: column;
+            z-index: 200;
+        }
+        .player.active { display: flex; }
+        .player .header { border-bottom: 1px solid var(--gray-200); }
+        .player .progress-track {
+            height: 4px;
+            background: var(--gray-200);
+            position: relative;
+            flex-shrink: 0;
+        }
+        .player .progress-fill {
+            height: 100%;
+            background: var(--orange);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .player-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 20px 100px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .step-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--orange);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .step-count {
+            font-size: 13px;
+            color: var(--gray-500);
+            font-weight: 600;
+        }
+        .step-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 14px;
+            line-height: 1.25;
+        }
+        .step-text {
+            font-size: 16px;
+            color: var(--gray-700);
+            line-height: 1.6;
+            margin-bottom: 18px;
+        }
+        .step-image {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            margin-bottom: 18px;
+            background: var(--gray-100);
+        }
+        .step-astuce {
+            background: var(--amber-light);
+            border-left: 4px solid var(--amber);
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--gray-800);
+            line-height: 1.5;
+        }
+        .step-astuce::before {
+            content: '💡 ';
+        }
+
+        .video-wrap {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%;
+            background: black;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 18px;
+        }
+        .video-wrap iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .player-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid var(--gray-200);
+            padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            flex: 1;
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--orange); color: white; }
+        .btn-secondary { background: var(--gray-100); color: var(--gray-700); }
+        .btn-success { background: var(--green); color: white; }
+        .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+        /* Admin modal */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: flex-end;
+            z-index: 300;
+        }
+        .modal.active { display: flex; }
+        .modal-body {
+            background: white;
+            width: 100%;
+            max-height: 90vh;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: slideUp 0.25s;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-200);
+            flex-shrink: 0;
+        }
+        .modal-header h3 { flex: 1; font-size: 17px; font-weight: 700; }
+        .modal-header button {
+            background: none;
+            border: none;
+            font-size: 22px;
+            color: var(--gray-500);
+            cursor: pointer;
+        }
+        .modal-content {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+            -webkit-overflow-scrolling: touch;
+        }
+        .modal-footer {
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--gray-300);
+            border-radius: 10px;
+            font-size: 15px;
+            background: white;
+            color: var(--gray-900);
+            font-family: inherit;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--orange);
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex: 1; }
+
+        .etape-editor {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .etape-editor-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 700;
+            color: var(--gray-700);
+        }
+        .etape-editor-head button {
+            background: var(--red-light);
+            color: var(--red);
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: var(--orange);
+            color: white;
+            border: none;
+            font-size: 28px;
+            box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+            cursor: pointer;
+            z-index: 50;
+        }
+        .fab:active { transform: scale(0.92); }
+
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gray-900);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 400;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+        }
+        .toast.show { opacity: 1; }
+
+        .admin-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--gray-200);
+        }
+        .admin-actions button {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+            background: white;
+            color: var(--gray-700);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .admin-actions .btn-danger {
+            color: var(--red);
+            border-color: var(--red-light);
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 22px 0 10px 2px;
+        }
+        .section-title:first-child { margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <div class="title">💡 HowTo — Tutoriels</div>
+        <div class="etab-badge" id="etab-badge">—</div>
+        <div class="user-badge" id="user-badge">—</div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar" id="filter-bar">
+        <button class="chip active" data-module="all">Tous</button>
+        <button class="chip" data-module="general">🔐 Général</button>
+        <button class="chip" data-module="taf">📋 TAF</button>
+        <button class="chip" data-module="checklist">✅ Check-Lists</button>
+        <button class="chip" data-module="caisse">🧾 Caisse</button>
+        <button class="chip" data-module="temperatures">🌡️ Températures</button>
+        <button class="chip" data-module="briefings">📢 Briefings</button>
+        <button class="chip" data-module="approvisionnement">📦 Appro</button>
+        <button class="chip" data-module="production">🏭 Production</button>
+        <button class="chip" data-module="ventes">💰 Ventes</button>
+        <button class="chip" data-module="cartons-jvr">🟡 Cartons JVR</button>
+    </div>
+
+    <!-- Content -->
+    <div class="content" id="content">
+        <div class="loader">
+            <div class="spinner"></div>
+            <p style="margin-top:12px;">Chargement des tutoriels…</p>
+        </div>
+    </div>
+
+    <!-- FAB admin -->
+    <button class="fab" id="fab-add" style="display:none;" onclick="openTutoEditor()">+</button>
+
+    <!-- Player screen -->
+    <div class="player" id="player">
+        <div class="header">
+            <button class="back-btn" onclick="closePlayer()">←</button>
+            <div class="title" id="player-title">Tutoriel</div>
+            <div class="etab-badge" id="player-step-count">1/1</div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="player-body" id="player-body"></div>
+        <div class="player-footer">
+            <button class="btn btn-secondary" id="btn-prev" onclick="playerPrev()">← Précédent</button>
+            <button class="btn btn-primary" id="btn-next" onclick="playerNext()">Suivant →</button>
+        </div>
+    </div>
+
+    <!-- Admin editor modal -->
+    <div class="modal" id="editor-modal">
+        <div class="modal-body">
+            <div class="modal-header">
+                <h3 id="editor-title">Nouveau tutoriel</h3>
+                <button onclick="closeTutoEditor()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="section-title">Informations générales</div>
+                <div class="form-group">
+                    <label>Titre</label>
+                    <input type="text" id="edit-titre" placeholder="Ex : Valider une tâche dans le TAF">
+                </div>
+                <div class="form-group">
+                    <label>Description courte</label>
+                    <textarea id="edit-description" placeholder="Une phrase qui résume ce qu'on apprend"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Module</label>
+                        <select id="edit-module">
+                            <option value="general">Général</option>
+                            <option value="taf">TAF</option>
+                            <option value="checklist">Check-Lists</option>
+                            <option value="caisse">Contrôle Caisse</option>
+                            <option value="temperatures">Températures</option>
+                            <option value="briefings">Briefings</option>
+                            <option value="approvisionnement">Approvisionnement</option>
+                            <option value="production">Production</option>
+                            <option value="ventes">Ventes</option>
+                            <option value="cartons-jvr">Cartons JVR</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Icône</label>
+                        <input type="text" id="edit-icone" maxlength="2" placeholder="💡">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Niveau</label>
+                        <select id="edit-niveau">
+                            <option value="debutant">Débutant</option>
+                            <option value="intermediaire">Intermédiaire</option>
+                            <option value="avance">Avancé</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Durée (sec)</label>
+                        <input type="number" id="edit-duree" min="30" max="600" value="90">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Rôle minimum</label>
+                        <select id="edit-role">
+                            <option value="collaborateur">Collaborateur</option>
+                            <option value="responsable">Responsable</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Équipe</label>
+                        <select id="edit-equipe">
+                            <option value="">Toutes</option>
+                            <option value="salle">Salle</option>
+                            <option value="cuisine">Cuisine</option>
+                            <option value="plonge">Plonge</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>URL vidéo YouTube (optionnel)</label>
+                    <input type="text" id="edit-video" placeholder="https://www.youtube.com/embed/...">
+                </div>
+
+                <div class="section-title">Étapes du tutoriel</div>
+                <div id="etapes-container"></div>
+                <button class="btn btn-secondary" onclick="addEtapeEditor()" style="margin-top:8px;">+ Ajouter une étape</button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTutoEditor()">Annuler</button>
+                <button class="btn btn-primary" onclick="saveTuto()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ============= State =============
+        let supabaseClient = null;
+        let currentUser = null;
+        let currentEstablishment = null;
+        let tutoriels = [];
+        let vuesUser = new Set();
+        let currentModuleFilter = 'all';
+        let currentTuto = null;
+        let currentEtapes = [];
+        let currentStepIndex = 0;
+        let editingTutoId = null;
+        let editorEtapes = [];
+
+        const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+        const MODULE_LABELS = {
+            general: '🔐 Général',
+            taf: '📋 TAF',
+            checklist: '✅ Check-Lists',
+            caisse: '🧾 Caisse',
+            temperatures: '🌡️ Températures',
+            briefings: '📢 Briefings',
+            approvisionnement: '📦 Approvisionnement',
+            production: '🏭 Production',
+            ventes: '💰 Ventes',
+            'cartons-jvr': '🟡 Cartons JVR'
+        };
+
+        const ROLE_RANK = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+
+        // ============= Init =============
+        async function init() {
+            try {
+                const userJson = sessionStorage.getItem('planb_user');
+                const etab = sessionStorage.getItem('planb_etablissement');
+                if (!userJson || !etab) { goBack(); return; }
+                currentUser = JSON.parse(userJson);
+                currentEstablishment = etab;
+
+                document.getElementById('etab-badge').textContent = etab === 'freddy' ? 'Freddy' : 'Liesel';
+                document.getElementById('user-badge').textContent = currentUser.initiales || currentUser.nom;
+
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+                // Show FAB for admin/manager
+                const rank = ROLE_RANK[currentUser.role] || 0;
+                if (rank >= 3) {
+                    document.getElementById('fab-add').style.display = 'block';
+                }
+
+                // Filter bar click
+                document.querySelectorAll('.filter-bar .chip').forEach(chip => {
+                    chip.addEventListener('click', () => {
+                        document.querySelectorAll('.filter-bar .chip').forEach(c => c.classList.remove('active'));
+                        chip.classList.add('active');
+                        currentModuleFilter = chip.dataset.module;
+                        renderList();
+                    });
+                });
+
+                await loadTutoriels();
+                await loadVues();
+                renderList();
+            } catch (err) {
+                console.error('Init error:', err);
+                document.getElementById('content').innerHTML = `
+                    <div class="empty">
+                        <div class="icon">⚠️</div>
+                        <p>Erreur de chargement. Vérifie que le schéma SQL a été exécuté.</p>
+                    </div>`;
+            }
+        }
+
+        async function loadTutoriels() {
+            const { data, error } = await supabaseClient
+                .from('howto_tutoriels')
+                .select('*')
+                .eq('actif', true)
+                .order('ordre', { ascending: true });
+            if (error) throw error;
+            tutoriels = data || [];
+        }
+
+        async function loadVues() {
+            const { data } = await supabaseClient
+                .from('howto_vues')
+                .select('tutoriel_id')
+                .eq('user_id', currentUser.id);
+            vuesUser = new Set((data || []).map(v => v.tutoriel_id));
+        }
+
+        function canSeeTuto(t) {
+            const userRank = ROLE_RANK[currentUser.role] || 0;
+            const minRank = ROLE_RANK[t.role_min] || 1;
+            if (userRank < minRank) return false;
+            if (t.equipe && currentUser.equipe && t.equipe !== currentUser.equipe) return false;
+            return true;
+        }
+
+        function renderList() {
+            const content = document.getElementById('content');
+            let filtered = tutoriels.filter(canSeeTuto);
+            if (currentModuleFilter !== 'all') {
+                filtered = filtered.filter(t => t.module_id === currentModuleFilter);
+            }
+
+            const vusCount = filtered.filter(t => vuesUser.has(t.id)).length;
+            const totalCount = filtered.length;
+
+            let html = `
+                <div class="hero">
+                    <h2>Apprends à utiliser PlanB Tools</h2>
+                    <p>Des tutoriels courts pour maîtriser chaque module en 1-2 minutes. Choisis un sujet et c'est parti.</p>
+                    <div class="stats">
+                        <span>📚 ${totalCount} tutoriels</span>
+                        <span>✓ ${vusCount} vus</span>
+                    </div>
+                </div>
+            `;
+
+            if (filtered.length === 0) {
+                html += `
+                    <div class="empty">
+                        <div class="icon">📭</div>
+                        <p>Aucun tutoriel dans cette catégorie pour le moment.</p>
+                    </div>`;
+                content.innerHTML = html;
+                return;
+            }
+
+            html += '<div class="tuto-list">';
+            filtered.forEach(t => {
+                const isVu = vuesUser.has(t.id);
+                const duree = Math.round(t.duree_sec / 60 * 10) / 10;
+                const dureeLabel = duree < 1 ? `${t.duree_sec}s` : `~${Math.ceil(duree)} min`;
+                const isAdmin = (ROLE_RANK[currentUser.role] || 0) >= 3;
+                html += `
+                    <div class="tuto-card ${isVu ? 'vu' : ''}" onclick="openTuto(${t.id})">
+                        ${isVu ? '<div class="badge-vu">✓ VU</div>' : ''}
+                        <div class="icon">${t.icone || '💡'}</div>
+                        <div class="info">
+                            <h3>${escapeHtml(t.titre)}</h3>
+                            <p>${escapeHtml(t.description || '')}</p>
+                            <div class="meta">
+                                <span class="niveau ${t.niveau}">${t.niveau}</span>
+                                <span>⏱ ${dureeLabel}</span>
+                                <span>${MODULE_LABELS[t.module_id] || t.module_id}</span>
+                            </div>
+                            ${isAdmin ? `
+                                <div class="admin-actions" onclick="event.stopPropagation()">
+                                    <button onclick="editTuto(${t.id})">✏️ Modifier</button>
+                                    <button class="btn-danger" onclick="deleteTuto(${t.id})">🗑️ Supprimer</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        // ============= Player =============
+        async function openTuto(id) {
+            const t = tutoriels.find(x => x.id === id);
+            if (!t) return;
+            currentTuto = t;
+            currentStepIndex = 0;
+
+            const { data, error } = await supabaseClient
+                .from('howto_etapes')
+                .select('*')
+                .eq('tutoriel_id', id)
+                .order('ordre', { ascending: true });
+            if (error) {
+                alert('Impossible de charger les étapes.');
+                return;
+            }
+            currentEtapes = data || [];
+            if (currentEtapes.length === 0) {
+                alert('Ce tutoriel n\'a pas encore d\'étapes.');
+                return;
+            }
+
+            document.getElementById('player-title').textContent = t.titre;
+            document.getElementById('player').classList.add('active');
+            renderStep();
+        }
+
+        function renderStep() {
+            const body = document.getElementById('player-body');
+            const step = currentEtapes[currentStepIndex];
+            const total = currentEtapes.length;
+
+            document.getElementById('player-step-count').textContent = `${currentStepIndex + 1}/${total}`;
+            document.getElementById('progress-fill').style.width = `${((currentStepIndex + 1) / total) * 100}%`;
+
+            let html = `
+                <div class="step-header">
+                    <div class="step-number">${currentStepIndex + 1}</div>
+                    <div class="step-count">Étape ${currentStepIndex + 1} sur ${total}</div>
+                </div>
+                <div class="step-title">${escapeHtml(step.titre)}</div>
+            `;
+
+            if (currentStepIndex === 0 && currentTuto.video_url) {
+                html += `<div class="video-wrap"><iframe src="${currentTuto.video_url}" allowfullscreen></iframe></div>`;
+            }
+
+            if (step.image_url) {
+                html += `<img src="${step.image_url}" class="step-image" alt="">`;
+            }
+
+            if (step.texte) {
+                html += `<div class="step-text">${escapeHtml(step.texte).replace(/\n/g, '<br>')}</div>`;
+            }
+
+            if (step.astuce) {
+                html += `<div class="step-astuce">${escapeHtml(step.astuce)}</div>`;
+            }
+
+            body.innerHTML = html;
+            body.scrollTop = 0;
+
+            document.getElementById('btn-prev').disabled = currentStepIndex === 0;
+            const nextBtn = document.getElementById('btn-next');
+            if (currentStepIndex === total - 1) {
+                nextBtn.textContent = '✓ Terminer';
+                nextBtn.className = 'btn btn-success';
+            } else {
+                nextBtn.textContent = 'Suivant →';
+                nextBtn.className = 'btn btn-primary';
+            }
+        }
+
+        function playerPrev() {
+            if (currentStepIndex > 0) {
+                currentStepIndex--;
+                renderStep();
+            }
+        }
+
+        async function playerNext() {
+            if (currentStepIndex < currentEtapes.length - 1) {
+                currentStepIndex++;
+                renderStep();
+            } else {
+                await markAsViewed(currentTuto.id);
+                closePlayer();
+                showToast('✓ Tutoriel terminé');
+            }
+        }
+
+        function closePlayer() {
+            document.getElementById('player').classList.remove('active');
+            renderList();
+        }
+
+        async function markAsViewed(tutoId) {
+            try {
+                await supabaseClient.from('howto_vues').upsert({
+                    tutoriel_id: tutoId,
+                    user_id: currentUser.id,
+                    user_nom: currentUser.nom,
+                    user_initiales: currentUser.initiales,
+                    etablissement: currentEstablishment,
+                    vu_at: new Date().toISOString()
+                }, { onConflict: 'tutoriel_id,user_id' });
+                vuesUser.add(tutoId);
+            } catch (e) {
+                console.warn('markAsViewed failed:', e);
+            }
+        }
+
+        // ============= Admin editor =============
+        function openTutoEditor() {
+            editingTutoId = null;
+            editorEtapes = [{ titre: '', texte: '', astuce: '', image_url: '' }];
+            document.getElementById('editor-title').textContent = 'Nouveau tutoriel';
+            document.getElementById('edit-titre').value = '';
+            document.getElementById('edit-description').value = '';
+            document.getElementById('edit-module').value = 'general';
+            document.getElementById('edit-icone').value = '💡';
+            document.getElementById('edit-niveau').value = 'debutant';
+            document.getElementById('edit-duree').value = 90;
+            document.getElementById('edit-role').value = 'collaborateur';
+            document.getElementById('edit-equipe').value = '';
+            document.getElementById('edit-video').value = '';
+            renderEtapesEditor();
+            document.getElementById('editor-modal').classList.add('active');
+        }
+
+        async function editTuto(id) {
+            const t = tutoriels.find(x => x.id === id);
+            if (!t) return;
+            editingTutoId = id;
+
+            const { data } = await supabaseClient
+                .from('howto_etapes')
+                .select('*')
+                .eq('tutoriel_id', id)
+                .order('ordre');
+            editorEtapes = (data && data.length) ? data.map(e => ({
+                titre: e.titre || '',
+                texte: e.texte || '',
+                astuce: e.astuce || '',
+                image_url: e.image_url || ''
+            })) : [{ titre: '', texte: '', astuce: '', image_url: '' }];
+
+            document.getElementById('editor-title').textContent = 'Modifier le tutoriel';
+            document.getElementById('edit-titre').value = t.titre || '';
+            document.getElementById('edit-description').value = t.description || '';
+            document.getElementById('edit-module').value = t.module_id || 'general';
+            document.getElementById('edit-icone').value = t.icone || '💡';
+            document.getElementById('edit-niveau').value = t.niveau || 'debutant';
+            document.getElementById('edit-duree').value = t.duree_sec || 90;
+            document.getElementById('edit-role').value = t.role_min || 'collaborateur';
+            document.getElementById('edit-equipe').value = t.equipe || '';
+            document.getElementById('edit-video').value = t.video_url || '';
+            renderEtapesEditor();
+            document.getElementById('editor-modal').classList.add('active');
+        }
+
+        function closeTutoEditor() {
+            document.getElementById('editor-modal').classList.remove('active');
+        }
+
+        function renderEtapesEditor() {
+            const c = document.getElementById('etapes-container');
+            c.innerHTML = '';
+            editorEtapes.forEach((e, i) => {
+                const div = document.createElement('div');
+                div.className = 'etape-editor';
+                div.innerHTML = `
+                    <div class="etape-editor-head">
+                        <span>Étape ${i + 1}</span>
+                        ${editorEtapes.length > 1 ? `<button onclick="removeEtape(${i})">Retirer</button>` : ''}
+                    </div>
+                    <div class="form-group">
+                        <label>Titre</label>
+                        <input type="text" data-field="titre" data-i="${i}" value="${escapeAttr(e.titre)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Texte de l'étape</label>
+                        <textarea data-field="texte" data-i="${i}">${escapeHtml(e.texte || '')}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Astuce (optionnel)</label>
+                        <input type="text" data-field="astuce" data-i="${i}" value="${escapeAttr(e.astuce)}">
+                    </div>
+                    <div class="form-group">
+                        <label>URL image (optionnel)</label>
+                        <input type="text" data-field="image_url" data-i="${i}" value="${escapeAttr(e.image_url)}" placeholder="https://...">
+                    </div>
+                `;
+                c.appendChild(div);
+            });
+            c.querySelectorAll('input, textarea').forEach(el => {
+                el.addEventListener('input', ev => {
+                    const i = parseInt(ev.target.dataset.i);
+                    const f = ev.target.dataset.field;
+                    editorEtapes[i][f] = ev.target.value;
+                });
+            });
+        }
+
+        function addEtapeEditor() {
+            editorEtapes.push({ titre: '', texte: '', astuce: '', image_url: '' });
+            renderEtapesEditor();
+        }
+
+        function removeEtape(i) {
+            editorEtapes.splice(i, 1);
+            renderEtapesEditor();
+        }
+
+        async function saveTuto() {
+            const titre = document.getElementById('edit-titre').value.trim();
+            if (!titre) { alert('Le titre est obligatoire'); return; }
+            if (editorEtapes.length === 0 || !editorEtapes[0].titre.trim()) {
+                alert('Au moins une étape avec un titre est obligatoire'); return;
+            }
+
+            const payload = {
+                titre,
+                description: document.getElementById('edit-description').value.trim(),
+                module_id: document.getElementById('edit-module').value,
+                icone: document.getElementById('edit-icone').value.trim() || '💡',
+                niveau: document.getElementById('edit-niveau').value,
+                duree_sec: parseInt(document.getElementById('edit-duree').value) || 90,
+                role_min: document.getElementById('edit-role').value,
+                equipe: document.getElementById('edit-equipe').value || null,
+                video_url: document.getElementById('edit-video').value.trim() || null,
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                let tutoId = editingTutoId;
+                if (editingTutoId) {
+                    const { error } = await supabaseClient
+                        .from('howto_tutoriels')
+                        .update(payload)
+                        .eq('id', editingTutoId);
+                    if (error) throw error;
+                    await supabaseClient.from('howto_etapes').delete().eq('tutoriel_id', editingTutoId);
+                } else {
+                    payload.cree_par_id = currentUser.id;
+                    payload.cree_par_nom = currentUser.nom;
+                    payload.ordre = tutoriels.length + 1;
+                    const { data, error } = await supabaseClient
+                        .from('howto_tutoriels')
+                        .insert(payload)
+                        .select()
+                        .single();
+                    if (error) throw error;
+                    tutoId = data.id;
+                }
+
+                const etapesPayload = editorEtapes
+                    .filter(e => e.titre.trim())
+                    .map((e, i) => ({
+                        tutoriel_id: tutoId,
+                        ordre: i + 1,
+                        titre: e.titre.trim(),
+                        texte: e.texte.trim() || null,
+                        astuce: e.astuce.trim() || null,
+                        image_url: e.image_url.trim() || null
+                    }));
+
+                if (etapesPayload.length > 0) {
+                    const { error } = await supabaseClient.from('howto_etapes').insert(etapesPayload);
+                    if (error) throw error;
+                }
+
+                closeTutoEditor();
+                await loadTutoriels();
+                renderList();
+                showToast('✓ Tutoriel enregistré');
+            } catch (err) {
+                console.error(err);
+                alert('Erreur : ' + err.message);
+            }
+        }
+
+        async function deleteTuto(id) {
+            if (!confirm('Supprimer définitivement ce tutoriel ?')) return;
+            try {
+                await supabaseClient.from('howto_tutoriels').delete().eq('id', id);
+                await loadTutoriels();
+                renderList();
+                showToast('✓ Supprimé');
+            } catch (err) {
+                alert('Erreur : ' + err.message);
+            }
+        }
+
+        // ============= Utils =============
+        function goBack() {
+            window.location.href = '../index.html';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
+        }
+
+        function escapeHtml(s) {
+            if (!s) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        function escapeAttr(s) { return escapeHtml(s); }
+
+        init();
+    </script>
+</body>
+</html>
