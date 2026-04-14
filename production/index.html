@@ -497,10 +497,13 @@
     .dlc-stat-dep { background: #fef2f2; }
     .dlc-stat-dep .num { color: #dc2626; }
 
-    /* ============ IMPRESSION ÉTIQUETTE DK-11209 PAYSAGE (62×29mm) ============
-       Règles dans le document principal pour éviter document.write (qui casse
-       la chaîne de user gesture iOS et déclenche le popup "autoriser"). */
-    @page etiquette { size: 62mm 29mm; margin: 0; }
+    /* ============ IMPRESSION ÉTIQUETTE DK-11209 ============
+       iOS Safari ne propose que le format 29×62mm PORTRAIT dans la liste Brother.
+       On imprime donc sur une page 29×62mm portrait, mais on dessine l'étiquette
+       en 62×29mm paysage et on la fait pivoter de 90° via CSS transform pour
+       qu'elle s'imprime correctement sur le support.
+       Pas de document.write : préserve le user gesture iOS (pas de popup "autoriser"). */
+    @page etiquette { size: 29mm 62mm; margin: 0; }
     #print-label-host {
       position: fixed; left: -9999px; top: -9999px;
       width: 62mm; height: 29mm; background: white;
@@ -573,18 +576,26 @@
       body > *:not(#print-label-host) { display: none !important; visibility: hidden !important; }
       body { background: white !important; margin: 0 !important; padding: 0 !important; }
       html, body {
-        width: 62mm !important; height: 29mm !important;
+        width: 29mm !important; height: 62mm !important;
         min-width: 0 !important; min-height: 0 !important;
-        max-width: 62mm !important; max-height: 29mm !important;
+        max-width: 29mm !important; max-height: 62mm !important;
+        margin: 0 !important; padding: 0 !important;
         overflow: hidden !important;
       }
+      /* Étiquette 62×29mm pivotée de 90° pour tenir dans la page 29×62mm portrait.
+         translate(29mm,0) + rotate(90deg) avec origine (0,0) : après rotation,
+         l'élément occupe x=0..29mm, y=0..62mm — exactement la page. */
       #print-label-host {
         display: block !important; visibility: visible !important;
-        position: fixed !important; left: 0 !important; top: 0 !important;
+        position: fixed !important;
+        top: 0 !important; left: 0 !important;
         width: 62mm !important; height: 29mm !important;
+        transform-origin: 0 0 !important;
+        transform: translate(29mm, 0) rotate(90deg) !important;
         z-index: 99999 !important;
         page: etiquette;
         page-break-inside: avoid !important; page-break-after: avoid !important;
+        background: white !important;
       }
       #print-label-host * { visibility: visible !important; }
     }
