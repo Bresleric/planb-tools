@@ -2409,10 +2409,27 @@ function printEtiquette(productionId) {
     .preview-frame { border: 0 !important; padding: 0 !important; margin: 0 !important; background: white !important; }
     .screen-wrap { display: block !important; gap: 0 !important; }
     html, body {
-      width: 62mm !important; height: 29mm !important;
-      max-width: 62mm !important; max-height: 29mm !important;
+      margin: 0 !important; padding: 0 !important;
       overflow: hidden !important;
     }
+  }
+  /* Impression PAYSAGE (62w × 29h) : layout naturel */
+  @media print and (orientation: landscape) {
+    html, body { width: 62mm !important; height: 29mm !important; }
+    .preview-frame { width: 62mm; height: 29mm; }
+    .label { width: 62mm; height: 29mm; }
+  }
+  /* Impression PORTRAIT (29w × 62h) = default iOS : on pivote le contenu de 90°
+     pour que l'étiquette s'imprime dans le bon sens sur le rouleau DK-11209. */
+  @media print and (orientation: portrait) {
+    html, body { width: 29mm !important; height: 62mm !important; }
+    .preview-frame {
+      position: absolute; top: 0; left: 29mm;
+      width: 62mm; height: 29mm;
+      transform: rotate(90deg);
+      transform-origin: 0 0;
+    }
+    .label { width: 62mm; height: 29mm; }
   }
   .label {
     width: 62mm; height: 29mm;
