@@ -497,12 +497,10 @@
     .dlc-stat-dep { background: #fef2f2; }
     .dlc-stat-dep .num { color: #dc2626; }
 
-    /* ============ IMPRESSION ÉTIQUETTE DK-11209 ============
-       iOS Safari ne propose que le format 29×62mm PORTRAIT dans la liste Brother.
-       On imprime donc sur une page 29×62mm portrait, mais on dessine l'étiquette
-       en 62×29mm paysage et on la fait pivoter de 90° via CSS transform pour
-       qu'elle s'imprime correctement sur le support.
-       Pas de document.write : préserve le user gesture iOS (pas de popup "autoriser"). */
+    /* ============ IMPRESSION ÉTIQUETTE DK-11209 PORTRAIT (29×62mm) ============
+       iOS Safari ne supporte pas correctement transform: rotate en impression,
+       donc on reste en portrait natif. Pas de document.write : préserve le user
+       gesture iOS (pas de popup "L'impression automatique n'est pas autorisée"). */
     @page etiquette { size: 29mm 62mm; margin: 0; }
     #print-label-host {
       position: fixed; left: -9999px; top: -9999px;
@@ -513,70 +511,51 @@
     }
     #print-label-host.printing { left: 0; top: 0; z-index: 99999; }
     #print-label-host .lbl-inner {
-      width: 62mm; height: 29mm;
-      padding: 1.5mm 2mm;
+      width: 29mm; height: 62mm;
+      padding: 2mm 1.5mm;
       box-sizing: border-box;
-      display: flex; flex-direction: row;
-      gap: 2mm;
+      display: flex; flex-direction: column;
       overflow: hidden;
-      /* Rotation 90° dans le sens horaire pour passer du layout paysage 62×29
-         à l'orientation de la page portrait 29×62. translate(29mm,0) + rotate(90deg)
-         avec origine (0,0) : l'élément occupe exactement x=0..29mm, y=0..62mm. */
-      transform-origin: 0 0;
-      transform: translate(29mm, 0) rotate(90deg);
       background: white;
     }
     #print-label-host .lbl-inner * { margin: 0; padding: 0; }
-    #print-label-host .lbl-col-left {
-      flex: 1 1 58%;
-      display: flex; flex-direction: column;
-      justify-content: center;
-      min-width: 0;
-    }
-    #print-label-host .lbl-col-right {
-      flex: 0 0 38%;
-      display: flex; flex-direction: column;
-      justify-content: space-between;
-      border-left: 0.4mm solid #000;
-      padding-left: 1.5mm;
-      min-width: 0;
-    }
     #print-label-host .lbl-day {
-      font-size: 10pt; font-weight: 900; text-transform: uppercase;
-      padding: 0.5mm 1mm; letter-spacing: 0.5px;
+      font-size: 11pt; font-weight: 900; text-transform: uppercase;
+      padding: 1mm 0; letter-spacing: 0.8px;
       text-align: center; white-space: nowrap;
-      border-radius: 1mm; margin-bottom: 1mm;
+      border-radius: 1mm; margin-bottom: 1.5mm;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    #print-label-host .lbl-day.day-red { color: #d00; border: 0.4mm solid #d00; }
+    #print-label-host .lbl-day.day-red { color: #d00; border: 0.5mm solid #d00; }
     #print-label-host .lbl-day.day-black { color: white; background: #000; }
     #print-label-host .lbl-product {
-      font-size: 11pt; font-weight: 800; line-height: 1.1;
-      text-align: center; word-wrap: break-word;
+      font-size: 12pt; font-weight: 800; line-height: 1.15;
+      text-align: center; word-wrap: break-word; margin-bottom: 1.5mm;
     }
     #print-label-host .lbl-etab {
       font-size: 9pt; font-weight: 800; text-align: center;
-      margin-top: 0.8mm;
+      margin-bottom: 2mm; border-bottom: 0.4mm solid #000; padding-bottom: 1.2mm;
     }
     #print-label-host .lbl-lot {
-      font-size: 7pt; font-weight: 700;
+      font-size: 8pt; font-weight: 700;
       font-family: 'Courier New', monospace;
-      text-align: center; white-space: nowrap;
+      text-align: center; white-space: nowrap; margin-bottom: 1mm;
     }
     #print-label-host .lbl-meta {
-      font-size: 8pt; font-weight: 700; text-align: center;
-      line-height: 1.2;
+      font-size: 9pt; font-weight: 700; text-align: center;
+      line-height: 1.3; margin-bottom: 1mm;
     }
     #print-label-host .lbl-prod {
-      font-size: 7pt; font-weight: 600; text-align: center;
+      font-size: 8pt; font-weight: 600; text-align: center;
+      margin-bottom: 0.8mm; margin-top: auto;
     }
     #print-label-host .lbl-dlc {
-      font-size: 10pt; font-weight: 900; color: #d00;
+      font-size: 12pt; font-weight: 900; color: #d00;
       text-align: center; white-space: nowrap;
-      border-top: 0.4mm solid #d00; padding-top: 0.5mm;
+      border-top: 0.5mm solid #d00; padding-top: 1mm;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    #print-label-host .lbl-dlc small { font-size: 6pt; display: block; font-weight: 700; }
+    #print-label-host .lbl-dlc small { font-size: 7pt; display: block; font-weight: 700; }
 
     @media print {
       /* Masquer toute l'UI de la page Production */
@@ -2474,17 +2453,13 @@ function printEtiquette(productionId) {
   host.id = 'print-label-host';
   host.innerHTML = `
     <div class="lbl-inner">
-      <div class="lbl-col-left">
-        <div class="lbl-day ${dayClass}">${dayName}</div>
-        <div class="lbl-product">${produitEsc}</div>
-        <div class="lbl-etab">${etabShort}</div>
-      </div>
-      <div class="lbl-col-right">
-        <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
-        <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
-        <div class="lbl-prod">Prod: ${prodDateStr}</div>
-        <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
-      </div>
+      <div class="lbl-day ${dayClass}">${dayName}</div>
+      <div class="lbl-product">${produitEsc}</div>
+      <div class="lbl-etab">${etabShort}</div>
+      <div class="lbl-lot">Lot:${escapeHtml(lotNum)}</div>
+      <div class="lbl-meta">${qte}${escapeHtml(unite)} · ${escapeHtml(producteur)}</div>
+      <div class="lbl-prod">Prod: ${prodDateStr}</div>
+      <div class="lbl-dlc"><small>DLC</small>${dlcStr}</div>
     </div>
   `;
   document.body.appendChild(host);
