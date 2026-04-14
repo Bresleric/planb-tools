@@ -2362,8 +2362,8 @@ function drawEtiquetteCanvas(data) {
   const INNER_H = H - PAD * 2;
 
   // === 3 LIGNES ===
-  const R1_H = Math.round(INNER_H * 0.44);  // nom produit (gros)
-  const R2_H = Math.round(INNER_H * 0.20);  // lot + initiales
+  const R1_H = Math.round(INNER_H * 0.48);  // nom produit (gros)
+  const R2_H = Math.round(INNER_H * 0.18);  // lot + initiales
   const R3_H = INNER_H - R1_H - R2_H;       // qte + DLC + jour (gros)
 
   const R1_Y = PAD;
@@ -2398,7 +2398,7 @@ function drawEtiquetteCanvas(data) {
   ctx.fillStyle = '#000000';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const nameWrap = wrapText(ctx, data.produit, nameBoxW, Math.round(10 * MM), fontFamily, '900', 2);
+  const nameWrap = wrapText(ctx, data.produit, nameBoxW, Math.round(9 * MM), fontFamily, '900', 2, nameBoxH);
   const nameLineH = nameWrap.size * 1.1;
   const nameTotalH = nameWrap.lines.length * nameLineH;
   const nameStartY = nameBoxY + (nameBoxH - nameTotalH) / 2 + nameLineH / 2;
@@ -2509,10 +2509,10 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// Helper : retour à la ligne et auto-fit du texte
-function wrapText(ctx, text, maxWidth, maxFontSize, fontFamily, weight, maxLines) {
+// Helper : retour à la ligne et auto-fit du texte (largeur ET hauteur)
+function wrapText(ctx, text, maxWidth, maxFontSize, fontFamily, weight, maxLines, maxTotalHeight) {
   let size = maxFontSize;
-  while (size > maxFontSize * 0.5) {
+  while (size > 6) {
     ctx.font = `${weight} ${size}px ${fontFamily}`;
     const words = String(text || '').split(/\s+/).filter(Boolean);
     const lines = [];
@@ -2527,10 +2527,11 @@ function wrapText(ctx, text, maxWidth, maxFontSize, fontFamily, weight, maxLines
       }
     }
     if (current) lines.push(current);
-    if (lines.length <= maxLines) {
-      return { lines, size };
-    }
-    size = Math.round(size * 0.9);
+    const totalH = lines.length * size * 1.1;
+    const fits = lines.length <= maxLines
+      && (!maxTotalHeight || totalH <= maxTotalHeight);
+    if (fits) return { lines, size };
+    size -= 2;
   }
   ctx.font = `${weight} ${size}px ${fontFamily}`;
   return { lines: [String(text || '')], size };
