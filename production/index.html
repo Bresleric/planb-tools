@@ -2329,21 +2329,12 @@ function closeEtiquette() {
 }
 
 // ============= GÉNÉRATION ÉTIQUETTE CANVAS =============
-// DK-11209 : 29mm × 62mm. Dessin en PAYSAGE à 300 DPI : 732 × 342 px.
-// Layout 3 lignes :
-//   +---------------------------------------------+
-//   |  NOM DU PRODUIT                     (Prod)  |  R1 : produit GROS + prod JJMM petit
-//   |  (grand, 2 lignes auto-fit)                 |
-//   +---------------------------------------------+
-//   |  Lot: XXXX-XX             |     EB          |  R2 : lot + initiales
-//   +---------------+-----------+-----------------+
-//   |  10kg         |  DLC      |      MER        |  R3 : qte | DLC JJMM | JOUR GROS
-//   |               |  1804     |                 |
-//   +---------------+-----------+-----------------+
+// DK-11209 : 29mm × 62mm (Small Address Label).
+// Dessin en PAYSAGE à 300 DPI : 732 × 342 px.
 function drawEtiquetteCanvas(data) {
   const DPI = 300;
   const MM = DPI / 25.4;
-  const W = Math.round(62 * MM);   // 732 px
+  const W = Math.round(62 * MM);   // 732 px (DK-11209)
   const H = Math.round(29 * MM);   // 342 px
 
   const canvas = document.createElement('canvas');
@@ -2579,45 +2570,63 @@ async function printEtiquette(productionId) {
     dlcDay,
   });
 
-  // Convertir en Blob PNG
-  canvas.toBlob(async (blob) => {
-    if (!blob) { showToast('Erreur génération étiquette', 'error'); return; }
+  // === IMPRESSION DIRECTE via iframe caché ===
+  // On injecte un iframe contenant une page HTML avec :
+  //  - @page { size: 62mm 29mm; margin: 0 } pour forcer la taille exacte
+  //  - <img> pleine page (62mm × 29mm, object-fit: fill) pour remplir l'étiquette
+  // iOS AirPrint va ouvrir le dialogue d'impression directement sur l'iframe,
+  // sans passer par la feuille de partage (1 clic au lieu de 4).
+  const dataURL = canvas.toDataURL('image/png');
 
-    const safeLot = String(lotNum).replace(/[^\w-]/g, '_');
-    const filename = `etiquette-${safeLot}.png`;
-    const file = new File([blob], filename, { type: 'image/png' });
+  // Supprime un éventuel iframe précédent
+  const oldFrame = document.getElementById('print-label-frame');
+  if (oldFrame) oldFrame.remove();
 
-    DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+  const iframe = document.createElement('iframe');
+  iframe.id = 'print-label-frame';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:80mm;height:40mm;border:0;opacity:0;pointer-events:none;';
+  document.body.appendChild(iframe);
 
-    // Essayer Web Share API (iOS 15+) : ouvre la feuille de partage iOS
-    // → l'utilisateur choisit "Brother iPrint&Label" et l'app ouvre l'image
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: 'Étiquette production',
-          text: production.nom_produit || '',
-        });
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return; // Utilisateur a annulé
-        console.error('Partage échoué:', err);
-        // Fallback : téléchargement
-      }
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(
+    '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<style>' +
+    '@page { size: 62mm 29mm; margin: 0; }' +
+    '@media print { @page { size: 62mm 29mm; margin: 0; } html, body { margin:0; padding:0; } }' +
+    '* { margin:0; padding:0; box-sizing:border-box; }' +
+    'html, body { width: 62mm; height: 29mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+    'img { display:block; width: 62mm; height: 29mm; margin:0; padding:0; object-fit: fill; }' +
+    '</style></head><body>' +
+    '<img id="lbl" src="' + dataURL + '">' +
+    '</body></html>'
+  );
+  idoc.close();
+
+  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+
+  // Lance l'impression dès que l'image est chargée (data URL : quasi-instantané)
+  const doPrint = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      console.error('print() failed:', e);
+      showToast('Erreur impression : ' + e.message, 'error');
     }
-
-    // Fallback : télécharger l'image (sur iPad : "Enregistrer dans Fichiers" puis
-    // ouvrir depuis Brother iPrint&Label)
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast('Étiquette téléchargée', 'success');
-  }, 'image/png');
+  };
+  const img = idoc.getElementById('lbl');
+  if (img && img.complete && img.naturalWidth > 0) {
+    doPrint();
+  } else if (img) {
+    img.addEventListener('load', doPrint, { once: true });
+    img.addEventListener('error', () => {
+      showToast('Erreur chargement étiquette', 'error');
+    }, { once: true });
+  } else {
+    doPrint();
+  }
 }
 
 async function markEtiquetteOk(productionId) {
