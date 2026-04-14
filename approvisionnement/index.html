@@ -945,6 +945,7 @@
                 <div class="tab" data-tab="commandes" onclick="switchTab('commandes')">📦 Commandes</div>
                 <div class="tab" data-tab="inventaire" onclick="switchTab('inventaire')">🔍 Inventaire</div>
                 <div class="tab" data-tab="catalogue" onclick="switchTab('catalogue')">📚 Catalogue</div>
+                <div class="tab hidden" id="tab-btn-ingredients" data-tab="ingredients" onclick="switchTab('ingredients')">🥘 Ingrédients</div>
             </div>
         </header>
 
@@ -1066,6 +1067,22 @@
                         <div class="empty-state-icon">💰</div>
                         <div class="empty-state-text">Sélectionnez un article</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- TAB: Ingrédients (Admin) -->
+            <div class="tab-content" id="tab-ingredients">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    <button class="btn-main primary" onclick="openIngredientModal()">➕ Nouvel ingrédient</button>
+                    <button class="btn-main secondary" onclick="openArticlesOrphelinsModal()">🔗 Articles non rattachés</button>
+                </div>
+                <div class="search-section">
+                    <input type="text" id="ingredients-search" class="search-input" placeholder="Rechercher un ingrédient..." oninput="renderIngredientsList()">
+                </div>
+                <div id="ingredients-list" class="table-like"></div>
+                <div id="ingredients-empty" class="empty-state hidden">
+                    <div class="empty-state-icon">🥘</div>
+                    <div class="empty-state-text">Aucun ingrédient</div>
                 </div>
             </div>
         </div>
@@ -1241,6 +1258,92 @@
         </div>
     </div>
 
+    <!-- Modal: Créer/Éditer un ingrédient -->
+    <div class="modal-overlay" id="modal-ingredient">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-ingredient-title">Nouvel ingrédient</div>
+                <button class="modal-close" onclick="closeIngredientModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nom générique</label>
+                    <input type="text" id="ing-nom" class="form-input" placeholder="ex: Essuie Mains">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Catégorie</label>
+                    <select id="ing-categorie" class="form-select">
+                        <option value="">Sélectionner...</option>
+                        <option value="Frais">Frais</option>
+                        <option value="Viande & charcuterie">Viande & charcuterie</option>
+                        <option value="Fruits & Légumes">Fruits & Légumes</option>
+                        <option value="Alimentaire">Alimentaire</option>
+                        <option value="Boisson alcoolisée">Boisson alcoolisée</option>
+                        <option value="Vins & Crémants">Vins & Crémants</option>
+                        <option value="Boulangerie">Boulangerie</option>
+                        <option value="Pâtisserie">Pâtisserie</option>
+                        <option value="Entretien/Hygiène">Entretien/Hygiène</option>
+                        <option value="Boisson sans alcool">Boisson sans alcool</option>
+                        <option value="Service">Service</option>
+                        <option value="Surgelés">Surgelés</option>
+                        <option value="Consignes">Consignes</option>
+                        <option value="Café">Café</option>
+                        <option value="Poisson">Poisson</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unité</label>
+                    <select id="ing-unite" class="form-select">
+                        <option value="kg">kg</option>
+                        <option value="L">L</option>
+                        <option value="pce">pce</option>
+                        <option value="Unité">Unité</option>
+                        <option value="Bouteille">Bouteille</option>
+                        <option value="Carton">Carton</option>
+                        <option value="Forfait">Forfait</option>
+                        <option value="Boîte">Boîte</option>
+                        <option value="paq">paq</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" id="ing-actif" checked> Actif (visible dans la recherche Besoins)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-small btn-secondary" onclick="closeIngredientModal()">Annuler</button>
+                <button class="btn-small btn-danger hidden" id="btn-delete-ingredient" onclick="deleteIngredient()">Supprimer</button>
+                <button class="btn-small btn-primary" onclick="saveIngredient()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Gérer les articles rattachés à un ingrédient -->
+    <div class="modal-overlay" id="modal-ingredient-articles">
+        <div class="modal" style="max-width: 760px;">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-ing-art-title">Articles rattachés</div>
+                <button class="modal-close" onclick="closeIngredientArticlesModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:12px;padding:10px;background:#FFF3E0;border-radius:6px;font-size:13px;color:#666;">
+                    Les articles listés ici sont rattachés à cet ingrédient. Cliquez sur "Détacher" pour les retirer, ou utilisez la recherche pour en ajouter.
+                </div>
+                <h4 style="margin:12px 0 6px 0;font-size:14px;color:#E67E22;">Articles actuellement rattachés</h4>
+                <div id="ing-art-attached" class="table-like"></div>
+                <h4 style="margin:18px 0 6px 0;font-size:14px;color:#E67E22;">Ajouter un article (catalogue)</h4>
+                <div class="form-group" style="position:relative;">
+                    <input type="text" id="ing-art-search" class="form-input" placeholder="3 car. min..." autocomplete="off" oninput="searchArticlesForIngredient(this.value)">
+                    <div class="search-dropdown" id="ing-art-dropdown" style="top:auto;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-small btn-secondary" onclick="closeIngredientArticlesModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="toast"></div>
 
     <script>
@@ -1299,6 +1402,12 @@
             const etabText = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽 Liesel';
             document.getElementById('etab-badge').textContent = etabText;
             document.getElementById('user-badge').textContent = currentUser.initiales;
+            // Onglet Ingrédients visible à partir de responsable
+            const hierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+            const lvl = hierarchy[currentUser?.role] || 0;
+            if (lvl >= 2) {
+                document.getElementById('tab-btn-ingredients').classList.remove('hidden');
+            }
         }
 
         async function loadData() {
@@ -1307,8 +1416,8 @@
                     const [besoinsRes, commandesRes, articlesRes, ingredientsRes, fournisseursRes, prixRes, lignesRes] = await Promise.all([
                         supabase.from('appro_besoins').select('*').eq('etablissement', currentEstablishment).in('statut', ['demande', 'valide']).order('date_demande', { ascending: false }),
                         supabase.from('appro_commandes').select('*').eq('etablissement', currentEstablishment).in('statut', ['brouillon', 'validee', 'envoyee']).order('date_creation', { ascending: false }),
-                        supabase.from('appro_catalogue').select('*').eq('actif', true),
-                        supabase.from('appro_ingredients').select('*').eq('actif', true).order('nom'),
+                        supabase.from('appro_catalogue').select('*'),
+                        supabase.from('appro_ingredients').select('*').order('nom'),
                         supabase.from('appro_fournisseurs').select('*').eq('actif', true),
                         supabase.from('appro_prix').select('*').eq('actif', true),
                         supabase.from('appro_commande_lignes').select('*'),
@@ -1954,6 +2063,260 @@
             }).join('');
         }
 
+        // ===========================================================
+        // Admin Ingrédients
+        // ===========================================================
+        let currentEditIngredient = null;
+        let currentArticlesModalIngredient = null;
+
+        function renderIngredientsList() {
+            const term = (document.getElementById('ingredients-search')?.value || '').toLowerCase().trim();
+            const container = document.getElementById('ingredients-list');
+            const empty = document.getElementById('ingredients-empty');
+            let list = ingredients.slice();
+            if (term) {
+                const normTerm = normalizeSearch(term);
+                list = list.filter(i =>
+                    (i.nom_recherche && i.nom_recherche.includes(normTerm)) ||
+                    (i.nom && i.nom.toLowerCase().includes(term)) ||
+                    (i.categorie && i.categorie.toLowerCase().includes(term))
+                );
+            }
+            list.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+
+            if (list.length === 0) {
+                container.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            container.innerHTML = list.map(i => {
+                const nbArt = articles.filter(a => a.ingredient_id === i.id).length;
+                const inactifBadge = i.actif === false ? ' <span style="color:#c00;font-size:11px;">(inactif)</span>' : '';
+                return `
+                    <div class="table-row">
+                        <div class="table-col">
+                            <div class="table-col-header">${i.nom}${inactifBadge}</div>
+                            <div class="table-col-value">${i.categorie || '—'} • ${i.unite || 'kg'} • ${nbArt} article${nbArt > 1 ? 's' : ''}</div>
+                        </div>
+                        <div class="table-col narrow" style="display:flex;gap:4px;">
+                            <button class="btn-small btn-secondary" onclick="openIngredientArticlesModal('${i.id}')" title="Gérer les articles rattachés">🔗</button>
+                            <button class="btn-small btn-secondary" onclick="openIngredientModal('${i.id}')" title="Modifier">✏</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openIngredientModal(ingredientId) {
+            currentEditIngredient = ingredientId || null;
+            const modal = document.getElementById('modal-ingredient');
+            const title = document.getElementById('modal-ingredient-title');
+            const btnDel = document.getElementById('btn-delete-ingredient');
+            if (ingredientId) {
+                const ing = ingredients.find(i => i.id === ingredientId);
+                if (!ing) return;
+                title.textContent = 'Modifier l\'ingrédient';
+                document.getElementById('ing-nom').value = ing.nom || '';
+                document.getElementById('ing-categorie').value = ing.categorie || '';
+                document.getElementById('ing-unite').value = ing.unite || 'kg';
+                document.getElementById('ing-actif').checked = ing.actif !== false;
+                btnDel.classList.remove('hidden');
+            } else {
+                title.textContent = 'Nouvel ingrédient';
+                document.getElementById('ing-nom').value = '';
+                document.getElementById('ing-categorie').value = '';
+                document.getElementById('ing-unite').value = 'kg';
+                document.getElementById('ing-actif').checked = true;
+                btnDel.classList.add('hidden');
+            }
+            modal.classList.add('show');
+        }
+
+        function closeIngredientModal() {
+            document.getElementById('modal-ingredient').classList.remove('show');
+            currentEditIngredient = null;
+        }
+
+        async function saveIngredient() {
+            const nom = document.getElementById('ing-nom').value.trim();
+            const categorie = document.getElementById('ing-categorie').value;
+            const unite = document.getElementById('ing-unite').value;
+            const actif = document.getElementById('ing-actif').checked;
+
+            if (!nom) { showToast('Nom requis', 'error'); return; }
+            if (!categorie) { showToast('Catégorie requise', 'error'); return; }
+
+            const nom_recherche = normalizeSearch(nom);
+
+            try {
+                if (currentEditIngredient) {
+                    const { error } = await supabase.from('appro_ingredients').update({
+                        nom, nom_recherche, categorie, unite, actif, updated_at: new Date().toISOString()
+                    }).eq('id', currentEditIngredient);
+                    if (error) throw error;
+                    const idx = ingredients.findIndex(i => i.id === currentEditIngredient);
+                    if (idx >= 0) ingredients[idx] = { ...ingredients[idx], nom, nom_recherche, categorie, unite, actif };
+                    showToast('Ingrédient mis à jour', 'success');
+                } else {
+                    const { data, error } = await supabase.from('appro_ingredients').insert([{
+                        nom, nom_recherche, categorie, unite, actif
+                    }]).select();
+                    if (error) throw error;
+                    if (data && data.length > 0) ingredients.push(data[0]);
+                    showToast('Ingrédient créé', 'success');
+                }
+                closeIngredientModal();
+                renderIngredientsList();
+            } catch (e) {
+                console.error(e);
+                showToast('Erreur: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteIngredient() {
+            if (!currentEditIngredient) return;
+            const ing = ingredients.find(i => i.id === currentEditIngredient);
+            if (!ing) return;
+            const nbArt = articles.filter(a => a.ingredient_id === ing.id).length;
+            if (nbArt > 0) {
+                if (!confirm(`Cet ingrédient a ${nbArt} article(s) rattaché(s). Voulez-vous plutôt le désactiver ? (Les articles resteront liés)`)) return;
+                document.getElementById('ing-actif').checked = false;
+                return saveIngredient();
+            }
+            if (!confirm(`Supprimer définitivement l'ingrédient "${ing.nom}" ?`)) return;
+            try {
+                const { error } = await supabase.from('appro_ingredients').delete().eq('id', currentEditIngredient);
+                if (error) throw error;
+                ingredients = ingredients.filter(i => i.id !== currentEditIngredient);
+                showToast('Ingrédient supprimé', 'success');
+                closeIngredientModal();
+                renderIngredientsList();
+            } catch (e) {
+                console.error(e);
+                showToast('Erreur: ' + e.message, 'error');
+            }
+        }
+
+        // --- Gestion des articles rattachés ---
+        function openIngredientArticlesModal(ingredientId) {
+            currentArticlesModalIngredient = ingredientId;
+            const ing = ingredients.find(i => i.id === ingredientId);
+            if (!ing) return;
+            document.getElementById('modal-ing-art-title').textContent = `Articles — ${ing.nom}`;
+            document.getElementById('ing-art-search').value = '';
+            document.getElementById('ing-art-dropdown').classList.remove('show');
+            renderAttachedArticles();
+            document.getElementById('modal-ingredient-articles').classList.add('show');
+        }
+
+        function closeIngredientArticlesModal() {
+            document.getElementById('modal-ingredient-articles').classList.remove('show');
+            currentArticlesModalIngredient = null;
+            renderIngredientsList();
+        }
+
+        function renderAttachedArticles() {
+            const container = document.getElementById('ing-art-attached');
+            const attached = articles.filter(a => a.ingredient_id === currentArticlesModalIngredient);
+            if (attached.length === 0) {
+                container.innerHTML = '<div style="padding:10px;color:#999;font-style:italic;">Aucun article rattaché</div>';
+                return;
+            }
+            container.innerHTML = attached.map(a => {
+                const prixArt = prix.filter(p => p.article_id === a.id);
+                const nbFourn = prixArt.length;
+                return `
+                    <div class="table-row">
+                        <div class="table-col">
+                            <div class="table-col-header">${a.nom}</div>
+                            <div class="table-col-value">${a.categorie || '—'} • ${a.unite || '—'} • ${nbFourn} fournisseur${nbFourn > 1 ? 's' : ''}</div>
+                        </div>
+                        <div class="table-col narrow">
+                            <button class="btn-small btn-secondary" onclick="detachArticleFromIngredient('${a.id}')" title="Détacher">✕</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function searchArticlesForIngredient(term) {
+            const dropdown = document.getElementById('ing-art-dropdown');
+            if (!term || term.length < 3) {
+                dropdown.classList.remove('show');
+                return;
+            }
+            const norm = normalizeSearch(term);
+            // Articles non rattachés à cet ingrédient et actifs
+            const results = articles.filter(a =>
+                a.actif !== false &&
+                a.ingredient_id !== currentArticlesModalIngredient &&
+                a.nom_recherche && a.nom_recherche.includes(norm)
+            ).slice(0, 20);
+            if (results.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-item" style="color:#999;font-style:italic;">Aucun article trouvé</div>';
+            } else {
+                dropdown.innerHTML = results.map(a => {
+                    const currentIng = a.ingredient_id ? ingredients.find(i => i.id === a.ingredient_id) : null;
+                    const currentLabel = currentIng ? ` <span style="color:#E67E22;font-size:11px;">(rattaché à : ${currentIng.nom})</span>` : '';
+                    return `
+                        <div class="dropdown-item" onclick="attachArticleToIngredient('${a.id}')">
+                            <div class="dropdown-item-title">${a.nom}${currentLabel}</div>
+                            <div class="dropdown-item-subtitle">${a.categorie || '—'} • ${a.unite || '—'}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            dropdown.classList.add('show');
+        }
+
+        async function attachArticleToIngredient(articleId) {
+            try {
+                const { error } = await supabase.from('appro_catalogue')
+                    .update({ ingredient_id: currentArticlesModalIngredient })
+                    .eq('id', articleId);
+                if (error) throw error;
+                const art = articles.find(a => a.id === articleId);
+                if (art) art.ingredient_id = currentArticlesModalIngredient;
+                document.getElementById('ing-art-search').value = '';
+                document.getElementById('ing-art-dropdown').classList.remove('show');
+                renderAttachedArticles();
+                showToast('Article rattaché', 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('Erreur: ' + e.message, 'error');
+            }
+        }
+
+        async function detachArticleFromIngredient(articleId) {
+            if (!confirm('Détacher cet article de l\'ingrédient ?')) return;
+            try {
+                const { error } = await supabase.from('appro_catalogue')
+                    .update({ ingredient_id: null })
+                    .eq('id', articleId);
+                if (error) throw error;
+                const art = articles.find(a => a.id === articleId);
+                if (art) art.ingredient_id = null;
+                renderAttachedArticles();
+                showToast('Article détaché', 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('Erreur: ' + e.message, 'error');
+            }
+        }
+
+        // --- Articles orphelins (non rattachés à un ingrédient) ---
+        function openArticlesOrphelinsModal() {
+            const orphans = articles.filter(a => !a.ingredient_id && a.actif !== false);
+            if (orphans.length === 0) {
+                showToast('Aucun article orphelin 🎉', 'success');
+                return;
+            }
+            // Ouvre la modale articles-rattachés mais sans ingrédient cible ; on offre de créer un ingrédient
+            const sample = orphans.slice(0, 30).map(a => `  • ${a.nom}`).join('\n');
+            alert(`${orphans.length} article(s) non rattaché(s) à un ingrédient.\n\nExemples:\n${sample}\n\nPour les rattacher, créez un ingrédient puis cliquez sur 🔗 dans la liste.`);
+        }
+
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -1965,6 +2328,9 @@
             }
             if (tabName === 'inventaire') {
                 loadInventaireJour();
+            }
+            if (tabName === 'ingredients') {
+                renderIngredientsList();
             }
         }
 
