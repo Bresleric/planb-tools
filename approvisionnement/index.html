@@ -428,6 +428,59 @@
             min-width: 40px;
         }
 
+        .gen-row {
+            background: white;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+            margin-bottom: 8px;
+        }
+        .gen-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+            gap: 8px;
+        }
+        .gen-row-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--gray-800);
+        }
+        .gen-row-qty {
+            font-size: 12px;
+            color: var(--gray-600);
+            white-space: nowrap;
+        }
+        .gen-row-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 12px;
+            background: var(--gray-50);
+            font-family: inherit;
+        }
+        .gen-row-noprice {
+            font-size: 12px;
+            color: var(--red);
+            font-style: italic;
+            padding: 6px 0;
+        }
+        .gen-row-single {
+            font-size: 12px;
+            color: var(--gray-700);
+            padding: 6px 0;
+        }
+        .gen-summary {
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: var(--orange-light, #FFF3E0);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--gray-800);
+        }
+
         .validation-buttons {
             display: flex;
             gap: 8px;
@@ -1149,22 +1202,21 @@
     </div>
 
     <div class="modal-overlay" id="modal-generate-orders">
-        <div class="modal">
+        <div class="modal" style="max-width: 720px;">
             <div class="modal-header">
                 <div class="modal-title">Générer les commandes</div>
                 <button class="modal-close" onclick="closeGenerateOrdersModal()">✕</button>
             </div>
             <div class="modal-body">
-                <div id="generate-orders-content">
-                    <p style="font-size: 13px; color: var(--gray-600);">
-                        Cela créera des commandes à partir de tous les besoins validés,
-                        en sélectionnant automatiquement les meilleurs prix par fournisseur.
-                    </p>
-                </div>
+                <p style="font-size: 13px; color: var(--gray-600); margin-bottom: 12px;">
+                    Sélectionne le fournisseur et le conditionnement souhaités pour chaque besoin.
+                    Le moins cher est pré-sélectionné par défaut.
+                </p>
+                <div id="generate-orders-content"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn-small btn-secondary" onclick="closeGenerateOrdersModal()">Annuler</button>
-                <button class="btn-small btn-primary" onclick="generateOrders()">Générer</button>
+                <button class="btn-small btn-primary" onclick="generateOrders()">Générer les commandes</button>
             </div>
         </div>
     </div>
@@ -1664,26 +1716,24 @@
                     return;
                 }
 
-                // Regrouper par fournisseur avec le meilleur prix
+                // Lire les sélections faites dans la modale
+                const selections = {};
+                document.querySelectorAll('.gen-row-select').forEach(el => {
+                    const bid = el.getAttribute('data-besoin-id');
+                    if (bid && el.value) selections[bid] = el.value;
+                });
+
+                // Regrouper par fournisseur selon les choix
                 const newOrders = {};
                 const besoinsSansPrix = [];
 
                 for (const besoin of validated) {
-                    // 1) Récupérer tous les articles du catalogue liés à cet ingrédient
-                    //    (fallback: si pas d'ingredient_id, utiliser l'ancien article_id)
-                    let articlesLies = [];
-                    if (besoin.ingredient_id) {
-                        articlesLies = articles.filter(a => a.ingredient_id === besoin.ingredient_id);
-                    } else if (besoin.article_id) {
-                        articlesLies = articles.filter(a => a.id === besoin.article_id);
+                    const selectedPrixId = selections[besoin.id];
+                    if (!selectedPrixId) {
+                        besoinsSansPrix.push(besoin.ingredient_nom || besoin.article_nom);
+                        continue;
                     }
-                    const articleIds = articlesLies.map(a => a.id);
-
-                    // 2) Trouver tous les prix actifs pour ces articles, et garder le moins cher
-                    const bestPrice = prix.filter(p =>
-                        articleIds.includes(p.article_id) && p.actif
-                    ).sort((a, b) => a.pu_ht - b.pu_ht)[0];
-
+                    const bestPrice = prix.find(p => p.id === selectedPrixId);
                     if (!bestPrice) {
                         besoinsSansPrix.push(besoin.ingredient_nom || besoin.article_nom);
                         continue;
@@ -2505,6 +2555,74 @@
         }
 
         function openGenerateOrdersModal() {
+            const validated = besoins.filter(b => b.statut === 'valide' && b.etablissement === currentEstablishment);
+            const container = document.getElementById('generate-orders-content');
+
+            if (validated.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:#999;font-style:italic;padding:20px;">Aucun besoin validé à commander.</p>';
+                document.getElementById('modal-generate-orders').classList.add('show');
+                return;
+            }
+
+            // Pour chaque besoin, lister les options fournisseur disponibles
+            let html = '';
+            let nbSansFournisseur = 0;
+            validated.forEach((b, idx) => {
+                // Récupérer les articles liés à l'ingrédient (fallback ancien article_id)
+                let articlesLies = [];
+                if (b.ingredient_id) {
+                    articlesLies = articles.filter(a => a.ingredient_id === b.ingredient_id);
+                } else if (b.article_id) {
+                    articlesLies = articles.filter(a => a.id === b.article_id);
+                }
+                const articleIds = articlesLies.map(a => a.id);
+
+                // Trouver tous les prix actifs pour ces articles
+                const options = prix.filter(p => articleIds.includes(p.article_id) && p.actif)
+                    .map(p => {
+                        const f = fournisseurs.find(ff => ff.id === p.fournisseur_id);
+                        return { ...p, fournisseur_nom: f?.nom || '?' };
+                    })
+                    .sort((a, b) => a.pu_ht - b.pu_ht);
+
+                const nom = b.ingredient_nom || b.article_nom;
+                const qty = b.quantite || 1;
+                const unite = b.unite || 'kg';
+
+                html += `<div class="gen-row" data-besoin-id="${b.id}">`;
+                html += `  <div class="gen-row-header">`;
+                html += `    <div class="gen-row-name">${nom}</div>`;
+                html += `    <div class="gen-row-qty">${qty} ${unite}</div>`;
+                html += `  </div>`;
+
+                if (options.length === 0) {
+                    html += `<div class="gen-row-noprice">⚠ Aucun fournisseur disponible — ce besoin sera ignoré</div>`;
+                    nbSansFournisseur++;
+                } else if (options.length === 1) {
+                    const o = options[0];
+                    const total = (o.pu_ht * qty).toFixed(2);
+                    html += `<div class="gen-row-single">${o.designation || nom} — <strong>${o.fournisseur_nom}</strong> — ${o.pu_ht.toFixed(2)} €/${o.unite || unite} → <strong>${total} €</strong></div>`;
+                    html += `<input type="hidden" class="gen-row-select" data-besoin-id="${b.id}" value="${o.id}">`;
+                } else {
+                    html += `<select class="gen-row-select" data-besoin-id="${b.id}">`;
+                    options.forEach((o, oidx) => {
+                        const total = (o.pu_ht * qty).toFixed(2);
+                        const label = `${o.fournisseur_nom} — ${o.pu_ht.toFixed(2)} €/${o.unite || unite} (total ${total} €) — ${o.designation || nom}`;
+                        html += `<option value="${o.id}"${oidx === 0 ? ' selected' : ''}>${label}</option>`;
+                    });
+                    html += `</select>`;
+                }
+                html += `</div>`;
+            });
+
+            html += `<div class="gen-summary">`;
+            html += `<strong>${validated.length}</strong> besoin(s) à commander`;
+            if (nbSansFournisseur > 0) {
+                html += ` — <span style="color:var(--red);">${nbSansFournisseur} sans fournisseur (ignoré${nbSansFournisseur > 1 ? 's' : ''})</span>`;
+            }
+            html += `</div>`;
+
+            container.innerHTML = html;
             document.getElementById('modal-generate-orders').classList.add('show');
         }
 
