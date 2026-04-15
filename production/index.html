@@ -2346,15 +2346,15 @@ function drawEtiquetteCanvas(data) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  const PAD = Math.round(2 * MM);
+  const PAD = Math.round(1 * MM);
   const fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 
   const INNER_W = W - PAD * 2;
   const INNER_H = H - PAD * 2;
 
   // === 3 LIGNES ===
-  const R1_H = Math.round(INNER_H * 0.48);  // nom produit (gros)
-  const R2_H = Math.round(INNER_H * 0.18);  // lot + initiales
+  const R1_H = Math.round(INNER_H * 0.52);  // nom produit (gros)
+  const R2_H = Math.round(INNER_H * 0.17);  // lot + initiales
   const R3_H = INNER_H - R1_H - R2_H;       // qte + DLC + jour (gros)
 
   const R1_Y = PAD;
@@ -2389,7 +2389,7 @@ function drawEtiquetteCanvas(data) {
   ctx.fillStyle = '#000000';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const nameWrap = wrapText(ctx, data.produit, nameBoxW, Math.round(9 * MM), fontFamily, '900', 2, nameBoxH);
+  const nameWrap = wrapText(ctx, data.produit, nameBoxW, Math.round(12 * MM), fontFamily, '900', 2, nameBoxH);
   const nameLineH = nameWrap.size * 1.1;
   const nameTotalH = nameWrap.lines.length * nameLineH;
   const nameStartY = nameBoxY + (nameBoxH - nameTotalH) / 2 + nameLineH / 2;
