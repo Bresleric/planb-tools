@@ -2570,73 +2570,65 @@ async function printEtiquette(productionId) {
     dlcDay,
   });
 
-  // === IMPRESSION VIA PDF (jsPDF) ===
-  // iOS Safari en impression HTML ajoute systématiquement des marges + un
-  // pied de page ("Page 1 sur 1 + date") qu'on ne peut PAS supprimer.
-  // Seule solution pour un bord-à-bord propre sur DK-11209 : générer un PDF
-  // avec MediaBox exact 29×62mm. iOS respecte à 100% le MediaBox d'un PDF
-  // et n'ajoute ni marge ni pied de page.
+  // === IMPRESSION VIA navigator.share → Brother iPrint&Label ===
+  // Sur iPad/iOS Safari, toute impression via window.print() (HTML ou PDF) se
+  // retrouve traitée par le pipeline print de Safari qui AJOUTE
+  // systématiquement marges + pied de page. Aucun moyen de contourner ça
+  // depuis la Web App.
   //
-  // Pipeline :
-  //  1. Canvas dessiné en landscape (62×29mm @ 300dpi = 732×342 px) — code inchangé
-  //  2. Rotation 90° CW sur un 2e canvas portrait (342×732 px)
-  //  3. jsPDF crée un PDF 29×62mm portrait, image couvrant toute la page
-  //  4. Blob URL du PDF chargé dans un iframe → contentWindow.print()
-  //  5. Fallback : si print() iframe échoue, on ouvre le PDF dans un nouvel onglet
+  // La seule façon d'obtenir un bord-à-bord propre sur DK-11209 est de
+  // passer par une app native qui parle directement à la QL-820NWBc.
+  // Brother iPrint&Label est parfait pour ça : elle accepte des fichiers
+  // image via la feuille de partage iOS, conserve leur format natif, et
+  // imprime sans marge ni pied de page ajoutés par Safari.
+  //
+  // Workflow (minimum possible sur iOS) :
+  //  1. [CLIC 1] utilisateur tape "Imprimer" dans l'app
+  //  2. iOS ouvre la feuille de partage avec le PNG préparé
+  //  3. [CLIC 2] utilisateur choisit Brother iPrint&Label
+  //  4. [CLIC 3] utilisateur tape le bouton Imprimer dans l'app Brother
+  //
+  // Fallback desktop : impression directe via iframe.
 
-  // Rotation 90° CW du canvas pour obtenir une image portrait 342×732
+  // Rotation 90° CW pour obtenir une image portrait 342×732
   const portraitCanvas = document.createElement('canvas');
-  portraitCanvas.width = canvas.height;   // 342
-  portraitCanvas.height = canvas.width;   // 732
+  portraitCanvas.width = canvas.height;
+  portraitCanvas.height = canvas.width;
   const pctx = portraitCanvas.getContext('2d');
   pctx.translate(canvas.height, 0);
   pctx.rotate(Math.PI / 2);
   pctx.drawImage(canvas, 0, 0);
-  const dataURL = portraitCanvas.toDataURL('image/png');
 
-  // Charge jsPDF à la demande (cache ensuite)
-  if (!window.jspdf) {
-    try {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('Échec chargement jsPDF'));
-        document.head.appendChild(s);
-      });
-    } catch (e) {
-      showToast('Erreur : jsPDF indisponible (' + e.message + ')', 'error');
+  // Convertit le canvas en Blob PNG
+  const blob = await new Promise((resolve) => portraitCanvas.toBlob(resolve, 'image/png'));
+  if (!blob) {
+    showToast('Erreur génération image étiquette', 'error');
+    return;
+  }
+
+  const safeName = (production.nom_produit || 'etiquette')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30) || 'etiquette';
+  const filename = `${safeName}-${lotNum}.png`;
+
+  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+
+  // --- Chemin iOS/Android : navigator.share avec un fichier ---
+  try {
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Étiquette' });
       return;
     }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // utilisateur a annulé
+    console.warn('navigator.share a échoué, fallback iframe :', e);
   }
 
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: [29, 62],
-    compress: true,
-    hotfixes: ['px_scaling'],
-  });
-  pdf.addImage(dataURL, 'PNG', 0, 0, 29, 62, undefined, 'FAST');
-
-  // autoPrint : ajoute une OpenAction /Print dans le PDF (desktop surtout)
-  if (typeof pdf.autoPrint === 'function') {
-    try { pdf.autoPrint({ variant: 'non-conform' }); } catch (e) { /* ignore */ }
-  }
-
-  const blob = pdf.output('blob');
-  const blobUrl = URL.createObjectURL(blob);
-
-  // Nettoie l'ancien iframe
+  // --- Fallback desktop : impression directe via iframe ---
+  const dataURL = portraitCanvas.toDataURL('image/png');
   const oldFrame = document.getElementById('print-label-frame');
-  if (oldFrame) {
-    try {
-      const prevSrc = oldFrame.getAttribute('src');
-      if (prevSrc && prevSrc.startsWith('blob:')) URL.revokeObjectURL(prevSrc);
-    } catch (e) { /* ignore */ }
-    oldFrame.remove();
-  }
+  if (oldFrame) oldFrame.remove();
 
   const iframe = document.createElement('iframe');
   iframe.id = 'print-label-frame';
@@ -2644,33 +2636,37 @@ async function printEtiquette(productionId) {
   iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:29mm;height:62mm;border:0;opacity:0;pointer-events:none;';
   document.body.appendChild(iframe);
 
-  DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(
+    '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<style>' +
+    '@page { size: 29mm 62mm; margin: 0; }' +
+    '* { margin:0; padding:0; box-sizing:border-box; }' +
+    'html, body { width:29mm; height:62mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
+    'img { display:block; width:29mm; height:62mm; margin:0; padding:0; }' +
+    '</style></head><body>' +
+    '<img src="' + dataURL + '" alt="">' +
+    '</body></html>'
+  );
+  idoc.close();
 
-  let printed = false;
+  const img = idoc.querySelector('img');
   const doPrint = () => {
-    if (printed) return;
-    printed = true;
     try {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
     } catch (e) {
-      console.error('iframe PDF print() failed:', e);
-      // Fallback iOS : ouvre le PDF dans un nouvel onglet,
-      // l'utilisateur tape Partager → Imprimer
-      try {
-        window.open(blobUrl, '_blank');
-        showToast('PDF ouvert — utilise Partager → Imprimer', 'info');
-      } catch (e2) {
-        showToast('Erreur impression : ' + e.message, 'error');
-      }
+      console.error('print() failed:', e);
+      showToast('Erreur impression : ' + e.message, 'error');
     }
   };
-
-  iframe.onload = () => setTimeout(doPrint, 150);
-  // Sécurité : si onload ne déclenche pas (iOS PDF viewer), tente quand même
-  setTimeout(doPrint, 1500);
-
-  iframe.src = blobUrl;
+  if (img && !img.complete) {
+    img.onload = () => setTimeout(doPrint, 50);
+    img.onerror = () => setTimeout(doPrint, 50);
+  } else {
+    setTimeout(doPrint, 50);
+  }
 }
 
 async function markEtiquetteOk(productionId) {
