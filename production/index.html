@@ -2570,12 +2570,17 @@ async function printEtiquette(productionId) {
     dlcDay,
   });
 
-  // === IMPRESSION DIRECTE via iframe caché + SVG ===
-  // iOS Safari rend les <img> de manière aléatoire en impression, mais respecte
-  // toujours les SVG (vectoriel). On embarque le PNG du canvas dans une balise
-  // <image> SVG dont le conteneur <svg> a des dimensions physiques explicites
-  // (width="62mm" height="29mm"). iOS honore ces mm et remplit l'étiquette.
+  // === IMPRESSION DIRECTE via iframe caché + SVG PORTRAIT ===
+  // iOS impose par défaut l'orientation Portrait dans le dialogue d'impression
+  // et on ne peut pas forcer Landscape depuis CSS. Donc on fait l'inverse :
+  //  - SVG conteneur en PORTRAIT (29mm × 62mm) pour matcher iOS
+  //  - L'image (dessinée en landscape 732×342) est placée dans le SVG avec une
+  //    rotation 90° CW → elle tourne dans le viewBox portrait et remplit le label.
+  //  - Quand l'étiquette sort de l'imprimante en portrait, il suffit de la tourner
+  //    90° dans la main pour lire en landscape.
   const dataURL = canvas.toDataURL('image/png');
+  const cw = canvas.width;   // 732 (landscape)
+  const ch = canvas.height;  // 342
 
   const oldFrame = document.getElementById('print-label-frame');
   if (oldFrame) oldFrame.remove();
@@ -2583,15 +2588,21 @@ async function printEtiquette(productionId) {
   const iframe = document.createElement('iframe');
   iframe.id = 'print-label-frame';
   iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:80mm;height:40mm;border:0;opacity:0;pointer-events:none;';
+  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:40mm;height:80mm;border:0;opacity:0;pointer-events:none;';
   document.body.appendChild(iframe);
 
+  // SVG portrait 29×62mm avec viewBox (ch × cw) = (342 × 732).
+  // L'image de canvas (cw × ch) est placée dedans, pivotée 90° CW :
+  //   transform="translate(ch, 0) rotate(90)"
+  //   → (0,0) image → (ch, 0)   (coin haut-droit portrait)
+  //   → (cw, ch) image → (0, cw) (coin bas-gauche portrait)
   const svgStr =
     '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
-    'width="62mm" height="29mm" viewBox="0 0 ' + canvas.width + ' ' + canvas.height + '" ' +
+    'width="29mm" height="62mm" viewBox="0 0 ' + ch + ' ' + cw + '" ' +
     'preserveAspectRatio="none">' +
     '<image xlink:href="' + dataURL + '" x="0" y="0" ' +
-    'width="' + canvas.width + '" height="' + canvas.height + '" ' +
+    'width="' + cw + '" height="' + ch + '" ' +
+    'transform="translate(' + ch + ',0) rotate(90)" ' +
     'preserveAspectRatio="none"/>' +
     '</svg>';
 
@@ -2600,11 +2611,11 @@ async function printEtiquette(productionId) {
   idoc.write(
     '<!DOCTYPE html><html><head><meta charset="utf-8">' +
     '<style>' +
-    '@page { size: 62mm 29mm; margin: 0; }' +
-    '@media print { @page { size: 62mm 29mm; margin: 0; } html, body { margin:0; padding:0; } }' +
+    '@page { size: 29mm 62mm; margin: 0; }' +
+    '@media print { @page { size: 29mm 62mm; margin: 0; } html, body { margin:0; padding:0; } }' +
     '* { margin:0; padding:0; box-sizing:border-box; }' +
-    'html, body { width:62mm; height:29mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
-    'svg { display:block; width:62mm; height:29mm; margin:0; padding:0; }' +
+    'html, body { width:29mm; height:62mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
+    'svg { display:block; width:29mm; height:62mm; margin:0; padding:0; }' +
     '</style></head><body>' +
     svgStr +
     '</body></html>'
