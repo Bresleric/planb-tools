@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Numerisations">
+  <meta name="theme-color" content="#0d9488">
+  <title>Numerisations - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --teal: #0d9488; --teal-light: #f0fdfa; --teal-dark: #0f766e;
+      --orange: #f97316; --orange-light: #fff7ed;
+      --green: #22c55e; --green-bg: #f0fdf4; --green-dark: #16a34a;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --blue: #3b82f6; --blue-bg: #eff6ff;
+      --amber: #f59e0b; --amber-bg: #fffbeb;
+      --purple: #8b5cf6; --purple-bg: #f5f3ff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px; --radius-lg: 12px; --radius-xl: 16px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+      --shadow-lg: 0 10px 15px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* HEADER */
+    .header {
+      background: white; border-bottom: 2px solid var(--teal);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--teal); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-back:active { background: var(--gray-100); }
+
+    /* TABS */
+    .tabs-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      display: flex; padding: 0 8px;
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 8px; border: none; background: none;
+      font-size: 0.85rem; font-weight: 500; color: var(--gray-400);
+      cursor: pointer; border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: all .2s;
+    }
+    .tab-btn.active { color: var(--teal); border-bottom-color: var(--teal); font-weight: 600; }
+    .tab-btn:active { background: var(--teal-light); }
+
+    /* CONTENT */
+    .content { flex: 1; padding: 12px 12px 100px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* SCAN TILES */
+    .scan-tiles {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-bottom: 16px;
+    }
+    .scan-tile {
+      background: white; border-radius: var(--radius-xl); padding: 20px 14px;
+      text-align: center; box-shadow: var(--shadow-md);
+      border: 2px solid var(--gray-200); cursor: pointer;
+      transition: all .2s; position: relative; overflow: hidden;
+    }
+    .scan-tile:active { transform: scale(.96); }
+    .scan-tile .tile-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .scan-tile .tile-name { font-weight: 700; font-size: 0.95rem; color: var(--gray-800); margin-bottom: 4px; }
+    .scan-tile .tile-desc { font-size: 0.75rem; color: var(--gray-500); }
+    .scan-tile .tile-count {
+      position: absolute; top: 10px; right: 10px;
+      background: var(--teal); color: white;
+      font-size: 0.7rem; font-weight: 700;
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .scan-tile .tile-count.zero { background: var(--gray-300); }
+    .scan-tile.facture { border-color: var(--blue); }
+    .scan-tile.facture:active { background: var(--blue-bg); }
+    .scan-tile.bl { border-color: var(--orange); }
+    .scan-tile.bl:active { background: var(--orange-light); }
+    .scan-tile.etiquette_mp { border-color: var(--purple); }
+    .scan-tile.etiquette_mp:active { background: var(--purple-bg); }
+    .scan-tile.etiquette_prod { border-color: var(--green); }
+    .scan-tile.etiquette_prod:active { background: var(--green-bg); }
+
+    /* TODAY SUMMARY */
+    .today-summary {
+      background: white; border-radius: var(--radius-lg); padding: 14px;
+      margin-bottom: 16px; box-shadow: var(--shadow);
+      border-left: 4px solid var(--teal);
+    }
+    .today-summary h3 { font-size: 0.9rem; color: var(--teal); margin-bottom: 8px; }
+    .summary-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 0; font-size: 0.85rem;
+    }
+    .summary-row .label { color: var(--gray-600); }
+    .summary-row .value { font-weight: 600; }
+    .summary-row .value.warn { color: var(--amber); }
+    .summary-row .value.ok { color: var(--green); }
+
+    /* QUICK ACTIONS */
+    .quick-actions {
+      background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+      border-radius: var(--radius-lg); padding: 16px;
+      margin-bottom: 16px; color: white; text-align: center;
+    }
+    .quick-actions h3 { font-size: 0.9rem; margin-bottom: 10px; font-weight: 600; }
+    .quick-actions .scanner-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 30px;
+      background: white; color: var(--teal-dark);
+      border: none; font-size: 1rem; font-weight: 700;
+      cursor: pointer; box-shadow: var(--shadow-lg);
+    }
+    .quick-actions .scanner-btn:active { transform: scale(.95); opacity: .9; }
+    .quick-actions .scanner-btn .icon { font-size: 1.3rem; }
+
+    /* DATE BAR */
+    .date-bar {
+      background: white; border-bottom: 1px solid var(--gray-200);
+      padding: 8px 16px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .date-nav-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: white; color: var(--teal); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .date-nav-btn:active { background: var(--teal-light); }
+    .date-display {
+      font-size: 1rem; font-weight: 600; color: var(--gray-800);
+      min-width: 200px; text-align: center;
+    }
+    .date-display .day-name { color: var(--teal); text-transform: capitalize; }
+    .btn-today {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-500); cursor: pointer;
+    }
+    .btn-today:active { background: var(--teal-light); }
+
+    /* SUB-TABS */
+    .sub-tabs {
+      display: flex; gap: 6px; padding: 10px 0; overflow-x: auto;
+    }
+    .sub-tab {
+      padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--gray-200); background: white;
+      font-size: 0.8rem; color: var(--gray-500); cursor: pointer;
+      white-space: nowrap;
+    }
+    .sub-tab.active { background: var(--teal); color: white; border-color: var(--teal); }
+    .sub-tab:active { opacity: .8; }
+
+    /* CARDS */
+    .card {
+      background: white; border-radius: var(--radius-lg); padding: 14px;
+      margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid var(--gray-200);
+      cursor: pointer;
+    }
+    .card:active { background: var(--gray-50); }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .card-title { font-weight: 600; font-size: 0.95rem; }
+    .card-meta { font-size: 0.75rem; color: var(--gray-400); }
+    .card-body { font-size: 0.85rem; color: var(--gray-600); }
+    .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+
+    /* BADGES */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-a_traiter { background: var(--amber-bg); color: var(--amber); }
+    .badge-traite { background: var(--green-bg); color: var(--green-dark); }
+    .badge-archive { background: var(--gray-100); color: var(--gray-500); }
+    .badge-probleme { background: var(--red-bg); color: var(--red); }
+    .badge-facture { background: var(--blue-bg); color: var(--blue); }
+    .badge-bl { background: var(--orange-light); color: var(--orange); }
+    .badge-etiquette_mp { background: var(--purple-bg); color: var(--purple); }
+    .badge-etiquette_prod { background: var(--green-bg); color: var(--green); }
+    .badge-dlc { background: #fef3c7; color: #92400e; }
+
+    /* STAT CARDS */
+    .stats-row {
+      display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .stat-card {
+      flex: 1; min-width: 80px; background: white; border-radius: var(--radius);
+      padding: 10px; text-align: center; box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+    }
+    .stat-card .number { font-size: 1.4rem; font-weight: 700; }
+    .stat-card .label { font-size: 0.65rem; color: var(--gray-500); }
+
+    /* FORM */
+    .form-section { margin-bottom: 16px; }
+    .form-label {
+      font-size: 0.8rem; font-weight: 600; color: var(--gray-600);
+      margin-bottom: 6px; display: block;
+    }
+    .form-label.required::after { content: ' *'; color: var(--red); }
+    select, input[type="text"], input[type="date"], textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); font-size: 0.9rem; background: white;
+      color: var(--gray-800); -webkit-appearance: none;
+    }
+    select:focus, input:focus, textarea:focus {
+      outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(13,148,136,.15);
+    }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* SCAN BUTTONS */
+    .scan-actions {
+      display: flex; gap: 8px; margin-bottom: 8px;
+    }
+    .scan-action-btn {
+      flex: 1; padding: 12px; border: none; border-radius: var(--radius-lg);
+      color: white; font-size: 0.85rem; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      cursor: pointer;
+    }
+    .scan-action-btn:active { opacity: .85; transform: scale(.97); }
+    .scan-action-btn.scanner { background: linear-gradient(135deg, #0d9488, #0f766e); }
+    .scan-action-btn.import { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+
+    /* FILE PREVIEW */
+    .file-info {
+      background: var(--teal-light); border: 1px solid var(--teal);
+      border-radius: var(--radius); padding: 10px; font-size: 0.8rem;
+      color: var(--teal-dark);
+    }
+    .photo-grid {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    }
+    .photo-item {
+      position: relative; width: 70px; height: 70px;
+    }
+    .photo-item img {
+      width: 100%; height: 100%; border-radius: var(--radius-sm);
+      object-fit: cover; border: 1px solid var(--gray-200);
+    }
+    .photo-item .page-num {
+      position: absolute; bottom: 2px; left: 2px;
+      background: rgba(0,0,0,.6); color: white;
+      font-size: 0.6rem; padding: 1px 5px; border-radius: 4px;
+    }
+
+    /* BUTTONS */
+    .btn {
+      padding: 10px 18px; border-radius: var(--radius); border: none;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all .2s;
+    }
+    .btn:active { transform: scale(.96); }
+    .btn:disabled { opacity: .5; pointer-events: none; }
+    .btn-primary { background: var(--teal); color: white; }
+    .btn-primary:active { background: var(--teal-dark); }
+    .btn-success { background: var(--green); color: white; }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-outline { background: white; color: var(--teal); border: 1px solid var(--teal); }
+    .btn-full { width: 100%; justify-content: center; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.4); z-index: 200;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white; border-radius: 16px 16px 0 0;
+      width: 100%; max-width: 500px; max-height: 92vh;
+      overflow-y: auto; padding: 0;
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-header {
+      padding: 16px; border-bottom: 1px solid var(--gray-200);
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; background: white; z-index: 1;
+    }
+    .modal-header h2 { font-size: 1.1rem; color: var(--gray-800); }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 50%; border: none;
+      background: var(--gray-100); font-size: 1.2rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-body { padding: 16px; }
+    .modal-footer {
+      padding: 12px 16px; border-top: 1px solid var(--gray-200);
+      display: flex; gap: 8px;
+      position: sticky; bottom: 0; background: white;
+    }
+
+    /* VIEWER */
+    .viewer-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.9); z-index: 300;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    .viewer-overlay.show { display: flex; }
+    .viewer-overlay img {
+      max-width: 95%; max-height: 80vh; object-fit: contain;
+      border-radius: var(--radius);
+    }
+    .viewer-nav {
+      display: flex; gap: 16px; margin-top: 16px; align-items: center;
+    }
+    .viewer-nav button {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: none; background: rgba(255,255,255,.2); color: white;
+      font-size: 1.2rem; cursor: pointer;
+    }
+    .viewer-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: none; background: rgba(255,255,255,.2); color: white;
+      font-size: 1.3rem; cursor: pointer;
+    }
+    .viewer-page-info { color: white; font-size: 0.9rem; font-weight: 600; }
+
+    /* OCR OVERLAY */
+    .ocr-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      z-index: 500; display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: white; gap: 16px;
+    }
+    .ocr-overlay.show { display: flex; }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ocr-status { font-size: 1rem; font-weight: 600; }
+    .ocr-progress {
+      width: 200px; height: 6px; background: rgba(255,255,255,.2);
+      border-radius: 3px; overflow: hidden;
+    }
+    .ocr-progress-fill {
+      height: 100%; background: var(--teal); border-radius: 3px;
+      transition: width .3s;
+    }
+
+    /* EMPTY STATE */
+    .empty {
+      text-align: center; padding: 40px 20px; color: var(--gray-400);
+    }
+    .empty .icon { font-size: 3rem; margin-bottom: 10px; }
+    .empty .text { font-size: 0.9rem; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      background: var(--gray-800); color: white; padding: 10px 20px;
+      border-radius: 20px; font-size: 0.85rem; z-index: 400;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    /* HIDDEN */
+    .hidden { display: none !important; }
+    .hidden-input { position: absolute; left: -9999px; opacity: 0; }
+
+    /* LOGIN FALLBACK */
+    .login-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 20px;
+    }
+    .login-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; color: var(--teal); }
+    .pin-dots { display: flex; gap: 10px; margin-bottom: 20px; }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--gray-300); background: white;
+    }
+    .pin-dot.filled { background: var(--teal); border-color: var(--teal); }
+    .pin-grid {
+      display: grid; grid-template-columns: repeat(3, 70px); gap: 10px;
+    }
+    .pin-btn {
+      height: 50px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+      background: white; font-size: 1.2rem; font-weight: 600; cursor: pointer;
+    }
+    .pin-btn:active { background: var(--teal-light); }
+    .login-error {
+      color: var(--red); font-size: 0.85rem; margin-top: 12px; display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== LOGIN SCREEN (fallback) ====== -->
+<div id="login-screen" class="login-screen hidden">
+  <div class="login-title">📸 Numerisations</div>
+  <div class="pin-dots" id="pin-dots"></div>
+  <div class="pin-grid">
+    <button class="pin-btn" onclick="pinAdd('1')">1</button>
+    <button class="pin-btn" onclick="pinAdd('2')">2</button>
+    <button class="pin-btn" onclick="pinAdd('3')">3</button>
+    <button class="pin-btn" onclick="pinAdd('4')">4</button>
+    <button class="pin-btn" onclick="pinAdd('5')">5</button>
+    <button class="pin-btn" onclick="pinAdd('6')">6</button>
+    <button class="pin-btn" onclick="pinAdd('7')">7</button>
+    <button class="pin-btn" onclick="pinAdd('8')">8</button>
+    <button class="pin-btn" onclick="pinAdd('9')">9</button>
+    <button class="pin-btn" onclick="pinClear()">C</button>
+    <button class="pin-btn" onclick="pinAdd('0')">0</button>
+    <button class="pin-btn" onclick="pinDelete()">←</button>
+  </div>
+  <div class="login-error" id="login-error"></div>
+</div>
+
+<!-- ====== MAIN APP ====== -->
+<div id="app-screen" class="hidden" style="display:flex;flex-direction:column;min-height:100vh;">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <a class="btn-back" href="../">← Retour</a>
+      <h1>📸 Numerisations</h1>
+    </div>
+    <div class="header-right">
+      <span id="user-badge"></span>
+      <span id="etab-badge"></span>
+    </div>
+  </div>
+
+  <!-- MAIN TABS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="scanner" onclick="switchTab('scanner')">📸 Scanner</button>
+    <button class="tab-btn" data-tab="documents" onclick="switchTab('documents')">📁 Documents</button>
+    <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Tableau</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ====== TAB: SCANNER (Home) ====== -->
+    <div class="tab-content active" id="tab-scanner">
+
+      <!-- Quick Scanner Pro launcher -->
+      <div class="quick-actions">
+        <h3>Scanner Pro</h3>
+        <button class="scanner-btn" onclick="openScannerPro()">
+          <span class="icon">📷</span> Ouvrir Scanner Pro
+        </button>
+      </div>
+
+      <!-- Scan Type Tiles -->
+      <div class="scan-tiles">
+        <div class="scan-tile facture" onclick="startScan('facture')">
+          <div class="tile-count zero" id="count-facture">0</div>
+          <div class="tile-icon">📄</div>
+          <div class="tile-name">Factures</div>
+          <div class="tile-desc">Factures fournisseurs</div>
+        </div>
+        <div class="scan-tile bl" onclick="startScan('bl')">
+          <div class="tile-count zero" id="count-bl">0</div>
+          <div class="tile-icon">📋</div>
+          <div class="tile-name">Bons de Livraison</div>
+          <div class="tile-desc">BL a checker</div>
+        </div>
+        <div class="scan-tile etiquette_mp" onclick="startScan('etiquette_mp')">
+          <div class="tile-count zero" id="count-etiquette_mp">0</div>
+          <div class="tile-icon">🏷️</div>
+          <div class="tile-name">Etiquettes MP</div>
+          <div class="tile-desc">Matieres premieres</div>
+        </div>
+        <div class="scan-tile etiquette_prod" onclick="startScan('etiquette_prod')">
+          <div class="tile-count zero" id="count-etiquette_prod">0</div>
+          <div class="tile-icon">🏭</div>
+          <div class="tile-name">Productions</div>
+          <div class="tile-desc">Etiquettes maison + DLC</div>
+        </div>
+      </div>
+
+      <!-- Today Summary -->
+      <div class="today-summary" id="today-summary">
+        <h3>📊 Aujourd'hui</h3>
+        <div id="summary-content">Chargement...</div>
+      </div>
+
+    </div>
+
+    <!-- ====== TAB: DOCUMENTS ====== -->
+    <div class="tab-content" id="tab-documents">
+      <!-- Date bar -->
+      <div class="date-bar" style="margin: -12px -12px 12px; border-bottom: 1px solid var(--gray-200);">
+        <button class="date-nav-btn" onclick="changeDate(-1)">‹</button>
+        <div class="date-display" id="date-display"></div>
+        <button class="date-nav-btn" onclick="changeDate(1)">›</button>
+        <button class="btn-today" onclick="goToday()">Auj.</button>
+      </div>
+
+      <!-- Type filter -->
+      <div class="sub-tabs" id="doc-type-tabs">
+        <button class="sub-tab active" data-type="all" onclick="filterByType('all')">Tous</button>
+        <button class="sub-tab" data-type="facture" onclick="filterByType('facture')">📄 Factures</button>
+        <button class="sub-tab" data-type="bl" onclick="filterByType('bl')">📋 BL</button>
+        <button class="sub-tab" data-type="etiquette_mp" onclick="filterByType('etiquette_mp')">🏷️ MP</button>
+        <button class="sub-tab" data-type="etiquette_prod" onclick="filterByType('etiquette_prod')">🏭 Prod</button>
+      </div>
+
+      <!-- Status filter -->
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-statut="all" onclick="filterByStatut('all')">Tous</button>
+        <button class="sub-tab" data-statut="a_traiter" onclick="filterByStatut('a_traiter')">A traiter</button>
+        <button class="sub-tab" data-statut="traite" onclick="filterByStatut('traite')">Traites</button>
+        <button class="sub-tab" data-statut="probleme" onclick="filterByStatut('probleme')">Problemes</button>
+      </div>
+
+      <div id="documents-list"></div>
+    </div>
+
+    <!-- ====== TAB: DASHBOARD ====== -->
+    <div class="tab-content" id="tab-dashboard">
+      <div id="dashboard-content">Chargement...</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== MODAL: NEW SCAN ====== -->
+<div class="modal-overlay" id="modal-scan">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-scan-title">Nouveau scan</h2>
+      <button class="modal-close" onclick="closeModal('modal-scan')">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Type (pre-selected) -->
+      <div class="form-section">
+        <label class="form-label required">Type</label>
+        <select id="form-type" onchange="onTypeChange()">
+          <option value="facture">📄 Facture</option>
+          <option value="bl">📋 Bon de livraison</option>
+          <option value="etiquette_mp">🏷️ Etiquette matiere premiere</option>
+          <option value="etiquette_prod">🏭 Etiquette production maison</option>
+        </select>
+      </div>
+
+      <!-- Fournisseur (factures, BL, etiquettes MP) -->
+      <div class="form-section" id="section-fournisseur">
+        <label class="form-label required">Fournisseur</label>
+        <select id="form-fournisseur">
+          <option value="">-- Choisir --</option>
+        </select>
+      </div>
+
+      <!-- Reference (factures, BL) -->
+      <div class="form-section" id="section-reference">
+        <label class="form-label">Numero de reference</label>
+        <input type="text" id="form-reference" placeholder="Ex: FA-2026-0042">
+      </div>
+
+      <!-- Designation (etiquettes) -->
+      <div class="form-section hidden" id="section-designation">
+        <label class="form-label required">Designation produit</label>
+        <input type="text" id="form-designation" placeholder="Ex: Farine T55, Sauce bolognaise...">
+      </div>
+
+      <!-- Lot (etiquettes) -->
+      <div class="form-section hidden" id="section-lot">
+        <label class="form-label">Numero de lot</label>
+        <input type="text" id="form-lot" placeholder="Ex: LOT-2026-04-15">
+      </div>
+
+      <!-- DLC (etiquettes) -->
+      <div class="form-section hidden" id="section-dlc">
+        <label class="form-label">DLC / DDM</label>
+        <input type="date" id="form-dlc">
+      </div>
+
+      <!-- Date fabrication (prod) -->
+      <div class="form-section hidden" id="section-date-fab">
+        <label class="form-label">Date de fabrication</label>
+        <input type="date" id="form-date-fab">
+      </div>
+
+      <!-- Fiche technique (prod) -->
+      <div class="form-section hidden" id="section-fiche">
+        <label class="form-label">Fiche technique liee</label>
+        <select id="form-fiche">
+          <option value="">-- Aucune --</option>
+        </select>
+      </div>
+
+      <!-- Lien commande (factures, BL) -->
+      <div class="form-section" id="section-commande">
+        <label class="form-label">Rattacher a une commande</label>
+        <select id="form-commande">
+          <option value="">-- Aucune --</option>
+        </select>
+      </div>
+
+      <!-- Document scan -->
+      <div class="form-section">
+        <label class="form-label required">Document scanne</label>
+        <div class="scan-actions">
+          <button type="button" class="scan-action-btn scanner" onclick="openScannerPro()">
+            📷 Scanner Pro
+          </button>
+          <button type="button" class="scan-action-btn import" onclick="triggerImport()">
+            📄 Importer PDF
+          </button>
+        </div>
+        <div id="file-info" class="file-info hidden">
+          <span id="file-count">Aucun fichier</span>
+        </div>
+        <div id="file-preview"></div>
+      </div>
+
+      <!-- Observation -->
+      <div class="form-section">
+        <label class="form-label">Observation</label>
+        <textarea id="form-observation" placeholder="Notes, remarques..."></textarea>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-scan')" style="flex:1;">Annuler</button>
+      <button class="btn btn-primary" onclick="submitScan()" id="btn-submit" style="flex:2;">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL: VIEW DOCUMENT ====== -->
+<div class="modal-overlay" id="modal-view">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-view-title">Document</h2>
+      <button class="modal-close" onclick="closeModal('modal-view')">×</button>
+    </div>
+    <div class="modal-body" id="modal-view-body"></div>
+    <div class="modal-footer" id="modal-view-footer"></div>
+  </div>
+</div>
+
+<!-- ====== FULLSCREEN VIEWER ====== -->
+<div class="viewer-overlay" id="viewer">
+  <button class="viewer-close" onclick="closeViewer()">×</button>
+  <img id="viewer-img" src="" alt="Document">
+  <div class="viewer-nav">
+    <button onclick="viewerNav(-1)">‹</button>
+    <span class="viewer-page-info" id="viewer-info">1 / 1</span>
+    <button onclick="viewerNav(1)">›</button>
+  </div>
+</div>
+
+<!-- OCR OVERLAY -->
+<div class="ocr-overlay" id="ocr-overlay">
+  <div class="spinner"></div>
+  <div class="ocr-status" id="ocr-status">Traitement...</div>
+  <div class="ocr-progress"><div class="ocr-progress-fill" id="ocr-progress" style="width:0%"></div></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- Hidden file input -->
+<input type="file" id="file-input" class="hidden-input" accept="application/pdf,image/*">
+
+<script>
+  // ====== CONFIG ======
+  const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+  const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+
+  const TYPE_LABELS = {
+    facture: '📄 Facture',
+    bl: '📋 Bon de livraison',
+    etiquette_mp: '🏷️ Etiquette MP',
+    etiquette_prod: '🏭 Production maison'
+  };
+
+  const TYPE_COLORS = {
+    facture: 'var(--blue)',
+    bl: 'var(--orange)',
+    etiquette_mp: 'var(--purple)',
+    etiquette_prod: 'var(--green)'
+  };
+
+  // pdf.js worker
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  // ====== STATE ======
+  let currentUser = null;
+  let currentEtablissement = null;
+  let sb = null;
+  let filterDate = new Date();
+  let currentTab = 'scanner';
+  let currentTypeFilter = 'all';
+  let currentStatutFilter = 'all';
+  let fournisseurs = [];
+  let commandes = [];
+  let fichestechniques = [];
+  let documents = [];
+  let todayCounts = { facture: 0, bl: 0, etiquette_mp: 0, etiquette_prod: 0 };
+  let importedFile = null;
+  let viewerPages = [];
+  let viewerIndex = 0;
+
+  // ====== UTILS ======
+  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function dateStr(d) { return (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0]; }
+  function formatDateFull(d) {
+    const s = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const p = s.split(' ');
+    return `<span class="day-name">${p[0]}</span> ${p.slice(1).join(' ')}`;
+  }
+  function formatDateShort(d) { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }); }
+  function formatTime(d) { return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
+  function userRole() { return ROLE_HIERARCHY[currentUser?.role] || 0; }
+  function isManager() { return userRole() >= 2; }
+  function isToday(d) { return dateStr(d) === dateStr(new Date()); }
+
+  // ====== SUPABASE ======
+  function initSupabase() {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+  }
+
+  const DB = {
+    async getFournisseurs(etab) {
+      const { data } = await sb.from('appro_fournisseurs').select('id, nom')
+        .or(`etablissement.eq.${etab},etablissement.is.null`)
+        .eq('actif', true).order('nom');
+      return data || [];
+    },
+    async getCommandes(etab) {
+      const { data } = await sb.from('appro_commandes').select('id, fournisseur_nom, date_creation, statut')
+        .eq('etablissement', etab)
+        .in('statut', ['envoyee', 'validee'])
+        .order('date_creation', { ascending: false }).limit(50);
+      return data || [];
+    },
+    async getFichesTechniques(etab) {
+      const { data } = await sb.from('fiches_techniques').select('id, nom, categorie')
+        .eq('etablissement', etab).eq('actif', true).order('nom');
+      return data || [];
+    },
+    async getDocuments(etab, date) {
+      const { data } = await sb.from('numerisations').select('*')
+        .eq('etablissement', etab).eq('date_document', date)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    async getDocumentsRange(etab, dateFrom, dateTo) {
+      const { data } = await sb.from('numerisations').select('*')
+        .eq('etablissement', etab)
+        .gte('date_document', dateFrom).lte('date_document', dateTo)
+        .order('date_document', { ascending: false });
+      return data || [];
+    },
+    async getPages(docId) {
+      const { data } = await sb.from('numerisations_pages').select('*')
+        .eq('document_id', docId).order('page_num');
+      return data || [];
+    },
+    async insertDocument(doc) {
+      const { data, error } = await sb.from('numerisations').insert(doc).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+    async insertPages(pages) {
+      const { error } = await sb.from('numerisations_pages').insert(pages);
+      if (error) throw error;
+    },
+    async updateDocument(id, updates) {
+      const { error } = await sb.from('numerisations').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    async getDlcAlerts(etab) {
+      const today = dateStr(new Date());
+      const in3days = dateStr(new Date(Date.now() + 3 * 86400000));
+      const { data } = await sb.from('numerisations').select('*')
+        .eq('etablissement', etab).eq('type', 'etiquette_prod')
+        .not('dlc', 'is', null).lte('dlc', in3days).gte('dlc', today)
+        .order('dlc');
+      return data || [];
+    }
+  };
+
+  // ====== SESSION ======
+  function checkPortalSession() {
+    const user = sessionStorage.getItem('planb_user');
+    const etab = sessionStorage.getItem('planb_etablissement');
+    return user && etab ? { user: JSON.parse(user), etablissement: etab } : null;
+  }
+
+  // ====== LOGIN FALLBACK ======
+  let pinCode = '';
+  function renderPinDots() {
+    const c = document.getElementById('pin-dots');
+    if (!c) return;
+    c.innerHTML = Array.from({ length: 6 }, (_, i) =>
+      `<div class="pin-dot ${i < pinCode.length ? 'filled' : ''}"></div>`
+    ).join('');
+  }
+  function pinAdd(n) {
+    if (pinCode.length >= 6) return;
+    pinCode += n; renderPinDots();
+    if (pinCode.length >= 4) attemptLogin();
+  }
+  function pinDelete() { pinCode = pinCode.slice(0, -1); renderPinDots(); }
+  function pinClear() { pinCode = ''; renderPinDots(); }
+
+  async function attemptLogin() {
+    try {
+      const { data } = await sb.from('users').select('*').eq('code', pinCode).eq('actif', true);
+      if (!data?.length) {
+        if (pinCode.length >= 6) {
+          document.getElementById('login-error').textContent = 'Code incorrect';
+          document.getElementById('login-error').style.display = 'block';
+          pinClear();
+        }
+        return;
+      }
+      const u = data[0];
+      currentUser = {
+        id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
+        etablissements: u.acces_etablissements?.length > 0 ? u.acces_etablissements : [u.etablissement]
+      };
+      if (currentUser.etablissements.length === 1) {
+        currentEtablissement = currentUser.etablissements[0];
+        showApp();
+      }
+    } catch (e) { console.error('Login error:', e); }
+  }
+
+  // ====== TAB NAVIGATION ======
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab)
+    );
+    document.querySelectorAll('.tab-content').forEach(c =>
+      c.classList.toggle('active', c.id === `tab-${tab}`)
+    );
+    if (tab === 'documents') { updateDateDisplay(); loadDocuments(); }
+    else if (tab === 'dashboard') loadDashboard();
+    else if (tab === 'scanner') loadTodayCounts();
+  }
+
+  // ====== DATE NAVIGATION ======
+  function changeDate(delta) {
+    filterDate.setDate(filterDate.getDate() + delta);
+    updateDateDisplay(); loadDocuments();
+  }
+  function goToday() { filterDate = new Date(); updateDateDisplay(); loadDocuments(); }
+  function updateDateDisplay() {
+    const el = document.getElementById('date-display');
+    if (el) el.innerHTML = formatDateFull(filterDate);
+  }
+
+  // ====== DOCUMENT FILTERS ======
+  function filterByType(type) {
+    currentTypeFilter = type;
+    document.querySelectorAll('#doc-type-tabs .sub-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.type === type)
+    );
+    renderDocuments();
+  }
+  function filterByStatut(statut) {
+    currentStatutFilter = statut;
+    document.querySelectorAll('#tab-documents .sub-tabs:last-of-type .sub-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.statut === statut)
+    );
+    renderDocuments();
+  }
+
+  // ====== SCANNER PRO ======
+  function openScannerPro() {
+    const schemes = ['readdle-scannerpro://', 'scannerpro://'];
+    const startTime = Date.now();
+    window.location.href = schemes[0];
+    setTimeout(() => {
+      if (Date.now() - startTime < 2000) return;
+      window.location.href = schemes[1];
+      setTimeout(() => {
+        if (Date.now() - startTime < 3500) return;
+        const useStore = confirm(
+          'Scanner Pro ne s\'est pas ouvert.\n\n' +
+          'Verifiez que l\'app est installee.\n\nOuvrir l\'App Store ?'
+        );
+        if (useStore) window.location.href = 'https://apps.apple.com/app/scanner-pro-scan-documents/id333710667';
+      }, 1500);
+    }, 1500);
+  }
+
+  // ====== START SCAN (from tiles) ======
+  function startScan(type) {
+    document.getElementById('form-type').value = type;
+    onTypeChange();
+    resetForm();
+    document.getElementById('modal-scan').classList.add('show');
+  }
+
+  function resetForm() {
+    document.getElementById('form-fournisseur').value = '';
+    document.getElementById('form-reference').value = '';
+    document.getElementById('form-designation').value = '';
+    document.getElementById('form-lot').value = '';
+    document.getElementById('form-dlc').value = '';
+    document.getElementById('form-date-fab').value = dateStr(new Date());
+    document.getElementById('form-commande').value = '';
+    document.getElementById('form-fiche').value = '';
+    document.getElementById('form-observation').value = '';
+    importedFile = null;
+    updateFilePreview();
+  }
+
+  function onTypeChange() {
+    const type = document.getElementById('form-type').value;
+    const isFacture = type === 'facture';
+    const isBl = type === 'bl';
+    const isMp = type === 'etiquette_mp';
+    const isProd = type === 'etiquette_prod';
+    const isEtiquette = isMp || isProd;
+
+    // Show/hide sections
+    toggle('section-fournisseur', !isProd);
+    toggle('section-reference', isFacture || isBl);
+    toggle('section-designation', isEtiquette);
+    toggle('section-lot', isEtiquette);
+    toggle('section-dlc', isEtiquette);
+    toggle('section-date-fab', isProd);
+    toggle('section-fiche', isProd);
+    toggle('section-commande', isFacture || isBl);
+
+    // Update title
+    document.getElementById('modal-scan-title').textContent = TYPE_LABELS[type] || 'Nouveau scan';
+
+    // Load fiches if prod
+    if (isProd && fichestechniques.length === 0) loadFichesTechniques();
+  }
+
+  function toggle(id, show) {
+    document.getElementById(id).classList.toggle('hidden', !show);
+  }
+
+  // ====== LOAD REFERENCE DATA ======
+  async function loadFournisseurs() {
+    try {
+      fournisseurs = await DB.getFournisseurs(currentEtablissement);
+      const sel = document.getElementById('form-fournisseur');
+      sel.innerHTML = '<option value="">-- Choisir --</option>';
+      fournisseurs.forEach(f => sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`);
+    } catch (e) { console.error('Erreur fournisseurs:', e); }
+  }
+
+  async function loadCommandes() {
+    try {
+      commandes = await DB.getCommandes(currentEtablissement);
+      const sel = document.getElementById('form-commande');
+      sel.innerHTML = '<option value="">-- Aucune --</option>';
+      commandes.forEach(c => {
+        sel.innerHTML += `<option value="${c.id}">${esc(c.fournisseur_nom)} - ${formatDateShort(c.date_creation)}</option>`;
+      });
+    } catch (e) { console.error('Erreur commandes:', e); }
+  }
+
+  async function loadFichesTechniques() {
+    try {
+      fichestechniques = await DB.getFichesTechniques(currentEtablissement);
+      const sel = document.getElementById('form-fiche');
+      sel.innerHTML = '<option value="">-- Aucune --</option>';
+      fichestechniques.forEach(f => sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`);
+    } catch (e) { console.error('Erreur fiches:', e); }
+  }
+
+  // ====== LOAD DOCUMENTS ======
+  async function loadDocuments() {
+    try {
+      documents = await DB.getDocuments(currentEtablissement, dateStr(filterDate));
+      renderDocuments();
+    } catch (e) {
+      console.error('Erreur chargement:', e);
+      showToast('Erreur de chargement', 'error');
+    }
+  }
+
+  async function loadTodayCounts() {
+    try {
+      const docs = await DB.getDocuments(currentEtablissement, dateStr(new Date()));
+      todayCounts = { facture: 0, bl: 0, etiquette_mp: 0, etiquette_prod: 0 };
+      docs.forEach(d => { if (todayCounts[d.type] !== undefined) todayCounts[d.type]++; });
+
+      Object.keys(todayCounts).forEach(type => {
+        const el = document.getElementById(`count-${type}`);
+        if (el) {
+          el.textContent = todayCounts[type];
+          el.classList.toggle('zero', todayCounts[type] === 0);
+        }
+      });
+
+      // Update summary
+      const total = Object.values(todayCounts).reduce((a, b) => a + b, 0);
+      const aTraiter = docs.filter(d => d.statut === 'a_traiter').length;
+      document.getElementById('summary-content').innerHTML = `
+        <div class="summary-row">
+          <span class="label">Total scans aujourd'hui</span>
+          <span class="value">${total}</span>
+        </div>
+        <div class="summary-row">
+          <span class="label">A traiter</span>
+          <span class="value ${aTraiter > 0 ? 'warn' : 'ok'}">${aTraiter}</span>
+        </div>
+        <div class="summary-row">
+          <span class="label">Factures</span>
+          <span class="value">${todayCounts.facture}</span>
+        </div>
+        <div class="summary-row">
+          <span class="label">BL</span>
+          <span class="value">${todayCounts.bl}</span>
+        </div>
+        <div class="summary-row">
+          <span class="label">Etiquettes MP</span>
+          <span class="value">${todayCounts.etiquette_mp}</span>
+        </div>
+        <div class="summary-row">
+          <span class="label">Productions maison</span>
+          <span class="value">${todayCounts.etiquette_prod}</span>
+        </div>
+      `;
+    } catch (e) {
+      console.error('Erreur counts:', e);
+      document.getElementById('summary-content').innerHTML =
+        '<div style="color:var(--red);font-size:.85rem;">Erreur de chargement</div>';
+    }
+  }
+
+  // ====== RENDER DOCUMENTS ======
+  function renderDocuments() {
+    const container = document.getElementById('documents-list');
+    let filtered = [...documents];
+    if (currentTypeFilter !== 'all') filtered = filtered.filter(d => d.type === currentTypeFilter);
+    if (currentStatutFilter !== 'all') filtered = filtered.filter(d => d.statut === currentStatutFilter);
+
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty"><div class="icon">📸</div><div class="text">Aucun document ${isToday(filterDate) ? 'aujourd\'hui' : 'ce jour'}</div></div>`;
+      return;
+    }
+    container.innerHTML = filtered.map(renderDocCard).join('');
+  }
+
+  function renderDocCard(doc) {
+    const typeBadge = `<span class="badge badge-${doc.type}">${TYPE_LABELS[doc.type] || doc.type}</span>`;
+    const statutBadge = `<span class="badge badge-${doc.statut}">${
+      { a_traiter: 'A traiter', traite: 'Traite', archive: 'Archive', probleme: 'Probleme' }[doc.statut] || doc.statut
+    }</span>`;
+
+    const title = doc.fournisseur_nom || doc.designation || TYPE_LABELS[doc.type];
+    const ref = doc.reference ? `<div style="font-size:.8rem;color:var(--gray-500);">Ref: ${esc(doc.reference)}</div>` : '';
+    const desig = doc.designation ? `<div style="font-size:.8rem;color:var(--gray-500);">${esc(doc.designation)}</div>` : '';
+    const dlc = doc.dlc ? `<span class="badge badge-dlc">DLC: ${formatDateShort(doc.dlc)}</span>` : '';
+    const obs = doc.observation ? `<div style="font-size:.8rem;color:var(--gray-500);margin-top:4px;">${esc(doc.observation).substring(0, 80)}</div>` : '';
+
+    return `
+      <div class="card" onclick="viewDocument('${doc.id}')">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${esc(title)}</div>
+            ${ref}${desig}
+          </div>
+          <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+            ${typeBadge}
+            ${statutBadge}
+          </div>
+        </div>
+        <div class="card-body">
+          ${obs}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+            <div class="card-tags">${dlc}</div>
+            <span class="card-meta">${esc(doc.user_initiales || doc.user_nom)} - ${formatTime(doc.created_at)}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ====== VIEW DOCUMENT ======
+  async function viewDocument(docId) {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc) return;
+
+    document.getElementById('modal-view-title').textContent = TYPE_LABELS[doc.type] || 'Document';
+
+    let pages = [];
+    try { pages = await DB.getPages(docId); } catch (e) { console.error(e); }
+
+    const statutLabel = {
+      a_traiter: '🟡 A traiter',
+      traite: '✅ Traite',
+      archive: '📦 Archive',
+      probleme: '❌ Probleme'
+    }[doc.statut] || doc.statut;
+
+    let body = `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Type</div>
+        <div style="font-weight:600;">${TYPE_LABELS[doc.type]}</div>
+      </div>`;
+
+    if (doc.fournisseur_nom) {
+      body += `<div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Fournisseur</div>
+        <div style="font-weight:600;">${esc(doc.fournisseur_nom)}</div>
+      </div>`;
+    }
+
+    if (doc.designation) {
+      body += `<div style="margin-bottom:12px;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Designation</div>
+        <div>${esc(doc.designation)}</div>
+      </div>`;
+    }
+
+    body += `<div style="display:flex;gap:16px;margin-bottom:12px;">
+      <div style="flex:1;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Date</div>
+        <div>${new Date(doc.date_document).toLocaleDateString('fr-FR')}</div>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Statut</div>
+        <div>${statutLabel}</div>
+      </div>
+    </div>`;
+
+    if (doc.reference) {
+      body += `<div style="margin-bottom:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Reference</div><div>${esc(doc.reference)}</div></div>`;
+    }
+    if (doc.lot) {
+      body += `<div style="margin-bottom:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Lot</div><div>${esc(doc.lot)}</div></div>`;
+    }
+    if (doc.dlc) {
+      const dlcDate = new Date(doc.dlc);
+      const daysLeft = Math.ceil((dlcDate - new Date()) / 86400000);
+      const dlcColor = daysLeft <= 1 ? 'var(--red)' : daysLeft <= 3 ? 'var(--amber)' : 'var(--green)';
+      body += `<div style="margin-bottom:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">DLC</div><div style="color:${dlcColor};font-weight:600;">${dlcDate.toLocaleDateString('fr-FR')} (J-${daysLeft})</div></div>`;
+    }
+    if (doc.date_fabrication) {
+      body += `<div style="margin-bottom:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Date fabrication</div><div>${new Date(doc.date_fabrication).toLocaleDateString('fr-FR')}</div></div>`;
+    }
+    if (doc.observation) {
+      body += `<div style="margin-bottom:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Observation</div><div>${esc(doc.observation)}</div></div>`;
+    }
+
+    body += `<div style="margin-bottom:8px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Enregistre par</div><div>${esc(doc.user_nom)} (${esc(doc.user_initiales || '')}) - ${formatTime(doc.created_at)}</div></div>`;
+
+    if (doc.pdf_data) {
+      body += `<div style="margin-top:12px;"><button class="btn btn-primary btn-full" onclick="downloadPdf('${doc.id}')">📥 Telecharger le PDF</button></div>`;
+    }
+
+    if (pages.length) {
+      body += `<div style="margin-top:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">Pages (${pages.length})</div><div class="photo-grid">
+        ${pages.map((p, i) => `<div class="photo-item"><img src="${p.photo_data}" alt="Page ${i+1}" onclick="event.stopPropagation();openViewerFromPages(${JSON.stringify(pages.map(pp => pp.photo_data))}, ${i})"><span class="page-num">p.${i+1}</span></div>`).join('')}
+      </div></div>`;
+    }
+
+    if (doc.texte_ocr) {
+      const preview = doc.texte_ocr.substring(0, 300);
+      body += `<div style="margin-top:12px;"><div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">Texte extrait</div><div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px;font-size:.75rem;color:var(--gray-600);max-height:120px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;">${esc(preview)}${doc.texte_ocr.length > 300 ? '...' : ''}</div></div>`;
+    }
+
+    document.getElementById('modal-view-body').innerHTML = body;
+
+    let footer = '';
+    if (doc.statut === 'a_traiter') {
+      footer = `
+        <button class="btn btn-danger btn-sm" onclick="updateStatus('${doc.id}','probleme')" style="flex:1;">Probleme</button>
+        <button class="btn btn-success btn-sm" onclick="updateStatus('${doc.id}','traite')" style="flex:2;">Marquer traite</button>`;
+    } else if (doc.statut === 'traite') {
+      footer = `<button class="btn btn-outline btn-sm btn-full" onclick="updateStatus('${doc.id}','archive')">Archiver</button>`;
+    }
+    document.getElementById('modal-view-footer').innerHTML = footer;
+    document.getElementById('modal-view').classList.add('show');
+  }
+
+  async function updateStatus(docId, statut) {
+    try {
+      await DB.updateDocument(docId, {
+        statut,
+        traite_par_id: currentUser.id,
+        traite_par_nom: currentUser.nom,
+        date_traitement: new Date().toISOString()
+      });
+      showToast(statut === 'traite' ? 'Marque comme traite !' : statut === 'probleme' ? 'Signale comme probleme' : 'Archive', 'success');
+      closeModal('modal-view');
+      loadDocuments();
+      if (currentTab === 'scanner') loadTodayCounts();
+    } catch (e) {
+      console.error('Erreur update:', e);
+      showToast('Erreur', 'error');
+    }
+  }
+
+  function downloadPdf(docId) {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc?.pdf_data) return;
+    const link = document.createElement('a');
+    link.href = doc.pdf_data;
+    link.download = `${doc.type}_${(doc.fournisseur_nom || doc.designation || 'doc').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20)}_${doc.date_document.replace(/-/g, '')}.pdf`;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
+
+  // ====== FILE IMPORT ======
+  function triggerImport() {
+    const input = document.getElementById('file-input');
+    input.value = ''; input.click();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('file-input')?.addEventListener('change', async function() {
+      if (!this.files?.length) return;
+      const file = this.files[0];
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      showOcr(true, 'Chargement...', 10);
+      try {
+        if (isPdf) await processPdf(file);
+        else await processImage(file);
+        showOcr(false);
+        updateFilePreview();
+        showToast(`${importedFile?.name || 'Fichier'} importe`, 'success');
+      } catch (err) {
+        console.error('Import error:', err);
+        showOcr(false);
+        showToast('Erreur d\'import', 'error');
+      }
+    });
+  });
+
+  async function processPdf(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const dataUri = await fileToDataUri(file);
+    const pageImages = [];
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      showOcr(true, `Page ${i}/${pdf.numPages}...`, 10 + (70 * i / pdf.numPages));
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale: 0.8 });
+      const canvas = document.createElement('canvas');
+      canvas.width = vp.width; canvas.height = vp.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      pageImages.push(canvas.toDataURL('image/jpeg', 0.5));
+      try {
+        const tc = await page.getTextContent();
+        const txt = tc.items.map(item => item.str).join(' ');
+        if (txt.trim()) fullText += (fullText ? '\n\n' : '') + txt.trim();
+      } catch (e) {}
+    }
+
+    if (!fullText.trim() && pageImages.length > 0) {
+      showOcr(true, 'OCR...', 80);
+      fullText = await runOcr(pageImages[0]);
+    }
+
+    importedFile = { type: 'pdf', dataUri, name: file.name, pageImages, textContent: fullText, nbPages: pdf.numPages };
+  }
+
+  async function processImage(file) {
+    const raw = await fileToDataUri(file);
+    showOcr(true, 'Compression...', 20);
+    const compressed = await compressImg(raw, 1400, 0.65);
+    const thumb = await compressImg(raw, 800, 0.5);
+    showOcr(true, 'OCR...', 50);
+    const text = await runOcr(compressed);
+    importedFile = { type: 'image', dataUri: compressed, name: file.name, pageImages: [thumb], textContent: text, nbPages: 1 };
+  }
+
+  function fileToDataUri(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result); r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
+  function compressImg(dataUri, maxW = 1200, quality = 0.6) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUri);
+      img.src = dataUri;
+    });
+  }
+
+  async function runOcr(base64) {
+    try {
+      const result = await Tesseract.recognize(base64, 'fra', {
+        logger: m => {
+          if (m.status === 'recognizing text')
+            showOcr(true, 'Extraction texte...', 80 + Math.round((m.progress || 0) * 20));
+        }
+      });
+      return (result?.data?.text || '').trim();
+    } catch (e) { console.error('OCR error:', e); return ''; }
+  }
+
+  function updateFilePreview() {
+    const infoEl = document.getElementById('file-info');
+    const countEl = document.getElementById('file-count');
+    const previewEl = document.getElementById('file-preview');
+
+    if (!importedFile) {
+      infoEl.classList.add('hidden');
+      previewEl.innerHTML = '';
+      return;
+    }
+
+    infoEl.classList.remove('hidden');
+    const icon = importedFile.type === 'pdf' ? '📄' : '🖼️';
+    countEl.textContent = `${icon} ${importedFile.name} (${importedFile.nbPages} page(s))`;
+
+    let html = '<div class="photo-grid">';
+    importedFile.pageImages.forEach((img, i) => {
+      html += `<div class="photo-item"><img src="${img}" alt="Page ${i+1}" onclick="previewPage(${i})"><span class="page-num">p.${i+1}</span></div>`;
+    });
+    html += '</div>';
+
+    if (importedFile.textContent) {
+      const preview = importedFile.textContent.substring(0, 150);
+      html += `<div style="margin-top:6px;font-size:.7rem;color:var(--gray-400);">Texte: ${esc(preview)}${importedFile.textContent.length > 150 ? '...' : ''}</div>`;
+    }
+    previewEl.innerHTML = html;
+  }
+
+  function previewPage(i) {
+    if (!importedFile) return;
+    viewerPages = importedFile.pageImages; viewerIndex = i; showViewer();
+  }
+
+  // ====== SUBMIT SCAN ======
+  async function submitScan() {
+    const type = document.getElementById('form-type').value;
+    const fournisseurId = document.getElementById('form-fournisseur').value;
+    const reference = document.getElementById('form-reference').value.trim();
+    const designation = document.getElementById('form-designation').value.trim();
+    const lot = document.getElementById('form-lot').value.trim();
+    const dlc = document.getElementById('form-dlc').value;
+    const dateFab = document.getElementById('form-date-fab').value;
+    const ficheId = document.getElementById('form-fiche').value;
+    const commandeId = document.getElementById('form-commande').value;
+    const observation = document.getElementById('form-observation').value.trim();
+
+    // Validation
+    const needsFournisseur = ['facture', 'bl', 'etiquette_mp'].includes(type);
+    if (needsFournisseur && !fournisseurId) { showToast('Selectionnez un fournisseur', 'error'); return; }
+    if (['etiquette_mp', 'etiquette_prod'].includes(type) && !designation) { showToast('Saisissez la designation', 'error'); return; }
+    if (!importedFile) { showToast('Importez un document', 'error'); return; }
+
+    const fournisseur = fournisseurs.find(f => f.id === fournisseurId);
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true; btn.textContent = 'Enregistrement...';
+
+    try {
+      const doc = await DB.insertDocument({
+        type,
+        fournisseur_id: needsFournisseur && fournisseurId ? fournisseurId : null,
+        fournisseur_nom: fournisseur?.nom || null,
+        date_document: dateStr(new Date()),
+        reference: reference || null,
+        designation: designation || null,
+        lot: lot || null,
+        dlc: dlc || null,
+        date_fabrication: dateFab || null,
+        fiche_technique_id: ficheId || null,
+        commande_id: commandeId || null,
+        statut: 'a_traiter',
+        observation: observation || null,
+        nb_pages: importedFile.nbPages,
+        pdf_data: importedFile.type === 'pdf' ? importedFile.dataUri : null,
+        texte_ocr: importedFile.textContent || null,
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+
+      if (doc && importedFile.pageImages.length) {
+        await DB.insertPages(importedFile.pageImages.map((img, i) => ({
+          document_id: doc.id,
+          page_num: i + 1,
+          photo_data: img,
+          texte_ocr: null
+        })));
+      }
+
+      showToast('Enregistre !', 'success');
+      closeModal('modal-scan');
+      loadTodayCounts();
+      if (currentTab === 'documents') loadDocuments();
+    } catch (e) {
+      console.error('Erreur:', e);
+      showToast('Erreur d\'enregistrement', 'error');
+      setTimeout(() => alert('Erreur:\n' + (e?.message || JSON.stringify(e))), 300);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Enregistrer';
+    }
+  }
+
+  // ====== DASHBOARD ======
+  async function loadDashboard() {
+    try {
+      const today = dateStr(new Date());
+      const d30ago = dateStr(new Date(Date.now() - 30 * 86400000));
+      const d7ago = dateStr(new Date(Date.now() - 7 * 86400000));
+
+      const [all30, dlcAlerts] = await Promise.all([
+        DB.getDocumentsRange(currentEtablissement, d30ago, today),
+        DB.getDlcAlerts(currentEtablissement)
+      ]);
+
+      const last7 = all30.filter(d => d.date_document >= d7ago);
+      const todayDocs = all30.filter(d => d.date_document === today);
+      const aTraiter = all30.filter(d => d.statut === 'a_traiter');
+
+      let html = '';
+
+      // Stats row
+      html += `<div class="stats-row">
+        <div class="stat-card"><div class="number" style="color:var(--teal)">${todayDocs.length}</div><div class="label">Aujourd'hui</div></div>
+        <div class="stat-card"><div class="number" style="color:var(--blue)">${last7.length}</div><div class="label">7 jours</div></div>
+        <div class="stat-card"><div class="number" style="color:var(--amber)">${aTraiter.length}</div><div class="label">A traiter</div></div>
+        <div class="stat-card"><div class="number" style="color:var(--purple)">${all30.length}</div><div class="label">30 jours</div></div>
+      </div>`;
+
+      // Type breakdown 7 days
+      const byType = {};
+      last7.forEach(d => { byType[d.type] = (byType[d.type] || 0) + 1; });
+      html += `<div style="background:white;border-radius:var(--radius-lg);padding:14px;margin-bottom:12px;box-shadow:var(--shadow);">
+        <div style="font-size:.9rem;font-weight:600;color:var(--teal);margin-bottom:10px;">Repartition 7 jours</div>
+        ${Object.entries(TYPE_LABELS).map(([type, label]) => {
+          const count = byType[type] || 0;
+          const pct = last7.length > 0 ? Math.round(count / last7.length * 100) : 0;
+          return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <div style="flex:1;font-size:.8rem;color:var(--gray-600);">${label}</div>
+            <div style="width:100px;height:8px;background:var(--gray-100);border-radius:4px;overflow:hidden;">
+              <div style="width:${pct}%;height:100%;background:${TYPE_COLORS[type]};border-radius:4px;"></div>
+            </div>
+            <div style="font-size:.8rem;font-weight:600;min-width:30px;text-align:right;">${count}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+      // DLC Alerts
+      if (dlcAlerts.length > 0) {
+        html += `<div style="background:white;border-radius:var(--radius-lg);padding:14px;margin-bottom:12px;box-shadow:var(--shadow);border-left:4px solid var(--amber);">
+          <div style="font-size:.9rem;font-weight:600;color:var(--amber);margin-bottom:10px;">⚠️ Alertes DLC (3 jours)</div>
+          ${dlcAlerts.map(d => {
+            const days = Math.ceil((new Date(d.dlc) - new Date()) / 86400000);
+            const color = days <= 1 ? 'var(--red)' : 'var(--amber)';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray-100);">
+              <div style="font-size:.85rem;">${esc(d.designation || 'Produit')}</div>
+              <div style="font-size:.8rem;font-weight:600;color:${color};">J-${days} (${formatDateShort(d.dlc)})</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+
+      // Recent documents needing treatment
+      if (aTraiter.length > 0) {
+        html += `<div style="font-size:.9rem;font-weight:600;color:var(--gray-700);margin:12px 0 8px;">A traiter (${aTraiter.length})</div>`;
+        aTraiter.slice(0, 10).forEach(d => { html += renderDocCard(d); });
+      }
+
+      document.getElementById('dashboard-content').innerHTML = html;
+    } catch (e) {
+      console.error('Dashboard error:', e);
+      document.getElementById('dashboard-content').innerHTML = '<div class="empty"><div class="icon">⚠️</div><div class="text">Erreur de chargement</div></div>';
+    }
+  }
+
+  // ====== VIEWER ======
+  function openViewerFromPages(pagesData, index) {
+    viewerPages = pagesData; viewerIndex = index; showViewer();
+  }
+  function showViewer() {
+    if (!viewerPages.length) return;
+    document.getElementById('viewer-img').src = viewerPages[viewerIndex];
+    document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
+    document.getElementById('viewer').classList.add('show');
+  }
+  function closeViewer() { document.getElementById('viewer').classList.remove('show'); }
+  function viewerNav(delta) {
+    viewerIndex = (viewerIndex + delta + viewerPages.length) % viewerPages.length;
+    document.getElementById('viewer-img').src = viewerPages[viewerIndex];
+    document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
+  }
+
+  // ====== MODALS ======
+  function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+  document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('show'))
+      e.target.classList.remove('show');
+  });
+
+  // ====== OCR OVERLAY ======
+  function showOcr(show, status, progress) {
+    const el = document.getElementById('ocr-overlay');
+    el.classList.toggle('show', show);
+    if (status) document.getElementById('ocr-status').textContent = status;
+    if (progress !== undefined) document.getElementById('ocr-progress').style.width = progress + '%';
+  }
+
+  // ====== TOAST ======
+  let toastTimer;
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ====== SHOW APP ======
+  function showApp() {
+    document.getElementById('login-screen').classList.add('hidden');
+    const app = document.getElementById('app-screen');
+    app.classList.remove('hidden'); app.style.display = 'flex';
+    document.getElementById('user-badge').textContent = currentUser.initiales || currentUser.nom;
+    const etabName = currentEtablissement === 'freddy' ? 'Freddy' : currentEtablissement === 'liesel' ? 'Liesel' : currentEtablissement;
+    document.getElementById('etab-badge').textContent = etabName;
+    updateDateDisplay();
+    loadFournisseurs();
+    loadCommandes();
+    loadTodayCounts();
+  }
+
+  // ====== INIT ======
+  document.addEventListener('DOMContentLoaded', () => {
+    initSupabase();
+    const session = checkPortalSession();
+    if (session) {
+      currentUser = session.user;
+      currentEtablissement = session.etablissement;
+      showApp();
+    } else if (sb) {
+      document.getElementById('login-screen').classList.remove('hidden');
+      renderPinDots();
+    }
+  });
+</script>
+
+<!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
+<style id="taf-header-style">
+.header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
+.header .header-left { display: flex !important; align-items: center !important; gap: 10px !important; flex: 0 1 auto !important; }
+.header .header-left h1 { font-size: 1.2rem !important; color: #f97316 !important; font-weight: 700 !important; margin: 0 !important; }
+.header .header-right { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 0.85rem !important; color: #6b7280 !important; flex-wrap: wrap !important; justify-content: flex-end !important; }
+.header .btn-back, .header .btn-logout { padding: 6px 12px !important; border-radius: 6px !important; border: 1px solid #e5e7eb !important; background: white !important; color: #4b5563 !important; font-size: 0.8rem !important; cursor: pointer !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; }
+.header .btn-back:hover, .header .btn-logout:hover { background: #f3f4f6 !important; }
+.header .btn-logout { border-color: #fecaca !important; color: #dc2626 !important; }
+.header .btn-logout:hover { background: #fef2f2 !important; }
+</style>
+<script id="taf-header-script">
+(function() {
+  window.__tafGoBackToPortal = function() { window.location.href = '../'; };
+  window.__tafLogout = function() { try { sessionStorage.clear(); } catch(e){} window.location.href = '../'; };
+  if (typeof window.goBackToPortal !== 'function') window.goBackToPortal = window.__tafGoBackToPortal;
+  if (typeof window.logout !== 'function') window.logout = window.__tafLogout;
+
+  var inactivityTimer = null;
+  var INACTIVITY_MS = 2 * 60 * 1000;
+  function resetInactivity() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(function() {
+      try { sessionStorage.clear(); } catch(e){}
+      window.location.href = '../';
+    }, INACTIVITY_MS);
+  }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(function(evt){
+    document.addEventListener(evt, resetInactivity, { passive: true, capture: true });
+  });
+
+  function patchHeader() {
+    var header = document.querySelector('.header');
+    if (!header) { resetInactivity(); return; }
+    var right = header.querySelector('.header-right');
+    if (!right) { right = document.createElement('div'); right.className = 'header-right'; header.appendChild(right); }
+    if (!right.querySelector('.btn-back')) {
+      var b = document.createElement('a'); b.className = 'btn-back'; b.href = 'javascript:void(0)';
+      b.textContent = '← Portail'; b.onclick = window.__tafGoBackToPortal; right.appendChild(b);
+    }
+    if (!right.querySelector('.btn-logout')) {
+      var l = document.createElement('button'); l.className = 'btn-logout'; l.type = 'button';
+      l.textContent = 'Deconnexion'; l.onclick = window.__tafLogout; right.appendChild(l);
+    }
+    var leftBacks = header.querySelectorAll('.header-left .btn-back');
+    leftBacks.forEach(function(b){ b.remove(); });
+    resetInactivity();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patchHeader);
+  else patchHeader();
+})();
+</script>
+
+</body>
+</html>
