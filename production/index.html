@@ -2579,61 +2579,50 @@ async function printEtiquette(productionId) {
   // Le canvas est dessiné en paysage (62×29mm), pivoté 90° CW pour portrait,
   // puis affiché dans un SVG portrait 29×62mm dans un iframe caché.
 
-  // Rotation 90° CW → canvas portrait
+  // === IMPRESSION VIA navigator.share → Brother iPrint&Label ===
+  // iOS Safari ajoute systématiquement marges + footer sur tout print HTML/PDF.
+  // Seul Brother iPrint&Label permet un bord-à-bord propre sur DK-11209.
+  // Workflow : bouton → feuille de partage → Brother → Imprimer.
+
+  // Rotation 90° CW → canvas portrait 342×732
   const portraitCanvas = document.createElement('canvas');
-  portraitCanvas.width = canvas.height;   // 342
-  portraitCanvas.height = canvas.width;   // 732
+  portraitCanvas.width = canvas.height;
+  portraitCanvas.height = canvas.width;
   const pctx = portraitCanvas.getContext('2d');
   pctx.translate(canvas.height, 0);
   pctx.rotate(Math.PI / 2);
   pctx.drawImage(canvas, 0, 0);
-  const dataURL = portraitCanvas.toDataURL('image/png');
 
-  const oldFrame = document.getElementById('print-label-frame');
-  if (oldFrame) oldFrame.remove();
+  const blob = await new Promise((resolve) => portraitCanvas.toBlob(resolve, 'image/png'));
+  if (!blob) {
+    showToast('Erreur génération image étiquette', 'error');
+    return;
+  }
 
-  const iframe = document.createElement('iframe');
-  iframe.id = 'print-label-frame';
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
-  document.body.appendChild(iframe);
-
-  // Approche : l'image remplit 100% de la zone disponible.
-  // iOS réserve de la place pour son footer — avec 100%/100%,
-  // l'image s'adapte à la zone restante sans déborder → 1 seule page.
-  const idoc = iframe.contentDocument || iframe.contentWindow.document;
-  idoc.open();
-  idoc.write(
-    '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-    '<style>' +
-    '@page { size: 29mm 62mm; margin: 0; }' +
-    '* { margin:0; padding:0; box-sizing:border-box; }' +
-    'html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
-    'img { display:block; width:100%; height:100%; object-fit:fill; }' +
-    '</style></head><body>' +
-    '<img src="' + dataURL + '" alt="">' +
-    '</body></html>'
-  );
-  idoc.close();
+  const safeName = (production.nom_produit || 'etiquette')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30) || 'etiquette';
+  const filename = `${safeName}-${lotNum}.png`;
 
   DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  const img = idoc.querySelector('img');
-  const doPrint = () => {
-    try {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    } catch (e) {
-      console.error('print() failed:', e);
-      showToast('Erreur impression : ' + e.message, 'error');
+  try {
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Étiquette' });
+      return;
     }
-  };
-  if (img && !img.complete) {
-    img.onload = () => setTimeout(doPrint, 80);
-    img.onerror = () => setTimeout(doPrint, 80);
-  } else {
-    setTimeout(doPrint, 80);
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    console.warn('navigator.share échoué:', e);
   }
+
+  // Fallback desktop : téléchargement direct
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Image téléchargée — ouvre-la pour imprimer', 'info');
 }
 
 async function markEtiquetteOk(productionId) {
