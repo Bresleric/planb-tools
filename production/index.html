@@ -2579,9 +2579,15 @@ async function printEtiquette(productionId) {
   // Le canvas est dessiné en paysage (62×29mm), pivoté 90° CW pour portrait,
   // puis affiché dans un SVG portrait 29×62mm dans un iframe caché.
 
-  const dataURL = canvas.toDataURL('image/png');
-  const cw = canvas.width;   // 732
-  const ch = canvas.height;  // 342
+  // Rotation 90° CW → canvas portrait
+  const portraitCanvas = document.createElement('canvas');
+  portraitCanvas.width = canvas.height;   // 342
+  portraitCanvas.height = canvas.width;   // 732
+  const pctx = portraitCanvas.getContext('2d');
+  pctx.translate(canvas.height, 0);
+  pctx.rotate(Math.PI / 2);
+  pctx.drawImage(canvas, 0, 0);
+  const dataURL = portraitCanvas.toDataURL('image/png');
 
   const oldFrame = document.getElementById('print-label-frame');
   if (oldFrame) oldFrame.remove();
@@ -2589,39 +2595,31 @@ async function printEtiquette(productionId) {
   const iframe = document.createElement('iframe');
   iframe.id = 'print-label-frame';
   iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:29mm;height:62mm;border:0;opacity:0;pointer-events:none;';
+  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
   document.body.appendChild(iframe);
 
-  // SVG portrait 29×62mm, image paysage pivotée 90° CW à l'intérieur
-  const svgStr =
-    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
-    'width="29mm" height="62mm" viewBox="0 0 ' + ch + ' ' + cw + '" ' +
-    'preserveAspectRatio="none">' +
-    '<image xlink:href="' + dataURL + '" x="0" y="0" ' +
-    'width="' + cw + '" height="' + ch + '" ' +
-    'transform="translate(' + ch + ',0) rotate(90)" ' +
-    'preserveAspectRatio="none"/>' +
-    '</svg>';
-
+  // Approche : l'image remplit 100% de la zone disponible.
+  // iOS réserve de la place pour son footer — avec 100%/100%,
+  // l'image s'adapte à la zone restante sans déborder → 1 seule page.
   const idoc = iframe.contentDocument || iframe.contentWindow.document;
   idoc.open();
   idoc.write(
     '<!DOCTYPE html><html><head><meta charset="utf-8">' +
     '<style>' +
     '@page { size: 29mm 62mm; margin: 0; }' +
-    '@media print { @page { size: 29mm 62mm; margin: 0; } html, body { margin:0; padding:0; } }' +
     '* { margin:0; padding:0; box-sizing:border-box; }' +
-    'html, body { width:29mm; height:62mm; margin:0; padding:0; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
-    'svg { display:block; width:29mm; height:62mm; margin:0; padding:0; }' +
+    'html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
+    'img { display:block; width:100%; height:100%; object-fit:fill; }' +
     '</style></head><body>' +
-    svgStr +
+    '<img src="' + dataURL + '" alt="">' +
     '</body></html>'
   );
   idoc.close();
 
   DB.markEtiquetteImprimee(productionId).catch(e => console.error(e));
 
-  setTimeout(() => {
+  const img = idoc.querySelector('img');
+  const doPrint = () => {
     try {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
@@ -2629,7 +2627,13 @@ async function printEtiquette(productionId) {
       console.error('print() failed:', e);
       showToast('Erreur impression : ' + e.message, 'error');
     }
-  }, 80);
+  };
+  if (img && !img.complete) {
+    img.onload = () => setTimeout(doPrint, 80);
+    img.onerror = () => setTimeout(doPrint, 80);
+  } else {
+    setTimeout(doPrint, 80);
+  }
 }
 
 async function markEtiquetteOk(productionId) {
