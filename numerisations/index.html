@@ -909,20 +909,18 @@
 
   // ====== SCANNER PRO ======
   function openScannerPro() {
-    const schemes = ['readdle-scannerpro://', 'scannerpro://'];
+    // URL scheme officiel Scanner Pro by Readdle
     const startTime = Date.now();
-    window.location.href = schemes[0];
+    window.location.href = 'scanproch://';
+
+    // Si l'app ne s'ouvre pas après 1.5s, proposer l'App Store
     setTimeout(() => {
       if (Date.now() - startTime < 2000) return;
-      window.location.href = schemes[1];
-      setTimeout(() => {
-        if (Date.now() - startTime < 3500) return;
-        const useStore = confirm(
-          'Scanner Pro ne s\'est pas ouvert.\n\n' +
-          'Verifiez que l\'app est installee.\n\nOuvrir l\'App Store ?'
-        );
-        if (useStore) window.location.href = 'https://apps.apple.com/app/scanner-pro-scan-documents/id333710667';
-      }, 1500);
+      const useStore = confirm(
+        'Scanner Pro ne s\'est pas ouvert.\n\n' +
+        'Verifiez que l\'app est installee.\n\nOuvrir l\'App Store ?'
+      );
+      if (useStore) window.location.href = 'https://apps.apple.com/app/scanner-pro-scan-documents/id333710667';
     }, 1500);
   }
 
