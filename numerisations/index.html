@@ -619,6 +619,12 @@
         </select>
       </div>
 
+      <!-- Date document -->
+      <div class="form-section" id="section-date-doc">
+        <label class="form-label">Date du document <span style="font-size:.7rem;color:var(--gray-400);font-weight:400;">(auto-detectee ou corriger)</span></label>
+        <input type="date" id="form-date-doc">
+      </div>
+
       <!-- Reference (factures, BL) -->
       <div class="form-section" id="section-reference">
         <label class="form-label">Numero de reference</label>
@@ -666,9 +672,18 @@
       </div>
 
       <!-- Document scan -->
-      <div class="form-section">
+      <div class="form-section" id="section-scan">
         <label class="form-label required">Document scanne</label>
-        <div class="scan-actions">
+        <!-- Résumé pages capturées (visible si on vient de la capture caméra) -->
+        <div id="capture-summary" class="hidden" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">📸</span>
+          <div style="flex:1;">
+            <div id="capture-summary-text" style="font-size:.85rem;font-weight:600;color:var(--gray-700);"></div>
+            <div id="capture-summary-thumbs" style="display:flex;gap:4px;margin-top:4px;"></div>
+          </div>
+        </div>
+        <!-- Boutons Scanner Pro / Import (masqués si capture caméra) -->
+        <div class="scan-actions" id="scan-actions-btns">
           <button type="button" class="scan-action-btn scanner" onclick="openScannerPro()">
             📷 Scanner Pro
           </button>
@@ -691,7 +706,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-scan')" style="flex:1;">Annuler</button>
-      <button class="btn btn-primary" onclick="submitScan()" id="btn-submit" style="flex:2;">Enregistrer</button>
+      <button class="btn btn-primary" onclick="submitScan()" id="btn-submit" style="flex:2;">✅ Enregistrer</button>
     </div>
   </div>
 </div>
@@ -1073,6 +1088,21 @@
     // Ouvrir le modal
     resetForm();
     updateFilePreview();
+    window._fromCapture = true;
+
+    // Masquer boutons Scanner Pro/Import, afficher résumé captures
+    const scanBtns = document.getElementById('scan-actions-btns');
+    const capSummary = document.getElementById('capture-summary');
+    if (scanBtns) scanBtns.classList.add('hidden');
+    if (capSummary) {
+      capSummary.classList.remove('hidden');
+      document.getElementById('capture-summary-text').textContent = capturedPages.length + ' page' + (capturedPages.length > 1 ? 's' : '') + ' capturee' + (capturedPages.length > 1 ? 's' : '');
+      const thumbsEl = document.getElementById('capture-summary-thumbs');
+      thumbsEl.innerHTML = capturedPages.slice(0, 4).map(p =>
+        `<img src="${p.thumb}" style="width:36px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200);">`
+      ).join('') + (capturedPages.length > 4 ? `<span style="font-size:.75rem;color:var(--gray-500);">+${capturedPages.length - 4}</span>` : '');
+    }
+
     // Si un type a été forcé (depuis une tuile), l'appliquer
     if (window._forcedType) {
       document.getElementById('form-type').value = window._forcedType;
@@ -1082,6 +1112,15 @@
       // Sinon, auto-détection
       autoFillFromOCR(allText);
     }
+
+    // Pré-remplir date du document
+    const dateField = document.getElementById('form-date-doc');
+    if (window._detectedDate) {
+      dateField.value = window._detectedDate;
+    } else {
+      dateField.value = dateStr(new Date());
+    }
+
     document.getElementById('modal-scan').classList.add('show');
   }
 
@@ -1224,14 +1263,73 @@
   function detectReference(text) {
     if (!text) return null;
     const patterns = [
-      /(?:n[°o]\s*(?:facture|fact|fa))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/]{2,20})/i,
-      /(?:facture|fact)\s*n[°o]?\s*[:\s]*([A-Z0-9][A-Z0-9\-\/]{2,20})/i,
-      /(?:n[°o]\s*(?:bl|bon))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/]{2,20})/i
+      // Patterns explicites
+      /(?:n[°o]\s*(?:facture|fact|fa))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
+      /(?:facture|fact)\s*n[°o]?\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
+      /(?:n[°o]\s*(?:bl|bon|piece|document|doc))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
+      /(?:bon\s*(?:de\s*)?livraison)\s*(?:n[°o]?)?\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
+      // Patterns type "Réf:" ou "Référence:"
+      /(?:ref|r[ée]f[ée]rence|r[ée]f\.?)\s*[:\s]+([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
+      // Pattern type "N° 12345" ou "No 12345" en début de ligne ou après label
+      /(?:n[°o]|num[ée]ro)\s*[:\s]*([A-Z]{0,3}\d{4,15}[A-Z0-9\-\/]*)/i,
+      // Pattern codes type BL-XXXX, FA-XXXX, FC-XXXX
+      /\b((?:BL|FA|FC|AV|CMD|LIV)[.\-\/]?\s*\d{3,15}[A-Z0-9\-\/]*)\b/i
     ];
     for (const rx of patterns) {
       const m = text.match(rx);
       if (m) return m[1].trim();
     }
+    return null;
+  }
+
+  // Extraire la date du document (pas la DLC — la date d'émission)
+  function detectDateDocument(text) {
+    if (!text) return null;
+    // Patterns pour la date du document
+    const patterns = [
+      // "Date : 16/04/2026" ou "Le 16/04/2026" ou "Du 16.04.2026"
+      /(?:date|le|du|emis(?:e)?\s*le|livr[ée]\s*le)\s*[:\s]*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/i,
+      // "16 avril 2026" ou "16 avr. 2026"
+      /(\d{1,2})\s+(janv(?:ier)?|f[ée]vr(?:ier)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|ao[uû]t|sept(?:embre)?|oct(?:obre)?|nov(?:embre)?|d[ée]c(?:embre)?)\s*\.?\s+(\d{4})/i
+    ];
+
+    const moisMap = {
+      'janv': '01', 'janvier': '01', 'fevr': '02', 'février': '02', 'fevrier': '02',
+      'mars': '03', 'avr': '04', 'avril': '04', 'mai': '05', 'juin': '06',
+      'juil': '07', 'juillet': '07', 'aout': '08', 'août': '08',
+      'sept': '09', 'septembre': '09', 'oct': '10', 'octobre': '10',
+      'nov': '11', 'novembre': '11', 'dec': '12', 'décembre': '12', 'decembre': '12'
+    };
+
+    // Pattern numérique d'abord
+    const m1 = text.match(patterns[0]);
+    if (m1) {
+      const jour = m1[1].padStart(2, '0');
+      const mois = m1[2].padStart(2, '0');
+      let annee = m1[3];
+      if (annee.length === 2) annee = '20' + annee;
+      // Vérifier que c'est une date plausible (pas dans le futur lointain)
+      const d = new Date(`${annee}-${mois}-${jour}`);
+      if (!isNaN(d) && d <= new Date(Date.now() + 7 * 86400000)) {
+        return `${annee}-${mois}-${jour}`;
+      }
+    }
+
+    // Pattern avec mois en texte
+    const m2 = text.match(patterns[1]);
+    if (m2) {
+      const jour = m2[1].padStart(2, '0');
+      const moisTexte = m2[2].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const mois = moisMap[moisTexte] || moisMap[moisTexte.substring(0, 4)];
+      if (mois) return `${m2[3]}-${mois}-${jour}`;
+    }
+
+    // Dernier recours : première date trouvée au format JJ/MM/AAAA
+    const mAny = text.match(/(\d{2})[\/.\-](\d{2})[\/.\-](20\d{2})/);
+    if (mAny) {
+      return `${mAny[3]}-${mAny[2]}-${mAny[1]}`;
+    }
+
     return null;
   }
 
@@ -1253,14 +1351,22 @@
     document.getElementById('form-lot').value = '';
     document.getElementById('form-dlc').value = '';
     document.getElementById('form-date-fab').value = dateStr(new Date());
+    document.getElementById('form-date-doc').value = dateStr(new Date());
     document.getElementById('form-commande').value = '';
     document.getElementById('form-fiche').value = '';
     document.getElementById('form-observation').value = '';
     importedFile = null;
+    window._fromCapture = false;
+    window._detectedDate = null;
     updateFilePreview();
     // Reset detection banner
     const banner = document.getElementById('detection-banner');
     if (banner) banner.classList.add('hidden');
+    // Réafficher boutons Scanner Pro/Import, masquer résumé
+    const scanBtns = document.getElementById('scan-actions-btns');
+    const capSummary = document.getElementById('capture-summary');
+    if (scanBtns) scanBtns.classList.remove('hidden');
+    if (capSummary) capSummary.classList.add('hidden');
   }
 
   function onTypeChange() {
@@ -1299,45 +1405,70 @@
     // 1. Détecter le type
     const detection = detectDocType(text);
     const banner = document.getElementById('detection-banner');
+    const detectedFields = [];
 
     if (detection.type) {
       document.getElementById('form-type').value = detection.type;
       onTypeChange();
-
-      // Afficher le bandeau de détection
-      if (banner) {
-        const confColors = { haute: 'var(--green)', moyenne: 'var(--amber)', faible: 'var(--red)' };
-        banner.innerHTML = `
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:1.2rem;">🤖</span>
-            <div>
-              <div style="font-weight:600;font-size:.85rem;">${detection.reason}</div>
-              <div style="font-size:.75rem;color:var(--gray-500);">Confiance : <span style="color:${confColors[detection.confidence]};font-weight:600;">${detection.confidence}</span> — Vous pouvez corriger le type ci-dessus</div>
-            </div>
-          </div>`;
-        banner.classList.remove('hidden');
-      }
+      detectedFields.push(TYPE_LABELS[detection.type]);
     }
 
     // 2. Détecter le fournisseur
     const fournisseur = detectFournisseur(text);
     if (fournisseur) {
       document.getElementById('form-fournisseur').value = fournisseur.id;
+      detectedFields.push(fournisseur.nom);
     }
 
-    // 3. Détecter la référence (factures/BL)
+    // 3. Détecter la date du document
+    const dateDoc = detectDateDocument(text);
+    if (dateDoc) {
+      window._detectedDate = dateDoc;
+      document.getElementById('form-date-doc').value = dateDoc;
+      const dFormatted = new Date(dateDoc).toLocaleDateString('fr-FR');
+      detectedFields.push('Date: ' + dFormatted);
+    } else {
+      window._detectedDate = null;
+    }
+
+    // 4. Détecter la référence (factures/BL)
     if (detection.type === 'facture' || detection.type === 'bl') {
       const ref = detectReference(text);
-      if (ref) document.getElementById('form-reference').value = ref;
+      if (ref) {
+        document.getElementById('form-reference').value = ref;
+        detectedFields.push('Ref: ' + ref);
+      }
     }
 
-    // 4. Détecter DLC et lot (étiquettes)
+    // 5. Détecter DLC et lot (étiquettes)
     if (detection.type === 'etiquette_mp' || detection.type === 'etiquette_prod') {
       const dlc = detectDLC(text);
-      if (dlc) document.getElementById('form-dlc').value = dlc;
+      if (dlc) {
+        document.getElementById('form-dlc').value = dlc;
+        detectedFields.push('DLC: ' + new Date(dlc).toLocaleDateString('fr-FR'));
+      }
 
       const lot = detectLot(text);
-      if (lot) document.getElementById('form-lot').value = lot;
+      if (lot) {
+        document.getElementById('form-lot').value = lot;
+        detectedFields.push('Lot: ' + lot);
+      }
+    }
+
+    // Afficher le bandeau récapitulatif
+    if (banner && detectedFields.length > 0) {
+      banner.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:8px;">
+          <span style="font-size:1.2rem;flex-shrink:0;">🤖</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:.85rem;color:var(--teal-dark);margin-bottom:4px;">Detection automatique</div>
+            <div style="font-size:.8rem;color:var(--gray-600);line-height:1.5;">
+              ${detectedFields.map(f => `<span style="display:inline-block;background:white;border:1px solid var(--gray-200);border-radius:12px;padding:2px 8px;margin:2px 2px;font-size:.75rem;">${esc(f)}</span>`).join('')}
+            </div>
+            <div style="font-size:.7rem;color:var(--gray-400);margin-top:4px;">Verifiez et corrigez si besoin avant d'enregistrer</div>
+          </div>
+        </div>`;
+      banner.classList.remove('hidden');
     }
   }
 
@@ -1758,6 +1889,7 @@
     const ficheId = document.getElementById('form-fiche').value;
     const commandeId = document.getElementById('form-commande').value;
     const observation = document.getElementById('form-observation').value.trim();
+    const dateDoc = document.getElementById('form-date-doc').value;
 
     // Validation
     const needsFournisseur = ['facture', 'bl', 'etiquette_mp'].includes(type);
@@ -1774,7 +1906,7 @@
         type,
         fournisseur_id: needsFournisseur && fournisseurId ? fournisseurId : null,
         fournisseur_nom: fournisseur?.nom || null,
-        date_document: dateStr(new Date()),
+        date_document: dateDoc || dateStr(new Date()),
         reference: reference || null,
         designation: designation || null,
         lot: lot || null,
