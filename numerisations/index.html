@@ -474,9 +474,15 @@
       <!-- Quick Scanner Pro launcher -->
       <div class="quick-actions">
         <h3>Scanner Pro</h3>
-        <button class="scanner-btn" onclick="openScannerPro()">
-          <span class="icon">📷</span> Ouvrir Scanner Pro
-        </button>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="scanner-btn" onclick="openScannerPro()">
+            <span class="icon">📷</span> Scanner
+          </button>
+          <button class="scanner-btn" onclick="startQuickScan()" style="background:var(--teal-light);color:var(--teal-dark);">
+            <span class="icon">📄</span> Importer un scan
+          </button>
+        </div>
+        <div style="font-size:.7rem;margin-top:8px;opacity:.7;">Le type de document est detecte automatiquement</div>
       </div>
 
       <!-- Scan Type Tiles -->
@@ -562,9 +568,12 @@
     </div>
     <div class="modal-body">
 
-      <!-- Type (pre-selected) -->
+      <!-- Detection auto banner -->
+      <div id="detection-banner" class="hidden" style="background:var(--teal-light);border:1px solid var(--teal);border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:12px;"></div>
+
+      <!-- Type (pre-selected ou auto-détecté) -->
       <div class="form-section">
-        <label class="form-label required">Type</label>
+        <label class="form-label required">Type <span style="font-size:.7rem;color:var(--gray-400);font-weight:400;">(auto-detecte ou corriger)</span></label>
         <select id="form-type" onchange="onTypeChange()">
           <option value="facture">📄 Facture</option>
           <option value="bl">📋 Bon de livraison</option>
@@ -924,12 +933,157 @@
     }, 1500);
   }
 
-  // ====== START SCAN (from tiles) ======
+  // ====== AUTO-DETECTION DU TYPE PAR OCR ======
+  function detectDocType(text) {
+    if (!text) return { type: null, confidence: 0, reason: '' };
+    const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Scores par type
+    const scores = { facture: 0, bl: 0, etiquette_mp: 0, etiquette_prod: 0 };
+
+    // --- FACTURE ---
+    if (/facture/i.test(text)) scores.facture += 5;
+    if (/n[°o]\s*facture|numero\s*facture/i.test(text)) scores.facture += 4;
+    if (/total\s*(ttc|ht)/i.test(text)) scores.facture += 3;
+    if (/tva|montant|reglement|echeance/i.test(t)) scores.facture += 2;
+    if (/siret|siren|rcs|tva\s*intra/i.test(t)) scores.facture += 2;
+    if (/avoir/i.test(text)) scores.facture += 2;
+
+    // --- BON DE LIVRAISON ---
+    if (/bon\s*de\s*livraison/i.test(text)) scores.bl += 6;
+    if (/\bbl\b/i.test(text)) scores.bl += 3;
+    if (/livre\s*(le|par)|livraison/i.test(t)) scores.bl += 3;
+    if (/quantite\s*livree|qte\s*liv/i.test(t)) scores.bl += 3;
+    if (/n[°o]\s*(bl|commande)/i.test(text)) scores.bl += 2;
+    if (/transporteur|colisage|palette/i.test(t)) scores.bl += 2;
+
+    // --- ETIQUETTE MATIERE PREMIERE ---
+    if (/ingredients?\s*:/i.test(text)) scores.etiquette_mp += 4;
+    if (/allergenes?/i.test(t)) scores.etiquette_mp += 3;
+    if (/valeurs?\s*nutritionn/i.test(t)) scores.etiquette_mp += 3;
+    if (/a\s*conserver|conservation/i.test(t)) scores.etiquette_mp += 2;
+    if (/poids\s*net|contenance/i.test(t)) scores.etiquette_mp += 2;
+    if (/traces?\s*de|peut\s*contenir/i.test(t)) scores.etiquette_mp += 3;
+    if (/ean|code.?barr?e|gtin/i.test(t)) scores.etiquette_mp += 1;
+    if (/lot\s*[:\s]?[A-Z0-9]/i.test(text)) scores.etiquette_mp += 2;
+
+    // --- ETIQUETTE PRODUCTION MAISON ---
+    if (/fabriqu[eé]\s*(le|par|en|a)/i.test(t)) scores.etiquette_prod += 4;
+    if (/production\s*maison|fait\s*maison/i.test(t)) scores.etiquette_prod += 5;
+    if (/dlc\s*[:\s]/i.test(text)) scores.etiquette_prod += 3;
+    if (/date\s*de\s*fabrication/i.test(t)) scores.etiquette_prod += 4;
+    if (/dluo|ddm|a\s*consommer/i.test(t)) scores.etiquette_prod += 2;
+    if (/freddy|liesel|planb/i.test(t)) scores.etiquette_prod += 3;
+    // Si c'est une étiquette (lot+DLC) mais pas d'ingrédients détaillés → prod maison
+    if (scores.etiquette_mp > 0 && /dlc/i.test(text) && /freddy|liesel|planb/i.test(t)) {
+      scores.etiquette_prod += 3;
+      scores.etiquette_mp -= 2;
+    }
+
+    // Trouver le type avec le meilleur score
+    const best = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    const [topType, topScore] = best[0];
+    const [secondType, secondScore] = best[1];
+
+    // Seuil minimum et écart
+    if (topScore < 3) return { type: null, confidence: 0, reason: 'Pas assez d\'indices' };
+
+    const confidence = topScore >= 6 ? 'haute' : topScore >= 4 ? 'moyenne' : 'faible';
+    const reasons = {
+      facture: 'Facture detectee (montants, TVA, n° facture)',
+      bl: 'Bon de livraison detecte (livraison, quantites)',
+      etiquette_mp: 'Etiquette MP detectee (ingredients, allergenes)',
+      etiquette_prod: 'Production maison detectee (DLC, fabrication)'
+    };
+
+    return {
+      type: topType,
+      confidence,
+      score: topScore,
+      reason: reasons[topType] || topType,
+      scores
+    };
+  }
+
+  // Essayer de détecter le fournisseur par le texte OCR
+  function detectFournisseur(text) {
+    if (!text || !fournisseurs.length) return null;
+    const t = text.toLowerCase();
+    // Chercher chaque nom de fournisseur dans le texte
+    for (const f of fournisseurs) {
+      const nom = f.nom.toLowerCase();
+      // Match exact ou partiel (au moins 4 chars)
+      if (t.includes(nom)) return f;
+      // Essayer les mots du nom (pour "Metro Cash & Carry" → chercher "metro")
+      const mots = nom.split(/[\s,&]+/).filter(m => m.length >= 4);
+      for (const mot of mots) {
+        if (t.includes(mot)) return f;
+      }
+    }
+    return null;
+  }
+
+  // Essayer d'extraire une date DLC du texte OCR
+  function detectDLC(text) {
+    if (!text) return null;
+    // Patterns courants: DLC: 20/04/2026, DLC 20.04.2026, A consommer avant le 20/04/2026
+    const patterns = [
+      /(?:dlc|ddm|dluo|a\s*consommer\s*(?:avant|jusqu))\s*[:\s]*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/i,
+      /(?:date\s*limite)\s*[:\s]*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/i
+    ];
+    for (const rx of patterns) {
+      const m = text.match(rx);
+      if (m) {
+        const jour = m[1].padStart(2, '0');
+        const mois = m[2].padStart(2, '0');
+        let annee = m[3];
+        if (annee.length === 2) annee = '20' + annee;
+        return `${annee}-${mois}-${jour}`;
+      }
+    }
+    return null;
+  }
+
+  // Essayer d'extraire un numéro de lot
+  function detectLot(text) {
+    if (!text) return null;
+    const m = text.match(/(?:lot|n[°o]\s*lot)\s*[:\s]*([A-Z0-9][A-Z0-9\-\.\/]{2,20})/i);
+    return m ? m[1].trim() : null;
+  }
+
+  // Essayer d'extraire une référence facture/BL
+  function detectReference(text) {
+    if (!text) return null;
+    const patterns = [
+      /(?:n[°o]\s*(?:facture|fact|fa))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/]{2,20})/i,
+      /(?:facture|fact)\s*n[°o]?\s*[:\s]*([A-Z0-9][A-Z0-9\-\/]{2,20})/i,
+      /(?:n[°o]\s*(?:bl|bon))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/]{2,20})/i
+    ];
+    for (const rx of patterns) {
+      const m = text.match(rx);
+      if (m) return m[1].trim();
+    }
+    return null;
+  }
+
+  // ====== START SCAN (from tiles = type forcé, depuis Scanner = auto) ======
   function startScan(type) {
-    document.getElementById('form-type').value = type;
-    onTypeChange();
     resetForm();
+    if (type) {
+      document.getElementById('form-type').value = type;
+    }
+    onTypeChange();
     document.getElementById('modal-scan').classList.add('show');
+  }
+
+  // Nouveau workflow : scan rapide sans pré-sélection de type
+  function startQuickScan() {
+    resetForm();
+    // On ouvre le modal mais on cache le type — il sera auto-détecté à l'import
+    document.getElementById('modal-scan').classList.add('show');
+    document.getElementById('modal-scan-title').textContent = 'Nouveau scan';
+    // Lancer directement l'import
+    triggerImport();
   }
 
   function resetForm() {
@@ -944,6 +1098,9 @@
     document.getElementById('form-observation').value = '';
     importedFile = null;
     updateFilePreview();
+    // Reset detection banner
+    const banner = document.getElementById('detection-banner');
+    if (banner) banner.classList.add('hidden');
   }
 
   function onTypeChange() {
@@ -973,6 +1130,55 @@
 
   function toggle(id, show) {
     document.getElementById(id).classList.toggle('hidden', !show);
+  }
+
+  // Auto-remplir le formulaire après détection OCR
+  function autoFillFromOCR(text) {
+    if (!text) return;
+
+    // 1. Détecter le type
+    const detection = detectDocType(text);
+    const banner = document.getElementById('detection-banner');
+
+    if (detection.type) {
+      document.getElementById('form-type').value = detection.type;
+      onTypeChange();
+
+      // Afficher le bandeau de détection
+      if (banner) {
+        const confColors = { haute: 'var(--green)', moyenne: 'var(--amber)', faible: 'var(--red)' };
+        banner.innerHTML = `
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.2rem;">🤖</span>
+            <div>
+              <div style="font-weight:600;font-size:.85rem;">${detection.reason}</div>
+              <div style="font-size:.75rem;color:var(--gray-500);">Confiance : <span style="color:${confColors[detection.confidence]};font-weight:600;">${detection.confidence}</span> — Vous pouvez corriger le type ci-dessus</div>
+            </div>
+          </div>`;
+        banner.classList.remove('hidden');
+      }
+    }
+
+    // 2. Détecter le fournisseur
+    const fournisseur = detectFournisseur(text);
+    if (fournisseur) {
+      document.getElementById('form-fournisseur').value = fournisseur.id;
+    }
+
+    // 3. Détecter la référence (factures/BL)
+    if (detection.type === 'facture' || detection.type === 'bl') {
+      const ref = detectReference(text);
+      if (ref) document.getElementById('form-reference').value = ref;
+    }
+
+    // 4. Détecter DLC et lot (étiquettes)
+    if (detection.type === 'etiquette_mp' || detection.type === 'etiquette_prod') {
+      const dlc = detectDLC(text);
+      if (dlc) document.getElementById('form-dlc').value = dlc;
+
+      const lot = detectLot(text);
+      if (lot) document.getElementById('form-lot').value = lot;
+    }
   }
 
   // ====== LOAD REFERENCE DATA ======
@@ -1256,6 +1462,13 @@
         else await processImage(file);
         showOcr(false);
         updateFilePreview();
+        // Auto-détection du type et pré-remplissage
+        if (importedFile?.textContent) {
+          showOcr(true, 'Analyse du document...', 95);
+          await new Promise(r => setTimeout(r, 200)); // petit délai pour l'UX
+          autoFillFromOCR(importedFile.textContent);
+          showOcr(false);
+        }
         showToast(`${importedFile?.name || 'Fichier'} importe`, 'success');
       } catch (err) {
         console.error('Import error:', err);
