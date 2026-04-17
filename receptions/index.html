@@ -462,14 +462,58 @@
       <div id="factures-list"></div>
     </div>
 
-    <!-- TAB: ETIQUETTES -->
+    <!-- TAB: ETIQUETTES (Scan au kilomètre) -->
     <div class="tab-content" id="tab-etiquettes">
-      <div class="sub-tabs">
-        <button class="sub-tab active" data-sub="all" onclick="filterDocs('etiquettes','all')">Tous</button>
-        <button class="sub-tab" data-sub="en_attente" onclick="filterDocs('etiquettes','en_attente')">En attente</button>
-        <button class="sub-tab" data-sub="valide" onclick="filterDocs('etiquettes','valide')">Valides</button>
+
+      <!-- Bouton nouvelle réception -->
+      <div style="padding:12px 0;">
+        <button onclick="openNewReception()" class="btn btn-primary btn-full" style="padding:14px;font-size:1rem;background:linear-gradient(135deg,var(--purple),var(--purple-dark));">
+          📦 Nouvelle reception d'etiquettes
+        </button>
       </div>
-      <div id="etiquettes-list"></div>
+
+      <!-- Session active de scan -->
+      <div id="rec-active" class="hidden">
+        <div style="background:white;border-radius:12px;padding:16px;box-shadow:var(--shadow-md);border:2px solid var(--purple);margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <div>
+              <div style="font-weight:700;font-size:1rem;color:var(--purple);" id="rec-fournisseur-label"></div>
+              <div style="font-size:.8rem;color:var(--gray-500);" id="rec-piece-label"></div>
+            </div>
+            <span class="badge badge-waiting" id="rec-count-badge">0 etiquette</span>
+          </div>
+
+          <!-- Gros bouton photo -->
+          <div style="text-align:center;padding:20px 0;">
+            <button onclick="recTakePhoto()" style="
+              width:100px;height:100px;border-radius:50%;border:none;
+              background:linear-gradient(135deg,var(--purple),var(--purple-dark));
+              color:white;font-size:2.5rem;cursor:pointer;
+              box-shadow:0 6px 20px rgba(139,92,246,.4);
+              display:inline-flex;align-items:center;justify-content:center;
+            ">📷</button>
+            <div style="margin-top:8px;font-size:.9rem;font-weight:700;color:var(--purple);">Scanner une etiquette</div>
+            <div style="font-size:.75rem;color:var(--gray-400);margin-top:2px;">Une photo par etiquette — scan au kilometre</div>
+          </div>
+
+          <!-- Strip de miniatures -->
+          <div id="rec-thumbs" style="display:flex;gap:6px;overflow-x:auto;padding:8px 0;"></div>
+
+          <!-- Boutons actions -->
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="recImportPDF()" class="btn btn-outline" style="flex:1;font-size:.8rem;">📄 Import PDF</button>
+            <button onclick="recFinish()" class="btn btn-success" style="flex:2;justify-content:center;" id="rec-finish-btn" disabled>
+              ✅ Terminer et analyser
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historique des réceptions d'étiquettes -->
+      <div style="font-weight:600;font-size:.9rem;color:var(--gray-600);margin:8px 0;">Receptions recentes</div>
+      <div id="rec-history">
+        <div class="empty"><div class="icon">🏷️</div><div class="text">Aucune reception d'etiquettes</div></div>
+      </div>
     </div>
 
     <!-- TAB: HISTORIQUE -->
@@ -569,6 +613,53 @@
   </div>
 </div>
 
+<!-- ====== MODAL: NOUVELLE RECEPTION ====== -->
+<div class="modal-overlay" id="modal-reception">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📦 Nouvelle reception</h2>
+      <button class="modal-close" onclick="closeModal('modal-reception')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <label class="form-label required">Fournisseur</label>
+        <select id="rec-fournisseur">
+          <option value="">-- Choisir le fournisseur --</option>
+        </select>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Type de piece</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-primary" id="rec-type-bl" onclick="recSetType('bl')" style="flex:1;justify-content:center;background:var(--purple);">📋 BL</button>
+          <button type="button" class="btn btn-outline" id="rec-type-facture" onclick="recSetType('facture')" style="flex:1;justify-content:center;">📄 Facture</button>
+        </div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Numero de piece</label>
+        <input type="text" id="rec-reference" placeholder="Ex: BL-2026-04-16, FA-042...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-reception')" style="flex:1;">Annuler</button>
+      <button class="btn btn-primary" onclick="recStartSession()" style="flex:2;justify-content:center;background:var(--purple);">📷 Commencer le scan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL: RESULTATS RECEPTION ====== -->
+<div class="modal-overlay" id="modal-rec-results">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="rec-results-title">Resultats</h2>
+      <button class="modal-close" onclick="closeModal('modal-rec-results')">×</button>
+    </div>
+    <div class="modal-body" id="rec-results-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary btn-full" onclick="closeModal('modal-rec-results');loadRecHistory();" style="background:var(--purple);">Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ====== FULLSCREEN IMAGE VIEWER ====== -->
 <div class="viewer-overlay" id="viewer">
   <button class="viewer-close" onclick="closeViewer()">×</button>
@@ -592,6 +683,8 @@
 
 <!-- Hidden file input for import (PDF + images) -->
 <input type="file" id="file-input" class="hidden-input" accept="application/pdf">
+<input type="file" id="rec-camera-input" class="hidden-input" accept="image/*" capture="environment">
+<input type="file" id="rec-pdf-input" class="hidden-input" accept="application/pdf">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -621,6 +714,11 @@
   let importedFile = null;    // { type:'pdf'|'image', dataUri: string, name: string, pageImages: [base64], textContent: string }
   let viewerPages = [];
   let viewerIndex = 0;
+
+  // Reception scan session state
+  let recSession = null;
+  let recPhotos = [];
+  let recTypePiece = 'bl';
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -711,6 +809,32 @@
         .eq('etablissement', etab)
         .gte('date', dateFrom).lte('date', dateTo);
       return data || [];
+    },
+
+    // Reception sessions (scan au kilomètre)
+    async createRecSession(session) {
+      const { data, error } = await supabaseClient.from('reception_sessions').insert(session).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+    async updateRecSession(id, updates) {
+      const { error } = await supabaseClient.from('reception_sessions').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    async getRecSessions(etab, limit = 20) {
+      const { data } = await supabaseClient.from('reception_sessions').select('*')
+        .eq('etablissement', etab).order('created_at', { ascending: false }).limit(limit);
+      return data || [];
+    },
+    async insertEtiquette(etiq) {
+      const { data, error } = await supabaseClient.from('etiquettes_data').insert(etiq).select();
+      if (error) throw error;
+      return data?.[0];
+    },
+    async getEtiquettesBySession(sessionId) {
+      const { data } = await supabaseClient.from('etiquettes_data').select('*')
+        .eq('session_id', sessionId).order('created_at');
+      return data || [];
     }
   };
 
@@ -793,8 +917,9 @@
     document.querySelectorAll('.tab-content').forEach(c =>
       c.classList.toggle('active', c.id === `tab-${tab}`)
     );
-    document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique');
+    document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique' || tab === 'etiquettes');
     if (tab === 'historique') loadHistorique();
+    else if (tab === 'etiquettes') loadRecHistory();
     else renderDocuments();
   }
 
@@ -1353,6 +1478,423 @@
     }
   }
 
+  // ====== RECEPTION SCAN AU KILOMETRE ======
+
+  function openNewReception() {
+    const sel = document.getElementById('rec-fournisseur');
+    sel.innerHTML = '<option value="">-- Choisir le fournisseur --</option>';
+    fournisseurs.forEach(f => {
+      sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`;
+    });
+    document.getElementById('rec-reference').value = '';
+    recTypePiece = 'bl';
+    recSetType('bl');
+    document.getElementById('modal-reception').classList.add('show');
+  }
+
+  function recSetType(type) {
+    recTypePiece = type;
+    const btnBl = document.getElementById('rec-type-bl');
+    const btnFa = document.getElementById('rec-type-facture');
+    if (type === 'bl') {
+      btnBl.className = 'btn btn-primary'; btnBl.style.cssText = 'flex:1;justify-content:center;background:var(--purple);color:white;';
+      btnFa.className = 'btn btn-outline'; btnFa.style.cssText = 'flex:1;justify-content:center;';
+    } else {
+      btnFa.className = 'btn btn-primary'; btnFa.style.cssText = 'flex:1;justify-content:center;background:var(--purple);color:white;';
+      btnBl.className = 'btn btn-outline'; btnBl.style.cssText = 'flex:1;justify-content:center;';
+    }
+  }
+
+  async function recStartSession() {
+    const fournisseurId = document.getElementById('rec-fournisseur').value;
+    if (!fournisseurId) { showToast('Choisissez un fournisseur', 'error'); return; }
+    const fournisseur = fournisseurs.find(f => f.id === fournisseurId);
+    const reference = document.getElementById('rec-reference').value.trim();
+
+    try {
+      const session = await DB.createRecSession({
+        date: dateStr(new Date()),
+        fournisseur_id: fournisseurId,
+        fournisseur_nom: fournisseur.nom,
+        type_piece: recTypePiece,
+        reference_piece: reference || null,
+        nb_etiquettes: 0,
+        statut: 'en_cours',
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+
+      recSession = session;
+      recPhotos = [];
+      document.getElementById('rec-fournisseur-label').textContent = fournisseur.nom;
+      document.getElementById('rec-piece-label').textContent =
+        (recTypePiece === 'bl' ? '📋 BL' : '📄 Facture') + (reference ? ' — ' + reference : '');
+      document.getElementById('rec-count-badge').textContent = '0 etiquette';
+      document.getElementById('rec-thumbs').innerHTML = '';
+      document.getElementById('rec-finish-btn').disabled = true;
+      document.getElementById('rec-active').classList.remove('hidden');
+      closeModal('modal-reception');
+      showToast('Session demarree — scannez les etiquettes !', 'success');
+    } catch (e) {
+      console.error('Erreur creation session:', e);
+      showToast('Erreur: ' + (e.message || ''), 'error');
+    }
+  }
+
+  function recTakePhoto() {
+    const input = document.getElementById('rec-camera-input');
+    input.value = '';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const dataUri = await fileToDataUri(file);
+      const thumb = await compressImage(dataUri, 120, 0.5);
+      const full = await compressImage(dataUri, 1400, 0.7);
+      recPhotos.push({ full, thumb });
+      updateRecUI();
+      if (navigator.vibrate) navigator.vibrate(50);
+      showToast(`Etiquette ${recPhotos.length} ajoutee`, 'success');
+    };
+    input.click();
+  }
+
+  async function recImportPDF() {
+    const input = document.getElementById('rec-pdf-input');
+    input.value = '';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      showOcrOverlay(true, 'Import PDF...', 10);
+      try {
+        const arrayBuf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          showOcrOverlay(true, `Page ${i}/${pdf.numPages}...`, Math.round((i / pdf.numPages) * 90));
+          const page = await pdf.getPage(i);
+          const vp = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          canvas.width = vp.width; canvas.height = vp.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+          const full = canvas.toDataURL('image/jpeg', 0.8);
+          const thumb = await compressImage(full, 120, 0.5);
+          recPhotos.push({ full, thumb });
+        }
+        updateRecUI();
+        showToast(`${pdf.numPages} page(s) importee(s)`, 'success');
+      } catch (err) {
+        console.error('Erreur import PDF:', err);
+        showToast('Erreur import PDF', 'error');
+      } finally {
+        showOcrOverlay(false);
+      }
+    };
+    input.click();
+  }
+
+  function updateRecUI() {
+    const count = recPhotos.length;
+    document.getElementById('rec-count-badge').textContent = count + ' etiquette' + (count > 1 ? 's' : '');
+    document.getElementById('rec-finish-btn').disabled = count === 0;
+    document.getElementById('rec-thumbs').innerHTML = recPhotos.map((p, i) => `
+      <div style="position:relative;flex-shrink:0;">
+        <img src="${p.thumb}" style="width:60px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--purple);">
+        <div style="position:absolute;top:2px;left:2px;background:var(--purple);color:white;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">${i + 1}</div>
+        <button onclick="recRemovePhoto(${i})" style="position:absolute;top:2px;right:2px;background:var(--red);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>
+    `).join('');
+  }
+
+  function recRemovePhoto(i) { recPhotos.splice(i, 1); updateRecUI(); }
+
+  async function recFinish() {
+    if (!recSession || recPhotos.length === 0) return;
+    const btn = document.getElementById('rec-finish-btn');
+    btn.disabled = true; btn.textContent = 'Traitement...';
+    await DB.updateRecSession(recSession.id, { statut: 'traitement' });
+    showOcrOverlay(true, 'Analyse des etiquettes...', 0);
+    const results = [];
+
+    try {
+      for (let i = 0; i < recPhotos.length; i++) {
+        const pct = Math.round(((i + 1) / recPhotos.length) * 100);
+        showOcrOverlay(true, `Etiquette ${i + 1}/${recPhotos.length}...`, pct);
+
+        let ocrText = '';
+        try {
+          const ocrResult = await Tesseract.recognize(recPhotos[i].full, 'fra', {
+            logger: m => {
+              if (m.status === 'recognizing text') {
+                showOcrOverlay(true, `OCR etiquette ${i + 1}/${recPhotos.length}...`,
+                  Math.round(((i + m.progress) / recPhotos.length) * 100));
+              }
+            }
+          });
+          ocrText = ocrResult.data.text || '';
+        } catch (ocrErr) { console.warn('OCR error page', i, ocrErr); }
+
+        const extracted = extractEtiquetteData(ocrText);
+        const etiq = await DB.insertEtiquette({
+          session_id: recSession.id,
+          photo_data: recPhotos[i].full,
+          photo_thumb: recPhotos[i].thumb,
+          texte_ocr: ocrText,
+          produit: extracted.produit || null,
+          code_article: extracted.code_article || null,
+          categorie: extracted.categorie || null,
+          lot: extracted.lot || null,
+          dlc: extracted.dlc || null,
+          ddm: extracted.ddm || null,
+          date_fabrication: extracted.date_fabrication || null,
+          date_emballage: extracted.date_emballage || null,
+          date_abattage: extracted.date_abattage || null,
+          poids_net_kg: extracted.poids_net_kg || null,
+          tare_kg: extracted.tare_kg || null,
+          temp_min: extracted.temp_min ?? null,
+          temp_max: extracted.temp_max ?? null,
+          ingredients: extracted.ingredients || null,
+          allergenes: extracted.allergenes || null,
+          nutrition: extracted.nutrition || null,
+          origine: extracted.origine || null,
+          estampille: extracted.estampille || null,
+          fabricant: extracted.fabricant || null,
+          code_barres: extracted.code_barres || null,
+          confiance_ocr: extracted.confiance || 0,
+          statut: ocrText ? 'extrait' : 'erreur',
+          etablissement: currentEtablissement
+        });
+        results.push({ index: i + 1, etiq, extracted });
+      }
+
+      await DB.updateRecSession(recSession.id, { statut: 'termine', nb_etiquettes: recPhotos.length });
+      showOcrOverlay(false);
+      showRecResults(results);
+      recSession = null; recPhotos = [];
+      document.getElementById('rec-active').classList.add('hidden');
+    } catch (e) {
+      console.error('Erreur traitement:', e);
+      showOcrOverlay(false);
+      showToast('Erreur: ' + (e.message || ''), 'error');
+      await DB.updateRecSession(recSession.id, { statut: 'erreur' });
+      btn.disabled = false; btn.textContent = '✅ Terminer et analyser';
+    }
+  }
+
+  function showRecResults(results) {
+    document.getElementById('rec-results-title').textContent = `✅ ${results.length} etiquette(s) analysee(s)`;
+    let html = '';
+    for (const r of results) {
+      const e = r.extracted;
+      const ok = e.produit || e.lot || e.dlc;
+      const color = ok ? 'var(--green)' : 'var(--amber)';
+      const icon = ok ? '✅' : '⚠️';
+      html += `<div style="background:var(--gray-50);border-radius:12px;padding:12px;margin-bottom:10px;border-left:4px solid ${color};">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          ${r.etiq?.photo_thumb ? `<img src="${r.etiq.photo_thumb}" style="width:50px;height:66px;object-fit:cover;border-radius:6px;">` : ''}
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:.85rem;margin-bottom:4px;">${icon} #${r.index} ${esc(e.produit || 'Produit non detecte')}</div>
+            <div style="font-size:.75rem;color:var(--gray-500);line-height:1.6;">
+              ${e.categorie ? `<span class="badge badge-etiquette">${esc(e.categorie)}</span> ` : ''}
+              ${e.lot ? `Lot: <b>${esc(e.lot)}</b> · ` : ''}
+              ${e.dlc ? `DLC: <b>${new Date(e.dlc).toLocaleDateString('fr-FR')}</b> · ` : ''}
+              ${e.poids_net_kg ? `${e.poids_net_kg} kg · ` : ''}
+              ${e.temp_min != null ? `${e.temp_min}°/${e.temp_max}°C · ` : ''}
+              ${e.estampille ? `${esc(e.estampille)} · ` : ''}
+              ${e.code_article ? `Art: ${esc(e.code_article)}` : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+    document.getElementById('rec-results-body').innerHTML = html;
+    document.getElementById('modal-rec-results').classList.add('show');
+  }
+
+  async function loadRecHistory() {
+    try {
+      const sessions = await DB.getRecSessions(currentEtablissement);
+      const container = document.getElementById('rec-history');
+      if (!sessions.length) {
+        container.innerHTML = '<div class="empty"><div class="icon">🏷️</div><div class="text">Aucune reception d\'etiquettes</div></div>';
+        return;
+      }
+      container.innerHTML = sessions.map(s => {
+        const badge = {
+          en_cours: '<span class="badge badge-waiting">En cours</span>',
+          traitement: '<span class="badge" style="background:var(--blue-bg);color:var(--blue);">Traitement</span>',
+          termine: '<span class="badge badge-valid">Termine</span>',
+          erreur: '<span class="badge badge-rejected">Erreur</span>'
+        }[s.statut] || '';
+        return `<div class="card" onclick="viewRecSession('${s.id}')">
+          <div class="card-header">
+            <div class="card-title">${esc(s.fournisseur_nom)}</div>
+            ${badge}
+          </div>
+          <div class="card-body">
+            ${s.type_piece === 'bl' ? '📋 BL' : '📄 Facture'}${s.reference_piece ? ' — ' + esc(s.reference_piece) : ''} · ${s.nb_etiquettes} etiquette(s)
+          </div>
+          <div class="card-meta">${new Date(s.created_at).toLocaleDateString('fr-FR')} a ${formatTime(s.created_at)}</div>
+        </div>`;
+      }).join('');
+    } catch (e) { console.error('Erreur historique receptions:', e); }
+  }
+
+  async function viewRecSession(sessionId) {
+    try {
+      const etiquettes = await DB.getEtiquettesBySession(sessionId);
+      if (!etiquettes.length) { showToast('Aucune etiquette', 'error'); return; }
+      document.getElementById('rec-results-title').textContent = `📦 ${etiquettes.length} etiquette(s)`;
+      document.getElementById('rec-results-body').innerHTML = etiquettes.map((e, i) => {
+        const ok = e.statut === 'extrait' || e.statut === 'verifie';
+        const color = ok ? 'var(--green)' : 'var(--amber)';
+        return `<div style="background:var(--gray-50);border-radius:12px;padding:12px;margin-bottom:10px;border-left:4px solid ${color};">
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            ${e.photo_thumb ? `<img src="${e.photo_thumb}" style="width:50px;height:66px;object-fit:cover;border-radius:6px;">` : ''}
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:.85rem;margin-bottom:4px;">${ok ? '✅' : '⚠️'} ${esc(e.produit || 'Non detecte')}</div>
+              <div style="font-size:.75rem;color:var(--gray-500);line-height:1.6;">
+                ${e.categorie ? `<span class="badge badge-etiquette">${esc(e.categorie)}</span> ` : ''}
+                ${e.lot ? `Lot: <b>${esc(e.lot)}</b> · ` : ''}
+                ${e.dlc ? `DLC: <b>${new Date(e.dlc).toLocaleDateString('fr-FR')}</b> · ` : ''}
+                ${e.poids_net_kg ? `${e.poids_net_kg} kg · ` : ''}
+                ${e.estampille ? `${esc(e.estampille)}` : ''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      document.getElementById('modal-rec-results').classList.add('show');
+    } catch (e) {
+      console.error('Erreur:', e);
+      showToast('Erreur', 'error');
+    }
+  }
+
+  // ====== EXTRACTION ETIQUETTES ======
+  function extractEtiquetteData(text) {
+    if (!text) return { confiance: 0 };
+    const t = text.toLowerCase();
+    const result = {};
+    let score = 0;
+
+    // PRODUIT
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+    const codeProductMatch = text.match(/(\d{4,6})\s*[:;]\s*(.+)/);
+    if (codeProductMatch) {
+      result.code_article = codeProductMatch[1];
+      result.produit = codeProductMatch[2].split('\n')[0].trim();
+      score += 15;
+    } else {
+      const artikelMatch = text.match(/Artikel:\s*(\d+)/i);
+      if (artikelMatch) { result.code_article = artikelMatch[1]; score += 8; }
+      for (const line of lines.slice(0, 8)) {
+        const clean = line.replace(/^\d+\s*[:;]?\s*/, '').trim();
+        if (clean.length > 5 && clean.length < 80 && clean === clean.toUpperCase() &&
+            !/ingredient|valeur|nutri|energie|conser|fabri|distri/i.test(clean) && !/^\d/.test(clean)) {
+          result.produit = clean; score += 10; break;
+        }
+      }
+    }
+
+    // LOT
+    const lotPats = [/lot\s*[:n°]*\s*([A-Z0-9][A-Z0-9\-\.\/\s]{2,20})/i, /charge\s*[:]*\s*(\d{4,})/i,
+      /Nr\.\s*de\s*lot\s*[:]*\s*([A-Z0-9\-\.]+)/i, /\bLOT\s+([A-Z0-9\-\.]+)/i];
+    for (const pat of lotPats) { const m = text.match(pat); if (m) { result.lot = m[1].trim(); score += 10; break; } }
+
+    // DLC
+    const dlcPats = [
+      /(?:consommer\s*(?:jusqu'?\s*au|avant\s*(?:le)?)\s*[:]*\s*)(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/i,
+      /(?:DLC|TGT)\s*[:/]*\s*(\d{1,2}[\-\.\/]\d{1,2}[\-\.\/]\d{2,4})/i,
+      /(?:haltbar\s*bis)\s*[:/]*\s*(\d{1,2}[\-\.\/]\d{1,2}[\-\.\/]\d{2,4})/i,
+      /(?:consommer\s*.*?)\s*(\d{1,2}[\/.]\d{1,2}[\/.]\d{4})/i
+    ];
+    for (const pat of dlcPats) { const m = text.match(pat); if (m) { const p = parseDateFr(m[1]); if (p) { result.dlc = p; score += 15; } break; } }
+
+    const ddmMatch = text.match(/(?:preference\s*(?:avant)?\s*[:]*\s*)(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/i);
+    if (ddmMatch) { const p = parseDateFr(ddmMatch[1]); if (p) result.ddm = p; }
+
+    // DATE FABRICATION / EMBALLAGE / ABATTAGE
+    const fabMatch = text.match(/(?:date\s*de\s*prod|produktionsdat|prod\.?\s*dat)\s*[.:/]*\s*(\d{1,2}[\-\.\/]\d{1,2}[\-\.\/]\d{2,4})/i);
+    if (fabMatch) { const p = parseDateFr(fabMatch[1]); if (p) { result.date_fabrication = p; score += 5; } }
+    const embMatch = text.match(/emballe\s*le\s*[:]*\s*(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/i);
+    if (embMatch) { const p = parseDateFr(embMatch[1]); if (p) result.date_emballage = p; }
+    const abatMatch = text.match(/(?:schlachtdat|abattage|slachtdat)\s*[.:/]*\s*(\d{1,2}[\-\.\/]\s*\d{1,2}\s*[\-\.\/]\s*\d{2,4})/i);
+    if (abatMatch) { const p = parseDateFr(abatMatch[1].replace(/\s/g, '')); if (p) result.date_abattage = p; }
+
+    // POIDS
+    const poidsPats = [/poids\s*net\s*[:]*\s*(\d+[,\.]\d{1,3})\s*kg/i, /netto\s*[:/]*\s*poids\s*net\s*[:]*\s*(\d+[,\.]\d{1,3})\s*kg/i, /(\d+[,\.]\d{1,3})\s*kg\s*$/im];
+    for (const pat of poidsPats) { const m = text.match(pat); if (m) { result.poids_net_kg = parseFloat(m[1].replace(',', '.')); score += 8; break; } }
+    const tareM = text.match(/tare?\s*[:]*\s*(\d+[,\.]\d{1,3})\s*kg/i);
+    if (tareM) result.tare_kg = parseFloat(tareM[1].replace(',', '.'));
+
+    // TEMPERATURE
+    const tempM = text.match(/conserver\s*(?:entre|de)?\s*[+]?(\-?\d+)[°o]\s*(?:C\s*)?(?:(?:et|[àa\-—–]|\.{2,3})\s*[+]?(\d+)[°o]?\s*C?)/i);
+    if (tempM) { result.temp_min = parseFloat(tempM[1]); result.temp_max = parseFloat(tempM[2]); score += 5; }
+    else {
+      const tempAlt = text.match(/(\-?\d+)[°o]\s*C?\s*[→\-—–àa]\s*\+?(\d+)[°o]\s*C?/i);
+      if (tempAlt) { result.temp_min = parseFloat(tempAlt[1]); result.temp_max = parseFloat(tempAlt[2]); score += 5; }
+    }
+
+    // INGREDIENTS
+    const ingrM = text.match(/ingr[eé]dients?\s*[:;]\s*([\s\S]{10,500}?)(?=valeurs?\s*nutri|$)/i);
+    if (ingrM) { result.ingredients = ingrM[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(); score += 8; }
+
+    // ALLERGENES
+    const allergens = ['gluten','lactose','lait','oeuf','soja','arachide','noix','celeri','moutarde','sesame','sulfites','lupin','crustaces','poisson'];
+    const tN = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const found = allergens.filter(a => tN.includes(a));
+    if (found.length) { result.allergenes = found.map(a => a.toUpperCase()); score += 5; }
+
+    // NUTRITION
+    const nutrition = {};
+    const nutriPats = [[/energie\s*[:]*\s*(\d+)\s*kj/i,'energie_kj'],[/(\d+)\s*kcal/i,'energie_kcal'],
+      [/lipides?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'lipides'],[/satur[eé]s?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'satures'],
+      [/glucides?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'glucides'],[/sucres?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'sucres'],
+      [/prot[eé]ines?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'proteines'],[/sel\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'sel'],
+      [/graisses?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'lipides']];
+    for (const [pat, key] of nutriPats) { const m = text.match(pat); if (m && !nutrition[key]) nutrition[key] = parseFloat(m[1].replace(',', '.')); }
+    if (Object.keys(nutrition).length) { result.nutrition = nutrition; score += 5; }
+
+    // ESTAMPILLE
+    const estM = text.match(/(FR\s*\d{2}[\.\-]\d{3}[\.\-]\d{2,3}\s*CE)/i) || text.match(/(NL\s*\d+\s*E[GC])/i) || text.match(/(BE\s*\d+)/i);
+    if (estM) { result.estampille = estM[1].trim(); score += 5; }
+
+    // FABRICANT
+    for (const pat of [/fabriqu[eé]\s*par\s*[:]*\s*(.+)/i, /distribu[eé]\s*par\s*[:]*\s*(.+)/i]) {
+      const m = text.match(pat); if (m) { result.fabricant = m[1].split('\n')[0].trim(); score += 3; break; }
+    }
+
+    // ORIGINE / CODE BARRES
+    const origM = text.match(/origine\s*[:]*\s*([\w\s]+)/i);
+    if (origM) result.origine = origM[1].trim();
+    const eanM = text.match(/\b(\d{13})\b/) || text.match(/\b(\d{8})\b/);
+    if (eanM) result.code_barres = eanM[1];
+
+    // CATEGORIE
+    if (/viande\s*(?:de\s*)?bov|boeuf|bourguignon|steak|entrecote/i.test(t)) result.categorie = 'Viande bovine';
+    else if (/viande\s*(?:de\s*)?porc|porc|jambon|lard|saucisse|knack|gendarme/i.test(t)) result.categorie = 'Charcuterie';
+    else if (/veau|kalbfleisch|kalfs/i.test(t)) result.categorie = 'Viande veau';
+    else if (/poulet|volaille|dinde|canard/i.test(t)) result.categorie = 'Volaille';
+    else if (/poisson|saumon|cabillaud|crevette/i.test(t)) result.categorie = 'Poisson';
+    else if (/fromage|munster|camembert|brie|comte|gruyere|emmental|lait\s*cru/i.test(t)) result.categorie = 'Fromage/Laitier';
+
+    result.confiance = Math.min(100, score);
+    return result;
+  }
+
+  function parseDateFr(str) {
+    if (!str) return null;
+    const clean = str.replace(/\s/g, '');
+    const m = clean.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/);
+    if (!m) return null;
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = '20' + y;
+    if (parseInt(d) > 31 || parseInt(mo) > 12) return null;
+    const pad = n => String(n).padStart(2, '0');
+    return `${y}-${pad(mo)}-${pad(d)}`;
+  }
+
   // ====== HISTORIQUE ======
   async function loadHistorique() {
     const dateTo = dateStr(new Date());
@@ -1464,8 +2006,7 @@
     }
   });
 </script>
-</content>
-</invoke>
+
 <!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
 <style id="taf-header-style">
 .header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
