@@ -572,16 +572,27 @@
       <!-- Document import -->
       <div class="form-section">
         <label class="form-label required">Document scanne</label>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <button type="button" onclick="openScannerPro()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
-            <span style="font-size:1.1rem;">📷</span> Ouvrir Scanner Pro
+        <div id="doc-scan-actions" style="display:flex;gap:8px;margin-bottom:8px;">
+          <button type="button" onclick="triggerDocCamera()" style="flex:2;padding:14px 12px;background:linear-gradient(135deg,var(--purple),var(--purple-dark));color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 4px 12px rgba(139,92,246,.3);">
+            <span style="font-size:1.3rem;">📷</span> Prendre en photo
           </button>
-          <button type="button" onclick="triggerImport()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#48bb78,#38a169);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
-            <span style="font-size:1.1rem;">📄</span> Importer PDF
+          <button type="button" onclick="triggerImport()" style="flex:1;padding:14px 12px;background:var(--gray-100);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:10px;font-size:.8rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+            📄 PDF
           </button>
         </div>
-        <div class="photo-capture-area" onclick="triggerImport()" style="padding:12px;">
-          <div style="font-size:.7rem;color:var(--gray-400);">1. Scanner Pro pour numeriser → 2. Importer le PDF ici</div>
+        <input type="file" id="doc-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleDocCamera(event)">
+        <!-- Résumé capture (masqué par défaut) -->
+        <div id="doc-capture-summary" class="hidden" style="background:var(--purple-light);border-radius:10px;padding:12px;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1.2rem;">✅</span>
+              <span style="font-weight:600;color:var(--purple);" id="doc-capture-text">1 page capturee</span>
+            </div>
+            <div id="doc-capture-thumbs" style="display:flex;gap:4px;"></div>
+          </div>
+        </div>
+        <div class="photo-capture-area" onclick="triggerDocCamera()" id="doc-drop-area" style="padding:12px;">
+          <div style="font-size:.75rem;color:var(--gray-400);">Prenez en photo la facture ou le BL</div>
           <div class="count" id="file-count">Aucun fichier</div>
         </div>
         <div id="file-preview" style="margin-top:10px;"></div>
@@ -1036,6 +1047,13 @@
     document.getElementById('form-observation').value = '';
     importedFile = null;
     updateFilePreview();
+    // Reset état capture caméra
+    const docActions = document.getElementById('doc-scan-actions');
+    const docSummary = document.getElementById('doc-capture-summary');
+    const docDrop = document.getElementById('doc-drop-area');
+    if (docActions) docActions.classList.remove('hidden');
+    if (docSummary) docSummary.classList.add('hidden');
+    if (docDrop) docDrop.classList.remove('hidden');
     loadCommandes();
     document.getElementById('modal-new').classList.add('show');
   }
@@ -1049,7 +1067,106 @@
       isFacture ? 'Nouvelle facture / BL' : 'Nouvelle etiquette';
   }
 
-  // ====== SCANNER PRO ======
+  // ====== CAMERA DIRECTE POUR FACTURES/BL ======
+  function triggerDocCamera() {
+    const input = document.getElementById('doc-camera-input');
+    input.value = '';
+    input.click();
+  }
+
+  async function handleDocCamera(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    showOcrOverlay(true, 'Traitement de la photo...', 20);
+
+    try {
+      const dataUri = await fileToDataUri(file);
+      const compressed = await compressImage(dataUri, 1400, 0.7);
+      const thumb = await compressImage(dataUri, 200, 0.4);
+
+      showOcrOverlay(true, 'Extraction du texte (OCR)...', 50);
+      const ocrText = await runOcrOnImage(compressed);
+
+      // Construire importedFile
+      importedFile = {
+        type: 'image',
+        dataUri: compressed,
+        name: `photo_${new Date().toISOString().slice(0,10)}.jpg`,
+        pageImages: [thumb],
+        fullImages: [compressed],
+        textContent: ocrText,
+        nbPages: 1
+      };
+
+      showOcrOverlay(false);
+      updateFilePreview();
+
+      // Afficher résumé capture, masquer boutons
+      const actions = document.getElementById('doc-scan-actions');
+      const summary = document.getElementById('doc-capture-summary');
+      const dropArea = document.getElementById('doc-drop-area');
+      if (actions) actions.classList.add('hidden');
+      if (dropArea) dropArea.classList.add('hidden');
+      if (summary) {
+        summary.classList.remove('hidden');
+        document.getElementById('doc-capture-text').textContent = '1 page capturee';
+        document.getElementById('doc-capture-thumbs').innerHTML =
+          `<img src="${thumb}" style="width:36px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200);">`;
+      }
+
+      // Auto-détection fournisseur et référence depuis OCR
+      if (ocrText) {
+        autoFillDocFromOCR(ocrText);
+      }
+
+      showToast('Photo capturee ✓', 'success');
+    } catch (err) {
+      console.error('Camera capture error:', err);
+      showOcrOverlay(false);
+      showToast('Erreur de capture', 'error');
+    }
+  }
+
+  // Auto-remplissage du formulaire Factures/BL depuis OCR
+  function autoFillDocFromOCR(text) {
+    if (!text) return;
+    const t = text.toLowerCase();
+
+    // Détecter fournisseur depuis le texte OCR
+    const fournSelect = document.getElementById('form-fournisseur');
+    if (fournSelect) {
+      for (const opt of fournSelect.options) {
+        if (!opt.value) continue;
+        const nom = opt.textContent.toLowerCase().trim();
+        if (nom.length > 2 && t.includes(nom)) {
+          fournSelect.value = opt.value;
+          break;
+        }
+      }
+    }
+
+    // Détecter référence (numéro facture/BL)
+    const refField = document.getElementById('form-reference');
+    if (refField && !refField.value) {
+      // Patterns courants pour N° facture/BL
+      const refPatterns = [
+        /(?:n[°o]?\s*(?:facture|fact|fa)|facture\s*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
+        /(?:n[°o]?\s*(?:bl|bon\s*de\s*livraison|livraison))\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
+        /(?:bon\s*n[°o]?|piece\s*n[°o]?|ref[.\s]*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
+        /(?:^|\s)(\d{6,12})(?:\s|$)/m  // Numéro seul de 6-12 chiffres
+      ];
+      for (const pattern of refPatterns) {
+        const match = text.match(pattern);
+        if (match?.[1]) {
+          refField.value = match[1].trim();
+          break;
+        }
+      }
+    }
+  }
+
+  // ====== SCANNER PRO (legacy) ======
   function openScannerPro() {
     // Try known Readdle Scanner Pro URL schemes
     const schemes = ['scannerpro://', 'readdle-scannerpro://'];

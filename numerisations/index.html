@@ -1216,8 +1216,13 @@
   function openFormFromCapture() {
     if (capturedPages.length === 0) { showToast('Prenez au moins une photo', 'error'); return; }
 
-    // Construire l'importedFile à partir des captures
     const allText = capturedPages.map(p => p.ocrText).join('\n\n');
+
+    // IMPORTANT : resetForm() d'abord (il met importedFile = null),
+    // puis on construit importedFile APRÈS
+    resetForm();
+    window._fromCapture = true;
+
     importedFile = {
       type: 'image',
       dataUri: capturedPages[0].full,
@@ -1227,11 +1232,7 @@
       textContent: allText,
       nbPages: capturedPages.length
     };
-
-    // Ouvrir le modal
-    resetForm();
     updateFilePreview();
-    window._fromCapture = true;
 
     // Masquer boutons Scanner Pro/Import, afficher résumé captures
     const scanBtns = document.getElementById('scan-actions-btns');
