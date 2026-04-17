@@ -1149,17 +1149,28 @@
     // Détecter référence (numéro facture/BL)
     const refField = document.getElementById('form-reference');
     if (refField && !refField.value) {
-      // Patterns courants pour N° facture/BL
+      // Patterns par priorité — du plus spécifique au plus générique
       const refPatterns = [
+        // 1. "Réf. : FA26-015883" ou "Ref : BL-12345" (format avec préfixe lettres + chiffres)
+        /(?:r[ée]f\.?\s*(?:facture|fact)?)\s*[:\s]+([A-Z]{1,4}\d{1,4}[\-\/]\d{3,10})/i,
+        // 2. "N° Facture : XXX" ou "Facture N° XXX"
         /(?:n[°o]?\s*(?:facture|fact|fa)|facture\s*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
+        // 3. "N° BL" ou "Bon de livraison N°"
         /(?:n[°o]?\s*(?:bl|bon\s*de\s*livraison|livraison))\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
-        /(?:bon\s*n[°o]?|piece\s*n[°o]?|ref[.\s]*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
-        /(?:^|\s)(\d{6,12})(?:\s|$)/m  // Numéro seul de 6-12 chiffres
+        // 4. "Bon N°" / "Pièce N°" / "Réf. N°"
+        /(?:bon\s*n[°o]?|pi[eè]ce\s*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
+        // 5. "Réf." suivi d'un code alphanumérique (catch-all pour Réf.)
+        /(?:r[ée]f\.?)\s*[:\s]+([A-Z]{1,4}[\d\-\/\.]{4,20})/i,
       ];
+      // PAS de pattern générique "nombre seul" — trop de faux positifs (SIREN, SIRET, tél, etc.)
       for (const pattern of refPatterns) {
         const match = text.match(pattern);
         if (match?.[1]) {
-          refField.value = match[1].trim();
+          const val = match[1].trim();
+          // Exclure les faux positifs connus
+          if (/^(FR|SIREN|SIRET|TVA|NAF|APE|RCS)/i.test(val)) continue;
+          if (/^\d{9,14}$/.test(val)) continue; // SIREN (9), SIRET (14), tél
+          refField.value = val;
           break;
         }
       }

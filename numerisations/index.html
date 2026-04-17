@@ -1407,21 +1407,28 @@
   function detectReference(text) {
     if (!text) return null;
     const patterns = [
-      // Patterns explicites
+      // 1. "Réf. : FA26-015883" — format préfixe lettres + tiret + chiffres (le plus fiable)
+      /(?:r[ée]f\.?\s*(?:facture|fact)?)\s*[:\s]+([A-Z]{1,4}\d{1,4}[\-\/]\d{3,10})/i,
+      // 2. Patterns explicites "N° Facture"
       /(?:n[°o]\s*(?:facture|fact|fa))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
       /(?:facture|fact)\s*n[°o]?\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
+      // 3. "N° BL" / "Bon de livraison"
       /(?:n[°o]\s*(?:bl|bon|piece|document|doc))\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
       /(?:bon\s*(?:de\s*)?livraison)\s*(?:n[°o]?)?\s*[:\s]*([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
-      // Patterns type "Réf:" ou "Référence:"
+      // 4. "Réf:" ou "Référence:" (catch-all)
       /(?:ref|r[ée]f[ée]rence|r[ée]f\.?)\s*[:\s]+([A-Z0-9][A-Z0-9\-\/\.]{2,25})/i,
-      // Pattern type "N° 12345" ou "No 12345" en début de ligne ou après label
-      /(?:n[°o]|num[ée]ro)\s*[:\s]*([A-Z]{0,3}\d{4,15}[A-Z0-9\-\/]*)/i,
-      // Pattern codes type BL-XXXX, FA-XXXX, FC-XXXX
+      // 5. Codes type BL-XXXX, FA-XXXX, FC-XXXX
       /\b((?:BL|FA|FC|AV|CMD|LIV)[.\-\/]?\s*\d{3,15}[A-Z0-9\-\/]*)\b/i
     ];
     for (const rx of patterns) {
       const m = text.match(rx);
-      if (m) return m[1].trim();
+      if (m) {
+        const val = m[1].trim();
+        // Exclure faux positifs : SIREN, SIRET, N° TVA, téléphone
+        if (/^(FR|SIREN|SIRET|TVA|NAF|APE|RCS)/i.test(val)) continue;
+        if (/^\d{9,14}$/.test(val)) continue; // SIREN (9 chiffres), SIRET (14), tél
+        return val;
+      }
     }
     return null;
   }
