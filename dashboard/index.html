@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dashboard">
+  <meta name="theme-color" content="#0ea5e9">
+  <title>Dashboard - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <style>
+    :root {
+      --accent: #0ea5e9; --accent-dark: #0284c7; --accent-light: #e0f2fe;
+      --green: #10b981; --green-bg: #ecfdf5;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --orange: #f97316; --orange-bg: #fff7ed;
+      --purple: #8b5cf6; --purple-bg: #f5f3ff;
+      --pink: #ec4899; --pink-bg: #fdf2f8;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 10px; --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 10px rgba(0,0,0,.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+    }
+
+    .header { background: white; border-bottom: 2px solid var(--accent); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); flex-wrap: wrap; justify-content: flex-end; }
+    .btn-back, .btn-logout { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--gray-200); background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-back:hover, .btn-logout:hover { background: var(--gray-100); }
+
+    /* Etab toggle */
+    .etab-bar { background: white; padding: 8px 12px; border-bottom: 1px solid var(--gray-200); display: flex; gap: 6px; overflow-x: auto; }
+    .etab-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--gray-200); background: white; font-size: 0.82rem; font-weight: 500; color: var(--gray-600); cursor: pointer; white-space: nowrap; }
+    .etab-btn.active { background: var(--gray-800); color: white; border-color: var(--gray-800); }
+
+    /* Tabs */
+    .tabs-bar { background: white; border-bottom: 1px solid var(--gray-200); display: flex; padding: 0 12px; overflow-x: auto; }
+    .tab-btn { padding: 10px 14px; border: none; background: none; font-size: 0.85rem; color: var(--gray-400); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; white-space: nowrap; }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    .content { flex: 1; overflow-y: auto; padding: 10px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card { background: white; border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); margin-bottom: 10px; }
+    .card-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-500); font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .card-subtitle { font-size: 0.78rem; color: var(--gray-500); margin-bottom: 8px; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
+    .kpi-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .kpi-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .kpi-card { background: white; border-radius: var(--radius); padding: 12px 10px; box-shadow: var(--shadow); text-align: center; }
+    .kpi-card.accent { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; }
+    .kpi-card.accent .kpi-label { color: rgba(255,255,255,.75); }
+    .kpi-card.accent .kpi-trend { color: rgba(255,255,255,.9); }
+    .kpi-card.accent .kpi-sub { color: rgba(255,255,255,.8); }
+    .kpi-value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+    .kpi-value.small { font-size: 1.15rem; }
+    .kpi-label { font-size: 0.68rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 4px; font-weight: 600; }
+    .kpi-sub { font-size: 0.72rem; color: var(--gray-500); margin-top: 4px; }
+    .kpi-trend { font-size: 0.75rem; font-weight: 700; margin-top: 4px; display: inline-block; padding: 1px 6px; border-radius: 3px; }
+    .kpi-trend.up { color: #065f46; background: var(--green-bg); }
+    .kpi-trend.down { color: #991b1b; background: var(--red-bg); }
+
+    /* Date nav */
+    .date-nav { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px; background: white; border-bottom: 1px solid var(--gray-200); }
+    .date-nav button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200); background: white; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .date-nav input { padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 0.88rem; }
+    .date-nav .today-btn { font-size: 0.72rem; font-weight: 600; color: var(--accent); padding: 6px 10px; border: none; background: none; cursor: pointer; }
+
+    /* Bar chart */
+    .bar-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; padding: 8px 4px 4px; min-height: 140px; overflow-x: auto; }
+    .bar-group { flex: 1; min-width: 28px; display: flex; flex-direction: column; align-items: center; position: relative; }
+    .bar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; transition: all .2s; min-height: 2px; position: relative; }
+    .bar:hover { opacity: 0.8; }
+    .bar-label { font-size: 0.62rem; color: var(--gray-500); margin-top: 4px; text-align: center; }
+    .bar-value { font-size: 0.6rem; color: var(--gray-600); font-weight: 600; margin-bottom: 2px; }
+
+    /* Dual bar (current vs prev) */
+    .dual-bar { display: flex; gap: 2px; width: 100%; }
+    .dual-bar .bar { flex: 1; }
+    .dual-bar .bar.prev { background: var(--gray-300); }
+
+    /* Heatmap */
+    .heatmap { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .heatmap-day { aspect-ratio: 1; border-radius: 4px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: 0.62rem; color: var(--gray-700); font-weight: 500; position: relative; }
+    .heatmap-hdr { font-size: 0.62rem; color: var(--gray-400); text-align: center; font-weight: 600; }
+
+    /* Table */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .data-table th { text-align: left; padding: 7px 6px; color: var(--gray-500); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--gray-200); }
+    .data-table td { padding: 6px; border-bottom: 1px solid var(--gray-100); }
+    .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* Empty state */
+    .empty-state { padding: 32px 16px; text-align: center; color: var(--gray-400); font-size: 0.85rem; }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 8px; opacity: .5; }
+
+    /* Progress bar */
+    .progress-bar { height: 6px; background: var(--gray-100); border-radius: 3px; overflow: hidden; margin: 4px 0; }
+    .progress-bar > div { height: 100%; background: var(--accent); border-radius: 3px; }
+
+    /* Legend */
+    .chart-legend { display: flex; gap: 12px; font-size: 0.72rem; color: var(--gray-500); margin-top: 6px; justify-content: center; }
+    .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+    /* Loading */
+    .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .loading-overlay.active { display: flex; }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--gray-200); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--gray-800); color: white; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; transition: transform .3s; z-index: 2000; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--red); }
+
+    /* Pill color palette */
+    .pill { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; }
+    .pill.green { background: var(--green-bg); color: #065f46; }
+    .pill.orange { background: var(--orange-bg); color: #9a3412; }
+    .pill.red { background: var(--red-bg); color: #991b1b; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>📊 Dashboard</h1>
+    </div>
+    <div class="header-right" id="header-right">
+      <span id="user-info"></span>
+    </div>
+  </div>
+
+  <!-- ETAB TOGGLE -->
+  <div class="etab-bar">
+    <button class="etab-btn active" data-etab="all" onclick="selectEtab('all')">🏠 PLANB (Consolidé)</button>
+    <button class="etab-btn" data-etab="freddy" onclick="selectEtab('freddy')">🧑‍🍳 Freddy</button>
+    <button class="etab-btn" data-etab="liesel" onclick="selectEtab('liesel')">👩‍🍳 Liesel</button>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">🏠 Vue d'ensemble</button>
+    <button class="tab-btn" data-tab="day" onclick="switchTab('day')">📅 Jour</button>
+    <button class="tab-btn" data-tab="month" onclick="switchTab('month')">📆 Mois</button>
+    <button class="tab-btn" data-tab="year" onclick="switchTab('year')">📈 Année</button>
+    <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')">🔎 Analyse</button>
+  </div>
+
+  <div class="content">
+    <!-- TAB: VUE D'ENSEMBLE -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="kpi-grid cols-2" id="ov-top-kpi"></div>
+      <div class="card">
+        <div class="card-title">CA TTC — 14 derniers jours</div>
+        <div class="bar-chart" id="ov-chart-14d"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Rythme du mois en cours</div>
+        <div id="ov-month-progress"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cumul année à date</div>
+        <div class="kpi-grid cols-3" id="ov-ytd"></div>
+      </div>
+    </div>
+
+    <!-- TAB: JOUR -->
+    <div class="tab-content" id="tab-day">
+      <div class="date-nav">
+        <button onclick="changeDay(-7)" title="-7 jours">⏪</button>
+        <button onclick="changeDay(-1)" title="Jour précédent">◀</button>
+        <input type="date" id="day-date" onchange="setDay(this.value)">
+        <button onclick="changeDay(1)" title="Jour suivant">▶</button>
+        <button class="today-btn" onclick="setTodayDay()">Auj.</button>
+      </div>
+      <div class="kpi-grid cols-2" id="day-kpi"></div>
+      <div class="card">
+        <div class="card-title">Comparaisons</div>
+        <div id="day-compare"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Répartition CA HT</div>
+        <div id="day-breakdown"></div>
+      </div>
+    </div>
+
+    <!-- TAB: MOIS -->
+    <div class="tab-content" id="tab-month">
+      <div class="date-nav">
+        <button onclick="changeMonth(-1)" title="Mois précédent">◀</button>
+        <div id="month-label" style="font-size:0.95rem; font-weight:700; min-width:160px; text-align:center;"></div>
+        <button onclick="changeMonth(1)" title="Mois suivant">▶</button>
+        <button class="today-btn" onclick="setCurrentMonth()">Ce mois</button>
+      </div>
+      <div class="kpi-grid cols-2" id="month-kpi"></div>
+      <div class="card">
+        <div class="card-title">CA TTC par jour</div>
+        <div class="bar-chart" id="month-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Comparaison mois précédent</div>
+        <div id="month-compare"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top 5 jours du mois</div>
+        <div id="month-top"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ANNÉE -->
+    <div class="tab-content" id="tab-year">
+      <div class="kpi-grid cols-3" id="year-kpi"></div>
+      <div class="card">
+        <div class="card-title">CA TTC par mois</div>
+        <div class="bar-chart" id="year-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Détail mensuel</div>
+        <div id="year-table"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ANALYSE -->
+    <div class="tab-content" id="tab-analysis">
+      <div class="card">
+        <div class="card-title">Performance par jour de la semaine</div>
+        <div class="card-subtitle">Basé sur les 30 derniers jours</div>
+        <div id="dow-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Répartition CA HT (30 derniers jours)</div>
+        <div id="breakdown-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Évolution du ticket moyen</div>
+        <div class="card-subtitle">Moyenne mobile 7 jours</div>
+        <div class="bar-chart" id="ticket-evolution"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Jour le plus fort / plus faible</div>
+        <div id="extremes"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let currentEtab = 'all';
+let allData = [];
+let currentDay = new Date();
+let currentMonth = new Date();
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', () => {
+  const userData = sessionStorage.getItem('planb_user');
+  if (!userData) { window.location.href = '../'; return; }
+  currentUser = JSON.parse(userData);
+  document.getElementById('user-info').textContent = currentUser.initiales || currentUser.nom;
+  setTodayDay();
+  setCurrentMonth();
+  loadAllData();
+});
+
+function selectEtab(etab) {
+  currentEtab = etab;
+  document.querySelectorAll('.etab-btn').forEach(b => b.classList.toggle('active', b.dataset.etab === etab));
+  renderAll();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+  renderAll();
+}
+
+// ============ DATA LOAD ============
+async function loadAllData() {
+  showLoading(true);
+  try {
+    const { data, error } = await sb
+      .from('ventes_journalieres')
+      .select('*')
+      .order('date', { ascending: true });
+    if (error) throw error;
+    // Parse notes JSON to enrich
+    allData = (data || []).map(r => {
+      let enrich = {};
+      try { if (r.notes && r.notes.startsWith('{')) enrich = JSON.parse(r.notes); } catch(e) {}
+      return { ...r, ...enrich };
+    });
+    renderAll();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur chargement: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function filterEtab(rows) {
+  if (currentEtab === 'all') return rows;
+  return rows.filter(r => r.etablissement === currentEtab);
+}
+
+function sumField(rows, field) {
+  return rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
+}
+
+function avgField(rows, field) {
+  const vals = rows.map(r => Number(r[field]) || 0).filter(v => v > 0);
+  if (!vals.length) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function fmtEur(n, decimals = 0) {
+  if (!n && n !== 0) return '—';
+  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace('.0','') + 'k€';
+  return n.toFixed(decimals) + '€';
+}
+
+function fmtEurFull(n, decimals = 2) {
+  if (!n && n !== 0) return '—';
+  return n.toLocaleString('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + ' €';
+}
+
+function fmtInt(n) {
+  if (!n && n !== 0) return '—';
+  return n.toLocaleString('fr-FR');
+}
+
+function fmtPct(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const sign = n >= 0 ? '+' : '';
+  return sign + n.toFixed(1) + '%';
+}
+
+function trendArrow(pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return '';
+  return pct >= 0 ? '↑' : '↓';
+}
+
+function dateStr(d) { return d.toISOString().split('T')[0]; }
+function dateFR(d, opts) {
+  const o = Object.assign({ day: 'numeric', month: 'short', year: 'numeric' }, opts || {});
+  return d.toLocaleDateString('fr-FR', o);
+}
+
+// ============ RENDER ORCHESTRATION ============
+function renderAll() {
+  if (!allData || !allData.length) return;
+  renderOverview();
+  renderDay();
+  renderMonth();
+  renderYear();
+  renderAnalysis();
+}
+
+// ============ VUE D'ENSEMBLE ============
+function renderOverview() {
+  const rows = filterEtab(allData);
+  if (!rows.length) {
+    document.getElementById('ov-top-kpi').innerHTML = emptyState();
+    return;
+  }
+  const now = new Date();
+  const today = dateStr(now);
+  const yesterday = dateStr(new Date(now.getTime() - 86400000));
+
+  const latestDate = rows[rows.length - 1]?.date;
+  const prev7 = dateStr(new Date(new Date(latestDate).getTime() - 7 * 86400000));
+
+  const latest = rows.filter(r => r.date === latestDate);
+  const previousSameDow = rows.filter(r => r.date === prev7);
+
+  const caLatest = sumField(latest, 'ca_ttc');
+  const caPrev = sumField(previousSameDow, 'ca_ttc');
+  const couvLatest = sumField(latest, 'couverts');
+  const couvPrev = sumField(previousSameDow, 'couverts');
+
+  const pctCA = caPrev > 0 ? ((caLatest - caPrev) / caPrev * 100) : null;
+  const pctCouv = couvPrev > 0 ? ((couvLatest - couvPrev) / couvPrev * 100) : null;
+
+  // Month to date
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthRows = rows.filter(r => r.date >= monthStart && r.date <= today);
+  const monthCA = sumField(monthRows, 'ca_ttc');
+  const monthCouv = sumField(monthRows, 'couverts');
+
+  document.getElementById('ov-top-kpi').innerHTML = `
+    <div class="kpi-card accent">
+      <div class="kpi-value">${fmtEurFull(caLatest, 0)}</div>
+      <div class="kpi-label">Dernier jour (${dateFR(new Date(latestDate), { weekday: 'short', day: 'numeric', month: 'short' })})</div>
+      ${pctCA !== null ? `<div class="kpi-trend ${pctCA >= 0 ? 'up' : 'down'}">${trendArrow(pctCA)} ${fmtPct(pctCA)} vs S-1</div>` : ''}
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--accent)">${fmtInt(couvLatest)}</div>
+      <div class="kpi-label">Couverts</div>
+      ${pctCouv !== null ? `<div class="kpi-trend ${pctCouv >= 0 ? 'up' : 'down'}">${trendArrow(pctCouv)} ${fmtPct(pctCouv)}</div>` : ''}
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--orange)">${fmtEurFull(monthCA, 0)}</div>
+      <div class="kpi-label">CA Mois en cours</div>
+      <div class="kpi-sub">${monthRows.length} jours saisis</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--purple)">${fmtInt(monthCouv)}</div>
+      <div class="kpi-label">Couverts Mois</div>
+      <div class="kpi-sub">TM ${monthCouv > 0 ? (monthCA / monthCouv).toFixed(1) : '—'} €</div>
+    </div>
+  `;
+
+  // 14-day chart
+  const chartEl = document.getElementById('ov-chart-14d');
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(latestDate);
+    d.setDate(d.getDate() - i);
+    days.push(dateStr(d));
+  }
+  const byDay = {};
+  days.forEach(d => byDay[d] = 0);
+  rows.forEach(r => { if (byDay[r.date] !== undefined) byDay[r.date] += (r.ca_ttc || 0); });
+  const maxCA = Math.max(...Object.values(byDay), 1);
+  chartEl.innerHTML = days.map(d => {
+    const v = byDay[d];
+    const h = Math.max((v / maxCA) * 100, 2);
+    const dd = new Date(d);
+    const dayLabel = dd.toLocaleDateString('fr-FR', { weekday: 'narrow' }) + dd.getDate();
+    return `<div class="bar-group" title="${dateFR(dd)}: ${fmtEur(v)}">
+      <div class="bar-value">${v > 0 ? fmtEur(v) : ''}</div>
+      <div class="bar" style="height:${h}%; background:${v === 0 ? 'var(--gray-200)' : 'var(--accent)'}"></div>
+      <div class="bar-label">${dayLabel}</div>
+    </div>`;
+  }).join('');
+
+  // Month progress (vs previous month same duration)
+  const pm = new Date(now); pm.setMonth(pm.getMonth() - 1);
+  const prevMonthStart = `${pm.getFullYear()}-${String(pm.getMonth() + 1).padStart(2, '0')}-01`;
+  const prevMonthEnd = `${pm.getFullYear()}-${String(pm.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const prevMonthRows = rows.filter(r => r.date >= prevMonthStart && r.date <= prevMonthEnd);
+  const prevMonthCA = sumField(prevMonthRows, 'ca_ttc');
+  const monthDelta = prevMonthCA > 0 ? ((monthCA - prevMonthCA) / prevMonthCA * 100) : null;
+
+  document.getElementById('ov-month-progress').innerHTML = `
+    <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px;">
+      <span>Ce mois à ce jour</span>
+      <span style="font-weight:700;">${fmtEurFull(monthCA, 0)}</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--gray-500); margin-bottom:6px;">
+      <span>M-1 à la même date</span>
+      <span>${fmtEurFull(prevMonthCA, 0)}</span>
+    </div>
+    <div class="progress-bar"><div style="width:${Math.min(100, prevMonthCA ? (monthCA / prevMonthCA) * 100 : 0)}%; background:${monthDelta >= 0 ? 'var(--green)' : 'var(--red)'}"></div></div>
+    ${monthDelta !== null ? `<div style="text-align:right; margin-top:4px;"><span class="pill ${monthDelta >= 0 ? 'green' : 'red'}">${trendArrow(monthDelta)} ${fmtPct(monthDelta)}</span></div>` : ''}
+  `;
+
+  // YTD
+  const yearStart = `${now.getFullYear()}-01-01`;
+  const ytdRows = rows.filter(r => r.date >= yearStart && r.date <= today);
+  const ytdCA = sumField(ytdRows, 'ca_ttc');
+  const ytdCouv = sumField(ytdRows, 'couverts');
+  const ytdDays = new Set(ytdRows.map(r => r.date)).size;
+
+  document.getElementById('ov-ytd').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-value small" style="color:var(--accent)">${fmtEurFull(ytdCA, 0)}</div>
+      <div class="kpi-label">CA Année</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value small" style="color:var(--purple)">${fmtInt(ytdCouv)}</div>
+      <div class="kpi-label">Couverts</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value small" style="color:var(--orange)">${ytdDays > 0 ? fmtEur(ytdCA / ytdDays) : '—'}</div>
+      <div class="kpi-label">CA / jour moyen</div>
+      <div class="kpi-sub">${ytdDays} jours</div>
+    </div>
+  `;
+}
+
+// ============ JOUR ============
+function setTodayDay() {
+  currentDay = new Date();
+  document.getElementById('day-date').value = dateStr(currentDay);
+  renderDay();
+}
+function changeDay(delta) {
+  currentDay.setDate(currentDay.getDate() + delta);
+  document.getElementById('day-date').value = dateStr(currentDay);
+  renderDay();
+}
+function setDay(v) {
+  if (v) {
+    currentDay = new Date(v + 'T12:00:00');
+    renderDay();
+  }
+}
+
+function renderDay() {
+  const rows = filterEtab(allData);
+  const ds = dateStr(currentDay);
+  const today = rows.filter(r => r.date === ds);
+
+  if (!today.length) {
+    document.getElementById('day-kpi').innerHTML = `<div style="grid-column: 1/-1;">${emptyState('Aucune donnée ce jour')}</div>`;
+    document.getElementById('day-compare').innerHTML = '';
+    document.getElementById('day-breakdown').innerHTML = '';
+    return;
+  }
+
+  const ca = sumField(today, 'ca_ttc');
+  const caHt = sumField(today, 'ca_ht');
+  const couv = sumField(today, 'couverts');
+  const tables = sumField(today, 'nb_tables');
+  const tm = couv > 0 ? ca / couv : 0;
+  const panier = avgField(today, 'panier_moy');
+  const freq = avgField(today, 'freq_pct');
+  const rot = avgField(today, 'rotation_moy');
+
+  document.getElementById('day-kpi').innerHTML = `
+    <div class="kpi-card accent">
+      <div class="kpi-value">${fmtEurFull(ca, 0)}</div>
+      <div class="kpi-label">CA TTC</div>
+      <div class="kpi-sub">${fmtEurFull(caHt, 0)} HT</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--purple)">${fmtInt(couv)}</div>
+      <div class="kpi-label">Couverts</div>
+      <div class="kpi-sub">${fmtInt(tables)} tables</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--orange)">${fmtEur(tm, 1)}</div>
+      <div class="kpi-label">Ticket moyen</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--green)">${freq > 0 ? freq.toFixed(0) + '%' : '—'}</div>
+      <div class="kpi-label">Fréquentation</div>
+      <div class="kpi-sub">Rotation ${rot > 0 ? rot.toFixed(1) : '—'}</div>
+    </div>
+  `;
+
+  // Comparisons
+  const prev7 = new Date(currentDay); prev7.setDate(prev7.getDate() - 7);
+  const yesterday = new Date(currentDay); yesterday.setDate(yesterday.getDate() - 1);
+  const prevYear = new Date(currentDay); prevYear.setFullYear(prevYear.getFullYear() - 1);
+
+  const prev7Rows = rows.filter(r => r.date === dateStr(prev7));
+  const yesterdayRows = rows.filter(r => r.date === dateStr(yesterday));
+  const prevYearRows = rows.filter(r => r.date === dateStr(prevYear));
+
+  const cmpCards = [
+    { label: 'Veille', date: yesterday, rows: yesterdayRows },
+    { label: 'Semaine précédente (même jour)', date: prev7, rows: prev7Rows },
+    { label: 'Année précédente (même date)', date: prevYear, rows: prevYearRows }
+  ];
+
+  document.getElementById('day-compare').innerHTML = cmpCards.map(c => {
+    const cmpCa = sumField(c.rows, 'ca_ttc');
+    const cmpCouv = sumField(c.rows, 'couverts');
+    const deltaCa = cmpCa > 0 ? ((ca - cmpCa) / cmpCa * 100) : null;
+    const deltaCouv = cmpCouv > 0 ? ((couv - cmpCouv) / cmpCouv * 100) : null;
+    return `<div style="padding:8px 0; border-bottom:1px solid var(--gray-100);">
+      <div style="display:flex; justify-content:space-between; font-size:0.82rem;">
+        <span style="color:var(--gray-500);">${c.label}</span>
+        <span style="color:var(--gray-400); font-size:0.75rem;">${dateFR(c.date, {weekday: 'short', day: 'numeric', month: 'short'})}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span style="font-size:0.78rem;">CA ${fmtEurFull(cmpCa, 0)} • ${fmtInt(cmpCouv)} couv.</span>
+        ${deltaCa !== null ? `<span class="pill ${deltaCa >= 0 ? 'green' : 'red'}">${trendArrow(deltaCa)} ${fmtPct(deltaCa)}</span>` : '<span class="pill" style="background:var(--gray-100); color:var(--gray-500);">—</span>'}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Breakdown
+  const solide = sumField(today, 'ca_ht_solide');
+  const alcool = sumField(today, 'ca_ht_alcool');
+  const nonAlcool = sumField(today, 'ca_ht_non_alcool');
+  const totalBreak = solide + alcool + nonAlcool;
+
+  if (totalBreak > 0) {
+    document.getElementById('day-breakdown').innerHTML = `
+      <div style="display:flex; height:18px; border-radius:4px; overflow:hidden; margin-bottom:10px;">
+        <div style="width:${(solide/totalBreak*100).toFixed(1)}%; background:var(--orange);"></div>
+        <div style="width:${(alcool/totalBreak*100).toFixed(1)}%; background:var(--purple);"></div>
+        <div style="width:${(nonAlcool/totalBreak*100).toFixed(1)}%; background:var(--accent);"></div>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; font-size:0.78rem;">
+        <div><span class="legend-dot" style="background:var(--orange)"></span>Solide<br><strong>${fmtEurFull(solide, 0)}</strong><br><span style="color:var(--gray-500); font-size:0.7rem;">${(solide/totalBreak*100).toFixed(1)}%</span></div>
+        <div><span class="legend-dot" style="background:var(--purple)"></span>Alcool<br><strong>${fmtEurFull(alcool, 0)}</strong><br><span style="color:var(--gray-500); font-size:0.7rem;">${(alcool/totalBreak*100).toFixed(1)}%</span></div>
+        <div><span class="legend-dot" style="background:var(--accent)"></span>Non alcool<br><strong>${fmtEurFull(nonAlcool, 0)}</strong><br><span style="color:var(--gray-500); font-size:0.7rem;">${(nonAlcool/totalBreak*100).toFixed(1)}%</span></div>
+      </div>`;
+  } else {
+    document.getElementById('day-breakdown').innerHTML = `<div style="font-size:0.78rem; color:var(--gray-400);">Données de ventilation non disponibles</div>`;
+  }
+}
+
+// ============ MOIS ============
+function setCurrentMonth() {
+  currentMonth = new Date();
+  renderMonth();
+}
+function changeMonth(delta) {
+  currentMonth.setMonth(currentMonth.getMonth() + delta);
+  renderMonth();
+}
+
+function renderMonth() {
+  const rows = filterEtab(allData);
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  const monthRows = rows.filter(r => r.date >= start && r.date <= end);
+
+  document.getElementById('month-label').textContent = currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+  if (!monthRows.length) {
+    document.getElementById('month-kpi').innerHTML = `<div style="grid-column: 1/-1;">${emptyState('Aucune donnée ce mois')}</div>`;
+    document.getElementById('month-chart').innerHTML = '';
+    document.getElementById('month-compare').innerHTML = '';
+    document.getElementById('month-top').innerHTML = '';
+    return;
+  }
+
+  const ca = sumField(monthRows, 'ca_ttc');
+  const caHt = sumField(monthRows, 'ca_ht');
+  const couv = sumField(monthRows, 'couverts');
+  const tm = couv > 0 ? ca / couv : 0;
+  const nbJ = new Set(monthRows.map(r => r.date)).size;
+
+  document.getElementById('month-kpi').innerHTML = `
+    <div class="kpi-card accent">
+      <div class="kpi-value">${fmtEurFull(ca, 0)}</div>
+      <div class="kpi-label">CA TTC</div>
+      <div class="kpi-sub">${fmtEurFull(caHt, 0)} HT</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--purple)">${fmtInt(couv)}</div>
+      <div class="kpi-label">Couverts</div>
+      <div class="kpi-sub">TM ${fmtEur(tm, 1)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--orange)">${fmtEur(ca / Math.max(nbJ, 1))}</div>
+      <div class="kpi-label">CA / jour moyen</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--green)">${nbJ}</div>
+      <div class="kpi-label">Jours d'activité</div>
+      <div class="kpi-sub">${lastDay} jours max</div>
+    </div>
+  `;
+
+  // Day-by-day chart
+  const byDay = {};
+  for (let d = 1; d <= lastDay; d++) {
+    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    byDay[ds] = 0;
+  }
+  monthRows.forEach(r => { byDay[r.date] = (byDay[r.date] || 0) + (r.ca_ttc || 0); });
+  const maxCa = Math.max(...Object.values(byDay), 1);
+
+  document.getElementById('month-chart').innerHTML = Object.entries(byDay).map(([d, v]) => {
+    const dd = new Date(d);
+    const dayNum = dd.getDate();
+    const h = Math.max((v / maxCa) * 100, 2);
+    const isToday = d === dateStr(new Date());
+    return `<div class="bar-group" title="${dateFR(dd)}: ${fmtEur(v)}">
+      <div class="bar" style="height:${h}%; background:${v === 0 ? 'var(--gray-200)' : (isToday ? 'var(--orange)' : 'var(--accent)')};"></div>
+      <div class="bar-label">${dayNum}</div>
+    </div>`;
+  }).join('');
+
+  // Comparison with previous month
+  const pm = new Date(year, month - 1, 1);
+  const pmStart = `${pm.getFullYear()}-${String(pm.getMonth() + 1).padStart(2, '0')}-01`;
+  const pmLast = new Date(pm.getFullYear(), pm.getMonth() + 1, 0).getDate();
+  const pmEnd = `${pm.getFullYear()}-${String(pm.getMonth() + 1).padStart(2, '0')}-${String(pmLast).padStart(2, '0')}`;
+  const pmRows = rows.filter(r => r.date >= pmStart && r.date <= pmEnd);
+  const pmCa = sumField(pmRows, 'ca_ttc');
+  const pmCouv = sumField(pmRows, 'couverts');
+  const deltaCa = pmCa > 0 ? ((ca - pmCa) / pmCa * 100) : null;
+  const deltaCouv = pmCouv > 0 ? ((couv - pmCouv) / pmCouv * 100) : null;
+
+  document.getElementById('month-compare').innerHTML = `
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+      <div>
+        <div style="font-size:0.72rem; color:var(--gray-500);">CA TTC ${pm.toLocaleDateString('fr-FR', { month: 'short' })}</div>
+        <div style="font-size:1.1rem; font-weight:700;">${fmtEurFull(pmCa, 0)}</div>
+        ${deltaCa !== null ? `<div class="pill ${deltaCa >= 0 ? 'green' : 'red'}">${trendArrow(deltaCa)} ${fmtPct(deltaCa)}</div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:0.72rem; color:var(--gray-500);">Couverts ${pm.toLocaleDateString('fr-FR', { month: 'short' })}</div>
+        <div style="font-size:1.1rem; font-weight:700;">${fmtInt(pmCouv)}</div>
+        ${deltaCouv !== null ? `<div class="pill ${deltaCouv >= 0 ? 'green' : 'red'}">${trendArrow(deltaCouv)} ${fmtPct(deltaCouv)}</div>` : ''}
+      </div>
+    </div>
+  `;
+
+  // Top 5 days
+  const top = [...monthRows].sort((a, b) => (b.ca_ttc || 0) - (a.ca_ttc || 0)).slice(0, 5);
+  document.getElementById('month-top').innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Jour</th><th class="num">CA TTC</th><th class="num">Couv.</th><th class="num">TM</th></tr></thead>
+      <tbody>
+        ${top.map((r, i) => {
+          const d = new Date(r.date);
+          const tm = (r.couverts > 0) ? (r.ca_ttc / r.couverts) : 0;
+          return `<tr>
+            <td style="color:var(--gray-400); font-weight:700;">${i + 1}</td>
+            <td>${d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</td>
+            <td class="num" style="font-weight:700;">${fmtEurFull(r.ca_ttc || 0, 0)}</td>
+            <td class="num">${fmtInt(r.couverts || 0)}</td>
+            <td class="num">${tm > 0 ? fmtEur(tm, 1) : '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ============ ANNÉE ============
+function renderYear() {
+  const rows = filterEtab(allData);
+  const year = (new Date()).getFullYear();
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const yearRows = rows.filter(r => r.date >= yearStart && r.date <= yearEnd);
+
+  if (!yearRows.length) {
+    document.getElementById('year-kpi').innerHTML = `<div style="grid-column: 1/-1;">${emptyState('Aucune donnée cette année')}</div>`;
+    return;
+  }
+
+  const ca = sumField(yearRows, 'ca_ttc');
+  const couv = sumField(yearRows, 'couverts');
+  const nbJ = new Set(yearRows.map(r => r.date)).size;
+
+  // Previous year same period
+  const prevYearStart = `${year - 1}-01-01`;
+  const today = dateStr(new Date());
+  const prevYearSamePeriod = `${year - 1}${today.substring(4)}`;
+  const prevYearRows = rows.filter(r => r.date >= prevYearStart && r.date <= prevYearSamePeriod);
+  const prevYearCa = sumField(prevYearRows, 'ca_ttc');
+  const pctYoY = prevYearCa > 0 ? ((ca - prevYearCa) / prevYearCa * 100) : null;
+
+  document.getElementById('year-kpi').innerHTML = `
+    <div class="kpi-card accent">
+      <div class="kpi-value">${fmtEurFull(ca, 0)}</div>
+      <div class="kpi-label">CA ${year}</div>
+      ${pctYoY !== null ? `<div class="kpi-trend ${pctYoY >= 0 ? 'up' : 'down'}">${trendArrow(pctYoY)} ${fmtPct(pctYoY)} vs ${year - 1}</div>` : ''}
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value small" style="color:var(--purple)">${fmtInt(couv)}</div>
+      <div class="kpi-label">Couverts</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value small" style="color:var(--orange)">${fmtEur(ca / Math.max(nbJ, 1))}</div>
+      <div class="kpi-label">CA / jour</div>
+      <div class="kpi-sub">${nbJ} jours</div>
+    </div>
+  `;
+
+  // Chart par mois
+  const byMonth = Array.from({ length: 12 }, () => 0);
+  const byMonthCouv = Array.from({ length: 12 }, () => 0);
+  const byMonthDays = Array.from({ length: 12 }, () => 0);
+  yearRows.forEach(r => {
+    const m = parseInt(r.date.substring(5, 7)) - 1;
+    byMonth[m] += r.ca_ttc || 0;
+    byMonthCouv[m] += r.couverts || 0;
+    byMonthDays[m]++;
+  });
+  const maxMonth = Math.max(...byMonth, 1);
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
+
+  document.getElementById('year-chart').innerHTML = byMonth.map((v, i) => {
+    const h = Math.max((v / maxMonth) * 100, 2);
+    return `<div class="bar-group" title="${monthNames[i]}: ${fmtEur(v)}">
+      <div class="bar-value">${v > 0 ? fmtEur(v) : ''}</div>
+      <div class="bar" style="height:${h}%; background:${v === 0 ? 'var(--gray-200)' : 'var(--accent)'};"></div>
+      <div class="bar-label">${monthNames[i]}</div>
+    </div>`;
+  }).join('');
+
+  // Détail mensuel
+  document.getElementById('year-table').innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Mois</th><th class="num">CA TTC</th><th class="num">Couv.</th><th class="num">CA/jour</th><th class="num">TM</th></tr></thead>
+      <tbody>
+        ${monthNames.map((name, i) => {
+          const ca = byMonth[i];
+          const couv = byMonthCouv[i];
+          const days = byMonthDays[i];
+          const tm = couv > 0 ? ca / couv : 0;
+          const caJ = days > 0 ? ca / days : 0;
+          if (ca === 0) return '';
+          return `<tr>
+            <td style="font-weight:600;">${name}</td>
+            <td class="num" style="font-weight:700;">${fmtEurFull(ca, 0)}</td>
+            <td class="num">${fmtInt(couv)}</td>
+            <td class="num">${fmtEur(caJ)}</td>
+            <td class="num">${tm > 0 ? fmtEur(tm, 1) : '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ============ ANALYSE ============
+function renderAnalysis() {
+  const rows = filterEtab(allData);
+  const thirtyDaysAgo = dateStr(new Date(Date.now() - 30 * 86400000));
+  const recent = rows.filter(r => r.date >= thirtyDaysAgo);
+
+  if (!recent.length) {
+    document.getElementById('dow-chart').innerHTML = emptyState('Pas assez de données');
+    document.getElementById('breakdown-chart').innerHTML = '';
+    document.getElementById('ticket-evolution').innerHTML = '';
+    document.getElementById('extremes').innerHTML = '';
+    return;
+  }
+
+  // Day of week
+  const dowNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  const byDow = Array.from({ length: 7 }, () => ({ ca: 0, n: 0, couv: 0 }));
+  recent.forEach(r => {
+    const dow = new Date(r.date).getDay();
+    byDow[dow].ca += r.ca_ttc || 0;
+    byDow[dow].couv += r.couverts || 0;
+    byDow[dow].n++;
+  });
+  const maxDow = Math.max(...byDow.map(d => d.n > 0 ? d.ca / d.n : 0), 1);
+  const orderedDows = [1, 2, 3, 4, 5, 6, 0]; // lu → di
+
+  document.getElementById('dow-chart').innerHTML = `
+    <div class="bar-chart">
+      ${orderedDows.map(dow => {
+        const d = byDow[dow];
+        const avg = d.n > 0 ? d.ca / d.n : 0;
+        const h = Math.max((avg / maxDow) * 100, 2);
+        return `<div class="bar-group" title="${dowNames[dow]}: ${fmtEur(avg)} moy (${d.n} jours)">
+          <div class="bar-value">${avg > 0 ? fmtEur(avg) : ''}</div>
+          <div class="bar" style="height:${h}%; background:${avg === 0 ? 'var(--gray-200)' : 'var(--accent)'};"></div>
+          <div class="bar-label">${dowNames[dow]}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:0.72rem; color:var(--gray-500); margin-top:8px; text-align:center;">CA moyen par jour de la semaine</div>
+  `;
+
+  // Breakdown 30 days
+  const solide = sumField(recent, 'ca_ht_solide');
+  const alcool = sumField(recent, 'ca_ht_alcool');
+  const nonAlcool = sumField(recent, 'ca_ht_non_alcool');
+  const totalBreak = solide + alcool + nonAlcool;
+
+  if (totalBreak > 0) {
+    document.getElementById('breakdown-chart').innerHTML = `
+      <div style="display:flex; height:26px; border-radius:4px; overflow:hidden; margin-bottom:10px;">
+        <div style="width:${(solide/totalBreak*100).toFixed(1)}%; background:var(--orange);" title="Solide"></div>
+        <div style="width:${(alcool/totalBreak*100).toFixed(1)}%; background:var(--purple);" title="Alcool"></div>
+        <div style="width:${(nonAlcool/totalBreak*100).toFixed(1)}%; background:var(--accent);" title="Non alcool"></div>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; font-size:0.78rem;">
+        <div><span class="legend-dot" style="background:var(--orange)"></span>Solide<br><strong>${fmtEurFull(solide, 0)}</strong> (${(solide/totalBreak*100).toFixed(0)}%)</div>
+        <div><span class="legend-dot" style="background:var(--purple)"></span>Alcool<br><strong>${fmtEurFull(alcool, 0)}</strong> (${(alcool/totalBreak*100).toFixed(0)}%)</div>
+        <div><span class="legend-dot" style="background:var(--accent)"></span>Non alcool<br><strong>${fmtEurFull(nonAlcool, 0)}</strong> (${(nonAlcool/totalBreak*100).toFixed(0)}%)</div>
+      </div>`;
+  } else {
+    document.getElementById('breakdown-chart').innerHTML = `<div style="font-size:0.78rem; color:var(--gray-400);">Données non disponibles</div>`;
+  }
+
+  // Ticket moyen evolution (7-day rolling)
+  const sortedRecent = [...recent].sort((a, b) => a.date.localeCompare(b.date));
+  const points = [];
+  for (let i = 0; i < sortedRecent.length; i++) {
+    const window = sortedRecent.slice(Math.max(0, i - 6), i + 1);
+    const wCa = sumField(window, 'ca_ttc');
+    const wCouv = sumField(window, 'couverts');
+    points.push({ date: sortedRecent[i].date, tm: wCouv > 0 ? wCa / wCouv : 0 });
+  }
+  const maxTm = Math.max(...points.map(p => p.tm), 1);
+  document.getElementById('ticket-evolution').innerHTML = points.slice(-21).map(p => {
+    const h = Math.max((p.tm / maxTm) * 100, 2);
+    const d = new Date(p.date);
+    return `<div class="bar-group" title="${dateFR(d)}: TM ${fmtEur(p.tm, 1)}">
+      <div class="bar" style="height:${h}%; background:var(--orange);"></div>
+      <div class="bar-label">${d.getDate()}</div>
+    </div>`;
+  }).join('');
+
+  // Extremes
+  const maxRow = recent.reduce((a, b) => (a.ca_ttc || 0) > (b.ca_ttc || 0) ? a : b);
+  const minRow = recent.filter(r => (r.ca_ttc || 0) > 0).reduce((a, b) => (a.ca_ttc || 0) < (b.ca_ttc || 0) ? a : b);
+
+  document.getElementById('extremes').innerHTML = `
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+      <div style="padding:10px; background:var(--green-bg); border-radius:8px;">
+        <div style="font-size:0.72rem; color:#065f46; font-weight:700; margin-bottom:4px;">🔥 MEILLEUR JOUR</div>
+        <div style="font-size:1rem; font-weight:700;">${new Date(maxRow.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+        <div style="font-size:1.2rem; font-weight:800; color:#065f46;">${fmtEurFull(maxRow.ca_ttc || 0, 0)}</div>
+        <div style="font-size:0.72rem; color:var(--gray-600);">${fmtInt(maxRow.couverts || 0)} couverts</div>
+      </div>
+      <div style="padding:10px; background:var(--red-bg); border-radius:8px;">
+        <div style="font-size:0.72rem; color:#991b1b; font-weight:700; margin-bottom:4px;">📉 PLUS FAIBLE</div>
+        <div style="font-size:1rem; font-weight:700;">${new Date(minRow.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+        <div style="font-size:1.2rem; font-weight:800; color:#991b1b;">${fmtEurFull(minRow.ca_ttc || 0, 0)}</div>
+        <div style="font-size:0.72rem; color:var(--gray-600);">${fmtInt(minRow.couverts || 0)} couverts</div>
+      </div>
+    </div>
+  `;
+}
+
+// ============ UTILITIES ============
+function emptyState(msg = 'Aucune donnée') {
+  return `<div class="empty-state"><div class="icon">📭</div>${msg}</div>`;
+}
+
+function showLoading(on) {
+  document.getElementById('loading').classList.toggle('active', on);
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type || ''} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+  </script>
+
+<!-- Header patch + inactivity (aligned with other modules) -->
+<script>
+(function() {
+  window.__goBack = function() { window.location.href = '../'; };
+  window.__doLogout = function() { try { sessionStorage.clear(); } catch(e){} window.location.href = '../'; };
+
+  var inactivityTimer = null;
+  var INACTIVITY_MS = 2 * 60 * 1000;
+  function resetInactivity() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(window.__doLogout, INACTIVITY_MS);
+  }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(function(evt){
+    document.addEventListener(evt, resetInactivity, { passive: true, capture: true });
+  });
+
+  function patchHeader() {
+    var right = document.getElementById('header-right');
+    if (!right) { resetInactivity(); return; }
+    if (!right.querySelector('.btn-back')) {
+      var btnBack = document.createElement('a');
+      btnBack.className = 'btn-back';
+      btnBack.href = 'javascript:void(0)';
+      btnBack.textContent = '← Portail';
+      btnBack.onclick = window.__goBack;
+      right.appendChild(btnBack);
+    }
+    if (!right.querySelector('.btn-logout')) {
+      var btnLogout = document.createElement('button');
+      btnLogout.className = 'btn-logout';
+      btnLogout.type = 'button';
+      btnLogout.textContent = 'Déconnexion';
+      btnLogout.onclick = window.__doLogout;
+      right.appendChild(btnLogout);
+    }
+    resetInactivity();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patchHeader);
+  else patchHeader();
+})();
+</script>
+
+</body>
+</html>
