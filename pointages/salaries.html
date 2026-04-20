@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Salariés - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👥</text></svg>">
+  <style>
+    :root {
+      --accent: #4f46e5; --accent-light: #eef2ff; --accent-dark: #4338ca;
+      --green: #22c55e; --green-bg: #f0fdf4;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --orange: #f97316; --orange-bg: #fff7ed;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 8px; --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* HEADER */
+    .header {
+      background: white; border-bottom: 2px solid var(--accent);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back {
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none;
+    }
+
+    /* CONTENT */
+    .content { flex: 1; overflow-y: auto; padding: 16px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+    /* TOOLBAR */
+    .toolbar {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 12px; background: white; padding: 10px; border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .toolbar input, .toolbar select {
+      padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      font-size: 0.88rem; background: white;
+    }
+    .toolbar input { flex: 1; min-width: 180px; }
+    .btn-primary {
+      padding: 8px 14px; border: none; border-radius: var(--radius-sm);
+      background: var(--accent); color: white; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+    }
+    .btn-primary:active { background: var(--accent-dark); }
+    .btn-secondary {
+      padding: 8px 14px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      background: white; color: var(--gray-600); font-size: 0.85rem; cursor: pointer; font-weight: 500;
+    }
+    .btn-danger {
+      padding: 8px 14px; border: none; border-radius: var(--radius-sm);
+      background: var(--red); color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-success {
+      padding: 8px 14px; border: none; border-radius: var(--radius-sm);
+      background: var(--green); color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+
+    /* LIST */
+    .list-container { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .list-header {
+      display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 120px;
+      gap: 10px; padding: 10px 14px; background: var(--gray-100);
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-500); font-weight: 600;
+    }
+    .list-row {
+      display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 120px;
+      gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--gray-100);
+      align-items: center; font-size: 0.9rem; cursor: pointer;
+    }
+    .list-row:hover { background: var(--gray-50); }
+    .list-row.inactif { opacity: 0.55; }
+    .salarie-name { font-weight: 600; color: var(--gray-800); }
+    .salarie-sub { font-size: 0.75rem; color: var(--gray-500); margin-top: 2px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-cdi { background: var(--green-bg); color: var(--green); }
+    .badge-cdd { background: var(--orange-bg); color: var(--orange); }
+    .badge-extra { background: #f3e8ff; color: #7c3aed; }
+    .badge-partiel { background: #dbeafe; color: #2563eb; }
+    .badge-user-ok { background: var(--green-bg); color: var(--green); }
+    .badge-user-ko { background: var(--gray-100); color: var(--gray-500); }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-400); }
+    .empty-state-icon { font-size: 3rem; margin-bottom: 12px; }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: white; border-radius: var(--radius); width: 100%; max-width: 800px;
+      max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+    }
+    .modal-header {
+      padding: 14px 18px; border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-title { font-size: 1.05rem; font-weight: 700; color: var(--gray-800); }
+    .modal-close {
+      width: 30px; height: 30px; border: none; border-radius: 50%;
+      background: var(--gray-100); cursor: pointer; font-size: 1.1rem;
+    }
+    .modal-tabs {
+      display: flex; border-bottom: 1px solid var(--gray-200); padding: 0 12px;
+      overflow-x: auto;
+    }
+    .modal-tab {
+      padding: 10px 14px; border: none; background: none;
+      font-size: 0.85rem; color: var(--gray-500); cursor: pointer;
+      border-bottom: 2px solid transparent; font-weight: 500; white-space: nowrap;
+    }
+    .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .modal-body { flex: 1; overflow-y: auto; padding: 18px; }
+    .modal-footer {
+      padding: 12px 18px; border-top: 1px solid var(--gray-200);
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    }
+
+    .form-section { display: none; }
+    .form-section.active { display: block; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.78rem; color: var(--gray-600); font-weight: 600; margin-bottom: 4px; }
+    .form-group label .required { color: var(--red); }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.9rem; background: white;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79,70,229,0.15);
+    }
+    .form-textarea { resize: vertical; min-height: 60px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .form-checkbox { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: var(--gray-700); }
+    .form-hint { font-size: 0.72rem; color: var(--gray-500); margin-top: 3px; }
+
+    .user-section {
+      background: var(--accent-light); border: 1px solid var(--accent);
+      border-radius: var(--radius); padding: 14px; margin-top: 10px;
+    }
+    .user-section h3 { font-size: 0.95rem; color: var(--accent-dark); margin-bottom: 8px; }
+
+    /* LOADING & TOAST */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.8);
+      display: none; align-items: center; justify-content: center; z-index: 2000;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid var(--gray-200);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 18px; border-radius: var(--radius); color: white;
+      font-size: 0.9rem; font-weight: 500; z-index: 3000;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    @media (max-width: 768px) {
+      .list-header { display: none; }
+      .list-row {
+        grid-template-columns: 1fr; padding: 12px;
+      }
+      .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./" class="btn-back">← Retour</a>
+      <h1>👥 Salariés</h1>
+    </div>
+    <div class="header-right">
+      <span id="user-info"></span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="🔍 Rechercher un salarié..." oninput="renderList()">
+      <select id="filter-etab" onchange="renderList()">
+        <option value="">Tous les établissements</option>
+        <option value="freddy">Freddy</option>
+        <option value="liesel">Liesel</option>
+      </select>
+      <select id="filter-contrat" onchange="renderList()">
+        <option value="">Tous les contrats</option>
+        <option value="cdi_plein">CDI plein</option>
+        <option value="cdi_partiel">CDI partiel</option>
+        <option value="cdd">CDD</option>
+        <option value="extra">Extra</option>
+      </select>
+      <select id="filter-actif" onchange="renderList()">
+        <option value="actif">Actifs uniquement</option>
+        <option value="tous">Tous (actifs + inactifs)</option>
+        <option value="inactif">Inactifs uniquement</option>
+      </select>
+      <button class="btn-primary" onclick="openModal()">+ Nouveau salarié</button>
+    </div>
+
+    <div class="list-container">
+      <div class="list-header">
+        <div>Salarié</div>
+        <div>Poste / Établissement</div>
+        <div>Contrat</div>
+        <div>Embauche</div>
+        <div>User</div>
+        <div>Actions</div>
+      </div>
+      <div id="list-body">
+        <div class="empty-state">
+          <div class="empty-state-icon">⏳</div>
+          <div>Chargement...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL FORMULAIRE -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Nouveau salarié</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" onclick="switchTab('identite')">Identité</button>
+        <button class="modal-tab" onclick="switchTab('coord')">Coordonnées</button>
+        <button class="modal-tab" onclick="switchTab('contrat')">Contrat</button>
+        <button class="modal-tab" onclick="switchTab('affect')">Affectation</button>
+        <button class="modal-tab" onclick="switchTab('admin')">Administratif</button>
+      </div>
+      <div class="modal-body">
+        <!-- SECTION IDENTITÉ -->
+        <div class="form-section active" id="section-identite">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prénom <span class="required">*</span></label>
+              <input type="text" class="form-input" id="f-prenom" required>
+            </div>
+            <div class="form-group">
+              <label>Nom <span class="required">*</span></label>
+              <input type="text" class="form-input" id="f-nom" required>
+            </div>
+          </div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Initiales</label>
+              <input type="text" class="form-input" id="f-initiales" maxlength="4" placeholder="ex: JD">
+              <div class="form-hint">Auto-généré si vide</div>
+            </div>
+            <div class="form-group">
+              <label>Date de naissance</label>
+              <input type="date" class="form-input" id="f-naissance">
+            </div>
+            <div class="form-group">
+              <label>Sexe</label>
+              <select class="form-select" id="f-sexe">
+                <option value="">—</option>
+                <option value="H">Homme</option>
+                <option value="F">Femme</option>
+                <option value="X">Autre</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nationalité</label>
+              <input type="text" class="form-input" id="f-nationalite" placeholder="Suisse, Française...">
+            </div>
+            <div class="form-group">
+              <label>N° AVS</label>
+              <input type="text" class="form-input" id="f-avs" placeholder="756.XXXX.XXXX.XX">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type de permis</label>
+              <select class="form-select" id="f-permis-type">
+                <option value="">— (CH)</option>
+                <option value="B">B — Séjour</option>
+                <option value="C">C — Établissement</option>
+                <option value="G">G — Frontalier</option>
+                <option value="L">L — Courte durée</option>
+                <option value="Ci">Ci — Conjoint diplomate</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Permis valable jusqu'au</label>
+              <input type="date" class="form-input" id="f-permis-valable">
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION COORDONNÉES -->
+        <div class="form-section" id="section-coord">
+          <div class="form-group">
+            <label>Adresse</label>
+            <input type="text" class="form-input" id="f-adresse">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>NPA</label>
+              <input type="text" class="form-input" id="f-npa" maxlength="4">
+            </div>
+            <div class="form-group">
+              <label>Localité</label>
+              <input type="text" class="form-input" id="f-localite">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Téléphone</label>
+              <input type="tel" class="form-input" id="f-telephone">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" class="form-input" id="f-email">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact urgence — Nom</label>
+              <input type="text" class="form-input" id="f-urgence-nom">
+            </div>
+            <div class="form-group">
+              <label>Contact urgence — Tél</label>
+              <input type="tel" class="form-input" id="f-urgence-tel">
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION CONTRAT -->
+        <div class="form-section" id="section-contrat">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type de contrat <span class="required">*</span></label>
+              <select class="form-select" id="f-type-contrat" onchange="onContratChange()">
+                <option value="cdi_plein">CDI temps plein</option>
+                <option value="cdi_partiel">CDI temps partiel</option>
+                <option value="cdd">CDD / saisonnier</option>
+                <option value="extra">Extra / auxiliaire</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Heures contractuelles / semaine</label>
+              <input type="number" class="form-input" id="f-heures-sem" step="0.5" value="42">
+              <div class="form-hint">42 = plein (L-GAV). 0 pour extras.</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date d'embauche <span class="required">*</span></label>
+              <input type="date" class="form-input" id="f-embauche" required>
+            </div>
+            <div class="form-group">
+              <label>Date fin de contrat</label>
+              <input type="date" class="form-input" id="f-fin-contrat">
+              <div class="form-hint">Laisser vide pour CDI</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Taux horaire brut (CHF/h)</label>
+              <input type="number" class="form-input" id="f-taux-horaire" step="0.05" placeholder="ex: 25.50">
+            </div>
+            <div class="form-group">
+              <label>Salaire mensuel brut (CHF)</label>
+              <input type="number" class="form-input" id="f-salaire-mensuel" step="1" placeholder="ex: 4500">
+              <div class="form-hint">Alternative au taux horaire</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-checkbox">
+                <input type="checkbox" id="f-13eme"> 13ème mois
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Vacances (jours/an)</label>
+              <input type="number" class="form-input" id="f-vacances" value="25">
+              <div class="form-hint">Min L-GAV = 25 jours</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION AFFECTATION -->
+        <div class="form-section" id="section-affect">
+          <div class="form-group">
+            <label>Établissement principal <span class="required">*</span></label>
+            <select class="form-select" id="f-etab-principal">
+              <option value="freddy">Freddy</option>
+              <option value="liesel">Liesel</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Établissements autorisés (polyvalence)</label>
+            <div class="form-row">
+              <label class="form-checkbox">
+                <input type="checkbox" id="f-etab-freddy" value="freddy"> Freddy
+              </label>
+              <label class="form-checkbox">
+                <input type="checkbox" id="f-etab-liesel" value="liesel"> Liesel
+              </label>
+            </div>
+            <div class="form-hint">Cocher les établissements où ce salarié peut pointer</div>
+          </div>
+          <div class="form-group">
+            <label>Poste principal</label>
+            <select class="form-select" id="f-poste-principal">
+              <option value="">— Sélectionner —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Postes secondaires (polyvalence)</label>
+            <div id="f-postes-sec" style="display:flex; flex-wrap:wrap; gap:8px; padding:6px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); min-height:40px;"></div>
+            <div class="form-hint">Cocher les autres postes que ce salarié peut tenir</div>
+          </div>
+        </div>
+
+        <!-- SECTION ADMINISTRATIF -->
+        <div class="form-section" id="section-admin">
+          <div class="form-row">
+            <div class="form-group">
+              <label>IBAN</label>
+              <input type="text" class="form-input" id="f-iban" placeholder="CH00 0000 0000 0000 0000 0">
+            </div>
+            <div class="form-group">
+              <label>Banque</label>
+              <input type="text" class="form-input" id="f-banque">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Caisse LPP / prévoyance</label>
+              <input type="text" class="form-input" id="f-lpp">
+            </div>
+            <div class="form-group">
+              <label>Caisse maladie</label>
+              <input type="text" class="form-input" id="f-maladie">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>N° matricule interne</label>
+              <input type="text" class="form-input" id="f-matricule">
+            </div>
+            <div class="form-group">
+              <label>Statut</label>
+              <select class="form-select" id="f-actif">
+                <option value="true">Actif</option>
+                <option value="false">Inactif</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notes RH internes</label>
+            <textarea class="form-textarea" id="f-notes"></textarea>
+          </div>
+
+          <!-- SECTION USER LIÉ -->
+          <div class="user-section" id="user-section">
+            <h3>🔐 User PlanB-Tools associé</h3>
+            <div id="user-status">
+              <p style="color: var(--gray-600); font-size: 0.88rem;">
+                Aucun user PlanB-Tools n'est encore lié à cette fiche.
+              </p>
+              <button type="button" class="btn-primary" style="margin-top: 8px;" onclick="genererUser()">
+                ⚡ Créer le user associé
+              </button>
+              <p class="form-hint" style="margin-top: 6px;">
+                Un user sera créé avec les infos saisies + un PIN généré automatiquement.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger" id="btn-delete" style="display:none;" onclick="deleteSalarie()">Supprimer</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button type="button" class="btn-secondary" onclick="closeModal()">Annuler</button>
+          <button type="button" class="btn-primary" onclick="saveSalarie()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+// ============= CONFIG =============
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============= STATE =============
+let currentUser = null;
+let currentEtablissement = null;
+let salaries = [];
+let postes = [];
+let editingId = null;
+
+// ============= INIT =============
+document.addEventListener('DOMContentLoaded', () => {
+  checkPortalSession();
+});
+
+function checkPortalSession() {
+  const userData = sessionStorage.getItem('planb_user');
+  const etab = sessionStorage.getItem('planb_etablissement');
+  if (!userData || !etab) {
+    window.location.href = '../index.html';
+    return;
+  }
+  currentUser = JSON.parse(userData);
+  currentEtablissement = etab;
+  document.getElementById('user-info').textContent = `${currentUser.initiales || currentUser.nom} • ${currentEtablissement}`;
+  document.getElementById('filter-etab').value = currentEtablissement;
+  loadData();
+}
+
+// ============= LOAD =============
+async function loadData() {
+  showLoading(true);
+  try {
+    const [{data: sal, error: e1}, {data: pos, error: e2}] = await Promise.all([
+      sb.from('pointage_salaries').select('*').order('nom'),
+      sb.from('pointage_postes').select('*').eq('actif', true).order('ordre')
+    ]);
+    if (e1) throw e1;
+    if (e2) throw e2;
+    salaries = sal || [];
+    postes = pos || [];
+    populatePostesSelect();
+    renderList();
+  } catch (e) {
+    console.error(e);
+    toast('Erreur chargement : ' + e.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function populatePostesSelect() {
+  const sel = document.getElementById('f-poste-principal');
+  sel.innerHTML = '<option value="">— Sélectionner —</option>';
+  postes.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.nom} (${p.equipe})`;
+    sel.appendChild(opt);
+  });
+
+  const sec = document.getElementById('f-postes-sec');
+  sec.innerHTML = '';
+  postes.forEach(p => {
+    const lbl = document.createElement('label');
+    lbl.className = 'form-checkbox';
+    lbl.style.fontSize = '0.82rem';
+    lbl.innerHTML = `<input type="checkbox" value="${p.id}"> ${p.nom}`;
+    sec.appendChild(lbl);
+  });
+}
+
+// ============= LIST =============
+function renderList() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const fEtab = document.getElementById('filter-etab').value;
+  const fContrat = document.getElementById('filter-contrat').value;
+  const fActif = document.getElementById('filter-actif').value;
+
+  let filtered = salaries;
+  if (search) {
+    filtered = filtered.filter(s =>
+      (s.nom + ' ' + s.prenom).toLowerCase().includes(search) ||
+      (s.initiales || '').toLowerCase().includes(search)
+    );
+  }
+  if (fEtab) filtered = filtered.filter(s => s.etablissement_principal === fEtab);
+  if (fContrat) filtered = filtered.filter(s => s.type_contrat === fContrat);
+  if (fActif === 'actif') filtered = filtered.filter(s => s.actif);
+  else if (fActif === 'inactif') filtered = filtered.filter(s => !s.actif);
+
+  const body = document.getElementById('list-body');
+  if (filtered.length === 0) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">👤</div>
+        <div>Aucun salarié ne correspond aux filtres.</div>
+        <div style="margin-top:12px;"><button class="btn-primary" onclick="openModal()">+ Créer le premier salarié</button></div>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map(s => {
+    const poste = postes.find(p => p.id === s.poste_principal_id);
+    const badgeContrat = {
+      cdi_plein: 'badge-cdi', cdi_partiel: 'badge-partiel',
+      cdd: 'badge-cdd', extra: 'badge-extra'
+    }[s.type_contrat] || '';
+    const labelContrat = {
+      cdi_plein: 'CDI plein', cdi_partiel: 'CDI partiel',
+      cdd: 'CDD', extra: 'Extra'
+    }[s.type_contrat] || s.type_contrat;
+    const embauche = s.date_embauche ? new Date(s.date_embauche).toLocaleDateString('fr-FR') : '—';
+    const userBadge = s.user_id
+      ? '<span class="badge badge-user-ok">✓ Lié</span>'
+      : '<span class="badge badge-user-ko">Aucun</span>';
+    return `
+      <div class="list-row ${s.actif ? '' : 'inactif'}" onclick="openModal('${s.id}')">
+        <div>
+          <div class="salarie-name">${escapeHtml(s.prenom)} ${escapeHtml(s.nom)}</div>
+          <div class="salarie-sub">${escapeHtml(s.initiales || '')}${s.email ? ' • ' + escapeHtml(s.email) : ''}</div>
+        </div>
+        <div>
+          ${poste ? escapeHtml(poste.nom) : '<em style="color:#999;">non défini</em>'}
+          <div class="salarie-sub">${escapeHtml(s.etablissement_principal || '')}</div>
+        </div>
+        <div><span class="badge ${badgeContrat}">${labelContrat}</span></div>
+        <div style="font-size:0.85rem; color:var(--gray-600);">${embauche}</div>
+        <div>${userBadge}</div>
+        <div>
+          <button class="btn-secondary" onclick="event.stopPropagation(); openModal('${s.id}')">Modifier</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============= MODAL =============
+function openModal(id) {
+  editingId = id || null;
+  document.getElementById('modal-title').textContent = id ? 'Modifier le salarié' : 'Nouveau salarié';
+  document.getElementById('btn-delete').style.display = id ? 'block' : 'none';
+  switchTab('identite');
+
+  if (id) {
+    const s = salaries.find(x => x.id === id);
+    fillForm(s);
+  } else {
+    resetForm();
+  }
+  document.getElementById('modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  editingId = null;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+  event?.target?.classList?.add('active') ||
+    document.querySelector(`.modal-tab[onclick*="${tab}"]`).classList.add('active');
+  document.getElementById('section-' + tab).classList.add('active');
+}
+
+function resetForm() {
+  ['f-prenom','f-nom','f-initiales','f-naissance','f-nationalite','f-avs','f-permis-valable',
+   'f-adresse','f-npa','f-localite','f-telephone','f-email','f-urgence-nom','f-urgence-tel',
+   'f-fin-contrat','f-taux-horaire','f-salaire-mensuel','f-iban','f-banque','f-lpp','f-maladie',
+   'f-matricule','f-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-sexe').value = '';
+  document.getElementById('f-permis-type').value = '';
+  document.getElementById('f-type-contrat').value = 'cdi_plein';
+  document.getElementById('f-heures-sem').value = 42;
+  document.getElementById('f-embauche').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-vacances').value = 25;
+  document.getElementById('f-13eme').checked = false;
+  document.getElementById('f-etab-principal').value = currentEtablissement;
+  document.getElementById('f-etab-freddy').checked = currentEtablissement === 'freddy';
+  document.getElementById('f-etab-liesel').checked = currentEtablissement === 'liesel';
+  document.getElementById('f-poste-principal').value = '';
+  document.querySelectorAll('#f-postes-sec input[type="checkbox"]').forEach(c => c.checked = false);
+  document.getElementById('f-actif').value = 'true';
+  renderUserSection(null);
+}
+
+function fillForm(s) {
+  document.getElementById('f-prenom').value = s.prenom || '';
+  document.getElementById('f-nom').value = s.nom || '';
+  document.getElementById('f-initiales').value = s.initiales || '';
+  document.getElementById('f-naissance').value = s.date_naissance || '';
+  document.getElementById('f-sexe').value = s.sexe || '';
+  document.getElementById('f-nationalite').value = s.nationalite || '';
+  document.getElementById('f-avs').value = s.numero_avs || '';
+  document.getElementById('f-permis-type').value = s.permis_type || '';
+  document.getElementById('f-permis-valable').value = s.permis_valable_jusquau || '';
+  document.getElementById('f-adresse').value = s.adresse || '';
+  document.getElementById('f-npa').value = s.npa || '';
+  document.getElementById('f-localite').value = s.localite || '';
+  document.getElementById('f-telephone').value = s.telephone || '';
+  document.getElementById('f-email').value = s.email || '';
+  document.getElementById('f-urgence-nom').value = s.contact_urgence_nom || '';
+  document.getElementById('f-urgence-tel').value = s.contact_urgence_tel || '';
+  document.getElementById('f-type-contrat').value = s.type_contrat || 'cdi_plein';
+  document.getElementById('f-heures-sem').value = s.heures_contractuelles_semaine || 42;
+  document.getElementById('f-embauche').value = s.date_embauche || '';
+  document.getElementById('f-fin-contrat').value = s.date_fin_contrat || '';
+  document.getElementById('f-taux-horaire').value = s.taux_horaire_brut || '';
+  document.getElementById('f-salaire-mensuel').value = s.salaire_mensuel_brut || '';
+  document.getElementById('f-13eme').checked = !!s.treizieme_mois;
+  document.getElementById('f-vacances').value = s.vacances_jours_an || 25;
+  document.getElementById('f-etab-principal').value = s.etablissement_principal || 'freddy';
+  const autorises = s.etablissements_autorises || [];
+  document.getElementById('f-etab-freddy').checked = autorises.includes('freddy');
+  document.getElementById('f-etab-liesel').checked = autorises.includes('liesel');
+  document.getElementById('f-poste-principal').value = s.poste_principal_id || '';
+  const sec = s.postes_secondaires || [];
+  document.querySelectorAll('#f-postes-sec input[type="checkbox"]').forEach(c => c.checked = sec.includes(c.value));
+  document.getElementById('f-iban').value = s.iban || '';
+  document.getElementById('f-banque').value = s.banque || '';
+  document.getElementById('f-lpp').value = s.caisse_lpp || '';
+  document.getElementById('f-maladie').value = s.caisse_maladie || '';
+  document.getElementById('f-matricule').value = s.numero_interne || '';
+  document.getElementById('f-notes').value = s.notes || '';
+  document.getElementById('f-actif').value = s.actif ? 'true' : 'false';
+  renderUserSection(s);
+}
+
+function renderUserSection(s) {
+  const statusDiv = document.getElementById('user-status');
+  if (s && s.user_id) {
+    statusDiv.innerHTML = `
+      <p style="color: var(--green); font-size: 0.88rem; font-weight: 600;">
+        ✓ User PlanB-Tools lié (ID : ${s.user_id.substring(0,8)}...)
+      </p>
+      <p class="form-hint" style="margin-top: 4px;">
+        Pour modifier le PIN ou le rôle, passer par l'écran Admin → Utilisateurs.
+      </p>`;
+  } else if (s) {
+    statusDiv.innerHTML = `
+      <p style="color: var(--gray-600); font-size: 0.88rem;">
+        Aucun user PlanB-Tools n'est encore lié à cette fiche.
+      </p>
+      <button type="button" class="btn-primary" style="margin-top: 8px;" onclick="genererUser()">
+        ⚡ Créer le user associé
+      </button>
+      <p class="form-hint" style="margin-top: 6px;">
+        Un user sera créé avec les infos saisies + un PIN généré automatiquement.
+      </p>`;
+  } else {
+    statusDiv.innerHTML = `
+      <p style="color: var(--gray-500); font-size: 0.88rem; font-style: italic;">
+        Enregistrer d'abord la fiche salarié pour pouvoir créer le user associé.
+      </p>`;
+  }
+}
+
+function onContratChange() {
+  const type = document.getElementById('f-type-contrat').value;
+  const heures = document.getElementById('f-heures-sem');
+  if (type === 'cdi_plein') heures.value = 42;
+  else if (type === 'extra') heures.value = 0;
+}
+
+// ============= SAVE =============
+async function saveSalarie() {
+  const prenom = document.getElementById('f-prenom').value.trim();
+  const nom = document.getElementById('f-nom').value.trim();
+  if (!prenom || !nom) { toast('Prénom et nom obligatoires', 'error'); return; }
+  const embauche = document.getElementById('f-embauche').value;
+  if (!embauche) { toast('Date d\'embauche obligatoire', 'error'); return; }
+
+  const initiales = document.getElementById('f-initiales').value.trim() ||
+    (prenom[0] + nom[0]).toUpperCase();
+
+  const etabsAutorises = [];
+  if (document.getElementById('f-etab-freddy').checked) etabsAutorises.push('freddy');
+  if (document.getElementById('f-etab-liesel').checked) etabsAutorises.push('liesel');
+
+  const postesSec = [];
+  document.querySelectorAll('#f-postes-sec input[type="checkbox"]:checked').forEach(c => postesSec.push(c.value));
+
+  const payload = {
+    prenom, nom, initiales,
+    date_naissance: document.getElementById('f-naissance').value || null,
+    sexe: document.getElementById('f-sexe').value || null,
+    nationalite: document.getElementById('f-nationalite').value.trim() || null,
+    numero_avs: document.getElementById('f-avs').value.trim() || null,
+    permis_type: document.getElementById('f-permis-type').value || null,
+    permis_valable_jusquau: document.getElementById('f-permis-valable').value || null,
+    adresse: document.getElementById('f-adresse').value.trim() || null,
+    npa: document.getElementById('f-npa').value.trim() || null,
+    localite: document.getElementById('f-localite').value.trim() || null,
+    telephone: document.getElementById('f-telephone').value.trim() || null,
+    email: document.getElementById('f-email').value.trim() || null,
+    contact_urgence_nom: document.getElementById('f-urgence-nom').value.trim() || null,
+    contact_urgence_tel: document.getElementById('f-urgence-tel').value.trim() || null,
+    type_contrat: document.getElementById('f-type-contrat').value,
+    heures_contractuelles_semaine: parseFloat(document.getElementById('f-heures-sem').value) || 0,
+    date_embauche: embauche,
+    date_fin_contrat: document.getElementById('f-fin-contrat').value || null,
+    taux_horaire_brut: parseFloat(document.getElementById('f-taux-horaire').value) || null,
+    salaire_mensuel_brut: parseFloat(document.getElementById('f-salaire-mensuel').value) || null,
+    treizieme_mois: document.getElementById('f-13eme').checked,
+    vacances_jours_an: parseInt(document.getElementById('f-vacances').value) || 25,
+    etablissement_principal: document.getElementById('f-etab-principal').value,
+    etablissements_autorises: etabsAutorises,
+    poste_principal_id: document.getElementById('f-poste-principal').value || null,
+    postes_secondaires: postesSec.length ? postesSec : null,
+    iban: document.getElementById('f-iban').value.trim() || null,
+    banque: document.getElementById('f-banque').value.trim() || null,
+    caisse_lpp: document.getElementById('f-lpp').value.trim() || null,
+    caisse_maladie: document.getElementById('f-maladie').value.trim() || null,
+    numero_interne: document.getElementById('f-matricule').value.trim() || null,
+    notes: document.getElementById('f-notes').value.trim() || null,
+    actif: document.getElementById('f-actif').value === 'true',
+    cree_par_id: currentUser.id,
+    cree_par_nom: currentUser.nom
+  };
+
+  showLoading(true);
+  try {
+    let res;
+    if (editingId) {
+      res = await sb.from('pointage_salaries').update(payload).eq('id', editingId).select().single();
+    } else {
+      res = await sb.from('pointage_salaries').insert(payload).select().single();
+    }
+    if (res.error) throw res.error;
+    toast(editingId ? 'Salarié modifié' : 'Salarié créé', 'success');
+    editingId = res.data.id;
+    await loadData();
+    // Re-ouvrir la modale sur le salarié créé/modifié pour permettre la génération user
+    const s = salaries.find(x => x.id === editingId);
+    if (s) {
+      document.getElementById('modal-title').textContent = 'Modifier le salarié';
+      document.getElementById('btn-delete').style.display = 'block';
+      renderUserSection(s);
+    } else {
+      closeModal();
+    }
+  } catch (e) {
+    console.error(e);
+    toast('Erreur : ' + e.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function deleteSalarie() {
+  if (!editingId) return;
+  if (!confirm('Supprimer ce salarié ? (préférable de le passer inactif pour conserver l\'historique)')) return;
+  showLoading(true);
+  try {
+    const {error} = await sb.from('pointage_salaries').delete().eq('id', editingId);
+    if (error) throw error;
+    toast('Salarié supprimé', 'success');
+    closeModal();
+    await loadData();
+  } catch (e) {
+    toast('Erreur : ' + (e.message || 'impossible de supprimer — le salarié a peut-être des pointages liés.'), 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ============= GÉNÉRATION USER =============
+async function genererUser() {
+  if (!editingId) { toast('Enregistrer d\'abord la fiche', 'error'); return; }
+  const s = salaries.find(x => x.id === editingId);
+  if (!s) return;
+  if (s.user_id) { toast('Un user est déjà lié', 'error'); return; }
+
+  // Générer un PIN aléatoire à 4 chiffres
+  const pin = String(Math.floor(1000 + Math.random() * 9000));
+
+  if (!confirm(`Créer un user PlanB-Tools pour ${s.prenom} ${s.nom} ?\n\nPIN généré : ${pin}\n\n(Note ce PIN, il sera transmis au salarié)`)) return;
+
+  showLoading(true);
+  try {
+    // Créer le user dans la table users
+    const userPayload = {
+      nom: `${s.prenom} ${s.nom}`,
+      initiales: s.initiales,
+      pin: pin,
+      role: 'collaborateur',  // Par défaut
+      etablissement: s.etablissement_principal,
+      etablissements_autorises: s.etablissements_autorises,
+      email: s.email,
+      actif: true
+    };
+
+    const {data: newUser, error: e1} = await sb.from('users').insert(userPayload).select().single();
+    if (e1) throw e1;
+
+    // Lier le user à la fiche salarié
+    const {error: e2} = await sb.from('pointage_salaries')
+      .update({ user_id: newUser.id })
+      .eq('id', s.id);
+    if (e2) throw e2;
+
+    toast(`User créé ! PIN : ${pin}`, 'success');
+    alert(`✅ User PlanB-Tools créé avec succès\n\nNom : ${s.prenom} ${s.nom}\nInitiales : ${s.initiales}\nPIN : ${pin}\n\n⚠️ Note ce PIN et transmets-le au salarié. Il pourra le changer plus tard.`);
+    await loadData();
+    const sMaj = salaries.find(x => x.id === editingId);
+    renderUserSection(sMaj);
+  } catch (e) {
+    console.error(e);
+    toast('Erreur création user : ' + e.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ============= UTILS =============
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showLoading(v) {
+  document.getElementById('loading').classList.toggle('active', v);
+}
+
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+  </script>
+</body>
+</html>
