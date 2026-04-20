@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Pointages - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
+  <style>
+    :root {
+      --accent: #4f46e5; --accent-light: #eef2ff; --accent-dark: #4338ca;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563;
+      --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 12px; --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50); color: var(--gray-800);
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    .header {
+      background: white; border-bottom: 2px solid var(--accent);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
+    .header-right { font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back {
+      padding: 6px 12px; border-radius: 6px; border: 1px solid var(--gray-200);
+      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none;
+    }
+
+    .content {
+      flex: 1; padding: 24px 16px;
+      max-width: 1000px; width: 100%; margin: 0 auto;
+    }
+    .page-title {
+      font-size: 1.5rem; font-weight: 700; color: var(--gray-800); margin-bottom: 6px;
+    }
+    .page-subtitle {
+      font-size: 0.95rem; color: var(--gray-500); margin-bottom: 24px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .module-card {
+      background: white; border-radius: var(--radius); padding: 22px 18px;
+      box-shadow: var(--shadow); text-decoration: none; color: inherit;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      border: 2px solid transparent;
+    }
+    .module-card:not(.disabled):hover {
+      transform: translateY(-2px); box-shadow: var(--shadow-md);
+      border-color: var(--accent-light);
+    }
+    .module-card:not(.disabled):active { transform: translateY(0); }
+    .module-card.disabled {
+      opacity: 0.55; cursor: not-allowed;
+      background: var(--gray-50);
+    }
+    .module-icon { font-size: 3rem; margin-bottom: 10px; }
+    .module-name { font-size: 1.05rem; font-weight: 700; color: var(--gray-800); margin-bottom: 4px; }
+    .module-desc { font-size: 0.82rem; color: var(--gray-500); line-height: 1.4; }
+    .module-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 0.7rem; font-weight: 600;
+      margin-top: 8px;
+      background: var(--accent-light); color: var(--accent-dark);
+    }
+    .module-badge.soon { background: var(--gray-100); color: var(--gray-500); }
+
+    .info-banner {
+      background: var(--accent-light); border-left: 3px solid var(--accent);
+      padding: 12px 14px; border-radius: var(--radius-sm);
+      font-size: 0.88rem; color: var(--accent-dark);
+      margin-bottom: 20px; line-height: 1.5;
+    }
+    .info-banner strong { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="../index.html" class="btn-back">← Portail</a>
+      <h1>⏰ Pointages</h1>
+    </div>
+    <div class="header-right">
+      <span id="user-info"></span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="page-title">Module Pointages</div>
+    <div class="page-subtitle">Gestion du temps de travail, plannings et congés — remplacement de Combo</div>
+
+    <div class="info-banner">
+      <strong>🚧 Module en développement actif.</strong>
+      Phase 1 en cours (salariés + pointage tablette). Bascule production prévue <strong>01/07/2026</strong>.
+    </div>
+
+    <div class="cards-grid">
+      <a href="./salaries.html" class="module-card">
+        <div class="module-icon">👥</div>
+        <div class="module-name">Salariés</div>
+        <div class="module-desc">Fiches RH, contrats, affectations, génération des users</div>
+        <span class="module-badge">✓ Disponible</span>
+      </a>
+
+      <div class="module-card disabled" title="Bientôt disponible">
+        <div class="module-icon">📱</div>
+        <div class="module-name">Pointage tablette</div>
+        <div class="module-desc">Écran de badgeage PIN + entrée/sortie/pauses pour la tablette du resto</div>
+        <span class="module-badge soon">En développement</span>
+      </div>
+
+      <div class="module-card disabled" title="Bientôt disponible">
+        <div class="module-icon">📊</div>
+        <div class="module-name">Consultation</div>
+        <div class="module-desc">Voir les pointages du jour/semaine, corrections, validation manager</div>
+        <span class="module-badge soon">Bientôt</span>
+      </div>
+
+      <div class="module-card disabled" title="Phase 2">
+        <div class="module-icon">📅</div>
+        <div class="module-name">Plannings</div>
+        <div class="module-desc">Création des plannings hebdomadaires par équipe/poste</div>
+        <span class="module-badge soon">Phase 2</span>
+      </div>
+
+      <div class="module-card disabled" title="Phase 3">
+        <div class="module-icon">🏖️</div>
+        <div class="module-name">Congés & absences</div>
+        <div class="module-desc">Demandes, validations, soldes par salarié</div>
+        <span class="module-badge soon">Phase 3</span>
+      </div>
+
+      <div class="module-card disabled" title="Phase 4">
+        <div class="module-icon">📤</div>
+        <div class="module-name">Export paie</div>
+        <div class="module-desc">Récap mensuel L-GAV, heures sup, export fiduciaire</div>
+        <span class="module-badge soon">Phase 4</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Vérifier la session
+    const userData = sessionStorage.getItem('planb_user');
+    const etab = sessionStorage.getItem('planb_etablissement');
+    if (!userData || !etab) {
+      window.location.href = '../index.html';
+    } else {
+      const user = JSON.parse(userData);
+      document.getElementById('user-info').textContent = `${user.initiales || user.nom} • ${etab}`;
+    }
+  </script>
+</body>
+</html>
