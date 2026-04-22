@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Objectifs">
+  <meta name="theme-color" content="#f97316">
+  <title>Objectifs de Ventes - PlanB Tools</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+  <style>
+    :root {
+      --accent: #f97316; --accent-dark: #ea580c; --accent-light: #fff7ed;
+      --blue: #0ea5e9; --blue-light: #e0f2fe;
+      --green: #10b981; --green-bg: #ecfdf5;
+      --red: #ef4444; --red-bg: #fef2f2;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --radius: 10px; --radius-sm: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-800); min-height: 100vh; display: flex; flex-direction: column; -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top); }
+
+    .header { background: white; border-bottom: 2px solid var(--accent); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .btn-back, .btn-logout { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--gray-200); background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+
+    .toolbar { background: white; padding: 10px; border-bottom: 1px solid var(--gray-200); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; }
+    .etab-group, .nav-group { display: flex; gap: 4px; align-items: center; }
+    .etab-btn { padding: 6px 12px; border-radius: 16px; border: 1px solid var(--gray-200); background: white; font-size: 0.82rem; font-weight: 500; color: var(--gray-600); cursor: pointer; }
+    .etab-btn.active { background: var(--gray-800); color: white; border-color: var(--gray-800); }
+    .nav-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200); background: white; font-size: 0.9rem; cursor: pointer; }
+    .month-label { font-size: 1rem; font-weight: 700; min-width: 170px; text-align: center; color: var(--gray-800); }
+    .today-btn { font-size: 0.75rem; padding: 6px 10px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: white; color: var(--accent); cursor: pointer; font-weight: 600; }
+
+    .actions-bar { background: var(--accent-light); padding: 8px 12px; border-bottom: 1px solid var(--accent); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .btn-action { padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    .btn-action.secondary { background: white; color: var(--accent); }
+    .summary-stats { font-size: 0.78rem; color: var(--gray-700); }
+
+    .content { flex: 1; overflow-y: auto; padding: 10px; }
+    .card { background: white; border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); margin-bottom: 10px; overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { text-align: left; padding: 8px 6px; color: var(--gray-500); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--gray-200); }
+    th.num { text-align: right; }
+    th.center { text-align: center; }
+    td { padding: 8px 6px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr:hover { background: var(--gray-50); }
+
+    input.obj-input { width: 90px; padding: 5px 6px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.82rem; text-align: right; font-variant-numeric: tabular-nums; }
+    input.obj-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(249,115,22,0.15); }
+    input.obj-input.modified { border-color: var(--accent); background: var(--accent-light); }
+    input.comm-input { width: 100%; min-width: 150px; padding: 5px 6px; border: 1px solid var(--gray-200); border-radius: 4px; font-size: 0.75rem; }
+
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; }
+    .badge.auto { background: var(--blue-light); color: var(--blue); }
+    .badge.manuel { background: var(--accent-light); color: var(--accent-dark); }
+    .badge.none { background: var(--gray-100); color: var(--gray-500); }
+
+    .btn-small { padding: 4px 8px; border: 1px solid var(--gray-200); background: white; border-radius: 4px; font-size: 0.72rem; cursor: pointer; color: var(--gray-600); }
+    .btn-small:hover { background: var(--gray-50); }
+    .btn-save-row { padding: 4px 10px; background: var(--accent); color: white; border: none; border-radius: 4px; font-size: 0.72rem; cursor: pointer; font-weight: 600; }
+    .btn-save-row:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-reset { padding: 4px 8px; background: white; border: 1px solid var(--gray-300); color: var(--gray-500); border-radius: 4px; font-size: 0.72rem; cursor: pointer; }
+
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--gray-800); color: white; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; transition: transform .3s; z-index: 2000; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--red); }
+    .toast.success { background: var(--green); }
+
+    .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .loading-overlay.active { display: flex; }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--gray-200); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { padding: 32px 16px; text-align: center; color: var(--gray-400); font-size: 0.85rem; }
+
+    .legend-line { font-size: 0.72rem; color: var(--gray-500); text-align: center; padding: 6px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>🎯 Objectifs de Ventes</h1>
+    </div>
+    <div class="header-right" id="header-right">
+      <span id="user-info"></span>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="etab-group">
+      <button class="etab-btn active" data-etab="freddy" onclick="selectEtab('freddy')">🧑‍🍳 Freddy</button>
+      <button class="etab-btn" data-etab="liesel" onclick="selectEtab('liesel')">👩‍🍳 Liesel</button>
+    </div>
+    <div class="nav-group">
+      <button class="nav-btn" onclick="changeMonth(-1)" title="Mois précédent">◀</button>
+      <div class="month-label" id="month-label"></div>
+      <button class="nav-btn" onclick="changeMonth(1)" title="Mois suivant">▶</button>
+      <button class="today-btn" onclick="setThisMonth()">Ce mois</button>
+      <button class="today-btn" onclick="setNextMonth()" style="border-color:var(--blue); color:var(--blue);">Mois +1</button>
+    </div>
+  </div>
+
+  <div class="actions-bar">
+    <div class="summary-stats" id="summary-stats">Chargement…</div>
+    <div>
+      <button class="btn-action secondary" onclick="seedMonth()" title="Crée les objectifs manquants à partir de N-1 × multiplicateur">⚡ Générer les objectifs du mois</button>
+    </div>
+  </div>
+
+  <div class="legend-line">Saisissez un objectif pour le figer. Laissez vide pour laisser le calcul auto. <strong>Entrée</strong> ou <strong>Sauver</strong> pour valider.</div>
+
+  <div class="content">
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Jour</th>
+            <th>Date N</th>
+            <th>Date N-1 (calée)</th>
+            <th class="num">CA N-1</th>
+            <th class="num">Obj auto</th>
+            <th class="num">Obj effectif</th>
+            <th class="center">Source</th>
+            <th>Commentaire</th>
+            <th class="center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="obj-table-body">
+          <tr><td colspan="9" class="empty-state">Chargement des données…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Multiplicateurs d'objectif par établissement (mêmes valeurs que le dashboard)
+const OBJECTIFS = {
+  freddy: { multVsN1: 1.02, label: '+2%', newOpenDow: [], newOpenFactor: 0 },
+  liesel: { multVsN1: 1.05, label: '+5%', newOpenDow: [1, 2], newOpenFactor: 0.5 }
+};
+
+let currentUser = null;
+let currentEtab = 'freddy';
+let currentMonth = new Date();
+let allSales = [];      // ventes_journalieres
+let allObj = [];        // objectifs_ventes
+let pendingChanges = {}; // { 'YYYY-MM-DD': { obj: N, comm: '...' } }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const userData = sessionStorage.getItem('planb_user');
+  if (!userData) { window.location.href = '../'; return; }
+  currentUser = JSON.parse(userData);
+  document.getElementById('user-info').textContent = currentUser.initiales || currentUser.nom;
+  loadAll();
+});
+
+function selectEtab(etab) {
+  currentEtab = etab;
+  document.querySelectorAll('.etab-btn').forEach(b => b.classList.toggle('active', b.dataset.etab === etab));
+  render();
+}
+
+function setThisMonth() { currentMonth = new Date(); render(); }
+function setNextMonth() {
+  const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1);
+  currentMonth = d; render();
+}
+function changeMonth(delta) {
+  currentMonth.setMonth(currentMonth.getMonth() + delta);
+  currentMonth.setDate(1);
+  render();
+}
+
+// Calage par jour de semaine : le 1er du mois N est aligné avec le 1er même-DOW du mois N-1
+function alignedPrevYearDate(currentDate) {
+  const y = currentDate.getFullYear();
+  const m = currentDate.getMonth();
+  const firstCurrent = new Date(y, m, 1);
+  const firstPrev = new Date(y - 1, m, 1);
+  const dowCur = firstCurrent.getDay();
+  const dowPrev = firstPrev.getDay();
+  let offset = dowCur - dowPrev;
+  if (offset < 0) offset += 7;
+  const dayInMonth = currentDate.getDate();
+  return new Date(y - 1, m, 1 + offset + (dayInMonth - 1));
+}
+
+function computeAutoObj(etab, caN1, dowCur) {
+  const cfg = OBJECTIFS[etab];
+  if (!cfg) return caN1 * 1.02;
+  if (caN1 > 0) return caN1 * cfg.multVsN1;
+  if (cfg.newOpenDow.includes(dowCur) && cfg.newOpenFactor > 0) {
+    const yearN1 = String(currentMonth.getFullYear() - 1);
+    const etabN1 = allSales.filter(r => r.etablissement === etab && r.date.startsWith(yearN1) && (r.ca_ttc || 0) > 0);
+    if (etabN1.length > 0) {
+      const avg = etabN1.reduce((s, r) => s + (r.ca_ttc || 0), 0) / etabN1.length;
+      return avg * cfg.newOpenFactor * cfg.multVsN1;
+    }
+  }
+  return 0;
+}
+
+function dateStr(d) { return d.toISOString().split('T')[0]; }
+function fmtEur(n) { if (!n && n !== 0) return '—'; return n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'; }
+function fmtEur2(n) { if (!n && n !== 0) return ''; return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+async function loadAll() {
+  showLoading(true);
+  try {
+    const [salesRes, objRes] = await Promise.all([
+      sb.from('ventes_journalieres').select('*').order('date', { ascending: true }),
+      sb.from('objectifs_ventes').select('*').order('date', { ascending: true })
+    ]);
+    if (salesRes.error) throw salesRes.error;
+    if (objRes.error) throw objRes.error;
+    allSales = salesRes.data || [];
+    allObj = objRes.data || [];
+    render();
+  } catch (e) {
+    showToast('Erreur chargement : ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function render() {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  document.getElementById('month-label').textContent = currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+  const dowNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+  const rows = [];
+  let totalAuto = 0, totalEffectif = 0, totalN1 = 0, nbManuel = 0, nbAuto = 0;
+
+  for (let d = 1; d <= lastDay; d++) {
+    const cur = new Date(year, month, d);
+    const prev = alignedPrevYearDate(cur);
+    const curStr = dateStr(cur);
+    const prevStr = dateStr(prev);
+    const dowCur = cur.getDay();
+
+    // CA N-1 calé
+    const n1Row = allSales.find(r => r.etablissement === currentEtab && r.date === prevStr);
+    const caN1 = n1Row ? (n1Row.ca_ttc || 0) : 0;
+    const objAuto = computeAutoObj(currentEtab, caN1, dowCur);
+    const stored = allObj.find(o => o.etablissement === currentEtab && o.date === curStr);
+    const pending = pendingChanges[curStr];
+
+    const effectiveValue = pending && pending.obj !== undefined ? pending.obj : (stored ? stored.ca_ttc_objectif : objAuto);
+    const effectiveComm = pending && pending.comm !== undefined ? pending.comm : (stored ? stored.commentaire : '');
+    const source = stored ? stored.source : 'auto';
+
+    totalAuto += objAuto;
+    totalEffectif += effectiveValue;
+    totalN1 += caN1;
+    if (stored && stored.source === 'manuel') nbManuel++;
+    else if (stored) nbAuto++;
+
+    const hasChange = pending && (pending.obj !== undefined || pending.comm !== undefined);
+
+    rows.push(`<tr data-date="${curStr}">
+      <td><strong>${dowNames[dowCur]}</strong></td>
+      <td>${cur.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</td>
+      <td style="font-size:0.72rem; color:var(--gray-500);">${dowNames[prev.getDay()]} ${prev.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</td>
+      <td class="num" style="color:${caN1 > 0 ? 'var(--gray-600)' : 'var(--gray-300)'};">${caN1 > 0 ? fmtEur(caN1) : '—'}</td>
+      <td class="num" style="color:var(--blue);">${fmtEur(objAuto)}</td>
+      <td class="num">
+        <input type="number" class="obj-input ${hasChange && pending.obj !== undefined ? 'modified' : ''}" step="0.01" min="0"
+          value="${effectiveValue.toFixed(2)}"
+          oninput="markPending('${curStr}', 'obj', parseFloat(this.value) || 0)"
+          onkeydown="if (event.key === 'Enter') saveRow('${curStr}')">
+      </td>
+      <td class="center">
+        ${stored
+          ? `<span class="badge ${source}">${source}</span>`
+          : `<span class="badge none">—</span>`}
+      </td>
+      <td>
+        <input type="text" class="comm-input" placeholder="Commentaire…"
+          value="${(effectiveComm || '').replace(/"/g, '&quot;')}"
+          oninput="markPending('${curStr}', 'comm', this.value)"
+          onkeydown="if (event.key === 'Enter') saveRow('${curStr}')">
+      </td>
+      <td class="center" style="white-space:nowrap;">
+        <button class="btn-save-row" onclick="saveRow('${curStr}')" ${hasChange ? '' : 'disabled'}>💾</button>
+        ${stored ? `<button class="btn-reset" onclick="resetToAuto('${curStr}', ${objAuto})" title="Remettre à l'objectif auto">↺</button>` : ''}
+      </td>
+    </tr>`);
+  }
+
+  document.getElementById('obj-table-body').innerHTML = rows.join('');
+
+  document.getElementById('summary-stats').innerHTML = `
+    <strong>${currentEtab === 'freddy' ? 'Freddy' : 'Liesel'}</strong> — ${lastDay} jours<br>
+    Total N-1 : <strong>${fmtEur(totalN1)}</strong> •
+    Auto : <strong style="color:var(--blue);">${fmtEur(totalAuto)}</strong> •
+    Effectif : <strong style="color:var(--accent-dark);">${fmtEur(totalEffectif)}</strong>
+    <span style="color:var(--gray-500); margin-left:8px;">(${nbManuel} manuels, ${nbAuto} auto stockés, ${lastDay - nbManuel - nbAuto} non stockés)</span>
+  `;
+}
+
+function markPending(date, field, value) {
+  if (!pendingChanges[date]) pendingChanges[date] = {};
+  pendingChanges[date][field] = value;
+  // Enable save button
+  const row = document.querySelector(`tr[data-date="${date}"]`);
+  if (row) row.querySelector('.btn-save-row').disabled = false;
+}
+
+async function saveRow(date) {
+  const change = pendingChanges[date];
+  if (!change) return;
+  const row = document.querySelector(`tr[data-date="${date}"]`);
+  const objInput = row.querySelector('.obj-input');
+  const commInput = row.querySelector('.comm-input');
+
+  const objValue = change.obj !== undefined ? change.obj : parseFloat(objInput.value) || 0;
+  const commValue = change.comm !== undefined ? change.comm : commInput.value;
+
+  // Retrouver CA N-1 pour stocker la référence
+  const cur = new Date(date + 'T12:00:00');
+  const prev = alignedPrevYearDate(cur);
+  const n1Row = allSales.find(r => r.etablissement === currentEtab && r.date === dateStr(prev));
+  const caN1 = n1Row ? (n1Row.ca_ttc || 0) : 0;
+  const pct = caN1 > 0 ? ((objValue - caN1) / caN1 * 100) : null;
+
+  const record = {
+    date: date,
+    etablissement: currentEtab,
+    ca_ttc_objectif: objValue,
+    ca_ttc_n1_aligne: caN1,
+    pct_vs_n1: pct,
+    source: 'manuel',
+    commentaire: commValue || null,
+    modifie_par_id: currentUser.id,
+    modifie_par_nom: currentUser.nom,
+    updated_at: new Date().toISOString()
+  };
+  // Si c'est la première fois, cree_par_*
+  const existing = allObj.find(o => o.etablissement === currentEtab && o.date === date);
+  if (!existing) {
+    record.cree_par_id = currentUser.id;
+    record.cree_par_nom = currentUser.nom;
+  }
+
+  showLoading(true);
+  try {
+    const { error } = await sb.from('objectifs_ventes').upsert(record, { onConflict: 'date,etablissement' });
+    if (error) throw error;
+    delete pendingChanges[date];
+    // Recharger juste cet élément
+    const { data } = await sb.from('objectifs_ventes').select('*').eq('date', date).eq('etablissement', currentEtab).single();
+    if (data) {
+      const idx = allObj.findIndex(o => o.id === data.id || (o.date === data.date && o.etablissement === data.etablissement));
+      if (idx >= 0) allObj[idx] = data; else allObj.push(data);
+    }
+    showToast('Objectif enregistré ✓', 'success');
+    render();
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+async function resetToAuto(date, objAuto) {
+  if (!confirm(`Remettre l'objectif auto (${fmtEur(objAuto)}) pour le ${date} ? L'objectif manuel sera supprimé.`)) return;
+  showLoading(true);
+  try {
+    const { error } = await sb.from('objectifs_ventes').delete().eq('date', date).eq('etablissement', currentEtab);
+    if (error) throw error;
+    allObj = allObj.filter(o => !(o.date === date && o.etablissement === currentEtab));
+    delete pendingChanges[date];
+    showToast('Remis en auto ✓', 'success');
+    render();
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+async function seedMonth() {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const records = [];
+
+  for (let d = 1; d <= lastDay; d++) {
+    const cur = new Date(year, month, d);
+    const curStr = dateStr(cur);
+    const prev = alignedPrevYearDate(cur);
+    const prevStr = dateStr(prev);
+    const dowCur = cur.getDay();
+
+    // Ne pas écraser un existant (auto ou manuel)
+    const stored = allObj.find(o => o.etablissement === currentEtab && o.date === curStr);
+    if (stored) continue;
+
+    const n1Row = allSales.find(r => r.etablissement === currentEtab && r.date === prevStr);
+    const caN1 = n1Row ? (n1Row.ca_ttc || 0) : 0;
+    const objAuto = computeAutoObj(currentEtab, caN1, dowCur);
+    const pct = caN1 > 0 ? ((objAuto - caN1) / caN1 * 100) : (currentEtab === 'liesel' ? OBJECTIFS.liesel.multVsN1 * 100 - 100 : null);
+
+    records.push({
+      date: curStr,
+      etablissement: currentEtab,
+      ca_ttc_objectif: objAuto,
+      ca_ttc_n1_aligne: caN1,
+      pct_vs_n1: pct,
+      source: 'auto',
+      cree_par_id: currentUser.id,
+      cree_par_nom: currentUser.nom
+    });
+  }
+
+  if (records.length === 0) {
+    showToast('Aucun objectif à générer (tous existants)', 'success');
+    return;
+  }
+
+  if (!confirm(`Générer ${records.length} objectifs auto pour ${document.getElementById('month-label').textContent} (${currentEtab === 'freddy' ? 'Freddy' : 'Liesel'}) ?`)) return;
+
+  showLoading(true);
+  try {
+    const { data, error } = await sb.from('objectifs_ventes').upsert(records, { onConflict: 'date,etablissement' }).select();
+    if (error) throw error;
+    // Ajout local
+    (data || []).forEach(nr => {
+      const idx = allObj.findIndex(o => o.date === nr.date && o.etablissement === nr.etablissement);
+      if (idx >= 0) allObj[idx] = nr; else allObj.push(nr);
+    });
+    showToast(`${records.length} objectifs générés ✓`, 'success');
+    render();
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type || ''} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function showLoading(on) { document.getElementById('loading').classList.toggle('active', on); }
+  </script>
+
+<script>
+(function() {
+  window.__goBack = function() { window.location.href = '../'; };
+  window.__doLogout = function() { try { sessionStorage.clear(); } catch(e){} window.location.href = '../'; };
+  var inactivityTimer = null;
+  var INACTIVITY_MS = 5 * 60 * 1000; // 5 min (édition longue)
+  function resetInactivity() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(window.__doLogout, INACTIVITY_MS);
+  }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(function(evt){
+    document.addEventListener(evt, resetInactivity, { passive: true, capture: true });
+  });
+  function patchHeader() {
+    var right = document.getElementById('header-right');
+    if (!right) { resetInactivity(); return; }
+    if (!right.querySelector('.btn-back')) {
+      var a = document.createElement('a'); a.className='btn-back'; a.href='javascript:void(0)'; a.textContent='← Portail'; a.onclick=window.__goBack; right.appendChild(a);
+    }
+    if (!right.querySelector('.btn-logout')) {
+      var b = document.createElement('button'); b.className='btn-logout'; b.type='button'; b.textContent='Déconnexion'; b.onclick=window.__doLogout; right.appendChild(b);
+    }
+    resetInactivity();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patchHeader);
+  else patchHeader();
+})();
+</script>
+
+</body>
+</html>

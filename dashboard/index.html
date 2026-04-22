@@ -313,6 +313,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let currentEtab = 'all';
 let allData = [];
+let allObjectifs = [];   // table objectifs_ventes (surcharges stockées)
 let currentDay = new Date();
 let currentMonth = new Date();
 
@@ -343,13 +344,15 @@ function switchTab(tab) {
 async function loadAllData() {
   showLoading(true);
   try {
-    const { data, error } = await sb
-      .from('ventes_journalieres')
-      .select('*')
-      .order('date', { ascending: true });
-    if (error) throw error;
+    const [salesRes, objRes] = await Promise.all([
+      sb.from('ventes_journalieres').select('*').order('date', { ascending: true }),
+      sb.from('objectifs_ventes').select('*')
+    ]);
+    if (salesRes.error) throw salesRes.error;
+    // objectifs_ventes peut ne pas exister encore (avant migration SQL) — on l'ignore dans ce cas
+    allObjectifs = (objRes && !objRes.error) ? (objRes.data || []) : [];
     // Parse notes JSON to enrich
-    allData = (data || []).map(r => {
+    allData = (salesRes.data || []).map(r => {
       let enrich = {};
       try { if (r.notes && r.notes.startsWith('{')) enrich = JSON.parse(r.notes); } catch(e) {}
       return { ...r, ...enrich };
@@ -461,15 +464,20 @@ function alignedPrevYearDate(currentDate) {
   return aligned;
 }
 
-// Calcule l'objectif pour une date donnée et un établissement, d'après CA N-1 calé
-function computeDailyObjective(etab, caN1, dowCur) {
+// Calcule l'objectif effectif pour un établissement à une date donnée.
+// Priorité : 1) surcharge dans objectifs_ventes (si présente)  2) CA N-1 × multiplicateur  3) estimation nouveaux jours
+function computeDailyObjective(etab, caN1, dowCur, dateStrCur) {
+  // 1) Surcharge stockée dans objectifs_ventes (manuelle ou auto déjà générée)
+  if (dateStrCur) {
+    const stored = allObjectifs.find(o => o.etablissement === etab && o.date === dateStrCur);
+    if (stored) return Number(stored.ca_ttc_objectif) || 0;
+  }
+  // 2) Calcul auto
   const cfg = OBJECTIFS[etab];
   if (!cfg) return caN1 * 1.02;
-  // Cas standard : jour ouvert en N-1 → objectif = N-1 × multiplicateur
   if (caN1 > 0) return caN1 * cfg.multVsN1;
-  // Cas "nouveau jour ouvert" (Liesel : lundi/mardi en 2026 alors que fermé en 2025)
+  // 3) Nouveaux jours ouverts (ex: Liesel lundi/mardi en 2026)
   if (cfg.newOpenDow.includes(dowCur) && cfg.newOpenFactor > 0) {
-    // Moyenne des CA de tous les jours ouverts en N-1 pour cet établissement × facteur × multiplicateur
     const etabN1 = allData.filter(r => r.etablissement === etab && r.date.startsWith(String(evoMonth.getFullYear() - 1)) && (r.ca_ttc || 0) > 0);
     if (etabN1.length > 0) {
       const avg = etabN1.reduce((s, r) => s + (r.ca_ttc || 0), 0) / etabN1.length;
@@ -520,7 +528,7 @@ function renderEvolution() {
       caN1 += etabCaN1;
       couvN += sumField(curR, 'couverts');
       couvN1 += sumField(prevR, 'couverts');
-      obj += computeDailyObjective(etab, etabCaN1, dowCur);
+      obj += computeDailyObjective(etab, etabCaN1, dowCur, curStr);
     }
 
     pairs.push({ day: d, cur, prev, caN, caN1, obj, couvN, couvN1 });
