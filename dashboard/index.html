@@ -161,6 +161,7 @@
     <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">🏠 Vue d'ensemble</button>
     <button class="tab-btn" data-tab="day" onclick="switchTab('day')">📅 Jour</button>
     <button class="tab-btn" data-tab="month" onclick="switchTab('month')">📆 Mois</button>
+    <button class="tab-btn" data-tab="evolution" onclick="switchTab('evolution')">🔄 Évolution</button>
     <button class="tab-btn" data-tab="year" onclick="switchTab('year')">📈 Année</button>
     <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')">🔎 Analyse</button>
   </div>
@@ -223,6 +224,34 @@
       <div class="card">
         <div class="card-title">Top 5 jours du mois</div>
         <div id="month-top"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ÉVOLUTION MENSUELLE (vs N-1 calé par jour de semaine) -->
+    <div class="tab-content" id="tab-evolution">
+      <div class="date-nav">
+        <button onclick="changeEvoMonth(-1)" title="Mois précédent">◀</button>
+        <div id="evo-month-label" style="font-size:0.95rem; font-weight:700; min-width:160px; text-align:center;"></div>
+        <button onclick="changeEvoMonth(1)" title="Mois suivant">▶</button>
+        <button class="today-btn" onclick="setCurrentEvoMonth()">Ce mois</button>
+      </div>
+      <div style="font-size:0.72rem; color:var(--gray-500); text-align:center; padding:4px 10px 8px;" id="evo-alignment-info"></div>
+      <div class="kpi-grid cols-2" id="evo-kpi"></div>
+      <div class="card">
+        <div class="card-title">CA TTC par jour — Mois N vs N-1 (jour de semaine calé)</div>
+        <div class="bar-chart" id="evo-chart" style="min-height:160px;"></div>
+        <div class="chart-legend">
+          <span><span class="legend-dot" style="background:var(--accent)"></span>Année en cours</span>
+          <span><span class="legend-dot" style="background:var(--gray-300)"></span>N-1 (calé)</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cumul progressif du mois</div>
+        <div id="evo-cumul"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Détail jour par jour</div>
+        <div id="evo-table" style="overflow-x:auto;"></div>
       </div>
     </div>
 
@@ -377,8 +406,188 @@ function renderAll() {
   renderOverview();
   renderDay();
   renderMonth();
+  renderEvolution();
   renderYear();
   renderAnalysis();
+}
+
+// ============ ÉVOLUTION MENSUELLE (N vs N-1 calé par jour de semaine) ============
+let evoMonth = new Date();
+
+function setCurrentEvoMonth() {
+  evoMonth = new Date();
+  renderEvolution();
+}
+function changeEvoMonth(delta) {
+  evoMonth.setMonth(evoMonth.getMonth() + delta);
+  renderEvolution();
+}
+
+// Pour un jour donné du mois N, renvoie le même numéro-de-jour-dans-le-mois
+// mais aligné sur le même jour de la semaine en N-1 (décalage appliqué dès le 1er).
+function alignedPrevYearDate(currentDate) {
+  const y = currentDate.getFullYear();
+  const m = currentDate.getMonth();
+  const firstCurrent = new Date(y, m, 1);
+  const firstPrev = new Date(y - 1, m, 1);
+  const dowCur = firstCurrent.getDay(); // 0=dim, 1=lun...
+  const dowPrev = firstPrev.getDay();
+  // Offset pour caler firstPrev sur le même DOW que firstCurrent
+  let offset = dowCur - dowPrev;
+  if (offset < 0) offset += 7;
+  // dayInMonth correspond au Nième jour du mois N (1-based)
+  const dayInMonth = currentDate.getDate();
+  // On aligne : jour N° N du mois N → jour N° (offset + N) à partir du 1er M-12
+  const aligned = new Date(y - 1, m, 1 + offset + (dayInMonth - 1));
+  return aligned;
+}
+
+function renderEvolution() {
+  const rows = filterEtab(allData);
+  const year = evoMonth.getFullYear();
+  const month = evoMonth.getMonth();
+  const monthName = evoMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  document.getElementById('evo-month-label').textContent = monthName;
+
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const firstCurrent = new Date(year, month, 1);
+  const firstAlignedPrev = alignedPrevYearDate(firstCurrent);
+
+  document.getElementById('evo-alignment-info').innerHTML =
+    `Le <strong>${firstCurrent.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> est aligné avec le <strong>${firstAlignedPrev.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> <span style="color:var(--gray-400);">(même jour de la semaine)</span>`;
+
+  // Construire jour par jour
+  const pairs = [];
+  for (let d = 1; d <= lastDay; d++) {
+    const cur = new Date(year, month, d);
+    const prev = alignedPrevYearDate(cur);
+    const curStr = dateStr(cur);
+    const prevStr = dateStr(prev);
+    const curRows = rows.filter(r => r.date === curStr);
+    const prevRows = rows.filter(r => r.date === prevStr);
+    pairs.push({
+      day: d,
+      cur, prev,
+      caN: sumField(curRows, 'ca_ttc'),
+      caN1: sumField(prevRows, 'ca_ttc'),
+      couvN: sumField(curRows, 'couverts'),
+      couvN1: sumField(prevRows, 'couverts')
+    });
+  }
+
+  // KPI totaux sur les jours avec données en cours (pour comparaison juste)
+  const daysWithCurrent = pairs.filter(p => p.caN > 0);
+  const totalCaN = daysWithCurrent.reduce((s, p) => s + p.caN, 0);
+  const totalCaN1OnSameDays = daysWithCurrent.reduce((s, p) => s + p.caN1, 0);
+  const totalCouvN = daysWithCurrent.reduce((s, p) => s + p.couvN, 0);
+  const totalCouvN1 = daysWithCurrent.reduce((s, p) => s + p.couvN1, 0);
+
+  // Totaux sur le mois complet N-1 (référence)
+  const totalCaN1Full = pairs.reduce((s, p) => s + p.caN1, 0);
+  const totalCouvN1Full = pairs.reduce((s, p) => s + p.couvN1, 0);
+
+  const deltaCa = totalCaN1OnSameDays > 0 ? ((totalCaN - totalCaN1OnSameDays) / totalCaN1OnSameDays * 100) : null;
+  const deltaCouv = totalCouvN1 > 0 ? ((totalCouvN - totalCouvN1) / totalCouvN1 * 100) : null;
+  const tmN = totalCouvN > 0 ? totalCaN / totalCouvN : 0;
+  const tmN1 = totalCouvN1 > 0 ? totalCaN1OnSameDays / totalCouvN1 : 0;
+  const deltaTm = tmN1 > 0 ? ((tmN - tmN1) / tmN1 * 100) : null;
+
+  document.getElementById('evo-kpi').innerHTML = `
+    <div class="kpi-card accent">
+      <div class="kpi-value">${fmtEurFull(totalCaN, 0)}</div>
+      <div class="kpi-label">CA ${monthName.split(' ')[0]} (${daysWithCurrent.length}j)</div>
+      ${deltaCa !== null ? `<div class="kpi-trend ${deltaCa >= 0 ? 'up' : 'down'}">${trendArrow(deltaCa)} ${fmtPct(deltaCa)} vs N-1 calé</div>` : ''}
+      <div class="kpi-sub">N-1 mêmes jours : ${fmtEurFull(totalCaN1OnSameDays, 0)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--purple)">${fmtInt(totalCouvN)}</div>
+      <div class="kpi-label">Couverts</div>
+      ${deltaCouv !== null ? `<div class="kpi-trend ${deltaCouv >= 0 ? 'up' : 'down'}">${trendArrow(deltaCouv)} ${fmtPct(deltaCouv)}</div>` : ''}
+      <div class="kpi-sub">N-1 : ${fmtInt(totalCouvN1)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--orange)">${tmN > 0 ? fmtEur(tmN, 1) : '—'}</div>
+      <div class="kpi-label">Ticket moyen</div>
+      ${deltaTm !== null ? `<div class="kpi-trend ${deltaTm >= 0 ? 'up' : 'down'}">${trendArrow(deltaTm)} ${fmtPct(deltaTm)}</div>` : ''}
+      <div class="kpi-sub">N-1 : ${tmN1 > 0 ? fmtEur(tmN1, 1) : '—'}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value" style="color:var(--gray-600); font-size:1.1rem;">${fmtEurFull(totalCaN1Full, 0)}</div>
+      <div class="kpi-label">CA ${year - 1} mois complet</div>
+      <div class="kpi-sub">${fmtInt(totalCouvN1Full)} couverts</div>
+    </div>
+  `;
+
+  // Chart barres N vs N-1 jour par jour
+  const maxCa = Math.max(...pairs.map(p => Math.max(p.caN, p.caN1)), 1);
+  document.getElementById('evo-chart').innerHTML = pairs.map(p => {
+    const hN = Math.max((p.caN / maxCa) * 100, 1);
+    const hN1 = Math.max((p.caN1 / maxCa) * 100, 1);
+    const dowChar = ['D','L','M','M','J','V','S'][p.cur.getDay()];
+    const colorN = p.caN === 0 ? 'var(--gray-200)' : 'var(--accent)';
+    const colorN1 = p.caN1 === 0 ? 'var(--gray-100)' : 'var(--gray-300)';
+    return `<div class="bar-group" title="${p.cur.toLocaleDateString('fr-FR')} : ${fmtEur(p.caN)} vs ${p.prev.toLocaleDateString('fr-FR')} : ${fmtEur(p.caN1)}">
+      <div class="dual-bar" style="width:100%; display:flex; align-items:flex-end; gap:1px; height:100%;">
+        <div class="bar" style="flex:1; height:${hN}%; background:${colorN};"></div>
+        <div class="bar" style="flex:1; height:${hN1}%; background:${colorN1};"></div>
+      </div>
+      <div class="bar-label">${p.day}<br><span style="color:var(--gray-400); font-size:0.55rem;">${dowChar}</span></div>
+    </div>`;
+  }).join('');
+
+  // Cumul progressif
+  let cumN = 0, cumN1 = 0;
+  const cumData = pairs.map(p => {
+    cumN += p.caN;
+    cumN1 += p.caN1;
+    return { day: p.day, cumN, cumN1 };
+  });
+  const maxCum = Math.max(cumData[cumData.length - 1].cumN, cumData[cumData.length - 1].cumN1, 1);
+  const finalCumN = cumData[cumData.length - 1].cumN;
+  const finalCumN1 = cumData[cumData.length - 1].cumN1;
+  const deltaFinalCum = finalCumN1 > 0 ? ((finalCumN - finalCumN1) / finalCumN1 * 100) : null;
+
+  document.getElementById('evo-cumul').innerHTML = `
+    <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:6px;">
+      <span style="color:var(--accent); font-weight:700;">${monthName.split(' ')[0]} ${year} à ce jour : ${fmtEurFull(finalCumN, 0)}</span>
+      <span style="color:var(--gray-500);">${year - 1} mêmes jours : ${fmtEurFull(finalCumN1, 0)}</span>
+    </div>
+    <div class="progress-bar" style="height:10px;"><div style="width:${Math.min(100, finalCumN1 > 0 ? (finalCumN / Math.max(finalCumN, finalCumN1)) * 100 : 0)}%; background:var(--accent);"></div></div>
+    <div class="progress-bar" style="height:10px; margin-top:4px;"><div style="width:${Math.min(100, finalCumN1 > 0 ? (finalCumN1 / Math.max(finalCumN, finalCumN1)) * 100 : 0)}%; background:var(--gray-400);"></div></div>
+    ${deltaFinalCum !== null ? `<div style="text-align:right; margin-top:6px;"><span class="pill ${deltaFinalCum >= 0 ? 'green' : 'red'}">${trendArrow(deltaFinalCum)} ${fmtPct(deltaFinalCum)} vs N-1 calé</span></div>` : ''}
+  `;
+
+  // Tableau détaillé
+  const dowNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+  document.getElementById('evo-table').innerHTML = `
+    <table class="data-table" style="min-width:520px;">
+      <thead><tr>
+        <th>Jour</th>
+        <th>${year}</th>
+        <th class="num">CA</th>
+        <th class="num">Couv.</th>
+        <th>${year - 1} (calé)</th>
+        <th class="num">CA</th>
+        <th class="num">Δ</th>
+      </tr></thead>
+      <tbody>
+        ${pairs.map(p => {
+          const delta = p.caN1 > 0 ? ((p.caN - p.caN1) / p.caN1 * 100) : null;
+          const deltaClass = p.caN === 0 ? '' : (delta === null ? '' : (delta >= 0 ? 'green' : 'red'));
+          const deltaTxt = p.caN === 0 ? '' : (delta === null ? '—' : fmtPct(delta));
+          return `<tr>
+            <td><strong>${dowNames[p.cur.getDay()]} ${p.day}</strong></td>
+            <td style="font-size:0.72rem; color:var(--gray-500);">${p.cur.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</td>
+            <td class="num" style="font-weight:600; color:${p.caN === 0 ? 'var(--gray-300)' : 'var(--accent)'};">${p.caN > 0 ? fmtEurFull(p.caN, 0) : '—'}</td>
+            <td class="num" style="color:${p.couvN === 0 ? 'var(--gray-300)' : 'var(--gray-700)'};">${p.couvN > 0 ? fmtInt(p.couvN) : '—'}</td>
+            <td style="font-size:0.72rem; color:var(--gray-500);">${p.prev.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</td>
+            <td class="num" style="color:${p.caN1 === 0 ? 'var(--gray-300)' : 'var(--gray-600)'};">${p.caN1 > 0 ? fmtEurFull(p.caN1, 0) : '—'}</td>
+            <td class="num">${deltaTxt ? `<span class="pill ${deltaClass}">${deltaTxt}</span>` : ''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 // ============ VUE D'ENSEMBLE ============
