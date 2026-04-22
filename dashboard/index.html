@@ -105,8 +105,12 @@
     /* Table */
     .data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
     .data-table th { text-align: left; padding: 7px 6px; color: var(--gray-500); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--gray-200); }
-    .data-table td { padding: 6px; border-bottom: 1px solid var(--gray-100); }
+    .data-table th.num { text-align: right; }
+    .data-table th.center { text-align: center; }
+    .data-table td { padding: 6px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
     .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .data-table td.center { text-align: center; }
+    .data-table tr.total-row td { background: var(--gray-50); font-weight: 700; border-top: 2px solid var(--gray-300); }
     .data-table tr:last-child td { border-bottom: none; }
 
     /* Empty state */
@@ -227,7 +231,7 @@
       </div>
     </div>
 
-    <!-- TAB: ÉVOLUTION MENSUELLE (vs N-1 calé par jour de semaine) -->
+    <!-- TAB: ÉVOLUTION MENSUELLE (vs N-1 calé + Objectifs) -->
     <div class="tab-content" id="tab-evolution">
       <div class="date-nav">
         <button onclick="changeEvoMonth(-1)" title="Mois précédent">◀</button>
@@ -235,20 +239,26 @@
         <button onclick="changeEvoMonth(1)" title="Mois suivant">▶</button>
         <button class="today-btn" onclick="setCurrentEvoMonth()">Ce mois</button>
       </div>
-      <div style="font-size:0.72rem; color:var(--gray-500); text-align:center; padding:4px 10px 8px;" id="evo-alignment-info"></div>
+      <div style="font-size:0.72rem; color:var(--gray-500); text-align:center; padding:4px 10px 0;" id="evo-alignment-info"></div>
+      <div style="font-size:0.72rem; text-align:center; padding:4px 10px 8px;" id="evo-obj-config"></div>
+
       <div class="kpi-grid cols-2" id="evo-kpi"></div>
+
       <div class="card">
-        <div class="card-title">CA TTC par jour — Mois N vs N-1 (jour de semaine calé)</div>
+        <div class="card-title">CA par jour — N-1 vs Objectif vs Réalisé</div>
         <div class="bar-chart" id="evo-chart" style="min-height:160px;"></div>
         <div class="chart-legend">
-          <span><span class="legend-dot" style="background:var(--accent)"></span>Année en cours</span>
-          <span><span class="legend-dot" style="background:var(--gray-300)"></span>N-1 (calé)</span>
+          <span><span class="legend-dot" style="background:var(--gray-300)"></span>N-1 calé</span>
+          <span><span class="legend-dot" style="background:var(--orange)"></span>Objectif</span>
+          <span><span class="legend-dot" style="background:var(--accent)"></span>Réalisé</span>
         </div>
       </div>
+
       <div class="card">
         <div class="card-title">Cumul progressif du mois</div>
         <div id="evo-cumul"></div>
       </div>
+
       <div class="card">
         <div class="card-title">Détail jour par jour</div>
         <div id="evo-table" style="overflow-x:auto;"></div>
@@ -411,7 +421,16 @@ function renderAll() {
   renderAnalysis();
 }
 
-// ============ ÉVOLUTION MENSUELLE (N vs N-1 calé par jour de semaine) ============
+// ============ ÉVOLUTION MENSUELLE (N vs N-1 calé + Objectifs) ============
+// Configuration des objectifs annuels par établissement (modifiable)
+// - multVsN1 : multiplicateur appliqué au CA N-1 calé (1.02 = +2%)
+// - newOpenDow : pour Liesel qui passe de 5/7 en 2025 à 7/7 en 2026, DOW à traiter comme "nouveaux jours"
+// - newOpenFactor : facteur appliqué au CA moyen d'un jour ouvert en N-1 pour estimer l'objectif d'un nouveau jour ouvert
+const OBJECTIFS = {
+  freddy: { multVsN1: 1.02, label: '+2% vs N-1', newOpenDow: [], newOpenFactor: 0 },
+  liesel: { multVsN1: 1.05, label: '+5% vs N-1', newOpenDow: [1, 2], newOpenFactor: 0.5 } // lundi=1, mardi=2
+};
+
 let evoMonth = new Date();
 
 function setCurrentEvoMonth() {
@@ -442,8 +461,25 @@ function alignedPrevYearDate(currentDate) {
   return aligned;
 }
 
+// Calcule l'objectif pour une date donnée et un établissement, d'après CA N-1 calé
+function computeDailyObjective(etab, caN1, dowCur) {
+  const cfg = OBJECTIFS[etab];
+  if (!cfg) return caN1 * 1.02;
+  // Cas standard : jour ouvert en N-1 → objectif = N-1 × multiplicateur
+  if (caN1 > 0) return caN1 * cfg.multVsN1;
+  // Cas "nouveau jour ouvert" (Liesel : lundi/mardi en 2026 alors que fermé en 2025)
+  if (cfg.newOpenDow.includes(dowCur) && cfg.newOpenFactor > 0) {
+    // Moyenne des CA de tous les jours ouverts en N-1 pour cet établissement × facteur × multiplicateur
+    const etabN1 = allData.filter(r => r.etablissement === etab && r.date.startsWith(String(evoMonth.getFullYear() - 1)) && (r.ca_ttc || 0) > 0);
+    if (etabN1.length > 0) {
+      const avg = etabN1.reduce((s, r) => s + (r.ca_ttc || 0), 0) / etabN1.length;
+      return avg * cfg.newOpenFactor * cfg.multVsN1;
+    }
+  }
+  return 0;
+}
+
 function renderEvolution() {
-  const rows = filterEtab(allData);
   const year = evoMonth.getFullYear();
   const month = evoMonth.getMonth();
   const monthName = evoMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -454,137 +490,191 @@ function renderEvolution() {
   const firstAlignedPrev = alignedPrevYearDate(firstCurrent);
 
   document.getElementById('evo-alignment-info').innerHTML =
-    `Le <strong>${firstCurrent.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> est aligné avec le <strong>${firstAlignedPrev.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> <span style="color:var(--gray-400);">(même jour de la semaine)</span>`;
+    `📅 <strong>${firstCurrent.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> aligné avec <strong>${firstAlignedPrev.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> <span style="color:var(--gray-400);">(même jour de semaine)</span>`;
 
-  // Construire jour par jour
+  // Affichage des objectifs configurés
+  const etabsShown = currentEtab === 'all' ? ['freddy', 'liesel'] : [currentEtab];
+  const etabLabels = { freddy: 'Freddy', liesel: 'Liesel' };
+  document.getElementById('evo-obj-config').innerHTML = '🎯 ' + etabsShown.map(e => {
+    const cfg = OBJECTIFS[e];
+    const extra = e === 'liesel' && cfg.newOpenDow.length ? ` (lu/ma nouveaux = ${Math.round(cfg.newOpenFactor * 100)}% moy × mult)` : '';
+    return `<span style="padding:2px 8px; background:var(--accent-light); color:var(--accent-dark); border-radius:10px; font-weight:600; margin:0 4px;">${etabLabels[e]} ${cfg.label}${extra}</span>`;
+  }).join('');
+
+  // Construction jour par jour avec objectif
   const pairs = [];
   for (let d = 1; d <= lastDay; d++) {
     const cur = new Date(year, month, d);
     const prev = alignedPrevYearDate(cur);
     const curStr = dateStr(cur);
     const prevStr = dateStr(prev);
-    const curRows = rows.filter(r => r.date === curStr);
-    const prevRows = rows.filter(r => r.date === prevStr);
-    pairs.push({
-      day: d,
-      cur, prev,
-      caN: sumField(curRows, 'ca_ttc'),
-      caN1: sumField(prevRows, 'ca_ttc'),
-      couvN: sumField(curRows, 'couverts'),
-      couvN1: sumField(prevRows, 'couverts')
-    });
+    const dowCur = cur.getDay();
+
+    let caN = 0, couvN = 0, caN1 = 0, couvN1 = 0, obj = 0;
+    for (const etab of etabsShown) {
+      const curR = allData.filter(r => r.etablissement === etab && r.date === curStr);
+      const prevR = allData.filter(r => r.etablissement === etab && r.date === prevStr);
+      const etabCaN = sumField(curR, 'ca_ttc');
+      const etabCaN1 = sumField(prevR, 'ca_ttc');
+      caN += etabCaN;
+      caN1 += etabCaN1;
+      couvN += sumField(curR, 'couverts');
+      couvN1 += sumField(prevR, 'couverts');
+      obj += computeDailyObjective(etab, etabCaN1, dowCur);
+    }
+
+    pairs.push({ day: d, cur, prev, caN, caN1, obj, couvN, couvN1 });
   }
 
-  // KPI totaux sur les jours avec données en cours (pour comparaison juste)
+  // Cumuls progressifs
+  let cumN = 0, cumN1 = 0, cumObj = 0;
+  pairs.forEach(p => {
+    cumN += p.caN; cumN1 += p.caN1; cumObj += p.obj;
+    p.cumN = cumN; p.cumN1 = cumN1; p.cumObj = cumObj;
+  });
+
+  // Totaux
   const daysWithCurrent = pairs.filter(p => p.caN > 0);
   const totalCaN = daysWithCurrent.reduce((s, p) => s + p.caN, 0);
-  const totalCaN1OnSameDays = daysWithCurrent.reduce((s, p) => s + p.caN1, 0);
-  const totalCouvN = daysWithCurrent.reduce((s, p) => s + p.couvN, 0);
-  const totalCouvN1 = daysWithCurrent.reduce((s, p) => s + p.couvN1, 0);
-
-  // Totaux sur le mois complet N-1 (référence)
+  const totalCaN1SameDays = daysWithCurrent.reduce((s, p) => s + p.caN1, 0);
+  const totalObjSameDays = daysWithCurrent.reduce((s, p) => s + p.obj, 0);
   const totalCaN1Full = pairs.reduce((s, p) => s + p.caN1, 0);
-  const totalCouvN1Full = pairs.reduce((s, p) => s + p.couvN1, 0);
+  const totalObjFull = pairs.reduce((s, p) => s + p.obj, 0);
 
-  const deltaCa = totalCaN1OnSameDays > 0 ? ((totalCaN - totalCaN1OnSameDays) / totalCaN1OnSameDays * 100) : null;
-  const deltaCouv = totalCouvN1 > 0 ? ((totalCouvN - totalCouvN1) / totalCouvN1 * 100) : null;
-  const tmN = totalCouvN > 0 ? totalCaN / totalCouvN : 0;
-  const tmN1 = totalCouvN1 > 0 ? totalCaN1OnSameDays / totalCouvN1 : 0;
-  const deltaTm = tmN1 > 0 ? ((tmN - tmN1) / tmN1 * 100) : null;
+  const deltaVsN1 = totalCaN1SameDays > 0 ? ((totalCaN - totalCaN1SameDays) / totalCaN1SameDays * 100) : null;
+  const deltaVsObj = totalObjSameDays > 0 ? ((totalCaN - totalObjSameDays) / totalObjSameDays * 100) : null;
 
+  // KPI cards : CA réalisé, vs N-1, vs Obj, Obj mois complet
   document.getElementById('evo-kpi').innerHTML = `
     <div class="kpi-card accent">
       <div class="kpi-value">${fmtEurFull(totalCaN, 0)}</div>
-      <div class="kpi-label">CA ${monthName.split(' ')[0]} (${daysWithCurrent.length}j)</div>
-      ${deltaCa !== null ? `<div class="kpi-trend ${deltaCa >= 0 ? 'up' : 'down'}">${trendArrow(deltaCa)} ${fmtPct(deltaCa)} vs N-1 calé</div>` : ''}
-      <div class="kpi-sub">N-1 mêmes jours : ${fmtEurFull(totalCaN1OnSameDays, 0)}</div>
+      <div class="kpi-label">CA réalisé (${daysWithCurrent.length}j)</div>
+      ${deltaVsObj !== null ? `<div class="kpi-trend ${deltaVsObj >= 0 ? 'up' : 'down'}">${trendArrow(deltaVsObj)} ${fmtPct(deltaVsObj)} vs Obj</div>` : ''}
     </div>
     <div class="kpi-card">
-      <div class="kpi-value" style="color:var(--purple)">${fmtInt(totalCouvN)}</div>
-      <div class="kpi-label">Couverts</div>
-      ${deltaCouv !== null ? `<div class="kpi-trend ${deltaCouv >= 0 ? 'up' : 'down'}">${trendArrow(deltaCouv)} ${fmtPct(deltaCouv)}</div>` : ''}
-      <div class="kpi-sub">N-1 : ${fmtInt(totalCouvN1)}</div>
+      <div class="kpi-value" style="color:var(--orange)">${fmtEurFull(totalObjSameDays, 0)}</div>
+      <div class="kpi-label">Objectif mêmes jours</div>
+      <div class="kpi-sub">Obj mois complet : ${fmtEurFull(totalObjFull, 0)}</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-value" style="color:var(--orange)">${tmN > 0 ? fmtEur(tmN, 1) : '—'}</div>
-      <div class="kpi-label">Ticket moyen</div>
-      ${deltaTm !== null ? `<div class="kpi-trend ${deltaTm >= 0 ? 'up' : 'down'}">${trendArrow(deltaTm)} ${fmtPct(deltaTm)}</div>` : ''}
-      <div class="kpi-sub">N-1 : ${tmN1 > 0 ? fmtEur(tmN1, 1) : '—'}</div>
+      <div class="kpi-value" style="color:var(--gray-600)">${fmtEurFull(totalCaN1SameDays, 0)}</div>
+      <div class="kpi-label">N-1 calé mêmes jours</div>
+      ${deltaVsN1 !== null ? `<div class="kpi-trend ${deltaVsN1 >= 0 ? 'up' : 'down'}">${trendArrow(deltaVsN1)} ${fmtPct(deltaVsN1)} vs N-1</div>` : ''}
     </div>
     <div class="kpi-card">
-      <div class="kpi-value" style="color:var(--gray-600); font-size:1.1rem;">${fmtEurFull(totalCaN1Full, 0)}</div>
-      <div class="kpi-label">CA ${year - 1} mois complet</div>
-      <div class="kpi-sub">${fmtInt(totalCouvN1Full)} couverts</div>
+      <div class="kpi-value" style="color:var(--purple); font-size:1.1rem;">${fmtEurFull(totalCaN1Full, 0)}</div>
+      <div class="kpi-label">N-1 mois complet</div>
+      <div class="kpi-sub">${year - 1}</div>
     </div>
   `;
 
-  // Chart barres N vs N-1 jour par jour
-  const maxCa = Math.max(...pairs.map(p => Math.max(p.caN, p.caN1)), 1);
+  // Chart : 3 barres par jour (N-1, Obj, Réalisé)
+  const maxCa = Math.max(...pairs.map(p => Math.max(p.caN, p.caN1, p.obj)), 1);
   document.getElementById('evo-chart').innerHTML = pairs.map(p => {
-    const hN = Math.max((p.caN / maxCa) * 100, 1);
-    const hN1 = Math.max((p.caN1 / maxCa) * 100, 1);
+    const hN = Math.max((p.caN / maxCa) * 100, p.caN > 0 ? 1 : 0);
+    const hO = Math.max((p.obj / maxCa) * 100, p.obj > 0 ? 1 : 0);
+    const hN1 = Math.max((p.caN1 / maxCa) * 100, p.caN1 > 0 ? 1 : 0);
     const dowChar = ['D','L','M','M','J','V','S'][p.cur.getDay()];
-    const colorN = p.caN === 0 ? 'var(--gray-200)' : 'var(--accent)';
-    const colorN1 = p.caN1 === 0 ? 'var(--gray-100)' : 'var(--gray-300)';
-    return `<div class="bar-group" title="${p.cur.toLocaleDateString('fr-FR')} : ${fmtEur(p.caN)} vs ${p.prev.toLocaleDateString('fr-FR')} : ${fmtEur(p.caN1)}">
-      <div class="dual-bar" style="width:100%; display:flex; align-items:flex-end; gap:1px; height:100%;">
-        <div class="bar" style="flex:1; height:${hN}%; background:${colorN};"></div>
-        <div class="bar" style="flex:1; height:${hN1}%; background:${colorN1};"></div>
+    return `<div class="bar-group" title="${p.cur.toLocaleDateString('fr-FR')}\nN-1 : ${fmtEur(p.caN1)}\nObj : ${fmtEur(p.obj)}\nRéalisé : ${fmtEur(p.caN)}">
+      <div style="width:100%; display:flex; align-items:flex-end; gap:1px; height:100%;">
+        <div class="bar" style="flex:1; height:${hN1}%; background:${p.caN1 === 0 ? 'transparent' : 'var(--gray-300)'};"></div>
+        <div class="bar" style="flex:1; height:${hO}%; background:${p.obj === 0 ? 'transparent' : 'var(--orange)'};"></div>
+        <div class="bar" style="flex:1; height:${hN}%; background:${p.caN === 0 ? 'transparent' : 'var(--accent)'};"></div>
       </div>
       <div class="bar-label">${p.day}<br><span style="color:var(--gray-400); font-size:0.55rem;">${dowChar}</span></div>
     </div>`;
   }).join('');
 
-  // Cumul progressif
-  let cumN = 0, cumN1 = 0;
-  const cumData = pairs.map(p => {
-    cumN += p.caN;
-    cumN1 += p.caN1;
-    return { day: p.day, cumN, cumN1 };
-  });
-  const maxCum = Math.max(cumData[cumData.length - 1].cumN, cumData[cumData.length - 1].cumN1, 1);
-  const finalCumN = cumData[cumData.length - 1].cumN;
-  const finalCumN1 = cumData[cumData.length - 1].cumN1;
-  const deltaFinalCum = finalCumN1 > 0 ? ((finalCumN - finalCumN1) / finalCumN1 * 100) : null;
+  // Cumul progressif : 3 lignes
+  const lastCumN = pairs[pairs.length - 1].cumN;
+  const lastCumN1 = pairs[pairs.length - 1].cumN1;
+  const lastCumObj = pairs[pairs.length - 1].cumObj;
+  // Cumul réalisé sur jours saisis seulement
+  const lastDayWithData = daysWithCurrent.length > 0 ? daysWithCurrent[daysWithCurrent.length - 1] : null;
+  const cumRealisedAtLastDataDay = lastDayWithData ? lastDayWithData.cumN : 0;
+  const cumN1AtLastDataDay = lastDayWithData ? lastDayWithData.cumN1 : 0;
+  const cumObjAtLastDataDay = lastDayWithData ? lastDayWithData.cumObj : 0;
+  const maxForBar = Math.max(lastCumN, lastCumN1, lastCumObj, 1);
 
   document.getElementById('evo-cumul').innerHTML = `
-    <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:6px;">
-      <span style="color:var(--accent); font-weight:700;">${monthName.split(' ')[0]} ${year} à ce jour : ${fmtEurFull(finalCumN, 0)}</span>
-      <span style="color:var(--gray-500);">${year - 1} mêmes jours : ${fmtEurFull(finalCumN1, 0)}</span>
+    <div style="display:grid; grid-template-columns: auto 1fr auto; gap:10px 12px; font-size:0.82rem; align-items:center;">
+      <span style="color:var(--accent); font-weight:700;">Réalisé${lastDayWithData ? ' (j' + lastDayWithData.day + ')' : ''}</span>
+      <div class="progress-bar" style="height:10px; margin:0;"><div style="width:${(cumRealisedAtLastDataDay / maxForBar * 100).toFixed(1)}%; background:var(--accent);"></div></div>
+      <span style="font-weight:700; text-align:right; min-width:80px;">${fmtEurFull(cumRealisedAtLastDataDay, 0)}</span>
+
+      <span style="color:var(--orange); font-weight:700;">Objectif mêmes jours</span>
+      <div class="progress-bar" style="height:10px; margin:0;"><div style="width:${(cumObjAtLastDataDay / maxForBar * 100).toFixed(1)}%; background:var(--orange);"></div></div>
+      <span style="text-align:right; min-width:80px;">${fmtEurFull(cumObjAtLastDataDay, 0)}</span>
+
+      <span style="color:var(--gray-500); font-weight:700;">N-1 mêmes jours</span>
+      <div class="progress-bar" style="height:10px; margin:0;"><div style="width:${(cumN1AtLastDataDay / maxForBar * 100).toFixed(1)}%; background:var(--gray-400);"></div></div>
+      <span style="color:var(--gray-600); text-align:right; min-width:80px;">${fmtEurFull(cumN1AtLastDataDay, 0)}</span>
+
+      <span style="color:var(--gray-500); font-size:0.72rem; padding-top:6px;">Projection mois complet</span>
+      <div style="border-top:1px dashed var(--gray-200); padding-top:6px; font-size:0.72rem; color:var(--gray-500);">Obj mois : ${fmtEurFull(lastCumObj, 0)} • N-1 mois : ${fmtEurFull(lastCumN1, 0)}</div>
+      <span></span>
     </div>
-    <div class="progress-bar" style="height:10px;"><div style="width:${Math.min(100, finalCumN1 > 0 ? (finalCumN / Math.max(finalCumN, finalCumN1)) * 100 : 0)}%; background:var(--accent);"></div></div>
-    <div class="progress-bar" style="height:10px; margin-top:4px;"><div style="width:${Math.min(100, finalCumN1 > 0 ? (finalCumN1 / Math.max(finalCumN, finalCumN1)) * 100 : 0)}%; background:var(--gray-400);"></div></div>
-    ${deltaFinalCum !== null ? `<div style="text-align:right; margin-top:6px;"><span class="pill ${deltaFinalCum >= 0 ? 'green' : 'red'}">${trendArrow(deltaFinalCum)} ${fmtPct(deltaFinalCum)} vs N-1 calé</span></div>` : ''}
+    ${(deltaVsObj !== null || deltaVsN1 !== null) ? `
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap;">
+      ${deltaVsObj !== null ? `<span class="pill ${deltaVsObj >= 0 ? 'green' : 'red'}">${trendArrow(deltaVsObj)} ${fmtPct(deltaVsObj)} vs Obj</span>` : ''}
+      ${deltaVsN1 !== null ? `<span class="pill ${deltaVsN1 >= 0 ? 'green' : 'red'}">${trendArrow(deltaVsN1)} ${fmtPct(deltaVsN1)} vs N-1</span>` : ''}
+    </div>` : ''}
   `;
 
-  // Tableau détaillé
+  // Tableau détaillé (s'inspire de la feuille Excel d'Eric)
   const dowNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+  const fmtDelta = (val) => val === null ? '' : (val > 0 ? '+' + fmtEurFull(val, 0) : fmtEurFull(val, 0));
+
   document.getElementById('evo-table').innerHTML = `
-    <table class="data-table" style="min-width:520px;">
-      <thead><tr>
-        <th>Jour</th>
-        <th>${year}</th>
-        <th class="num">CA</th>
-        <th class="num">Couv.</th>
-        <th>${year - 1} (calé)</th>
-        <th class="num">CA</th>
-        <th class="num">Δ</th>
-      </tr></thead>
+    <table class="data-table" style="min-width:780px;">
+      <thead>
+        <tr>
+          <th>Jour ${year - 1}</th>
+          <th class="num">CA N-1</th>
+          <th>Jour ${year}</th>
+          <th class="num">Obj</th>
+          <th class="num">Réalisé</th>
+          <th class="num">Δ N-1</th>
+          <th class="num">Δ Obj</th>
+          <th class="num">Cum réalisé</th>
+          <th class="num">Cum Obj</th>
+          <th class="num">Cum N-1</th>
+        </tr>
+      </thead>
       <tbody>
         ${pairs.map(p => {
-          const delta = p.caN1 > 0 ? ((p.caN - p.caN1) / p.caN1 * 100) : null;
-          const deltaClass = p.caN === 0 ? '' : (delta === null ? '' : (delta >= 0 ? 'green' : 'red'));
-          const deltaTxt = p.caN === 0 ? '' : (delta === null ? '—' : fmtPct(delta));
+          const deltaN1 = p.caN - p.caN1;
+          const deltaObj = p.caN - p.obj;
+          const deltaN1Pct = p.caN1 > 0 ? ((p.caN - p.caN1) / p.caN1 * 100) : null;
+          const deltaObjPct = p.obj > 0 ? ((p.caN - p.obj) / p.obj * 100) : null;
+          const hasCurrent = p.caN > 0;
           return `<tr>
-            <td><strong>${dowNames[p.cur.getDay()]} ${p.day}</strong></td>
-            <td style="font-size:0.72rem; color:var(--gray-500);">${p.cur.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</td>
-            <td class="num" style="font-weight:600; color:${p.caN === 0 ? 'var(--gray-300)' : 'var(--accent)'};">${p.caN > 0 ? fmtEurFull(p.caN, 0) : '—'}</td>
-            <td class="num" style="color:${p.couvN === 0 ? 'var(--gray-300)' : 'var(--gray-700)'};">${p.couvN > 0 ? fmtInt(p.couvN) : '—'}</td>
-            <td style="font-size:0.72rem; color:var(--gray-500);">${p.prev.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</td>
+            <td style="color:var(--gray-500); font-size:0.72rem;">${dowNames[p.prev.getDay()]} ${p.prev.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</td>
             <td class="num" style="color:${p.caN1 === 0 ? 'var(--gray-300)' : 'var(--gray-600)'};">${p.caN1 > 0 ? fmtEurFull(p.caN1, 0) : '—'}</td>
-            <td class="num">${deltaTxt ? `<span class="pill ${deltaClass}">${deltaTxt}</span>` : ''}</td>
+            <td><strong>${dowNames[p.cur.getDay()]} ${p.day}</strong> <span style="font-size:0.72rem; color:var(--gray-400);">${p.cur.toLocaleDateString('fr-FR', {month:'short'})}</span></td>
+            <td class="num" style="color:var(--orange); font-weight:600;">${p.obj > 0 ? fmtEurFull(p.obj, 0) : '—'}</td>
+            <td class="num" style="font-weight:700; color:${hasCurrent ? 'var(--accent)' : 'var(--gray-300)'};">${hasCurrent ? fmtEurFull(p.caN, 0) : '—'}</td>
+            <td class="num" style="font-size:0.75rem;">${hasCurrent ? `<div style="color:${deltaN1 >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${fmtDelta(deltaN1)}</div><div style="color:var(--gray-400); font-size:0.68rem;">${deltaN1Pct !== null ? fmtPct(deltaN1Pct) : ''}</div>` : ''}</td>
+            <td class="num" style="font-size:0.75rem;">${hasCurrent && p.obj > 0 ? `<div style="color:${deltaObj >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${fmtDelta(deltaObj)}</div><div style="color:var(--gray-400); font-size:0.68rem;">${deltaObjPct !== null ? fmtPct(deltaObjPct) : ''}</div>` : ''}</td>
+            <td class="num" style="color:${hasCurrent ? 'var(--accent-dark)' : 'var(--gray-300)'};">${hasCurrent ? fmtEurFull(p.cumN, 0) : '—'}</td>
+            <td class="num" style="color:var(--gray-600);">${fmtEurFull(p.cumObj, 0)}</td>
+            <td class="num" style="color:var(--gray-500);">${fmtEurFull(p.cumN1, 0)}</td>
           </tr>`;
         }).join('')}
+        <tr class="total-row">
+          <td><strong>TOTAL ${year - 1}</strong></td>
+          <td class="num">${fmtEurFull(totalCaN1Full, 0)}</td>
+          <td><strong>TOTAL ${year}</strong></td>
+          <td class="num" style="color:var(--orange);">${fmtEurFull(totalObjFull, 0)}</td>
+          <td class="num" style="color:var(--accent);">${fmtEurFull(totalCaN, 0)}</td>
+          <td class="num" colspan="2" style="text-align:center;">
+            ${deltaVsN1 !== null ? `<span class="pill ${deltaVsN1 >= 0 ? 'green' : 'red'}" style="margin-right:4px;">${fmtPct(deltaVsN1)} vs N-1</span>` : ''}
+            ${deltaVsObj !== null ? `<span class="pill ${deltaVsObj >= 0 ? 'green' : 'red'}">${fmtPct(deltaVsObj)} vs Obj</span>` : ''}
+          </td>
+          <td class="num" style="color:var(--accent-dark);">${fmtEurFull(lastCumN, 0)}</td>
+          <td class="num">${fmtEurFull(lastCumObj, 0)}</td>
+          <td class="num">${fmtEurFull(lastCumN1, 0)}</td>
+        </tr>
       </tbody>
     </table>
   `;
