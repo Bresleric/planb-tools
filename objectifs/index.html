@@ -320,7 +320,7 @@ function getHolidaysFor(dStr) {
   return allHolidays.filter(h => h.startDate <= dStr && h.endDate >= dStr);
 }
 
-// Génère le HTML des badges (jours fériés + vacances scolaires)
+// Génère le HTML des badges (1 badge par pays, détails au survol)
 function renderHolidayBadges(dStr) {
   const hol = getHolidaysFor(dStr);
   if (!hol.length) return '';
@@ -330,20 +330,30 @@ function renderHolidayBadges(dStr) {
     if (!byCountry[h.country]) byCountry[h.country] = { flag: h.flag, label: h.countryLabel, public: [], school: [] };
     byCountry[h.country][h.type].push(h);
   });
+  // Un badge unique par pays, avec indicateur compact
   const parts = [];
   for (const [cc, data] of Object.entries(byCountry)) {
-    // Jours fériés (toujours nationaux ou très localisés)
-    data.public.forEach(h => {
-      const tip = `${data.label} — ${h.name}${!h.nationwide && h.subdivisions.length ? ' (' + h.subdivisions.join(', ') + ')' : ''}`;
-      parts.push(`<span class="hol-badge public" title="${tip.replace(/"/g,'&quot;')}">${data.flag}🎉</span>`);
-    });
-    // Vacances scolaires
-    data.school.forEach(h => {
-      const isLocal = !h.nationwide && h.subdivisions.length;
-      const tip = `${data.label} — ${h.name}${isLocal ? ' (' + h.subdivisions.join(', ') + ')' : ''}`;
-      const cls = isLocal ? 'hol-badge school local' : 'hol-badge school';
-      parts.push(`<span class="${cls}" title="${tip.replace(/"/g,'&quot;')}">${data.flag}🎒${isLocal ? h.subdivisions[0].substring(0,3) : ''}</span>`);
-    });
+    const hasPublic = data.public.length > 0;
+    const hasSchool = data.school.length > 0;
+    // Classe de fond : rouge si férié (même si vacances aussi), bleu si vacances seules
+    const cls = hasPublic ? 'hol-badge public' : 'hol-badge school';
+    // Icône compacte : férié prioritaire, sinon vacances
+    const icon = (hasPublic && hasSchool) ? '🎉' : (hasPublic ? '🎉' : '🎒');
+    // Construction du tooltip détaillé (multi-lignes)
+    const lines = [];
+    if (hasPublic) {
+      data.public.forEach(h => {
+        lines.push(`🎉 ${h.name}${!h.nationwide && h.subdivisions.length ? ' (' + h.subdivisions.join(', ') + ')' : ''}`);
+      });
+    }
+    if (hasSchool) {
+      data.school.forEach(h => {
+        const loc = !h.nationwide && h.subdivisions.length ? ' (' + h.subdivisions.join(', ') + ')' : '';
+        lines.push(`🎒 ${h.name}${loc}`);
+      });
+    }
+    const tip = `${data.label}\n${lines.join('\n')}`;
+    parts.push(`<span class="${cls}" title="${tip.replace(/"/g,'&quot;').replace(/\n/g,'&#10;')}">${data.flag}${icon}</span>`);
   }
   return `<div class="hol-badges">${parts.join('')}</div>`;
 }
