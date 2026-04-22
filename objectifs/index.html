@@ -59,6 +59,14 @@
     input.obj-input.modified { border-color: var(--accent); background: var(--accent-light); }
     input.comm-input { width: 100%; min-width: 150px; padding: 5px 6px; border: 1px solid var(--gray-200); border-radius: 4px; font-size: 0.75rem; }
 
+    /* Badges jours fériés / vacances */
+    .hol-badges { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 4px; max-width: 260px; }
+    .hol-badge { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; cursor: help; line-height: 1.3; white-space: nowrap; }
+    .hol-badge.public { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .hol-badge.school { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .hol-badge.school.local { background: #eff6ff; color: #3b82f6; border: 1px solid #dbeafe; font-style: italic; }
+    .hol-empty { color: var(--gray-300); font-size: 0.68rem; margin-bottom: 3px; }
+
     .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; }
     .badge.auto { background: var(--blue-light); color: var(--blue); }
     .badge.manuel { background: var(--accent-light); color: var(--accent-dark); }
@@ -116,7 +124,10 @@
     </div>
   </div>
 
-  <div class="legend-line">Saisissez un objectif pour le figer. Laissez vide pour laisser le calcul auto. <strong>Entrée</strong> ou <strong>Sauver</strong> pour valider.</div>
+  <div class="legend-line">
+    Saisissez un objectif pour le figer. <strong>Entrée</strong> ou <strong>Sauver</strong> pour valider.
+    <span style="margin-left:10px;">Badges : <span class="hol-badge public" style="cursor:default;">🎉 jour férié</span> <span class="hol-badge school" style="cursor:default;">🎒 vacances scolaires</span> (survoler pour détails)</span>
+  </div>
 
   <div class="content">
     <div class="card">
@@ -161,7 +172,20 @@ let currentEtab = 'freddy';
 let currentMonth = new Date();
 let allSales = [];      // ventes_journalieres
 let allObj = [];        // objectifs_ventes
+let allHolidays = [];   // jours fériés + vacances scolaires (API openholidaysapi.org)
 let pendingChanges = {}; // { 'YYYY-MM-DD': { obj: N, comm: '...' } }
+
+// 8 pays cibles pour les jours fériés + vacances scolaires
+const HOLIDAY_COUNTRIES = [
+  { code: 'FR', flag: '🇫🇷', label: 'France' },
+  { code: 'DE', flag: '🇩🇪', label: 'Allemagne' },
+  { code: 'CH', flag: '🇨🇭', label: 'Suisse' },
+  { code: 'LU', flag: '🇱🇺', label: 'Luxembourg' },
+  { code: 'BE', flag: '🇧🇪', label: 'Belgique' },
+  { code: 'ES', flag: '🇪🇸', label: 'Espagne' },
+  { code: 'IT', flag: '🇮🇹', label: 'Italie' },
+  { code: 'PT', flag: '🇵🇹', label: 'Portugal' }
+];
 
 document.addEventListener('DOMContentLoaded', () => {
   const userData = sessionStorage.getItem('planb_user');
@@ -226,7 +250,8 @@ async function loadAll() {
   try {
     const [salesRes, objRes] = await Promise.all([
       sb.from('ventes_journalieres').select('*').order('date', { ascending: true }),
-      sb.from('objectifs_ventes').select('*').order('date', { ascending: true })
+      sb.from('objectifs_ventes').select('*').order('date', { ascending: true }),
+      loadHolidays() // lancé en parallèle, non-bloquant (remplit allHolidays)
     ]);
     if (salesRes.error) throw salesRes.error;
     if (objRes.error) throw objRes.error;
@@ -237,6 +262,90 @@ async function loadAll() {
     showToast('Erreur chargement : ' + e.message, 'error');
   }
   showLoading(false);
+}
+
+// Charge jours fériés + vacances scolaires pour les 8 pays et 3 ans (N-1, N, N+1)
+async function loadHolidays() {
+  // localStorage cache (1 jour) pour éviter les appels répétés
+  const CACHE_KEY = 'planb_holidays_v1';
+  const CACHE_TTL_MS = 24 * 3600 * 1000;
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed.timestamp && (Date.now() - parsed.timestamp) < CACHE_TTL_MS && parsed.data) {
+        allHolidays = parsed.data;
+        return;
+      }
+    }
+  } catch (e) {}
+
+  const year = new Date().getFullYear();
+  const from = `${year - 1}-01-01`;
+  const to = `${year + 1}-12-31`;
+
+  const calls = [];
+  for (const c of HOLIDAY_COUNTRIES) {
+    for (const ep of ['PublicHolidays', 'SchoolHolidays']) {
+      const url = `https://openholidaysapi.org/${ep}?countryIsoCode=${c.code}&validFrom=${from}&validTo=${to}&languageIsoCode=FR`;
+      calls.push(
+        fetch(url, { headers: { Accept: 'application/json' } })
+          .then(r => r.ok ? r.json() : [])
+          .then(list => (list || []).map(h => ({
+            country: c.code,
+            flag: c.flag,
+            countryLabel: c.label,
+            type: ep === 'PublicHolidays' ? 'public' : 'school',
+            startDate: h.startDate,
+            endDate: h.endDate,
+            name: (h.name && h.name[0] && h.name[0].text) || '',
+            nationwide: !!h.nationwide,
+            subdivisions: (h.subdivisions || []).map(s => s.shortName || s.code).filter(Boolean)
+          })))
+          .catch(() => [])
+      );
+    }
+  }
+  try {
+    const results = await Promise.all(calls);
+    allHolidays = results.flat();
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data: allHolidays })); } catch (e) {}
+  } catch (e) {
+    allHolidays = [];
+  }
+}
+
+// Renvoie les jours fériés et vacances pour une date
+function getHolidaysFor(dStr) {
+  return allHolidays.filter(h => h.startDate <= dStr && h.endDate >= dStr);
+}
+
+// Génère le HTML des badges (jours fériés + vacances scolaires)
+function renderHolidayBadges(dStr) {
+  const hol = getHolidaysFor(dStr);
+  if (!hol.length) return '';
+  // Grouper par pays + type
+  const byCountry = {};
+  hol.forEach(h => {
+    if (!byCountry[h.country]) byCountry[h.country] = { flag: h.flag, label: h.countryLabel, public: [], school: [] };
+    byCountry[h.country][h.type].push(h);
+  });
+  const parts = [];
+  for (const [cc, data] of Object.entries(byCountry)) {
+    // Jours fériés (toujours nationaux ou très localisés)
+    data.public.forEach(h => {
+      const tip = `${data.label} — ${h.name}${!h.nationwide && h.subdivisions.length ? ' (' + h.subdivisions.join(', ') + ')' : ''}`;
+      parts.push(`<span class="hol-badge public" title="${tip.replace(/"/g,'&quot;')}">${data.flag}🎉</span>`);
+    });
+    // Vacances scolaires
+    data.school.forEach(h => {
+      const isLocal = !h.nationwide && h.subdivisions.length;
+      const tip = `${data.label} — ${h.name}${isLocal ? ' (' + h.subdivisions.join(', ') + ')' : ''}`;
+      const cls = isLocal ? 'hol-badge school local' : 'hol-badge school';
+      parts.push(`<span class="${cls}" title="${tip.replace(/"/g,'&quot;')}">${data.flag}🎒${isLocal ? h.subdivisions[0].substring(0,3) : ''}</span>`);
+    });
+  }
+  return `<div class="hol-badges">${parts.join('')}</div>`;
 }
 
 function render() {
@@ -292,7 +401,8 @@ function render() {
           ? `<span class="badge ${source}">${source}</span>`
           : `<span class="badge none">—</span>`}
       </td>
-      <td>
+      <td style="min-width:200px;">
+        ${renderHolidayBadges(curStr)}
         <input type="text" class="comm-input" placeholder="Commentaire…"
           value="${(effectiveComm || '').replace(/"/g, '&quot;')}"
           oninput="markPending('${curStr}', 'comm', this.value)"
