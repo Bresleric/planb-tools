@@ -407,7 +407,13 @@ function trendArrow(pct) {
   return pct >= 0 ? '↑' : '↓';
 }
 
-function dateStr(d) { return d.toISOString().split('T')[0]; }
+// Important : composants locaux pour éviter le décalage UTC (fuseau horaire)
+function dateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function dateFR(d, opts) {
   const o = Object.assign({ day: 'numeric', month: 'short', year: 'numeric' }, opts || {});
   return d.toLocaleDateString('fr-FR', o);

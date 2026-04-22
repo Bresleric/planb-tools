@@ -187,6 +187,35 @@ const HOLIDAY_COUNTRIES = [
   { code: 'PT', flag: '🇵🇹', label: 'Portugal' }
 ];
 
+// Traduction des codes ISO 3166-2 → noms lisibles (tooltip plus clair)
+const SUBDIV_NAMES = {
+  // France - Outre-mer
+  'MF': 'Martinique', 'BL': 'Saint-Barthélemy', 'GP': 'Guadeloupe', 'GF': 'Guyane',
+  'RE': 'La Réunion', 'YT': 'Mayotte', 'NC': 'Nouvelle-Calédonie',
+  'PF': 'Polynésie française', 'WF': 'Wallis-et-Futuna', 'PM': 'Saint-Pierre-et-Miquelon',
+  // France - Régions / zones
+  'IF': 'Île-de-France', 'OC': 'Occitanie', 'ZA': 'Zone A', 'ZB': 'Zone B (Strasbourg)', 'ZC': 'Zone C',
+  'ARA': 'Auvergne-Rhône-Alpes', 'NOR': 'Normandie', 'HDF': 'Hauts-de-France',
+  'GES': 'Grand Est (Strasbourg)', 'BFC': 'Bourgogne-Franche-Comté', 'NAQ': 'Nouvelle-Aquitaine',
+  'PDL': 'Pays de la Loire', 'BRE': 'Bretagne', 'CVL': 'Centre-Val de Loire',
+  'PAC': "Provence-Alpes-Côte d'Azur", 'COR': 'Corse',
+  // Allemagne - Länder
+  'BW': 'Bade-Wurtemberg', 'BY': 'Bavière', 'BE': 'Berlin', 'BB': 'Brandebourg',
+  'HB': 'Brême', 'HH': 'Hambourg', 'HE': 'Hesse', 'MV': 'Mecklembourg-Poméranie',
+  'NI': 'Basse-Saxe', 'NW': 'Rhénanie-du-Nord-Westphalie', 'RP': 'Rhénanie-Palatinat',
+  'SL': 'Sarre', 'SN': 'Saxe', 'ST': 'Saxe-Anhalt', 'SH': 'Schleswig-Holstein', 'TH': 'Thuringe',
+  // Belgique
+  'VLG': 'Flandre', 'WAL': 'Wallonie', 'BRU': 'Bruxelles-Capitale',
+  // Suisse - cantons (principaux)
+  'ZH': 'Zurich', 'BE-CH': 'Berne', 'LU-CH': 'Lucerne', 'UR': 'Uri', 'SZ': 'Schwytz',
+  'OW': 'Obwald', 'NW-CH': 'Nidwald', 'GL': 'Glaris', 'ZG': 'Zoug', 'FR-CH': 'Fribourg',
+  'SO': 'Soleure', 'BS': 'Bâle-Ville', 'BL-CH': 'Bâle-Campagne', 'SH-CH': 'Schaffhouse',
+  'AR': 'Appenzell Rh.-Ext.', 'AI': 'Appenzell Rh.-Int.', 'SG': 'Saint-Gall', 'GR': 'Grisons',
+  'AG': 'Argovie', 'TG': 'Thurgovie', 'TI': 'Tessin', 'VD': 'Vaud', 'VS': 'Valais',
+  'NE-CH': 'Neuchâtel', 'GE': 'Genève', 'JU': 'Jura'
+};
+function readableSubdiv(code) { return SUBDIV_NAMES[code] || code; }
+
 document.addEventListener('DOMContentLoaded', () => {
   const userData = sessionStorage.getItem('planb_user');
   if (!userData) { window.location.href = '../'; return; }
@@ -241,7 +270,14 @@ function computeAutoObj(etab, caN1, dowCur) {
   return 0;
 }
 
-function dateStr(d) { return d.toISOString().split('T')[0]; }
+// Important : utiliser les composants locaux (pas toISOString qui convertit en UTC)
+// pour éviter un décalage d'un jour selon le fuseau horaire.
+function dateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function fmtEur(n) { if (!n && n !== 0) return '—'; return n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'; }
 function fmtEur2(n) { if (!n && n !== 0) return ''; return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -267,7 +303,9 @@ async function loadAll() {
 // Charge jours fériés + vacances scolaires pour les 8 pays et 3 ans (N-1, N, N+1)
 async function loadHolidays() {
   // localStorage cache (1 jour) pour éviter les appels répétés
-  const CACHE_KEY = 'planb_holidays_v1';
+  const CACHE_KEY = 'planb_holidays_v2'; // v2 : après correction fuseau horaire
+  // Nettoyer l'ancien cache v1 pour forcer un rechargement propre
+  try { localStorage.removeItem('planb_holidays_v1'); } catch (e) {}
   const CACHE_TTL_MS = 24 * 3600 * 1000;
   try {
     const cached = localStorage.getItem(CACHE_KEY);
@@ -341,14 +379,15 @@ function renderHolidayBadges(dStr) {
     const icon = (hasPublic && hasSchool) ? '🎉' : (hasPublic ? '🎉' : '🎒');
     // Construction du tooltip détaillé (multi-lignes)
     const lines = [];
+    const subdivText = (subs) => subs.map(readableSubdiv).join(', ');
     if (hasPublic) {
       data.public.forEach(h => {
-        lines.push(`🎉 ${h.name}${!h.nationwide && h.subdivisions.length ? ' (' + h.subdivisions.join(', ') + ')' : ''}`);
+        lines.push(`🎉 ${h.name}${!h.nationwide && h.subdivisions.length ? ' — ' + subdivText(h.subdivisions) : ''}`);
       });
     }
     if (hasSchool) {
       data.school.forEach(h => {
-        const loc = !h.nationwide && h.subdivisions.length ? ' (' + h.subdivisions.join(', ') + ')' : '';
+        const loc = !h.nationwide && h.subdivisions.length ? ' — ' + subdivText(h.subdivisions) : '';
         lines.push(`🎒 ${h.name}${loc}`);
       });
     }
