@@ -200,7 +200,7 @@
 <body>
   <header class="header">
     <div class="header-left">
-      <a href="./" class="btn-back">← Retour</a>
+      <a href="./" class="btn-back">← Administration</a>
       <h1>👥 Salariés</h1>
     </div>
     <div class="header-right">
@@ -549,6 +549,16 @@ function checkPortalSession() {
   }
   currentUser = JSON.parse(userData);
   currentEtablissement = etab;
+
+  // ============= CONTRÔLE D'ACCÈS — ADMIN UNIQUEMENT =============
+  // Cet écran contient des données RH sensibles (AVS, salaire, IBAN).
+  // Accès strictement réservé aux administrateurs.
+  if (currentUser.role !== 'admin') {
+    alert('⛔ Accès refusé\n\nLa gestion des fiches salariés est réservée aux administrateurs.\n\nContacte un administrateur si tu as besoin de modifier une fiche.');
+    window.location.href = '../index.html';
+    return;
+  }
+
   document.getElementById('user-info').textContent = `${currentUser.initiales || currentUser.nom} • ${currentEtablissement}`;
   document.getElementById('filter-etab').value = currentEtablissement;
   loadData();
