@@ -394,6 +394,91 @@
       color: var(--red); font-size: 0.85rem; margin-top: 12px;
       display: none;
     }
+
+    /* ============ ELIS ============ */
+    .elis-mouv-card {
+      background: white; border-radius: var(--radius-lg); padding: 14px;
+      margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid var(--gray-200);
+      cursor: pointer;
+    }
+    .elis-mouv-card:active { opacity: .85; }
+    .elis-mouv-card .type-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 0.7rem; font-weight: 600;
+    }
+    .elis-mouv-card .type-badge.inventaire { background: var(--amber-bg); color: var(--amber); }
+    .elis-mouv-card .type-badge.passage { background: var(--blue-bg); color: var(--blue); }
+
+    .elis-type-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+    .elis-type-toggle .type-btn {
+      flex: 1; padding: 10px; border-radius: var(--radius);
+      border: 1px solid var(--gray-200); background: white;
+      font-size: 0.9rem; font-weight: 600; color: var(--gray-500); cursor: pointer;
+    }
+    .elis-type-toggle .type-btn.active {
+      border-color: var(--purple); background: var(--purple-light); color: var(--purple);
+    }
+
+    .elis-section {
+      margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--gray-200);
+    }
+    .elis-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    .elis-section h3 {
+      font-size: 0.8rem; font-weight: 700; color: var(--purple);
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .elis-article-row { padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+    .elis-article-row:last-child { border-bottom: none; }
+    .elis-article-name {
+      font-size: 0.85rem; font-weight: 600; color: var(--gray-700);
+      margin-bottom: 2px;
+    }
+    .elis-article-meta {
+      font-size: 0.7rem; color: var(--gray-400); margin-bottom: 6px;
+    }
+    .elis-article-inputs {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    }
+    .elis-article-inputs.two-cols { grid-template-columns: repeat(2, 1fr); }
+    .elis-input-group { display: flex; flex-direction: column; gap: 2px; }
+    .elis-input-label {
+      font-size: 0.65rem; color: var(--gray-400); font-weight: 600;
+      text-align: center; text-transform: uppercase;
+    }
+    .elis-input-label.retour { color: var(--amber); }
+    .elis-input-label.livre  { color: var(--green-dark); }
+    .elis-input-label.stock  { color: var(--purple); }
+    .elis-article-inputs input[type="number"] {
+      width: 100%; padding: 8px 6px; text-align: center; font-size: 0.95rem;
+      border: 1px solid var(--gray-200); border-radius: var(--radius);
+      background: white; -moz-appearance: textfield; -webkit-appearance: none;
+    }
+    .elis-article-inputs input[type="number"]::-webkit-outer-spin-button,
+    .elis-article-inputs input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .elis-article-inputs input:focus {
+      outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px rgba(139,92,246,.15);
+    }
+
+    .elis-summary {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-top: 6px; font-size: 0.75rem; color: var(--gray-500);
+    }
+    .elis-summary .kv { display: flex; gap: 4px; }
+    .elis-summary .kv b { color: var(--gray-700); }
+
+    .elis-view-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 8px; }
+    .elis-view-table th {
+      background: var(--gray-100); padding: 6px; text-align: left;
+      font-size: .7rem; text-transform: uppercase; color: var(--gray-500);
+    }
+    .elis-view-table th.num, .elis-view-table td.num { text-align: center; }
+    .elis-view-table td { padding: 6px; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
+    .elis-view-table tr:last-child td { border-bottom: none; }
+    .elis-view-table .art-name { font-weight: 600; color: var(--gray-700); }
+    .elis-view-table .art-meta { font-size: .7rem; color: var(--gray-400); }
   </style>
 </head>
 <body>
@@ -438,6 +523,7 @@
   <div class="tabs-bar">
     <button class="tab-btn active" data-tab="factures" onclick="switchMainTab('factures')">📄 Factures/BL</button>
     <button class="tab-btn" data-tab="etiquettes" onclick="switchMainTab('etiquettes')">🏷️ Etiquettes</button>
+    <button class="tab-btn" data-tab="elis" onclick="switchMainTab('elis')">🧺 ELIS</button>
     <button class="tab-btn" data-tab="historique" onclick="switchMainTab('historique')">📊 Historique</button>
   </div>
 
@@ -462,58 +548,25 @@
       <div id="factures-list"></div>
     </div>
 
-    <!-- TAB: ETIQUETTES (Scan au kilomètre) -->
+    <!-- TAB: ETIQUETTES -->
     <div class="tab-content" id="tab-etiquettes">
-
-      <!-- Bouton nouvelle réception -->
-      <div style="padding:12px 0;">
-        <button onclick="openNewReception()" class="btn btn-primary btn-full" style="padding:14px;font-size:1rem;background:linear-gradient(135deg,var(--purple),var(--purple-dark));">
-          📦 Nouvelle reception d'etiquettes
-        </button>
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-sub="all" onclick="filterDocs('etiquettes','all')">Tous</button>
+        <button class="sub-tab" data-sub="en_attente" onclick="filterDocs('etiquettes','en_attente')">En attente</button>
+        <button class="sub-tab" data-sub="valide" onclick="filterDocs('etiquettes','valide')">Valides</button>
       </div>
+      <div id="etiquettes-list"></div>
+    </div>
 
-      <!-- Session active de scan -->
-      <div id="rec-active" class="hidden">
-        <div style="background:white;border-radius:12px;padding:16px;box-shadow:var(--shadow-md);border:2px solid var(--purple);margin-bottom:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
-            <div>
-              <div style="font-weight:700;font-size:1rem;color:var(--purple);" id="rec-fournisseur-label"></div>
-              <div style="font-size:.8rem;color:var(--gray-500);" id="rec-piece-label"></div>
-            </div>
-            <span class="badge badge-waiting" id="rec-count-badge">0 etiquette</span>
-          </div>
-
-          <!-- Gros bouton photo -->
-          <div style="text-align:center;padding:20px 0;">
-            <button onclick="recTakePhoto()" style="
-              width:100px;height:100px;border-radius:50%;border:none;
-              background:linear-gradient(135deg,var(--purple),var(--purple-dark));
-              color:white;font-size:2.5rem;cursor:pointer;
-              box-shadow:0 6px 20px rgba(139,92,246,.4);
-              display:inline-flex;align-items:center;justify-content:center;
-            ">📷</button>
-            <div style="margin-top:8px;font-size:.9rem;font-weight:700;color:var(--purple);">Scanner une etiquette</div>
-            <div style="font-size:.75rem;color:var(--gray-400);margin-top:2px;">Une photo par etiquette — scan au kilometre</div>
-          </div>
-
-          <!-- Strip de miniatures -->
-          <div id="rec-thumbs" style="display:flex;gap:6px;overflow-x:auto;padding:8px 0;"></div>
-
-          <!-- Boutons actions -->
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button onclick="recImportPDF()" class="btn btn-outline" style="flex:1;font-size:.8rem;">📄 Import PDF</button>
-            <button onclick="recFinish()" class="btn btn-success" style="flex:2;justify-content:center;" id="rec-finish-btn" disabled>
-              ✅ Terminer et analyser
-            </button>
-          </div>
-        </div>
+    <!-- TAB: ELIS -->
+    <div class="tab-content" id="tab-elis">
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-sub="all"         onclick="filterElis('all')">Tous</button>
+        <button class="sub-tab"        data-sub="inventaire"  onclick="filterElis('inventaire')">Inventaires</button>
+        <button class="sub-tab"        data-sub="passage"     onclick="filterElis('passage')">Passages</button>
       </div>
-
-      <!-- Historique des réceptions d'étiquettes -->
-      <div style="font-weight:600;font-size:.9rem;color:var(--gray-600);margin:8px 0;">Receptions recentes</div>
-      <div id="rec-history">
-        <div class="empty"><div class="icon">🏷️</div><div class="text">Aucune reception d'etiquettes</div></div>
-      </div>
+      <div id="elis-stats"></div>
+      <div id="elis-list"></div>
     </div>
 
     <!-- TAB: HISTORIQUE -->
@@ -572,28 +625,19 @@
       <!-- Document import -->
       <div class="form-section">
         <label class="form-label required">Document scanne</label>
-        <div id="doc-scan-actions" style="display:flex;gap:8px;margin-bottom:8px;">
-          <button type="button" onclick="triggerDocCamera()" style="flex:2;padding:14px 12px;background:linear-gradient(135deg,var(--purple),var(--purple-dark));color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 4px 12px rgba(139,92,246,.3);">
-            <span style="font-size:1.3rem;">📷</span> Prendre en photo
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button type="button" onclick="openScannerPro()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+            <span style="font-size:1.1rem;">📷</span> Ouvrir Scanner Pro
           </button>
-          <button type="button" onclick="triggerImport()" style="flex:1;padding:14px 12px;background:var(--gray-100);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:10px;font-size:.8rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
-            📄 PDF
+          <button type="button" onclick="triggerImport()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#48bb78,#38a169);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+            <span style="font-size:1.1rem;">📄</span> Importer PDF
           </button>
         </div>
-        <input type="file" id="doc-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleDocCamera(event)">
-        <!-- Résumé capture (masqué par défaut) -->
-        <div id="doc-capture-summary" class="hidden" style="background:var(--purple-light);border-radius:10px;padding:12px;margin-bottom:8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:1.2rem;">✅</span>
-              <span style="font-weight:600;color:var(--purple);" id="doc-capture-text">1 page capturee</span>
-            </div>
-            <div id="doc-capture-thumbs" style="display:flex;gap:4px;"></div>
-          </div>
-        </div>
-        <div class="photo-capture-area" onclick="triggerDocCamera()" id="doc-drop-area" style="padding:12px;">
-          <div style="font-size:.75rem;color:var(--gray-400);">Prenez en photo la facture ou le BL</div>
+        <div class="photo-capture-area" onclick="triggerImport()" style="padding:12px;">
           <div class="count" id="file-count">Aucun fichier</div>
+          <div id="file-hint" style="font-size:.7rem;color:var(--gray-400);margin-top:4px;line-height:1.4;">
+            Parcourir → iCloud Drive → <b style="color:var(--gray-600);">BALPlanB-Tools</b>
+          </div>
         </div>
         <div id="file-preview" style="margin-top:10px;"></div>
       </div>
@@ -624,50 +668,65 @@
   </div>
 </div>
 
-<!-- ====== MODAL: NOUVELLE RECEPTION ====== -->
-<div class="modal-overlay" id="modal-reception">
+<!-- ====== MODAL: NEW ELIS MOUVEMENT ====== -->
+<div class="modal-overlay" id="modal-elis-new">
   <div class="modal">
     <div class="modal-header">
-      <h2>📦 Nouvelle reception</h2>
-      <button class="modal-close" onclick="closeModal('modal-reception')">×</button>
+      <h2 id="modal-elis-new-title">Nouveau mouvement ELIS</h2>
+      <button class="modal-close" onclick="closeModal('modal-elis-new')">×</button>
     </div>
     <div class="modal-body">
+
+      <!-- Type de mouvement -->
       <div class="form-section">
-        <label class="form-label required">Fournisseur</label>
-        <select id="rec-fournisseur">
-          <option value="">-- Choisir le fournisseur --</option>
-        </select>
-      </div>
-      <div class="form-section">
-        <label class="form-label">Type de piece</label>
-        <div style="display:flex;gap:8px;">
-          <button type="button" class="btn btn-primary" id="rec-type-bl" onclick="recSetType('bl')" style="flex:1;justify-content:center;background:var(--purple);">📋 BL</button>
-          <button type="button" class="btn btn-outline" id="rec-type-facture" onclick="recSetType('facture')" style="flex:1;justify-content:center;">📄 Facture</button>
+        <label class="form-label required">Type de mouvement</label>
+        <div class="elis-type-toggle">
+          <button type="button" class="type-btn active" data-elis-type="inventaire" onclick="setElisType('inventaire')">📋 Inventaire</button>
+          <button type="button" class="type-btn"        data-elis-type="passage"    onclick="setElisType('passage')">🚛 Passage ELIS</button>
+        </div>
+        <div id="elis-type-help" style="font-size:.75rem;color:var(--gray-500);line-height:1.4;">
+          <b>Inventaire</b> : comptage avant passage — <b>Sale</b> (à retourner) + <b>Stock propre</b> restant.
         </div>
       </div>
+
+      <!-- Date -->
       <div class="form-section">
-        <label class="form-label">Numero de piece</label>
-        <input type="text" id="rec-reference" placeholder="Ex: BL-2026-04-16, FA-042...">
+        <label class="form-label required">Date</label>
+        <input type="date" id="elis-form-date">
       </div>
+
+      <!-- BL number (passage only) -->
+      <div class="form-section hidden" id="elis-form-bl-section">
+        <label class="form-label">N° Bon de livraison</label>
+        <input type="text" id="elis-form-bl" placeholder="Ex: BL-20260424-001">
+      </div>
+
+      <!-- Articles groupés par service -->
+      <div id="elis-articles-form"></div>
+
+      <!-- Observation -->
+      <div class="form-section" style="margin-top:14px;">
+        <label class="form-label">Observation / anomalie</label>
+        <textarea id="elis-form-observation" placeholder="Article manquant, qualité insuffisante, report, etc."></textarea>
+      </div>
+
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-reception')" style="flex:1;">Annuler</button>
-      <button class="btn btn-primary" onclick="recStartSession()" style="flex:2;justify-content:center;background:var(--purple);">📷 Commencer le scan</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-elis-new')" style="flex:1;">Annuler</button>
+      <button class="btn btn-primary" onclick="submitElisMouvement()" id="btn-elis-submit" style="flex:2;">Enregistrer</button>
     </div>
   </div>
 </div>
 
-<!-- ====== MODAL: RESULTATS RECEPTION ====== -->
-<div class="modal-overlay" id="modal-rec-results">
+<!-- ====== MODAL: VIEW ELIS MOUVEMENT ====== -->
+<div class="modal-overlay" id="modal-elis-view">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="rec-results-title">Resultats</h2>
-      <button class="modal-close" onclick="closeModal('modal-rec-results')">×</button>
+      <h2 id="modal-elis-view-title">Mouvement ELIS</h2>
+      <button class="modal-close" onclick="closeModal('modal-elis-view')">×</button>
     </div>
-    <div class="modal-body" id="rec-results-body"></div>
-    <div class="modal-footer">
-      <button class="btn btn-primary btn-full" onclick="closeModal('modal-rec-results');loadRecHistory();" style="background:var(--purple);">Fermer</button>
-    </div>
+    <div class="modal-body" id="modal-elis-view-body"></div>
+    <div class="modal-footer" id="modal-elis-view-footer"></div>
   </div>
 </div>
 
@@ -694,8 +753,6 @@
 
 <!-- Hidden file input for import (PDF + images) -->
 <input type="file" id="file-input" class="hidden-input" accept="application/pdf">
-<input type="file" id="rec-camera-input" class="hidden-input" accept="image/*" capture="environment">
-<input type="file" id="rec-pdf-input" class="hidden-input" accept="application/pdf">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -726,10 +783,11 @@
   let viewerPages = [];
   let viewerIndex = 0;
 
-  // Reception scan session state
-  let recSession = null;
-  let recPhotos = [];
-  let recTypePiece = 'bl';
+  // ELIS state
+  let elisArticles = [];
+  let elisMouvements = [];
+  let elisFilter = 'all';
+  let currentElisType = 'inventaire';
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -822,30 +880,40 @@
       return data || [];
     },
 
-    // Reception sessions (scan au kilomètre)
-    async createRecSession(session) {
-      const { data, error } = await supabaseClient.from('reception_sessions').insert(session).select();
+    // ===== ELIS =====
+    async getElisArticles(etab) {
+      const { data, error } = await supabaseClient.from('elis_articles')
+        .select('*').eq('etablissement', etab).eq('actif', true)
+        .order('ordre');
+      if (error) console.error('getElisArticles:', error);
+      return data || [];
+    },
+    async getElisMouvements(etab, dateFrom, dateTo) {
+      const { data, error } = await supabaseClient.from('elis_mouvements').select(`
+        *,
+        lignes:elis_mouvements_lignes(
+          id, article_id, qty_retour, qty_livre, qty_stock,
+          article:elis_articles(id, nom, service, stock_theorique, pu_ht_hebdo, ordre)
+        )
+      `)
+        .eq('etablissement', etab)
+        .gte('date', dateFrom).lte('date', dateTo)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) console.error('getElisMouvements:', error);
+      return data || [];
+    },
+    async insertElisMouvement(mv) {
+      const { data, error } = await supabaseClient.from('elis_mouvements')
+        .insert(mv).select();
       if (error) throw error;
       return data?.[0];
     },
-    async updateRecSession(id, updates) {
-      const { error } = await supabaseClient.from('reception_sessions').update(updates).eq('id', id);
+    async insertElisLignes(lignes) {
+      if (!lignes.length) return;
+      const { error } = await supabaseClient.from('elis_mouvements_lignes')
+        .insert(lignes);
       if (error) throw error;
-    },
-    async getRecSessions(etab, limit = 20) {
-      const { data } = await supabaseClient.from('reception_sessions').select('*')
-        .eq('etablissement', etab).order('created_at', { ascending: false }).limit(limit);
-      return data || [];
-    },
-    async insertEtiquette(etiq) {
-      const { data, error } = await supabaseClient.from('etiquettes_data').insert(etiq).select();
-      if (error) throw error;
-      return data?.[0];
-    },
-    async getEtiquettesBySession(sessionId) {
-      const { data } = await supabaseClient.from('etiquettes_data').select('*')
-        .eq('session_id', sessionId).order('created_at');
-      return data || [];
     }
   };
 
@@ -928,9 +996,12 @@
     document.querySelectorAll('.tab-content').forEach(c =>
       c.classList.toggle('active', c.id === `tab-${tab}`)
     );
-    document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique' || tab === 'etiquettes');
+    document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique');
+    // Hide date bar on ELIS tab (mouvements are shown on a 90-day window, not per day)
+    const dateBar = document.querySelector('.date-bar');
+    if (dateBar) dateBar.classList.toggle('hidden', tab === 'elis');
     if (tab === 'historique') loadHistorique();
-    else if (tab === 'etiquettes') loadRecHistory();
+    else if (tab === 'elis') loadElisData();
     else renderDocuments();
   }
 
@@ -1038,6 +1109,8 @@
 
   // ====== NEW DOCUMENT ======
   function openNewDocModal() {
+    // Dispatch to ELIS modal when on ELIS tab
+    if (currentMainTab === 'elis') return openNewElisModal();
     const typeSelect = document.getElementById('form-type');
     typeSelect.value = currentMainTab === 'etiquettes' ? 'etiquette' : 'facture';
     onTypeChange();
@@ -1047,13 +1120,6 @@
     document.getElementById('form-observation').value = '';
     importedFile = null;
     updateFilePreview();
-    // Reset état capture caméra
-    const docActions = document.getElementById('doc-scan-actions');
-    const docSummary = document.getElementById('doc-capture-summary');
-    const docDrop = document.getElementById('doc-drop-area');
-    if (docActions) docActions.classList.remove('hidden');
-    if (docSummary) docSummary.classList.add('hidden');
-    if (docDrop) docDrop.classList.remove('hidden');
     loadCommandes();
     document.getElementById('modal-new').classList.add('show');
   }
@@ -1067,129 +1133,28 @@
       isFacture ? 'Nouvelle facture / BL' : 'Nouvelle etiquette';
   }
 
-  // ====== CAMERA DIRECTE POUR FACTURES/BL ======
-  function triggerDocCamera() {
-    const input = document.getElementById('doc-camera-input');
-    input.value = '';
-    input.click();
-  }
-
-  async function handleDocCamera(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    showOcrOverlay(true, 'Traitement de la photo...', 20);
-
-    try {
-      const dataUri = await fileToDataUri(file);
-      const compressed = await compressImage(dataUri, 1400, 0.7);
-      const thumb = await compressImage(dataUri, 200, 0.4);
-
-      showOcrOverlay(true, 'Extraction du texte (OCR)...', 50);
-      const ocrText = await runOcrOnImage(compressed);
-
-      // Construire importedFile
-      importedFile = {
-        type: 'image',
-        dataUri: compressed,
-        name: `photo_${new Date().toISOString().slice(0,10)}.jpg`,
-        pageImages: [thumb],
-        fullImages: [compressed],
-        textContent: ocrText,
-        nbPages: 1
-      };
-
-      showOcrOverlay(false);
-      updateFilePreview();
-
-      // Afficher résumé capture, masquer boutons
-      const actions = document.getElementById('doc-scan-actions');
-      const summary = document.getElementById('doc-capture-summary');
-      const dropArea = document.getElementById('doc-drop-area');
-      if (actions) actions.classList.add('hidden');
-      if (dropArea) dropArea.classList.add('hidden');
-      if (summary) {
-        summary.classList.remove('hidden');
-        document.getElementById('doc-capture-text').textContent = '1 page capturee';
-        document.getElementById('doc-capture-thumbs').innerHTML =
-          `<img src="${thumb}" style="width:36px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200);">`;
-      }
-
-      // Auto-détection fournisseur et référence depuis OCR
-      if (ocrText) {
-        autoFillDocFromOCR(ocrText);
-      }
-
-      showToast('Photo capturee ✓', 'success');
-    } catch (err) {
-      console.error('Camera capture error:', err);
-      showOcrOverlay(false);
-      showToast('Erreur de capture', 'error');
-    }
-  }
-
-  // Auto-remplissage du formulaire Factures/BL depuis OCR
-  function autoFillDocFromOCR(text) {
-    if (!text) return;
-    const t = text.toLowerCase();
-
-    // Détecter fournisseur depuis le texte OCR
-    const fournSelect = document.getElementById('form-fournisseur');
-    if (fournSelect) {
-      for (const opt of fournSelect.options) {
-        if (!opt.value) continue;
-        const nom = opt.textContent.toLowerCase().trim();
-        if (nom.length > 2 && t.includes(nom)) {
-          fournSelect.value = opt.value;
-          break;
-        }
-      }
-    }
-
-    // Détecter référence (numéro facture/BL)
-    const refField = document.getElementById('form-reference');
-    if (refField && !refField.value) {
-      // Patterns par priorité — du plus spécifique au plus générique
-      const refPatterns = [
-        // 1. "Réf. : FA26-015883" ou "Ref : BL-12345" (format avec préfixe lettres + chiffres)
-        /(?:r[ée]f\.?\s*(?:facture|fact)?)\s*[:\s]+([A-Z]{1,4}\d{1,4}[\-\/]\d{3,10})/i,
-        // 2. "N° Facture : XXX" ou "Facture N° XXX"
-        /(?:n[°o]?\s*(?:facture|fact|fa)|facture\s*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
-        // 3. "N° BL" ou "Bon de livraison N°"
-        /(?:n[°o]?\s*(?:bl|bon\s*de\s*livraison|livraison))\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
-        // 4. "Bon N°" / "Pièce N°" / "Réf. N°"
-        /(?:bon\s*n[°o]?|pi[eè]ce\s*n[°o]?)\s*[:\s]*([A-Z0-9][\w\-\/\.]{3,20})/i,
-        // 5. "Réf." suivi d'un code alphanumérique (catch-all pour Réf.)
-        /(?:r[ée]f\.?)\s*[:\s]+([A-Z]{1,4}[\d\-\/\.]{4,20})/i,
-      ];
-      // PAS de pattern générique "nombre seul" — trop de faux positifs (SIREN, SIRET, tél, etc.)
-      for (const pattern of refPatterns) {
-        const match = text.match(pattern);
-        if (match?.[1]) {
-          const val = match[1].trim();
-          // Exclure les faux positifs connus
-          if (/^(FR|SIREN|SIRET|TVA|NAF|APE|RCS)/i.test(val)) continue;
-          if (/^\d{9,14}$/.test(val)) continue; // SIREN (9), SIRET (14), tél
-          refField.value = val;
-          break;
-        }
-      }
-    }
-  }
-
-  // ====== SCANNER PRO (legacy) ======
+  // ====== SCANNER PRO ======
   function openScannerPro() {
-    // Try known Readdle Scanner Pro URL schemes
-    const schemes = ['scannerpro://', 'readdle-scannerpro://'];
+    // Show guidance before switching apps
+    const hint = document.getElementById('file-hint');
+    if (hint) {
+      hint.innerHTML = '⏳ <b style="color:var(--primary);">Scanner Pro ouvert</b> — Scannez, sauvegardez dans <b>BALPlanB-Tools</b>, puis revenez et tapez <b>Importer PDF</b>';
+      hint.style.color = 'var(--primary)';
+      hint.style.fontSize = '.8rem';
+    }
+
+    // Try known Readdle Scanner Pro URL scheme
+    window.location.href = 'scannerpro://';
+
+    // If we're still here after 2s, the app didn't open
     const startTime = Date.now();
-
-    // Try first scheme
-    window.location.href = schemes[0];
-
-    // If we're still here after 1.5s, the app didn't open
     setTimeout(() => {
-      if (Date.now() - startTime < 2000) return; // App opened
-      // Try App Store link as fallback
+      if (document.hidden) return; // App opened successfully
+      if (hint) {
+        hint.innerHTML = 'Parcourir → iCloud Drive → <b style="color:var(--gray-600);">BALPlanB-Tools</b>';
+        hint.style.color = 'var(--gray-400)';
+        hint.style.fontSize = '.7rem';
+      }
       const useStore = confirm(
         'Scanner Pro ne s\'est pas ouvert.\n\n' +
         'Verifiez que l\'app est bien installee.\n\n' +
@@ -1198,7 +1163,7 @@
       if (useStore) {
         window.location.href = 'https://apps.apple.com/app/scanner-pro-scan-documents/id333710667';
       }
-    }, 1500);
+    }, 2000);
   }
 
   // ====== FILE IMPORT ======
@@ -1606,423 +1571,6 @@
     }
   }
 
-  // ====== RECEPTION SCAN AU KILOMETRE ======
-
-  function openNewReception() {
-    const sel = document.getElementById('rec-fournisseur');
-    sel.innerHTML = '<option value="">-- Choisir le fournisseur --</option>';
-    fournisseurs.forEach(f => {
-      sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`;
-    });
-    document.getElementById('rec-reference').value = '';
-    recTypePiece = 'bl';
-    recSetType('bl');
-    document.getElementById('modal-reception').classList.add('show');
-  }
-
-  function recSetType(type) {
-    recTypePiece = type;
-    const btnBl = document.getElementById('rec-type-bl');
-    const btnFa = document.getElementById('rec-type-facture');
-    if (type === 'bl') {
-      btnBl.className = 'btn btn-primary'; btnBl.style.cssText = 'flex:1;justify-content:center;background:var(--purple);color:white;';
-      btnFa.className = 'btn btn-outline'; btnFa.style.cssText = 'flex:1;justify-content:center;';
-    } else {
-      btnFa.className = 'btn btn-primary'; btnFa.style.cssText = 'flex:1;justify-content:center;background:var(--purple);color:white;';
-      btnBl.className = 'btn btn-outline'; btnBl.style.cssText = 'flex:1;justify-content:center;';
-    }
-  }
-
-  async function recStartSession() {
-    const fournisseurId = document.getElementById('rec-fournisseur').value;
-    if (!fournisseurId) { showToast('Choisissez un fournisseur', 'error'); return; }
-    const fournisseur = fournisseurs.find(f => f.id === fournisseurId);
-    const reference = document.getElementById('rec-reference').value.trim();
-
-    try {
-      const session = await DB.createRecSession({
-        date: dateStr(new Date()),
-        fournisseur_id: fournisseurId,
-        fournisseur_nom: fournisseur.nom,
-        type_piece: recTypePiece,
-        reference_piece: reference || null,
-        nb_etiquettes: 0,
-        statut: 'en_cours',
-        user_id: currentUser.id,
-        user_nom: currentUser.nom,
-        user_initiales: currentUser.initiales,
-        etablissement: currentEtablissement
-      });
-
-      recSession = session;
-      recPhotos = [];
-      document.getElementById('rec-fournisseur-label').textContent = fournisseur.nom;
-      document.getElementById('rec-piece-label').textContent =
-        (recTypePiece === 'bl' ? '📋 BL' : '📄 Facture') + (reference ? ' — ' + reference : '');
-      document.getElementById('rec-count-badge').textContent = '0 etiquette';
-      document.getElementById('rec-thumbs').innerHTML = '';
-      document.getElementById('rec-finish-btn').disabled = true;
-      document.getElementById('rec-active').classList.remove('hidden');
-      closeModal('modal-reception');
-      showToast('Session demarree — scannez les etiquettes !', 'success');
-    } catch (e) {
-      console.error('Erreur creation session:', e);
-      showToast('Erreur: ' + (e.message || ''), 'error');
-    }
-  }
-
-  function recTakePhoto() {
-    const input = document.getElementById('rec-camera-input');
-    input.value = '';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const dataUri = await fileToDataUri(file);
-      const thumb = await compressImage(dataUri, 120, 0.5);
-      const full = await compressImage(dataUri, 1400, 0.7);
-      recPhotos.push({ full, thumb });
-      updateRecUI();
-      if (navigator.vibrate) navigator.vibrate(50);
-      showToast(`Etiquette ${recPhotos.length} ajoutee`, 'success');
-    };
-    input.click();
-  }
-
-  async function recImportPDF() {
-    const input = document.getElementById('rec-pdf-input');
-    input.value = '';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      showOcrOverlay(true, 'Import PDF...', 10);
-      try {
-        const arrayBuf = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
-        for (let i = 1; i <= pdf.numPages; i++) {
-          showOcrOverlay(true, `Page ${i}/${pdf.numPages}...`, Math.round((i / pdf.numPages) * 90));
-          const page = await pdf.getPage(i);
-          const vp = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement('canvas');
-          canvas.width = vp.width; canvas.height = vp.height;
-          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-          const full = canvas.toDataURL('image/jpeg', 0.8);
-          const thumb = await compressImage(full, 120, 0.5);
-          recPhotos.push({ full, thumb });
-        }
-        updateRecUI();
-        showToast(`${pdf.numPages} page(s) importee(s)`, 'success');
-      } catch (err) {
-        console.error('Erreur import PDF:', err);
-        showToast('Erreur import PDF', 'error');
-      } finally {
-        showOcrOverlay(false);
-      }
-    };
-    input.click();
-  }
-
-  function updateRecUI() {
-    const count = recPhotos.length;
-    document.getElementById('rec-count-badge').textContent = count + ' etiquette' + (count > 1 ? 's' : '');
-    document.getElementById('rec-finish-btn').disabled = count === 0;
-    document.getElementById('rec-thumbs').innerHTML = recPhotos.map((p, i) => `
-      <div style="position:relative;flex-shrink:0;">
-        <img src="${p.thumb}" style="width:60px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--purple);">
-        <div style="position:absolute;top:2px;left:2px;background:var(--purple);color:white;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">${i + 1}</div>
-        <button onclick="recRemovePhoto(${i})" style="position:absolute;top:2px;right:2px;background:var(--red);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
-      </div>
-    `).join('');
-  }
-
-  function recRemovePhoto(i) { recPhotos.splice(i, 1); updateRecUI(); }
-
-  async function recFinish() {
-    if (!recSession || recPhotos.length === 0) return;
-    const btn = document.getElementById('rec-finish-btn');
-    btn.disabled = true; btn.textContent = 'Traitement...';
-    await DB.updateRecSession(recSession.id, { statut: 'traitement' });
-    showOcrOverlay(true, 'Analyse des etiquettes...', 0);
-    const results = [];
-
-    try {
-      for (let i = 0; i < recPhotos.length; i++) {
-        const pct = Math.round(((i + 1) / recPhotos.length) * 100);
-        showOcrOverlay(true, `Etiquette ${i + 1}/${recPhotos.length}...`, pct);
-
-        let ocrText = '';
-        try {
-          const ocrResult = await Tesseract.recognize(recPhotos[i].full, 'fra', {
-            logger: m => {
-              if (m.status === 'recognizing text') {
-                showOcrOverlay(true, `OCR etiquette ${i + 1}/${recPhotos.length}...`,
-                  Math.round(((i + m.progress) / recPhotos.length) * 100));
-              }
-            }
-          });
-          ocrText = ocrResult.data.text || '';
-        } catch (ocrErr) { console.warn('OCR error page', i, ocrErr); }
-
-        const extracted = extractEtiquetteData(ocrText);
-        const etiq = await DB.insertEtiquette({
-          session_id: recSession.id,
-          photo_data: recPhotos[i].full,
-          photo_thumb: recPhotos[i].thumb,
-          texte_ocr: ocrText,
-          produit: extracted.produit || null,
-          code_article: extracted.code_article || null,
-          categorie: extracted.categorie || null,
-          lot: extracted.lot || null,
-          dlc: extracted.dlc || null,
-          ddm: extracted.ddm || null,
-          date_fabrication: extracted.date_fabrication || null,
-          date_emballage: extracted.date_emballage || null,
-          date_abattage: extracted.date_abattage || null,
-          poids_net_kg: extracted.poids_net_kg || null,
-          tare_kg: extracted.tare_kg || null,
-          temp_min: extracted.temp_min ?? null,
-          temp_max: extracted.temp_max ?? null,
-          ingredients: extracted.ingredients || null,
-          allergenes: extracted.allergenes || null,
-          nutrition: extracted.nutrition || null,
-          origine: extracted.origine || null,
-          estampille: extracted.estampille || null,
-          fabricant: extracted.fabricant || null,
-          code_barres: extracted.code_barres || null,
-          confiance_ocr: extracted.confiance || 0,
-          statut: ocrText ? 'extrait' : 'erreur',
-          etablissement: currentEtablissement
-        });
-        results.push({ index: i + 1, etiq, extracted });
-      }
-
-      await DB.updateRecSession(recSession.id, { statut: 'termine', nb_etiquettes: recPhotos.length });
-      showOcrOverlay(false);
-      showRecResults(results);
-      recSession = null; recPhotos = [];
-      document.getElementById('rec-active').classList.add('hidden');
-    } catch (e) {
-      console.error('Erreur traitement:', e);
-      showOcrOverlay(false);
-      showToast('Erreur: ' + (e.message || ''), 'error');
-      await DB.updateRecSession(recSession.id, { statut: 'erreur' });
-      btn.disabled = false; btn.textContent = '✅ Terminer et analyser';
-    }
-  }
-
-  function showRecResults(results) {
-    document.getElementById('rec-results-title').textContent = `✅ ${results.length} etiquette(s) analysee(s)`;
-    let html = '';
-    for (const r of results) {
-      const e = r.extracted;
-      const ok = e.produit || e.lot || e.dlc;
-      const color = ok ? 'var(--green)' : 'var(--amber)';
-      const icon = ok ? '✅' : '⚠️';
-      html += `<div style="background:var(--gray-50);border-radius:12px;padding:12px;margin-bottom:10px;border-left:4px solid ${color};">
-        <div style="display:flex;gap:10px;align-items:flex-start;">
-          ${r.etiq?.photo_thumb ? `<img src="${r.etiq.photo_thumb}" style="width:50px;height:66px;object-fit:cover;border-radius:6px;">` : ''}
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:.85rem;margin-bottom:4px;">${icon} #${r.index} ${esc(e.produit || 'Produit non detecte')}</div>
-            <div style="font-size:.75rem;color:var(--gray-500);line-height:1.6;">
-              ${e.categorie ? `<span class="badge badge-etiquette">${esc(e.categorie)}</span> ` : ''}
-              ${e.lot ? `Lot: <b>${esc(e.lot)}</b> · ` : ''}
-              ${e.dlc ? `DLC: <b>${new Date(e.dlc).toLocaleDateString('fr-FR')}</b> · ` : ''}
-              ${e.poids_net_kg ? `${e.poids_net_kg} kg · ` : ''}
-              ${e.temp_min != null ? `${e.temp_min}°/${e.temp_max}°C · ` : ''}
-              ${e.estampille ? `${esc(e.estampille)} · ` : ''}
-              ${e.code_article ? `Art: ${esc(e.code_article)}` : ''}
-            </div>
-          </div>
-        </div>
-      </div>`;
-    }
-    document.getElementById('rec-results-body').innerHTML = html;
-    document.getElementById('modal-rec-results').classList.add('show');
-  }
-
-  async function loadRecHistory() {
-    try {
-      const sessions = await DB.getRecSessions(currentEtablissement);
-      const container = document.getElementById('rec-history');
-      if (!sessions.length) {
-        container.innerHTML = '<div class="empty"><div class="icon">🏷️</div><div class="text">Aucune reception d\'etiquettes</div></div>';
-        return;
-      }
-      container.innerHTML = sessions.map(s => {
-        const badge = {
-          en_cours: '<span class="badge badge-waiting">En cours</span>',
-          traitement: '<span class="badge" style="background:var(--blue-bg);color:var(--blue);">Traitement</span>',
-          termine: '<span class="badge badge-valid">Termine</span>',
-          erreur: '<span class="badge badge-rejected">Erreur</span>'
-        }[s.statut] || '';
-        return `<div class="card" onclick="viewRecSession('${s.id}')">
-          <div class="card-header">
-            <div class="card-title">${esc(s.fournisseur_nom)}</div>
-            ${badge}
-          </div>
-          <div class="card-body">
-            ${s.type_piece === 'bl' ? '📋 BL' : '📄 Facture'}${s.reference_piece ? ' — ' + esc(s.reference_piece) : ''} · ${s.nb_etiquettes} etiquette(s)
-          </div>
-          <div class="card-meta">${new Date(s.created_at).toLocaleDateString('fr-FR')} a ${formatTime(s.created_at)}</div>
-        </div>`;
-      }).join('');
-    } catch (e) { console.error('Erreur historique receptions:', e); }
-  }
-
-  async function viewRecSession(sessionId) {
-    try {
-      const etiquettes = await DB.getEtiquettesBySession(sessionId);
-      if (!etiquettes.length) { showToast('Aucune etiquette', 'error'); return; }
-      document.getElementById('rec-results-title').textContent = `📦 ${etiquettes.length} etiquette(s)`;
-      document.getElementById('rec-results-body').innerHTML = etiquettes.map((e, i) => {
-        const ok = e.statut === 'extrait' || e.statut === 'verifie';
-        const color = ok ? 'var(--green)' : 'var(--amber)';
-        return `<div style="background:var(--gray-50);border-radius:12px;padding:12px;margin-bottom:10px;border-left:4px solid ${color};">
-          <div style="display:flex;gap:10px;align-items:flex-start;">
-            ${e.photo_thumb ? `<img src="${e.photo_thumb}" style="width:50px;height:66px;object-fit:cover;border-radius:6px;">` : ''}
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;font-size:.85rem;margin-bottom:4px;">${ok ? '✅' : '⚠️'} ${esc(e.produit || 'Non detecte')}</div>
-              <div style="font-size:.75rem;color:var(--gray-500);line-height:1.6;">
-                ${e.categorie ? `<span class="badge badge-etiquette">${esc(e.categorie)}</span> ` : ''}
-                ${e.lot ? `Lot: <b>${esc(e.lot)}</b> · ` : ''}
-                ${e.dlc ? `DLC: <b>${new Date(e.dlc).toLocaleDateString('fr-FR')}</b> · ` : ''}
-                ${e.poids_net_kg ? `${e.poids_net_kg} kg · ` : ''}
-                ${e.estampille ? `${esc(e.estampille)}` : ''}
-              </div>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-      document.getElementById('modal-rec-results').classList.add('show');
-    } catch (e) {
-      console.error('Erreur:', e);
-      showToast('Erreur', 'error');
-    }
-  }
-
-  // ====== EXTRACTION ETIQUETTES ======
-  function extractEtiquetteData(text) {
-    if (!text) return { confiance: 0 };
-    const t = text.toLowerCase();
-    const result = {};
-    let score = 0;
-
-    // PRODUIT
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-    const codeProductMatch = text.match(/(\d{4,6})\s*[:;]\s*(.+)/);
-    if (codeProductMatch) {
-      result.code_article = codeProductMatch[1];
-      result.produit = codeProductMatch[2].split('\n')[0].trim();
-      score += 15;
-    } else {
-      const artikelMatch = text.match(/Artikel:\s*(\d+)/i);
-      if (artikelMatch) { result.code_article = artikelMatch[1]; score += 8; }
-      for (const line of lines.slice(0, 8)) {
-        const clean = line.replace(/^\d+\s*[:;]?\s*/, '').trim();
-        if (clean.length > 5 && clean.length < 80 && clean === clean.toUpperCase() &&
-            !/ingredient|valeur|nutri|energie|conser|fabri|distri/i.test(clean) && !/^\d/.test(clean)) {
-          result.produit = clean; score += 10; break;
-        }
-      }
-    }
-
-    // LOT
-    const lotPats = [/lot\s*[:n°]*\s*([A-Z0-9][A-Z0-9\-\.\/\s]{2,20})/i, /charge\s*[:]*\s*(\d{4,})/i,
-      /Nr\.\s*de\s*lot\s*[:]*\s*([A-Z0-9\-\.]+)/i, /\bLOT\s+([A-Z0-9\-\.]+)/i];
-    for (const pat of lotPats) { const m = text.match(pat); if (m) { result.lot = m[1].trim(); score += 10; break; } }
-
-    // DLC
-    const dlcPats = [
-      /(?:consommer\s*(?:jusqu'?\s*au|avant\s*(?:le)?)\s*[:]*\s*)(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/i,
-      /(?:DLC|TGT)\s*[:/]*\s*(\d{1,2}[\-\.\/]\d{1,2}[\-\.\/]\d{2,4})/i,
-      /(?:haltbar\s*bis)\s*[:/]*\s*(\d{1,2}[\-\.\/]\d{1,2}[\-\.\/]\d{2,4})/i,
-      /(?:consommer\s*.*?)\s*(\d{1,2}[\/.]\d{1,2}[\/.]\d{4})/i
-    ];
-    for (const pat of dlcPats) { const m = text.match(pat); if (m) { const p = parseDateFr(m[1]); if (p) { result.dlc = p; score += 15; } break; } }
-
-    const ddmMatch = text.match(/(?:preference\s*(?:avant)?\s*[:]*\s*)(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/i);
-    if (ddmMatch) { const p = parseDateFr(ddmMatch[1]); if (p) result.ddm = p; }
-
-    // DATE FABRICATION / EMBALLAGE / ABATTAGE
-    const fabMatch = text.match(/(?:date\s*de\s*prod|produktionsdat|prod\.?\s*dat)\s*[.:/]*\s*(\d{1,2}[\-\.\/]\d{1,2}[\-\.\/]\d{2,4})/i);
-    if (fabMatch) { const p = parseDateFr(fabMatch[1]); if (p) { result.date_fabrication = p; score += 5; } }
-    const embMatch = text.match(/emballe\s*le\s*[:]*\s*(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/i);
-    if (embMatch) { const p = parseDateFr(embMatch[1]); if (p) result.date_emballage = p; }
-    const abatMatch = text.match(/(?:schlachtdat|abattage|slachtdat)\s*[.:/]*\s*(\d{1,2}[\-\.\/]\s*\d{1,2}\s*[\-\.\/]\s*\d{2,4})/i);
-    if (abatMatch) { const p = parseDateFr(abatMatch[1].replace(/\s/g, '')); if (p) result.date_abattage = p; }
-
-    // POIDS
-    const poidsPats = [/poids\s*net\s*[:]*\s*(\d+[,\.]\d{1,3})\s*kg/i, /netto\s*[:/]*\s*poids\s*net\s*[:]*\s*(\d+[,\.]\d{1,3})\s*kg/i, /(\d+[,\.]\d{1,3})\s*kg\s*$/im];
-    for (const pat of poidsPats) { const m = text.match(pat); if (m) { result.poids_net_kg = parseFloat(m[1].replace(',', '.')); score += 8; break; } }
-    const tareM = text.match(/tare?\s*[:]*\s*(\d+[,\.]\d{1,3})\s*kg/i);
-    if (tareM) result.tare_kg = parseFloat(tareM[1].replace(',', '.'));
-
-    // TEMPERATURE
-    const tempM = text.match(/conserver\s*(?:entre|de)?\s*[+]?(\-?\d+)[°o]\s*(?:C\s*)?(?:(?:et|[àa\-—–]|\.{2,3})\s*[+]?(\d+)[°o]?\s*C?)/i);
-    if (tempM) { result.temp_min = parseFloat(tempM[1]); result.temp_max = parseFloat(tempM[2]); score += 5; }
-    else {
-      const tempAlt = text.match(/(\-?\d+)[°o]\s*C?\s*[→\-—–àa]\s*\+?(\d+)[°o]\s*C?/i);
-      if (tempAlt) { result.temp_min = parseFloat(tempAlt[1]); result.temp_max = parseFloat(tempAlt[2]); score += 5; }
-    }
-
-    // INGREDIENTS
-    const ingrM = text.match(/ingr[eé]dients?\s*[:;]\s*([\s\S]{10,500}?)(?=valeurs?\s*nutri|$)/i);
-    if (ingrM) { result.ingredients = ingrM[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(); score += 8; }
-
-    // ALLERGENES
-    const allergens = ['gluten','lactose','lait','oeuf','soja','arachide','noix','celeri','moutarde','sesame','sulfites','lupin','crustaces','poisson'];
-    const tN = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const found = allergens.filter(a => tN.includes(a));
-    if (found.length) { result.allergenes = found.map(a => a.toUpperCase()); score += 5; }
-
-    // NUTRITION
-    const nutrition = {};
-    const nutriPats = [[/energie\s*[:]*\s*(\d+)\s*kj/i,'energie_kj'],[/(\d+)\s*kcal/i,'energie_kcal'],
-      [/lipides?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'lipides'],[/satur[eé]s?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'satures'],
-      [/glucides?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'glucides'],[/sucres?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'sucres'],
-      [/prot[eé]ines?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'proteines'],[/sel\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'sel'],
-      [/graisses?\s*[:]*\s*(\d+[,\.]\d+)\s*g/i,'lipides']];
-    for (const [pat, key] of nutriPats) { const m = text.match(pat); if (m && !nutrition[key]) nutrition[key] = parseFloat(m[1].replace(',', '.')); }
-    if (Object.keys(nutrition).length) { result.nutrition = nutrition; score += 5; }
-
-    // ESTAMPILLE
-    const estM = text.match(/(FR\s*\d{2}[\.\-]\d{3}[\.\-]\d{2,3}\s*CE)/i) || text.match(/(NL\s*\d+\s*E[GC])/i) || text.match(/(BE\s*\d+)/i);
-    if (estM) { result.estampille = estM[1].trim(); score += 5; }
-
-    // FABRICANT
-    for (const pat of [/fabriqu[eé]\s*par\s*[:]*\s*(.+)/i, /distribu[eé]\s*par\s*[:]*\s*(.+)/i]) {
-      const m = text.match(pat); if (m) { result.fabricant = m[1].split('\n')[0].trim(); score += 3; break; }
-    }
-
-    // ORIGINE / CODE BARRES
-    const origM = text.match(/origine\s*[:]*\s*([\w\s]+)/i);
-    if (origM) result.origine = origM[1].trim();
-    const eanM = text.match(/\b(\d{13})\b/) || text.match(/\b(\d{8})\b/);
-    if (eanM) result.code_barres = eanM[1];
-
-    // CATEGORIE
-    if (/viande\s*(?:de\s*)?bov|boeuf|bourguignon|steak|entrecote/i.test(t)) result.categorie = 'Viande bovine';
-    else if (/viande\s*(?:de\s*)?porc|porc|jambon|lard|saucisse|knack|gendarme/i.test(t)) result.categorie = 'Charcuterie';
-    else if (/veau|kalbfleisch|kalfs/i.test(t)) result.categorie = 'Viande veau';
-    else if (/poulet|volaille|dinde|canard/i.test(t)) result.categorie = 'Volaille';
-    else if (/poisson|saumon|cabillaud|crevette/i.test(t)) result.categorie = 'Poisson';
-    else if (/fromage|munster|camembert|brie|comte|gruyere|emmental|lait\s*cru/i.test(t)) result.categorie = 'Fromage/Laitier';
-
-    result.confiance = Math.min(100, score);
-    return result;
-  }
-
-  function parseDateFr(str) {
-    if (!str) return null;
-    const clean = str.replace(/\s/g, '');
-    const m = clean.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/);
-    if (!m) return null;
-    let [, d, mo, y] = m;
-    if (y.length === 2) y = '20' + y;
-    if (parseInt(d) > 31 || parseInt(mo) > 12) return null;
-    const pad = n => String(n).padStart(2, '0');
-    return `${y}-${pad(mo)}-${pad(d)}`;
-  }
-
   // ====== HISTORIQUE ======
   async function loadHistorique() {
     const dateTo = dateStr(new Date());
@@ -2060,6 +1608,301 @@
       document.getElementById('historique-list').innerHTML = html ||
         '<div class="empty"><div class="icon">📊</div><div class="text">Aucun document sur les 30 derniers jours</div></div>';
     } catch (e) { console.error('Erreur historique:', e); }
+  }
+
+  // ====== ELIS ======
+
+  const ELIS_SERVICE_ORDER = ['Linge-Service', 'Habillement-Porteur', 'Habillement-Groupe', 'Sanitaire', 'Sol-Service'];
+  const ELIS_SERVICE_META = {
+    'Linge-Service':       { label: '🍽️ Linge-Service',           help: 'Tabliers, torchons, nappes, serviettes…' },
+    'Habillement-Porteur': { label: '👨‍🍳 Habillement par porteur', help: 'Vestes / polos affectés aux personnes — compter le total du type.' },
+    'Habillement-Groupe':  { label: '🧥 Habillement groupé',       help: 'Tabliers communs, non nominatifs.' },
+    'Sanitaire':           { label: '🧻 Sanitaire',                help: 'Recharges et distributeurs — laisser vide pour les équipements fixes.' },
+    'Sol-Service':         { label: '🟫 Sol-Service',              help: 'Tapis entrée / poste.' }
+  };
+
+  async function loadElisData() {
+    try {
+      if (!elisArticles.length || elisArticles[0]?.etablissement !== currentEtablissement) {
+        elisArticles = await DB.getElisArticles(currentEtablissement);
+      }
+      const today = new Date();
+      const from = dateStr(new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000));
+      const to = dateStr(new Date(today.getTime() + 24 * 60 * 60 * 1000)); // +1j marge
+      elisMouvements = await DB.getElisMouvements(currentEtablissement, from, to);
+      renderElisList();
+    } catch (e) {
+      console.error('Erreur ELIS:', e);
+      showToast('Erreur de chargement ELIS', 'error');
+    }
+  }
+
+  function filterElis(filter) {
+    elisFilter = filter;
+    document.querySelectorAll('#tab-elis .sub-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.sub === filter)
+    );
+    renderElisList();
+  }
+
+  function renderElisList() {
+    const totalInv  = elisMouvements.filter(m => m.type === 'inventaire').length;
+    const totalPass = elisMouvements.filter(m => m.type === 'passage').length;
+    document.getElementById('elis-stats').innerHTML = `
+      <div class="stats-row">
+        <div class="stat-card amber"><div class="number">${totalInv}</div><div class="label">Inventaires</div></div>
+        <div class="stat-card purple"><div class="number">${totalPass}</div><div class="label">Passages</div></div>
+        <div class="stat-card green"><div class="number">${elisArticles.length}</div><div class="label">Articles suivis</div></div>
+      </div>
+      <div style="font-size:.75rem;color:var(--gray-400);margin-bottom:10px;text-align:center;">Mouvements des 90 derniers jours</div>
+    `;
+
+    let list = elisMouvements;
+    if (elisFilter !== 'all') list = list.filter(m => m.type === elisFilter);
+
+    const container = document.getElementById('elis-list');
+    if (!list.length) {
+      container.innerHTML = `<div class="empty"><div class="icon">🧺</div><div class="text">Aucun mouvement ELIS. Tapez + pour en saisir un.</div></div>`;
+      return;
+    }
+    container.innerHTML = list.map(renderElisMouvCard).join('');
+  }
+
+  function renderElisMouvCard(mv) {
+    const lignes = mv.lignes || [];
+    const tRetour = lignes.reduce((s,l) => s + (l.qty_retour || 0), 0);
+    const tLivre  = lignes.reduce((s,l) => s + (l.qty_livre  || 0), 0);
+    const tStock  = lignes.reduce((s,l) => s + (l.qty_stock  || 0), 0);
+    const dLabel  = new Date(mv.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const typeLabel = mv.type === 'inventaire' ? '📋 Inventaire' : '🚛 Passage';
+    const retourLabel = mv.type === 'inventaire' ? 'Sale' : 'Retour';
+
+    return `
+      <div class="elis-mouv-card" onclick="viewElisMouvement('${mv.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-weight:600;font-size:.95rem;text-transform:capitalize;">${dLabel}</div>
+            ${mv.bon_livraison ? `<div style="font-size:.75rem;color:var(--gray-500);">BL : ${esc(mv.bon_livraison)}</div>` : ''}
+          </div>
+          <span class="type-badge ${mv.type}">${typeLabel}</span>
+        </div>
+        <div class="elis-summary">
+          <div class="kv">🔙 ${retourLabel} <b>${tRetour}</b></div>
+          ${mv.type === 'passage' ? `<div class="kv">📦 Livré <b>${tLivre}</b></div>` : ''}
+          <div class="kv">📊 Stock <b>${tStock}</b></div>
+          <div class="kv">📋 Articles <b>${lignes.length}</b></div>
+        </div>
+        ${mv.observation ? `<div style="font-size:.75rem;color:var(--gray-500);margin-top:6px;">💬 ${esc(mv.observation)}</div>` : ''}
+        <div style="font-size:.7rem;color:var(--gray-400);margin-top:4px;">${esc(mv.user_initiales || mv.user_nom)} · ${formatTime(mv.created_at)}</div>
+      </div>
+    `;
+  }
+
+  // ---- New mouvement modal ----
+
+  function openNewElisModal() {
+    if (!elisArticles.length) {
+      showToast('Chargement du référentiel...', 'error');
+      loadElisData().then(() => openNewElisModal());
+      return;
+    }
+    currentElisType = 'inventaire';
+    applyElisType();
+    document.getElementById('elis-form-date').value = dateStr(new Date());
+    document.getElementById('elis-form-bl').value = '';
+    document.getElementById('elis-form-observation').value = '';
+    renderElisArticlesForm();
+    document.getElementById('modal-elis-new').classList.add('show');
+  }
+
+  function setElisType(type) {
+    currentElisType = type;
+    applyElisType();
+    renderElisArticlesForm();
+  }
+
+  function applyElisType() {
+    document.querySelectorAll('.elis-type-toggle .type-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.elisType === currentElisType)
+    );
+    const isPassage = currentElisType === 'passage';
+    document.getElementById('elis-form-bl-section').classList.toggle('hidden', !isPassage);
+    document.getElementById('modal-elis-new-title').textContent =
+      isPassage ? 'Nouveau passage ELIS' : 'Nouvel inventaire ELIS';
+    document.getElementById('elis-type-help').innerHTML = isPassage
+      ? '<b>Passage</b> : lors de la livraison — <b>Retour</b> (sale remis), <b>Livré</b> (propre reçu) et <b>Stock</b> propre restant après passage.'
+      : '<b>Inventaire</b> : comptage avant passage — <b>Sale</b> (à retourner) et <b>Stock propre</b> restant.';
+  }
+
+  function renderElisArticlesForm() {
+    const isPassage = currentElisType === 'passage';
+    const grouped = {};
+    elisArticles.forEach(a => {
+      if (!grouped[a.service]) grouped[a.service] = [];
+      grouped[a.service].push(a);
+    });
+
+    let html = '';
+    ELIS_SERVICE_ORDER.forEach(svc => {
+      if (!grouped[svc]?.length) return;
+      const meta = ELIS_SERVICE_META[svc] || { label: svc, help: '' };
+      html += `<div class="elis-section"><h3>${meta.label}</h3>`;
+      if (meta.help) html += `<div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px;">${meta.help}</div>`;
+      grouped[svc].sort((a,b) => (a.ordre||0) - (b.ordre||0)).forEach(a => {
+        const meta2 = [];
+        if (a.stock_theorique)   meta2.push(`stock théo. ${a.stock_theorique}`);
+        if (a.pu_ht_hebdo > 0)   meta2.push(`${Number(a.pu_ht_hebdo).toFixed(3)} €`);
+        if (a.frequence)         meta2.push(a.frequence);
+        html += `<div class="elis-article-row" data-article-id="${a.id}">
+          <div class="elis-article-name">${esc(a.nom)}</div>
+          <div class="elis-article-meta">${meta2.join(' · ')}</div>
+          <div class="elis-article-inputs ${isPassage ? '' : 'two-cols'}">
+            <div class="elis-input-group">
+              <div class="elis-input-label retour">${isPassage ? 'Retour' : 'Sale'}</div>
+              <input type="number" inputmode="numeric" min="0" class="elis-qty-retour" placeholder="0">
+            </div>
+            ${isPassage ? `
+            <div class="elis-input-group">
+              <div class="elis-input-label livre">Livré</div>
+              <input type="number" inputmode="numeric" min="0" class="elis-qty-livre" placeholder="0">
+            </div>` : ''}
+            <div class="elis-input-group">
+              <div class="elis-input-label stock">Stock</div>
+              <input type="number" inputmode="numeric" min="0" class="elis-qty-stock" placeholder="0">
+            </div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    const container = document.getElementById('elis-articles-form');
+    container.innerHTML = html || '<div class="empty"><div class="icon">⚠️</div><div class="text">Aucun article référencé pour cet établissement. Exécutez <code>elis-schema.sql</code> dans Supabase.</div></div>';
+  }
+
+  async function submitElisMouvement() {
+    const btn = document.getElementById('btn-elis-submit');
+    const date = document.getElementById('elis-form-date').value;
+    const bl   = document.getElementById('elis-form-bl').value.trim();
+    const obs  = document.getElementById('elis-form-observation').value.trim();
+
+    if (!date) { showToast('Date requise', 'error'); return; }
+
+    const rows = document.querySelectorAll('#elis-articles-form .elis-article-row');
+    const lignes = [];
+    rows.forEach(row => {
+      const id = row.dataset.articleId;
+      const r = row.querySelector('.elis-qty-retour')?.value;
+      const l = row.querySelector('.elis-qty-livre')?.value;
+      const s = row.querySelector('.elis-qty-stock')?.value;
+      const hasAny = (r !== '' && r != null) || (l !== '' && l != null) || (s !== '' && s != null);
+      if (!hasAny) return;
+      lignes.push({
+        article_id: id,
+        qty_retour: (r === '' || r == null) ? null : parseInt(r, 10),
+        qty_livre:  (l === '' || l == null) ? null : parseInt(l, 10),
+        qty_stock:  (s === '' || s == null) ? null : parseInt(s, 10)
+      });
+    });
+
+    if (!lignes.length) {
+      showToast('Saisissez au moins une quantité', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    const oldTxt = btn.textContent;
+    btn.textContent = 'Enregistrement...';
+    try {
+      const mv = await DB.insertElisMouvement({
+        type: currentElisType,
+        date,
+        etablissement: currentEtablissement,
+        bon_livraison: (currentElisType === 'passage' && bl) ? bl : null,
+        observation: obs || null,
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales
+      });
+      if (!mv) throw new Error('Échec insertion mouvement');
+      await DB.insertElisLignes(lignes.map(l => ({ ...l, mouvement_id: mv.id })));
+      showToast('Mouvement ELIS enregistré !', 'success');
+      closeModal('modal-elis-new');
+      loadElisData();
+    } catch (e) {
+      console.error('Erreur ELIS submit:', e);
+      const msg = e?.message || e?.details || e?.hint || JSON.stringify(e);
+      showToast("Erreur d'enregistrement", 'error');
+      setTimeout(() => alert('Erreur Supabase :\n' + msg), 300);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = oldTxt;
+    }
+  }
+
+  function viewElisMouvement(id) {
+    const mv = elisMouvements.find(m => m.id === id);
+    if (!mv) return;
+    const isPassage = mv.type === 'passage';
+    const typeLabel = isPassage ? '🚛 Passage ELIS' : '📋 Inventaire ELIS';
+    document.getElementById('modal-elis-view-title').textContent = typeLabel;
+
+    const lignes = mv.lignes || [];
+    const byService = {};
+    lignes.forEach(l => {
+      const a = l.article || elisArticles.find(x => x.id === l.article_id) || {};
+      const svc = a.service || 'Autre';
+      if (!byService[svc]) byService[svc] = [];
+      byService[svc].push({ ligne: l, article: a });
+    });
+
+    let html = `
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
+        <div>
+          <div style="font-size:.75rem;color:var(--gray-500);">Date</div>
+          <div style="font-weight:600;text-transform:capitalize;">${new Date(mv.date).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+        </div>
+        ${mv.bon_livraison ? `<div>
+          <div style="font-size:.75rem;color:var(--gray-500);">N° BL</div>
+          <div style="font-weight:600;">${esc(mv.bon_livraison)}</div>
+        </div>` : ''}
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:.75rem;color:var(--gray-500);">Saisi par</div>
+        <div>${esc(mv.user_nom)} ${mv.user_initiales ? `(${esc(mv.user_initiales)})` : ''} · ${formatTime(mv.created_at)}</div>
+      </div>`;
+
+    ELIS_SERVICE_ORDER.forEach(svc => {
+      if (!byService[svc]?.length) return;
+      const meta = ELIS_SERVICE_META[svc] || { label: svc };
+      html += `<div class="elis-section"><h3>${meta.label}</h3>
+        <table class="elis-view-table"><thead><tr>
+          <th>Article</th>
+          <th class="num">${isPassage ? 'Retour' : 'Sale'}</th>
+          ${isPassage ? '<th class="num">Livré</th>' : ''}
+          <th class="num">Stock</th>
+        </tr></thead><tbody>`;
+      byService[svc].sort((a,b) => (a.article.ordre||0) - (b.article.ordre||0)).forEach(({ligne, article}) => {
+        html += `<tr>
+          <td><div class="art-name">${esc(article.nom || '–')}</div>
+              ${article.stock_theorique ? `<div class="art-meta">théo. ${article.stock_theorique}</div>` : ''}</td>
+          <td class="num">${ligne.qty_retour ?? '–'}</td>
+          ${isPassage ? `<td class="num">${ligne.qty_livre ?? '–'}</td>` : ''}
+          <td class="num">${ligne.qty_stock ?? '–'}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+
+    if (mv.observation) {
+      html += `<div class="form-section" style="margin-top:14px;">
+        <label class="form-label">Observation</label>
+        <div style="font-size:.85rem;color:var(--gray-700);">${esc(mv.observation)}</div>
+      </div>`;
+    }
+
+    document.getElementById('modal-elis-view-body').innerHTML = html;
+    document.getElementById('modal-elis-view-footer').innerHTML = '';
+    document.getElementById('modal-elis-view').classList.add('show');
   }
 
   // ====== IMAGE VIEWER ======
@@ -2134,7 +1977,8 @@
     }
   });
 </script>
-
+</content>
+</invoke>
 <!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
 <style id="taf-header-style">
 .header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
