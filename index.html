@@ -1431,12 +1431,14 @@
         }
 
         // ============= Helper: redirect vers Pointages si premier login du jour =============
-        // Logique : si le user est collaborateur ou responsable ET qu'il n'a pas encore
-        // pointé son début de service aujourd'hui sur cet établissement → redirige vers /pointages/
-        // Les managers et admins ne sont jamais redirigés.
+        // Logique : tout user (incl manager/admin) qui n'a pas encore pointé son début de
+        // service aujourd'hui sur cet établissement → redirect vers /pointages/.
+        // Cas d'usage manager/admin : ils sont sur le planning du jour et doivent pointer.
+        // Si un manager/admin n'est PAS planifié, il peut cliquer "← Portail" depuis l'écran
+        // de pointage pour passer outre (pas de validation forcée).
+        // 🔜 Phase 2 (plannings) : on conditionnera ce redirect à "présence sur planning du jour".
         async function checkAndRedirectIfFirstPointage(user, establishment) {
             try {
-                if (user.role !== 'collaborateur' && user.role !== 'responsable') return false;
                 const today = new Date().toISOString().split('T')[0];
                 const { data, error } = await supabaseClient
                     .from('pointage_evenements')
