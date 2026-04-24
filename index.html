@@ -892,15 +892,7 @@
                 icon: '📊',
                 description: 'KPI, comparaisons N-1, analyses',
                 minRole: 'responsable',
-                url: './dashboard/index.html?v=2'
-            },
-            {
-                id: 'objectifs',
-                name: 'Objectifs',
-                icon: '🎯',
-                description: 'Objectifs CA jour par jour (écrasable)',
-                minRole: 'manager',
-                url: './objectifs/index.html?v=1'
+                url: './dashboard/index.html?v=1'
             },
             {
                 id: 'temperatures',
@@ -1418,14 +1410,18 @@
                     }
                 }
 
-                setTimeout(() => {
+                setTimeout(async () => {
                     if (user.etablissements.length === 1) {
                         // Auto-select single establishment
                         currentEstablishment = user.etablissements[0];
                         storeSession(user, currentEstablishment);
-                        updateHeader();
-                        renderModules();
-                        showScreen(dashboardScreen);
+                        // Check si premier login du jour → redirect Pointages
+                        const redirected = await checkAndRedirectIfFirstPointage(user, currentEstablishment);
+                        if (!redirected) {
+                            updateHeader();
+                            renderModules();
+                            showScreen(dashboardScreen);
+                        }
                     } else {
                         // Show establishment selector
                         establishmentSubtitle.textContent = `Bienvenue, ${user.nom}`;
@@ -1434,15 +1430,47 @@
                 }, 500);
         }
 
+        // ============= Helper: redirect vers Pointages si premier login du jour =============
+        // Logique : si le user est collaborateur ou responsable ET qu'il n'a pas encore
+        // pointé son début de service aujourd'hui sur cet établissement → redirige vers /pointages/
+        // Les managers et admins ne sont jamais redirigés.
+        async function checkAndRedirectIfFirstPointage(user, establishment) {
+            try {
+                if (user.role !== 'collaborateur' && user.role !== 'responsable') return false;
+                const today = new Date().toISOString().split('T')[0];
+                const { data, error } = await supabaseClient
+                    .from('pointage_evenements')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('etablissement', establishment)
+                    .eq('date_service', today)
+                    .eq('type_evenement', 'debut_service')
+                    .limit(1);
+                if (error) { console.warn('Pointage check error:', error); return false; }
+                if (!data || data.length === 0) {
+                    // Pas encore pointé → redirect vers Pointages
+                    window.location.href = './pointages/';
+                    return true;
+                }
+            } catch (e) {
+                console.warn('checkAndRedirectIfFirstPointage failed:', e);
+            }
+            return false;
+        }
+
         // ============= Event Listeners: Establishment =============
         document.querySelectorAll('.establishment-card').forEach(card => {
-            card.addEventListener('click', () => {
+            card.addEventListener('click', async () => {
                 const establishment = card.dataset.establishment;
                 currentEstablishment = establishment;
                 storeSession(currentUser, establishment);
-                updateHeader();
-                renderModules();
-                showScreen(dashboardScreen);
+                // Check si premier login du jour → redirect Pointages
+                const redirected = await checkAndRedirectIfFirstPointage(currentUser, establishment);
+                if (!redirected) {
+                    updateHeader();
+                    renderModules();
+                    showScreen(dashboardScreen);
+                }
             });
         });
 

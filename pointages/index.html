@@ -10,84 +10,187 @@
   <style>
     :root {
       --accent: #4f46e5; --accent-light: #eef2ff; --accent-dark: #4338ca;
+      --green: #22c55e; --green-bg: #dcfce7; --green-dark: #16a34a;
+      --orange: #f97316; --orange-bg: #ffedd5; --orange-dark: #c2410c;
+      --red: #ef4444; --red-bg: #fee2e2; --red-dark: #b91c1c;
       --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
       --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563;
-      --gray-700: #374151; --gray-800: #1f2937;
+      --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
       --radius: 12px; --radius-sm: 8px;
       --shadow: 0 1px 3px rgba(0,0,0,.1);
-      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.12);
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--gray-50); color: var(--gray-800);
-      min-height: 100vh; display: flex; flex-direction: column;
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
     }
+
     .header {
       background: white; border-bottom: 2px solid var(--accent);
-      padding: 10px 16px;
+      padding: 12px 20px;
       display: flex; align-items: center; justify-content: space-between;
       position: sticky; top: 0; z-index: 100;
     }
-    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
     .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
-    .header-right { font-size: 0.85rem; color: var(--gray-500); }
+    .header-right { font-size: 0.85rem; color: var(--gray-500); display: flex; gap: 12px; align-items: center; }
     .btn-back {
-      padding: 6px 12px; border-radius: 6px; border: 1px solid var(--gray-200);
+      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
       background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
       text-decoration: none;
     }
 
     .content {
       flex: 1; padding: 24px 16px;
-      max-width: 1000px; width: 100%; margin: 0 auto;
-    }
-    .page-title {
-      font-size: 1.5rem; font-weight: 700; color: var(--gray-800); margin-bottom: 6px;
-    }
-    .page-subtitle {
-      font-size: 0.95rem; color: var(--gray-500); margin-bottom: 24px;
+      max-width: 700px; width: 100%; margin: 0 auto;
     }
 
-    .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 14px;
+    /* ===== ÉTAT COURANT ===== */
+    .status-card {
+      background: white; border-radius: var(--radius);
+      padding: 24px; margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      border-top: 4px solid var(--gray-300);
     }
-    .module-card {
-      background: white; border-radius: var(--radius); padding: 22px 18px;
-      box-shadow: var(--shadow); text-decoration: none; color: inherit;
-      display: flex; flex-direction: column; align-items: center; text-align: center;
-      transition: transform 0.15s, box-shadow 0.15s;
-      border: 2px solid transparent;
+    .status-card.en-service { border-top-color: var(--green); background: var(--green-bg); }
+    .status-card.en-pause { border-top-color: var(--orange); background: var(--orange-bg); }
+    .status-card.absent { border-top-color: var(--gray-400); }
+    .status-card.fini { border-top-color: var(--accent); background: var(--accent-light); }
+
+    .status-icon { font-size: 3.5rem; margin-bottom: 8px; line-height: 1; }
+    .status-label {
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--gray-500); font-weight: 600; margin-bottom: 4px;
     }
-    .module-card:not(.disabled):hover {
-      transform: translateY(-2px); box-shadow: var(--shadow-md);
-      border-color: var(--accent-light);
+    .status-text { font-size: 1.4rem; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; }
+    .status-detail {
+      font-size: 1rem; color: var(--gray-700); line-height: 1.5;
     }
-    .module-card:not(.disabled):active { transform: translateY(0); }
-    .module-card.disabled {
-      opacity: 0.55; cursor: not-allowed;
-      background: var(--gray-50);
-    }
-    .module-icon { font-size: 3rem; margin-bottom: 10px; }
-    .module-name { font-size: 1.05rem; font-weight: 700; color: var(--gray-800); margin-bottom: 4px; }
-    .module-desc { font-size: 0.82rem; color: var(--gray-500); line-height: 1.4; }
-    .module-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 0.7rem; font-weight: 600;
+    .status-detail strong { color: var(--gray-900); font-size: 1.05rem; }
+    .clock-big {
+      font-size: 2.4rem; font-weight: 700; color: var(--accent);
+      font-variant-numeric: tabular-nums;
       margin-top: 8px;
-      background: var(--accent-light); color: var(--accent-dark);
     }
-    .module-badge.soon { background: var(--gray-100); color: var(--gray-500); }
 
-    .info-banner {
-      background: var(--accent-light); border-left: 3px solid var(--accent);
-      padding: 12px 14px; border-radius: var(--radius-sm);
-      font-size: 0.88rem; color: var(--accent-dark);
-      margin-bottom: 20px; line-height: 1.5;
+    /* ===== RÉSUMÉ DU JOUR ===== */
+    .day-summary {
+      background: white; border-radius: var(--radius);
+      padding: 16px; margin-bottom: 16px;
+      box-shadow: var(--shadow);
     }
-    .info-banner strong { font-weight: 700; }
+    .day-summary h3 {
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-500); font-weight: 600; margin-bottom: 12px;
+    }
+    .day-summary-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    .ds-item {
+      text-align: center; padding: 8px;
+      background: var(--gray-50); border-radius: var(--radius-sm);
+    }
+    .ds-value { font-size: 1.4rem; font-weight: 700; color: var(--gray-900); font-variant-numeric: tabular-nums; }
+    .ds-label { font-size: 0.7rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+    /* ===== ACTIONS ===== */
+    .actions {
+      display: flex; flex-direction: column; gap: 10px;
+      margin-top: 8px;
+    }
+    .action-btn {
+      padding: 18px 20px;
+      border: none; border-radius: var(--radius);
+      font-size: 1.1rem; font-weight: 700;
+      color: white;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      transition: transform 0.1s, opacity 0.15s;
+      box-shadow: var(--shadow);
+    }
+    .action-btn:active { transform: scale(0.97); }
+    .action-btn.start { background: var(--green); }
+    .action-btn.pause { background: var(--orange); }
+    .action-btn.resume { background: var(--green); }
+    .action-btn.end { background: var(--red); }
+    .action-btn-icon { font-size: 1.6rem; }
+
+    /* ===== HISTORIQUE DU JOUR ===== */
+    .history {
+      background: white; border-radius: var(--radius);
+      padding: 14px 16px; margin-top: 16px;
+      box-shadow: var(--shadow);
+    }
+    .history h3 {
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-500); font-weight: 600; margin-bottom: 10px;
+    }
+    .history-list { display: flex; flex-direction: column; gap: 6px; }
+    .history-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: var(--radius-sm);
+      background: var(--gray-50);
+      font-size: 0.92rem;
+    }
+    .history-time {
+      font-weight: 700; color: var(--gray-800);
+      font-variant-numeric: tabular-nums; min-width: 50px;
+    }
+    .history-icon { font-size: 1.1rem; }
+    .history-label { color: var(--gray-600); flex: 1; }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-history {
+      text-align: center; padding: 20px;
+      color: var(--gray-400); font-size: 0.9rem;
+    }
+
+    /* ===== TOAST & LOADING ===== */
+    .toast {
+      position: fixed; top: 80px; left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: white; color: var(--gray-800);
+      padding: 14px 22px; border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      font-size: 1rem; font-weight: 600;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 2000;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success { background: var(--green); color: white; }
+    .toast.error { background: var(--red); color: white; }
+
+    .loading-overlay {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.7); backdrop-filter: blur(2px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 3000;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--gray-200);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== BANNER PREMIER POINTAGE ===== */
+    .first-banner {
+      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+      color: white; border-radius: var(--radius);
+      padding: 18px; margin-bottom: 16px;
+      text-align: center;
+    }
+    .first-banner-icon { font-size: 2rem; margin-bottom: 6px; }
+    .first-banner-text { font-size: 1.05rem; font-weight: 600; }
+    .first-banner-sub { font-size: 0.88rem; margin-top: 4px; opacity: 0.9; }
   </style>
 </head>
 <body>
@@ -102,62 +205,371 @@
   </header>
 
   <main class="content">
-    <div class="page-title">Module Pointages</div>
-    <div class="page-subtitle">Gestion du temps de travail, plannings et congés — remplacement de Combo</div>
-
-    <div class="info-banner">
-      <strong>🚧 Module en développement actif.</strong>
-      Phase 1 en cours (salariés + pointage tablette). Bascule production prévue <strong>01/07/2026</strong>.
+    <!-- Banner premier login du jour (affiché si pas encore pointé) -->
+    <div class="first-banner" id="first-banner" style="display:none;">
+      <div class="first-banner-icon">👋</div>
+      <div class="first-banner-text">Bonjour <span id="banner-prenom"></span> !</div>
+      <div class="first-banner-sub">Tu n'as pas encore pointé ton début de poste aujourd'hui.</div>
     </div>
 
-    <div class="cards-grid">
-      <div class="module-card disabled" title="Bientôt disponible">
-        <div class="module-icon">📱</div>
-        <div class="module-name">Pointage tablette</div>
-        <div class="module-desc">Écran de badgeage PIN + entrée/sortie/pauses pour la tablette du resto</div>
-        <span class="module-badge soon">En développement</span>
-      </div>
+    <!-- Carte d'état courant -->
+    <div class="status-card" id="status-card">
+      <div class="status-icon" id="status-icon">⏳</div>
+      <div class="status-label">État actuel</div>
+      <div class="status-text" id="status-text">Chargement…</div>
+      <div class="status-detail" id="status-detail"></div>
+      <div class="clock-big" id="clock"></div>
+    </div>
 
-      <div class="module-card disabled" title="Bientôt disponible">
-        <div class="module-icon">📊</div>
-        <div class="module-name">Consultation</div>
-        <div class="module-desc">Voir les pointages du jour/semaine, corrections, validation manager</div>
-        <span class="module-badge soon">Bientôt</span>
+    <!-- Résumé du jour (visible si déjà pointé aujourd'hui) -->
+    <div class="day-summary" id="day-summary" style="display:none;">
+      <h3>Récapitulatif du jour</h3>
+      <div class="day-summary-grid">
+        <div class="ds-item">
+          <div class="ds-value" id="ds-debut">--:--</div>
+          <div class="ds-label">Début</div>
+        </div>
+        <div class="ds-item">
+          <div class="ds-value" id="ds-pauses">0 min</div>
+          <div class="ds-label">Pauses</div>
+        </div>
+        <div class="ds-item">
+          <div class="ds-value" id="ds-travaille">0h00</div>
+          <div class="ds-label">Travaillé</div>
+        </div>
       </div>
+    </div>
 
-      <div class="module-card disabled" title="Phase 2">
-        <div class="module-icon">📅</div>
-        <div class="module-name">Plannings</div>
-        <div class="module-desc">Création des plannings hebdomadaires par équipe/poste</div>
-        <span class="module-badge soon">Phase 2</span>
-      </div>
+    <!-- Boutons d'action contextuels -->
+    <div class="actions" id="actions"></div>
 
-      <div class="module-card disabled" title="Phase 3">
-        <div class="module-icon">🏖️</div>
-        <div class="module-name">Congés & absences</div>
-        <div class="module-desc">Demandes, validations, soldes par salarié</div>
-        <span class="module-badge soon">Phase 3</span>
-      </div>
-
-      <div class="module-card disabled" title="Phase 4">
-        <div class="module-icon">📤</div>
-        <div class="module-name">Export paie</div>
-        <div class="module-desc">Récap mensuel L-GAV, heures sup, export fiduciaire</div>
-        <span class="module-badge soon">Phase 4</span>
-      </div>
+    <!-- Historique des événements du jour -->
+    <div class="history" id="history" style="display:none;">
+      <h3>Historique du jour</h3>
+      <div class="history-list" id="history-list"></div>
     </div>
   </main>
 
+  <div class="toast" id="toast"></div>
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    // Vérifier la session
-    const userData = sessionStorage.getItem('planb_user');
-    const etab = sessionStorage.getItem('planb_etablissement');
-    if (!userData || !etab) {
-      window.location.href = '../index.html';
-    } else {
-      const user = JSON.parse(userData);
-      document.getElementById('user-info').textContent = `${user.initiales || user.nom} • ${etab}`;
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============= STATE =============
+let currentUser = null;
+let currentEtablissement = null;
+let etatCourant = null;          // null = pas pointé / { periode, statut: 'en_service'|'en_pause' } sinon
+let evenementsDuJour = [];
+
+// ============= INIT =============
+document.addEventListener('DOMContentLoaded', async () => {
+  // Vérifier la session
+  const userData = sessionStorage.getItem('planb_user');
+  const etab = sessionStorage.getItem('planb_etablissement');
+  if (!userData || !etab) {
+    window.location.href = '../index.html';
+    return;
+  }
+  currentUser = JSON.parse(userData);
+  currentEtablissement = etab;
+  document.getElementById('user-info').textContent = `${currentUser.initiales || currentUser.nom} • ${currentEtablissement}`;
+
+  startClock();
+  await loadEtatCourant();
+  await loadEvenementsDuJour();
+  render();
+});
+
+function startClock() {
+  const upd = () => {
+    const d = new Date();
+    document.getElementById('clock').textContent =
+      String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+  };
+  upd();
+  setInterval(upd, 1000);
+}
+
+// ============= LOAD =============
+async function loadEtatCourant() {
+  // Cherche une période ouverte (fin_service IS NULL) du jour pour ce user dans cet établissement
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await sb
+    .from('pointage_periodes_travail')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .eq('etablissement', currentEtablissement)
+    .eq('date_service', today)
+    .is('fin_service', null)
+    .maybeSingle();
+  if (error) { console.error(error); return; }
+
+  if (!data) { etatCourant = null; return; }
+
+  // Déterminer le statut (en_service ou en_pause) en regardant le dernier événement
+  const { data: evts } = await sb
+    .from('pointage_evenements')
+    .select('type_evenement, horodatage')
+    .eq('periode_travail_id', data.id)
+    .order('horodatage', { ascending: false })
+    .limit(1);
+  const dernier = (evts && evts[0]) ? evts[0].type_evenement : 'debut_service';
+  etatCourant = {
+    periode: data,
+    statut: dernier === 'debut_pause' ? 'en_pause' : 'en_service'
+  };
+}
+
+async function loadEvenementsDuJour() {
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await sb
+    .from('pointage_evenements')
+    .select('type_evenement, horodatage')
+    .eq('user_id', currentUser.id)
+    .eq('etablissement', currentEtablissement)
+    .eq('date_service', today)
+    .order('horodatage');
+  evenementsDuJour = data || [];
+}
+
+// ============= RENDER =============
+function render() {
+  const card = document.getElementById('status-card');
+  const icon = document.getElementById('status-icon');
+  const text = document.getElementById('status-text');
+  const detail = document.getElementById('status-detail');
+  const banner = document.getElementById('first-banner');
+  const summary = document.getElementById('day-summary');
+  const actions = document.getElementById('actions');
+  const history = document.getElementById('history');
+
+  // Cas : pas encore pointé aujourd'hui
+  if (!etatCourant && evenementsDuJour.length === 0) {
+    card.className = 'status-card absent';
+    icon.textContent = '🌅';
+    text.textContent = 'Pas encore en service';
+    detail.innerHTML = 'Clique sur le bouton ci-dessous pour <strong>commencer ta journée</strong>.';
+    banner.style.display = 'block';
+    document.getElementById('banner-prenom').textContent = (currentUser.nom || '').split(' ')[0];
+    summary.style.display = 'none';
+    actions.innerHTML = `
+      <button class="action-btn start" onclick="doAction('debut_service')">
+        <span class="action-btn-icon">▶️</span> Commencer ma journée
+      </button>`;
+    history.style.display = 'none';
+    return;
+  }
+
+  banner.style.display = 'none';
+
+  // Cas : journée terminée (a pointé fin_service)
+  const aFini = !etatCourant && evenementsDuJour.length > 0;
+  if (aFini) {
+    card.className = 'status-card fini';
+    icon.textContent = '✅';
+    text.textContent = 'Journée terminée';
+    const fin = evenementsDuJour.find(e => e.type_evenement === 'fin_service');
+    detail.innerHTML = `Tu as terminé ton service à <strong>${formatHeure(fin?.horodatage)}</strong>. Bonne fin de journée !`;
+    summary.style.display = 'block';
+    fillSummary();
+    actions.innerHTML = `
+      <button class="action-btn start" onclick="doAction('debut_service')">
+        <span class="action-btn-icon">🔄</span> Reprendre une nouvelle session
+      </button>`;
+  }
+  // Cas : en service
+  else if (etatCourant?.statut === 'en_service') {
+    card.className = 'status-card en-service';
+    icon.textContent = '🟢';
+    text.textContent = 'En service';
+    detail.innerHTML = `Depuis <strong>${formatHeure(etatCourant.periode.debut_service)}</strong>`;
+    summary.style.display = 'block';
+    fillSummary();
+    actions.innerHTML = `
+      <button class="action-btn pause" onclick="doAction('debut_pause')">
+        <span class="action-btn-icon">⏸️</span> Commencer une pause
+      </button>
+      <button class="action-btn end" onclick="doAction('fin_service')">
+        <span class="action-btn-icon">⏹️</span> Fin de service
+      </button>`;
+  }
+  // Cas : en pause
+  else if (etatCourant?.statut === 'en_pause') {
+    card.className = 'status-card en-pause';
+    icon.textContent = '🟠';
+    text.textContent = 'En pause';
+    const lastPauseStart = [...evenementsDuJour].reverse().find(e => e.type_evenement === 'debut_pause');
+    detail.innerHTML = `Pause commencée à <strong>${formatHeure(lastPauseStart?.horodatage)}</strong>`;
+    summary.style.display = 'block';
+    fillSummary();
+    actions.innerHTML = `
+      <button class="action-btn resume" onclick="doAction('fin_pause')">
+        <span class="action-btn-icon">▶️</span> Reprendre le service
+      </button>
+      <button class="action-btn end" onclick="doAction('fin_service')">
+        <span class="action-btn-icon">⏹️</span> Fin de service
+      </button>`;
+  }
+
+  // Historique du jour
+  if (evenementsDuJour.length > 0) {
+    history.style.display = 'block';
+    document.getElementById('history-list').innerHTML = evenementsDuJour.map(e => {
+      const map = {
+        debut_service: { icon: '▶️', label: 'Début de service' },
+        debut_pause: { icon: '⏸️', label: 'Début de pause' },
+        fin_pause: { icon: '▶️', label: 'Fin de pause' },
+        fin_service: { icon: '⏹️', label: 'Fin de service' }
+      }[e.type_evenement] || { icon: '•', label: e.type_evenement };
+      return `
+        <div class="history-item">
+          <div class="history-time">${formatHeure(e.horodatage)}</div>
+          <div class="history-icon">${map.icon}</div>
+          <div class="history-label">${map.label}</div>
+        </div>`;
+    }).join('');
+  }
+}
+
+function fillSummary() {
+  const debut = evenementsDuJour.find(e => e.type_evenement === 'debut_service');
+  document.getElementById('ds-debut').textContent = debut ? formatHeure(debut.horodatage) : '--:--';
+
+  // Calcul des pauses
+  let pausesMs = 0;
+  let lastDebutPause = null;
+  evenementsDuJour.forEach(e => {
+    if (e.type_evenement === 'debut_pause') lastDebutPause = new Date(e.horodatage);
+    else if (e.type_evenement === 'fin_pause' && lastDebutPause) {
+      pausesMs += new Date(e.horodatage) - lastDebutPause;
+      lastDebutPause = null;
     }
+  });
+  // Si en pause actuellement, ajouter le temps écoulé
+  if (etatCourant?.statut === 'en_pause' && lastDebutPause) {
+    pausesMs += new Date() - lastDebutPause;
+  }
+  const pausesMinutes = Math.round(pausesMs / 60000);
+  document.getElementById('ds-pauses').textContent = pausesMinutes + ' min';
+
+  // Travaillé = (fin || maintenant) - debut - pauses
+  if (debut) {
+    const fin = evenementsDuJour.find(e => e.type_evenement === 'fin_service');
+    const finMs = fin ? new Date(fin.horodatage).getTime() : Date.now();
+    const travailMs = finMs - new Date(debut.horodatage).getTime() - pausesMs;
+    const h = Math.floor(travailMs / 3600000);
+    const m = Math.floor((travailMs % 3600000) / 60000);
+    document.getElementById('ds-travaille').textContent = `${h}h${String(m).padStart(2,'0')}`;
+  }
+}
+
+// ============= ACTIONS =============
+async function doAction(typeEvenement) {
+  showLoading(true);
+  try {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const userNom = currentUser.nom;
+
+    // Insérer l'événement
+    const evtPayload = {
+      user_id: currentUser.id,
+      user_nom: userNom,
+      type_evenement: typeEvenement,
+      horodatage: now.toISOString(),
+      date_service: today,
+      etablissement: currentEtablissement,
+      source: 'tablette',
+      periode_travail_id: etatCourant?.periode.id || null
+    };
+
+    const { data: evt, error: eEvt } = await sb
+      .from('pointage_evenements')
+      .insert(evtPayload)
+      .select()
+      .single();
+    if (eEvt) throw eEvt;
+
+    // Mettre à jour periodes_travail
+    if (typeEvenement === 'debut_service') {
+      const { data: per, error: ePer } = await sb
+        .from('pointage_periodes_travail')
+        .insert({
+          user_id: currentUser.id,
+          user_nom: userNom,
+          date_service: today,
+          etablissement: currentEtablissement,
+          debut_service: now.toISOString(),
+          statut: 'saisi'
+        })
+        .select()
+        .single();
+      if (ePer) throw ePer;
+      await sb.from('pointage_evenements')
+        .update({ periode_travail_id: per.id })
+        .eq('id', evt.id);
+      toast('▶️ Début de service enregistré', 'success');
+    } else if (typeEvenement === 'fin_service') {
+      // Recalculer les pauses
+      const { data: pauses } = await sb
+        .from('pointage_evenements')
+        .select('type_evenement, horodatage')
+        .eq('periode_travail_id', etatCourant.periode.id)
+        .in('type_evenement', ['debut_pause', 'fin_pause'])
+        .order('horodatage');
+      let dureeMin = 0; let lastDeb = null;
+      (pauses || []).forEach(e => {
+        if (e.type_evenement === 'debut_pause') lastDeb = new Date(e.horodatage);
+        else if (e.type_evenement === 'fin_pause' && lastDeb) {
+          dureeMin += Math.round((new Date(e.horodatage) - lastDeb) / 60000);
+          lastDeb = null;
+        }
+      });
+      await sb.from('pointage_periodes_travail')
+        .update({
+          fin_service: now.toISOString(),
+          duree_pauses_minutes: dureeMin,
+          statut: 'saisi'
+        })
+        .eq('id', etatCourant.periode.id);
+      toast('⏹️ Fin de service enregistrée. Bonne fin de journée !', 'success');
+    } else if (typeEvenement === 'debut_pause') {
+      toast('⏸️ Pause commencée', 'success');
+    } else if (typeEvenement === 'fin_pause') {
+      toast('▶️ Reprise du service', 'success');
+    }
+
+    // Recharger l'état + rendre
+    await loadEtatCourant();
+    await loadEvenementsDuJour();
+    render();
+  } catch (e) {
+    console.error(e);
+    toast('Erreur : ' + e.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ============= UTILS =============
+function formatHeure(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function showLoading(v) {
+  document.getElementById('loading').classList.toggle('active', v);
+}
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
   </script>
 </body>
 </html>
