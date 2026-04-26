@@ -341,22 +341,76 @@ function switchTab(tab) {
 }
 
 // ============ DATA LOAD ============
+// Source de vérité pour le "CA réalisé" :
+//   1) caisse_controle (saisi quotidiennement par l'équipe) — PRIORITAIRE
+//   2) ventes_journalieres (scraping L'Addition) — fournit couverts, ticket moyen, ca_ht…
+// Lorsque caisse_controle.ca existe pour un (date, etablissement), il écrase ca_ttc.
+// Lorsque caisse_controle existe SANS ventes_journalieres, on crée une entrée de synthèse
+// (CA seul, couverts/ticket vides). Le contrôle L'Addition vs caisse_controle se fera plus tard.
 async function loadAllData() {
   showLoading(true);
   try {
-    const [salesRes, objRes] = await Promise.all([
+    const [salesRes, objRes, caisseRes] = await Promise.all([
       sb.from('ventes_journalieres').select('*').order('date', { ascending: true }),
-      sb.from('objectifs_ventes').select('*')
+      sb.from('objectifs_ventes').select('*'),
+      sb.from('caisse_controle').select('date, etablissement, ca, vae').order('date', { ascending: true })
     ]);
     if (salesRes.error) throw salesRes.error;
     // objectifs_ventes peut ne pas exister encore (avant migration SQL) — on l'ignore dans ce cas
     allObjectifs = (objRes && !objRes.error) ? (objRes.data || []) : [];
-    // Parse notes JSON to enrich
-    allData = (salesRes.data || []).map(r => {
+
+    // Index caisse_controle par "date|etablissement"
+    const caisseByKey = new Map();
+    const caisseRows = (caisseRes && !caisseRes.error) ? (caisseRes.data || []) : [];
+    caisseRows.forEach(c => {
+      const ca = Number(c.ca) || 0;
+      // On ne prend en compte que les jours réellement saisis (CA > 0 ou VAE > 0)
+      if (ca > 0 || (Number(c.vae) || 0) > 0) {
+        caisseByKey.set(`${c.date}|${c.etablissement}`, c);
+      }
+    });
+
+    // Parse notes JSON et override ca_ttc avec le CA du contrôle de caisse si dispo
+    const seenKeys = new Set();
+    const merged = (salesRes.data || []).map(r => {
       let enrich = {};
       try { if (r.notes && r.notes.startsWith('{')) enrich = JSON.parse(r.notes); } catch(e) {}
-      return { ...r, ...enrich };
+      const key = `${r.date}|${r.etablissement}`;
+      seenKeys.add(key);
+      const caisse = caisseByKey.get(key);
+      const row = { ...r, ...enrich };
+      if (caisse) {
+        // Override : la case "CA réalisé" prend la valeur saisie en contrôle de caisse
+        row.ca_ttc = Number(caisse.ca) || 0;
+        row.ca_source = 'caisse_controle';
+      } else {
+        row.ca_source = 'laddition';
+      }
+      return row;
     });
+
+    // Ajoute les jours présents en caisse_controle mais absents de ventes_journalieres
+    // (= CA seul, couverts/ticket vides — ex : période actuelle où le scraper L'Addition n'a pas tourné)
+    caisseByKey.forEach((c, key) => {
+      if (seenKeys.has(key)) return;
+      merged.push({
+        date: c.date,
+        etablissement: c.etablissement,
+        service: 'journee',
+        ca_ttc: Number(c.ca) || 0,
+        ca_ht: 0,
+        couverts: 0,
+        nb_tables: null,
+        nb_additions: null,
+        source: 'caisse_controle',
+        ca_source: 'caisse_controle',
+        saisi_par_nom: 'Contrôle de caisse'
+      });
+    });
+
+    // Re-tri par date pour rester cohérent avec l'ordre attendu plus loin
+    merged.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    allData = merged;
     renderAll();
   } catch (e) {
     console.error(e);
