@@ -149,6 +149,83 @@
       color: var(--gray-400); font-size: 0.9rem;
     }
 
+    /* ===== BANDEAU PERMANENT MODE TEST ===== */
+    .test-banner {
+      background: linear-gradient(90deg, #f97316 0%, #ea580c 100%);
+      color: white;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .test-banner-icon { font-size: 1rem; }
+
+    /* ===== MODAL DISCLAIMER ===== */
+    .disclaimer-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 5000; padding: 20px;
+    }
+    .disclaimer-overlay.active { display: flex; }
+    .disclaimer-modal {
+      background: white; border-radius: 16px;
+      width: 100%; max-width: 500px;
+      padding: 28px 24px;
+      animation: modalIn 0.25s ease-out;
+      text-align: center;
+    }
+    @keyframes modalIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .disclaimer-icon {
+      font-size: 3rem; margin-bottom: 12px;
+    }
+    .disclaimer-title {
+      font-size: 1.3rem; font-weight: 700; color: var(--gray-900);
+      margin-bottom: 14px;
+    }
+    .disclaimer-body {
+      font-size: 0.98rem; color: var(--gray-700); line-height: 1.55;
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    .disclaimer-body p { margin-bottom: 12px; }
+    .disclaimer-body p:last-child { margin-bottom: 0; }
+    .disclaimer-body strong { color: var(--gray-900); }
+    .disclaimer-highlight {
+      background: var(--orange-bg);
+      border-left: 4px solid var(--orange);
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-size: 0.92rem;
+      color: var(--orange-dark);
+      font-weight: 600;
+      margin: 12px 0;
+    }
+    .disclaimer-thanks {
+      background: var(--accent-light);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.95rem;
+      color: var(--accent-dark);
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    .disclaimer-btn {
+      width: 100%;
+      padding: 16px;
+      border: none; border-radius: 12px;
+      background: var(--accent); color: white;
+      font-size: 1.05rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .disclaimer-btn:active { background: var(--accent-dark); transform: scale(0.98); }
+
     /* ===== TOAST & LOADING ===== */
     .toast {
       position: fixed; top: 80px; left: 50%;
@@ -204,6 +281,12 @@
     </div>
   </header>
 
+  <!-- Bandeau permanent : module en phase de test -->
+  <div class="test-banner">
+    <span class="test-banner-icon">🧪</span>
+    <span>Module en phase de test — <strong>Combo reste l'application officielle de pointage</strong></span>
+  </div>
+
   <main class="content">
     <!-- Banner premier login du jour (affiché si pas encore pointé) -->
     <div class="first-banner" id="first-banner" style="display:none;">
@@ -250,6 +333,36 @@
     </div>
   </main>
 
+  <!-- Modale d'avertissement au premier accès (1 fois par user) -->
+  <div class="disclaimer-overlay" id="disclaimer">
+    <div class="disclaimer-modal">
+      <div class="disclaimer-icon">🧪</div>
+      <div class="disclaimer-title">Bienvenue dans le module Pointages !</div>
+      <div class="disclaimer-body">
+        <p>
+          Ce module est <strong>en cours de construction</strong>. Nous sommes
+          actuellement en <strong>phase de test</strong> et tu fais partie des premières
+          personnes à l'utiliser.
+        </p>
+        <div class="disclaimer-highlight">
+          ⚠️ Pour l'instant, <strong>continue de pointer dans Combo comme d'habitude</strong>.
+          C'est Combo qui reste l'application officielle pour la paie.
+        </div>
+        <p>
+          Tu peux quand même utiliser ce module en parallèle pour <strong>nous aider à le
+          tester</strong>. Si quelque chose ne fonctionne pas comme attendu, n'hésite pas
+          à nous le signaler.
+        </p>
+        <div class="disclaimer-thanks">
+          🙏 Merci pour ta participation, elle nous est précieuse !
+        </div>
+      </div>
+      <button class="disclaimer-btn" onclick="acknowledgeDisclaimer()">
+        J'ai compris, je continue
+      </button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 
@@ -278,11 +391,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentEtablissement = etab;
   document.getElementById('user-info').textContent = `${currentUser.initiales || currentUser.nom} • ${currentEtablissement}`;
 
+  // Afficher la modale d'avertissement au PREMIER accès de ce user au module
+  // Mémorisé dans localStorage, ne se réaffiche pas pour ce user après acquittement
+  maybeShowDisclaimer();
+
   startClock();
   await loadEtatCourant();
   await loadEvenementsDuJour();
   render();
 });
+
+// ============= DISCLAIMER (modale phase test) =============
+function maybeShowDisclaimer() {
+  const key = 'pointages_disclaimer_acknowledged_' + currentUser.id;
+  if (localStorage.getItem(key) === 'true') return;
+  document.getElementById('disclaimer').classList.add('active');
+}
+
+function acknowledgeDisclaimer() {
+  const key = 'pointages_disclaimer_acknowledged_' + currentUser.id;
+  try { localStorage.setItem(key, 'true'); } catch (e) { /* mode privé navigateur, on ignore */ }
+  document.getElementById('disclaimer').classList.remove('active');
+}
 
 function startClock() {
   const upd = () => {
