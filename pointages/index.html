@@ -496,14 +496,27 @@ function render() {
 
   banner.style.display = 'none';
 
-  // Cas : journée terminée (a pointé fin_service)
-  const aFini = !etatCourant && evenementsDuJour.length > 0;
-  if (aFini) {
+  // Cas : journée terminée (a pointé fin_service) — vérifier qu'il y a bien un fin_service
+  const finEvent = evenementsDuJour.find(e => e.type_evenement === 'fin_service');
+  const aFini = !etatCourant && finEvent;
+  // Cas anormal : événements sans période ouverte ET sans fin_service → état incohérent
+  const incoherent = !etatCourant && evenementsDuJour.length > 0 && !finEvent;
+
+  if (incoherent) {
+    card.className = 'status-card absent';
+    icon.textContent = '⚠️';
+    text.textContent = 'État incohérent';
+    detail.innerHTML = 'Des actions ont été enregistrées mais aucune session active n\'a pu être créée. <strong>Préviens un administrateur.</strong>';
+    summary.style.display = 'none';
+    actions.innerHTML = `
+      <button class="action-btn start" onclick="doAction('debut_service')">
+        <span class="action-btn-icon">▶️</span> Réessayer le début de service
+      </button>`;
+  } else if (aFini) {
     card.className = 'status-card fini';
     icon.textContent = '✅';
     text.textContent = 'Journée terminée';
-    const fin = evenementsDuJour.find(e => e.type_evenement === 'fin_service');
-    detail.innerHTML = `Tu as terminé ton service à <strong>${formatHeure(fin?.horodatage)}</strong>. Bonne fin de journée !`;
+    detail.innerHTML = `Tu as terminé ton service à <strong>${formatHeure(finEvent.horodatage)}</strong>. Bonne fin de journée !`;
     summary.style.display = 'block';
     fillSummary();
     actions.innerHTML = `
@@ -598,34 +611,37 @@ function fillSummary() {
 }
 
 // ============= ACTIONS =============
+let actionInProgress = false; // Anti double-clic
 async function doAction(typeEvenement) {
+  if (actionInProgress) return;
+  actionInProgress = true;
   showLoading(true);
   try {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const userNom = currentUser.nom;
 
-    // Insérer l'événement
-    const evtPayload = {
-      user_id: currentUser.id,
-      user_nom: userNom,
-      type_evenement: typeEvenement,
-      horodatage: now.toISOString(),
-      date_service: today,
-      etablissement: currentEtablissement,
-      source: 'tablette',
-      periode_travail_id: etatCourant?.periode.id || null
-    };
-
-    const { data: evt, error: eEvt } = await sb
-      .from('pointage_evenements')
-      .insert(evtPayload)
-      .select()
-      .single();
-    if (eEvt) throw eEvt;
-
-    // Mettre à jour periodes_travail
+    // ===== Cas debut_service : on crée la période AVANT l'événement =====
+    // Comme ça, si l'INSERT période plante (déjà ouverte par exemple),
+    // on n'a pas d'événement orphelin en base.
     if (typeEvenement === 'debut_service') {
+      // Vérification préalable : pas déjà en service aujourd'hui ?
+      const { data: existante } = await sb
+        .from('pointage_periodes_travail')
+        .select('id, debut_service')
+        .eq('user_id', currentUser.id)
+        .eq('date_service', today)
+        .is('fin_service', null)
+        .maybeSingle();
+      if (existante) {
+        toast('⚠️ Tu es déjà en service depuis ' + formatHeure(existante.debut_service), 'error');
+        await loadEtatCourant();
+        await loadEvenementsDuJour();
+        render();
+        return;
+      }
+
+      // Créer la période en premier
       const { data: per, error: ePer } = await sb
         .from('pointage_periodes_travail')
         .insert({
@@ -638,12 +654,59 @@ async function doAction(typeEvenement) {
         })
         .select()
         .single();
-      if (ePer) throw ePer;
-      await sb.from('pointage_evenements')
-        .update({ periode_travail_id: per.id })
-        .eq('id', evt.id);
+      if (ePer) {
+        throw new Error('Impossible de créer la session : ' + (ePer.message || 'erreur DB'));
+      }
+
+      // Puis créer l'événement, lié à la période
+      const { error: eEvt } = await sb
+        .from('pointage_evenements')
+        .insert({
+          user_id: currentUser.id,
+          user_nom: userNom,
+          type_evenement: 'debut_service',
+          horodatage: now.toISOString(),
+          date_service: today,
+          etablissement: currentEtablissement,
+          source: 'tablette',
+          periode_travail_id: per.id
+        });
+      if (eEvt) console.warn('Évt debut_service raté mais période créée OK:', eEvt);
+
       toast('▶️ Début de service enregistré', 'success');
-    } else if (typeEvenement === 'fin_service') {
+      await loadEtatCourant();
+      await loadEvenementsDuJour();
+      render();
+      return;
+    }
+
+    // ===== Cas pause / reprise / fin : il faut une période ouverte =====
+    if (!etatCourant?.periode?.id) {
+      toast('⚠️ Aucune session en cours. Recharge la page.', 'error');
+      return;
+    }
+
+    // Insérer l'événement (lié à la période existante)
+    const evtPayload = {
+      user_id: currentUser.id,
+      user_nom: userNom,
+      type_evenement: typeEvenement,
+      horodatage: now.toISOString(),
+      date_service: today,
+      etablissement: currentEtablissement,
+      source: 'tablette',
+      periode_travail_id: etatCourant.periode.id
+    };
+
+    const { data: evt, error: eEvt } = await sb
+      .from('pointage_evenements')
+      .insert(evtPayload)
+      .select()
+      .single();
+    if (eEvt) throw eEvt;
+
+    // Mettre à jour periodes_travail
+    if (typeEvenement === 'fin_service') {
       // Recalculer les pauses
       const { data: pauses } = await sb
         .from('pointage_evenements')
@@ -679,9 +742,13 @@ async function doAction(typeEvenement) {
     render();
   } catch (e) {
     console.error(e);
-    toast('Erreur : ' + e.message, 'error');
+    // Erreur visible et persistante (5s) avec message clair
+    toast('❌ ' + (e.message || 'Erreur inconnue') + ' — recharge la page si le problème persiste', 'error', 5000);
+    // Recharger l'état pour éviter d'être bloqué
+    try { await loadEtatCourant(); await loadEvenementsDuJour(); render(); } catch (_) {}
   } finally {
     showLoading(false);
+    actionInProgress = false;
   }
 }
 
@@ -694,11 +761,11 @@ function formatHeure(iso) {
 function showLoading(v) {
   document.getElementById('loading').classList.toggle('active', v);
 }
-function toast(msg, type = '') {
+function toast(msg, type = '', duration = 3000) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = `toast ${type} show`;
-  setTimeout(() => t.classList.remove('show'), 3000);
+  setTimeout(() => t.classList.remove('show'), duration);
 }
   </script>
 </body>
