@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Réceptions — PLANB</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#171a21; --panel2:#1f232c; --border:#2a2f3a;
+      --text:#e6e8ee; --muted:#8b93a7; --accent:#4f8cff; --accent2:#6cf; --good:#3fbf7f; --warn:#f5a524; --bad:#e5484d;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#171a21,#171a21f0);border-bottom:1px solid var(--border);padding:14px 20px;backdrop-filter:blur(10px)}
+    h1{margin:0 0 4px 0;font-size:18px;font-weight:600}
+    .sub{color:var(--muted);font-size:12px}
+    .stats{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
+    .stat{background:var(--panel2);padding:8px 12px;border-radius:8px;border:1px solid var(--border)}
+    .stat .v{font-size:18px;font-weight:600}
+    .stat .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+    .filters{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+    .filters label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
+    .filters select,.filters input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px}
+    .filters input[type=text]{min-width:220px}
+    .clear{background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;height:30px;align-self:flex-end}
+    main{padding:18px 20px;max-width:1600px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+    .card-head{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+    .card-title{font-weight:600;font-size:15px}
+    .card-meta{color:var(--muted);font-size:12px;margin-top:2px}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{font-size:11px;padding:2px 8px;border-radius:12px;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+    .badge.good{background:rgba(63,191,127,.15);color:var(--good);border-color:rgba(63,191,127,.3)}
+    .badge.warn{background:rgba(245,165,36,.15);color:var(--warn);border-color:rgba(245,165,36,.3)}
+    .badge.bad{background:rgba(229,72,77,.15);color:var(--bad);border-color:rgba(229,72,77,.3)}
+    .badge.info{background:rgba(79,140,255,.15);color:var(--accent);border-color:rgba(79,140,255,.3)}
+    .card-body{display:grid;grid-template-columns:1.1fr 1fr;gap:0}
+    .col-img{background:#0a0c0f;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:10px;min-height:300px;border-right:1px solid var(--border)}
+    .col-img img{max-width:100%;max-height:600px;border-radius:6px;cursor:zoom-in}
+    .col-img .empty{color:var(--muted);padding:60px 10px;text-align:center;font-size:13px}
+    .col-img .pdf-link{margin-top:8px;display:inline-block;color:var(--accent2);text-decoration:none;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--panel2)}
+    .col-ocr{padding:12px 14px;display:flex;flex-direction:column}
+    .col-ocr h4{margin:0 0 6px 0;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+    .ocr-text{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'SF Mono',Monaco,monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;overflow:auto;max-height:600px;color:#cbd2e1}
+    .quality{margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);font-size:12px}
+    .quality .row{display:flex;justify-content:space-between;padding:2px 0}
+    .quality .row span:last-child{font-weight:600}
+    .verdict{padding:10px;border-radius:6px;margin-top:8px;font-size:13px;font-weight:600;text-align:center}
+    .verdict.good{background:rgba(63,191,127,.12);color:var(--good);border:1px solid rgba(63,191,127,.3)}
+    .verdict.warn{background:rgba(245,165,36,.12);color:var(--warn);border:1px solid rgba(245,165,36,.3)}
+    .verdict.bad{background:rgba(229,72,77,.12);color:var(--bad);border:1px solid rgba(229,72,77,.3)}
+    .loading{text-align:center;padding:60px;color:var(--muted)}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out;padding:30px}
+    .modal.open{display:flex}
+    .modal img{max-width:100%;max-height:100%;object-fit:contain}
+    @media (max-width:900px){
+      .card-body{grid-template-columns:1fr}
+      .col-img{border-right:none;border-bottom:1px solid var(--border)}
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Audit des pièces scannées — Module Réceptions</h1>
+  <div class="sub" id="sub">Chargement…</div>
+  <div class="stats" id="stats"></div>
+  <div class="filters">
+    <label>Fournisseur<select id="f-fournisseur"><option value="">Tous</option></select></label>
+    <label>Établissement<select id="f-etab"><option value="">Tous</option></select></label>
+    <label>Type<select id="f-type"><option value="">Tous</option><option value="facture">Factures</option><option value="etiquette">Étiquettes</option></select></label>
+    <label>Verdict<select id="f-verdict"><option value="">Tous</option><option value="good">Exploitable</option><option value="warn">Médiocre</option><option value="bad">Inutilisable</option></select></label>
+    <label>Recherche OCR<input type="text" id="f-search" placeholder="ex : 123,45 ou TVA"></label>
+    <button class="clear" id="clear-filters">Réinitialiser</button>
+  </div>
+</header>
+<main>
+  <div id="content" class="loading">Connexion à Supabase…</div>
+</main>
+<div class="modal" id="modal" onclick="this.classList.remove('open')"><img id="modal-img"></div>
+
+<script>
+const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allDocs = [];
+let allPages = [];
+
+// Heuristique qualité : score sur 5 critères
+// 1. présence d'un montant TTC (regex monétaire)
+// 2. présence d'une date au format jj/mm/aa
+// 3. présence d'un n° SIRET ou TVA
+// 4. présence de mot-clé facture / bon de livraison / quantité
+// 5. ratio caractères alphanumériques propres / bruit
+function scoreOCR(text) {
+  if (!text || text.length < 50) return { score:0, criteria:{} };
+  const t = text;
+  const c = {
+    montant: /\b\d{1,5}[.,]\d{2}\b/.test(t),
+    date: /\b\d{2}\/\d{2}\/(20)?\d{2}\b/.test(t),
+    fiscal: /(SIRET|SIREN|TVA|FR\d{8,11}|FR\s?\d{2}\s?\d{9})/i.test(t),
+    keyword: /(facture|bon de livraison|livraison|quantit|total|H\.?T\.?|T\.?T\.?C\.?)/i.test(t),
+    cleanRatio: (() => {
+      const alnum = (t.match(/[A-Za-z0-9éèêàâïôûç]/g)||[]).length;
+      const total = t.replace(/\s/g,'').length;
+      return total > 0 && (alnum/total) > 0.7;
+    })()
+  };
+  const score = Object.values(c).filter(Boolean).length;
+  return { score, criteria:c };
+}
+
+function verdict(doc, ocr) {
+  // PDF searchable = automatiquement exploitable
+  if (doc.pdf_data && doc.pdf_data.length > 1000) return 'good';
+  if (!ocr || ocr.score === 0) return 'bad';
+  if (ocr.score >= 4) return 'good';
+  if (ocr.score >= 2) return 'warn';
+  return 'bad';
+}
+
+function fmtDate(d){return d ? new Date(d).toLocaleDateString('fr-FR') : '—';}
+function escapeHtml(s){return (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+
+async function loadAll() {
+  const c = document.getElementById('content');
+  const sub = document.getElementById('sub');
+
+  sub.textContent = 'Chargement des documents…';
+  const { data: docs, error: e1 } = await sb.from('receptions_documents').select('*').order('date',{ascending:false});
+  if (e1) { c.innerHTML = `<div style="color:var(--bad);padding:20px">Erreur : ${e1.message}</div>`; return; }
+  allDocs = docs;
+
+  sub.textContent = `Chargement des pages photos pour ${docs.length} documents…`;
+  const { data: pages, error: e2 } = await sb.from('receptions_pages').select('*');
+  if (e2) { c.innerHTML = `<div style="color:var(--bad);padding:20px">Erreur pages : ${e2.message}</div>`; return; }
+  allPages = pages;
+
+  // Pré-calcul : analyse + détection doublons (même fournisseur + ref + date)
+  const dupMap = {};
+  docs.forEach(d => {
+    if (d.reference) {
+      const k = `${d.fournisseur_nom}|${d.reference}|${d.date}`;
+      dupMap[k] = (dupMap[k]||0) + 1;
+    }
+  });
+  docs.forEach(d => {
+    d._pages = pages.filter(p => p.document_id === d.id).sort((a,b)=>a.page_num-b.page_num);
+    d._ocr = scoreOCR(d.texte_ocr);
+    d._verdict = verdict(d, d._ocr);
+    d._dup = d.reference ? dupMap[`${d.fournisseur_nom}|${d.reference}|${d.date}`] : 1;
+  });
+
+  buildFilters();
+  renderStats();
+  renderCards();
+  sub.textContent = `${docs.length} documents chargés — ${pages.length} pages photos`;
+}
+
+function buildFilters() {
+  const fournisseurs = [...new Set(allDocs.map(d=>d.fournisseur_nom))].sort();
+  const fEl = document.getElementById('f-fournisseur');
+  fournisseurs.forEach(f => { const o = document.createElement('option'); o.value=f; o.textContent=f; fEl.appendChild(o); });
+  const etabs = [...new Set(allDocs.map(d=>d.etablissement))].sort();
+  const eEl = document.getElementById('f-etab');
+  etabs.forEach(e => { const o = document.createElement('option'); o.value=e; o.textContent=e; eEl.appendChild(o); });
+
+  ['f-fournisseur','f-etab','f-type','f-verdict','f-search'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderCards);
+  });
+  document.getElementById('clear-filters').addEventListener('click', () => {
+    ['f-fournisseur','f-etab','f-type','f-verdict','f-search'].forEach(id => document.getElementById(id).value='');
+    renderCards();
+  });
+}
+
+function renderStats() {
+  const tot = allDocs.length;
+  const good = allDocs.filter(d => d._verdict === 'good').length;
+  const warn = allDocs.filter(d => d._verdict === 'warn').length;
+  const bad = allDocs.filter(d => d._verdict === 'bad').length;
+  const withPdf = allDocs.filter(d => d.pdf_data && d.pdf_data.length > 1000).length;
+  const withPhoto = allDocs.filter(d => d._pages.length > 0).length;
+  const noContent = allDocs.filter(d => !d.pdf_data && d._pages.length === 0).length;
+  const dups = allDocs.filter(d => d._dup > 1).length;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="v">${tot}</div><div class="l">Documents</div></div>
+    <div class="stat"><div class="v" style="color:var(--good)">${good}</div><div class="l">Exploitables</div></div>
+    <div class="stat"><div class="v" style="color:var(--warn)">${warn}</div><div class="l">Médiocres</div></div>
+    <div class="stat"><div class="v" style="color:var(--bad)">${bad}</div><div class="l">Inutilisables</div></div>
+    <div class="stat"><div class="v">${withPdf}</div><div class="l">PDF searchable</div></div>
+    <div class="stat"><div class="v">${withPhoto}</div><div class="l">Avec photo</div></div>
+    <div class="stat"><div class="v" style="color:var(--bad)">${noContent}</div><div class="l">Vides</div></div>
+    <div class="stat"><div class="v" style="color:var(--warn)">${dups}</div><div class="l">Doublons</div></div>
+  `;
+}
+
+function renderCards() {
+  const f = {
+    fournisseur: document.getElementById('f-fournisseur').value,
+    etab: document.getElementById('f-etab').value,
+    type: document.getElementById('f-type').value,
+    verdict: document.getElementById('f-verdict').value,
+    search: document.getElementById('f-search').value.toLowerCase().trim()
+  };
+  const filtered = allDocs.filter(d => {
+    if (f.fournisseur && d.fournisseur_nom !== f.fournisseur) return false;
+    if (f.etab && d.etablissement !== f.etab) return false;
+    if (f.type && d.type !== f.type) return false;
+    if (f.verdict && d._verdict !== f.verdict) return false;
+    if (f.search && !((d.texte_ocr||'').toLowerCase().includes(f.search))) return false;
+    return true;
+  });
+
+  const c = document.getElementById('content');
+  if (filtered.length === 0) { c.innerHTML = '<div class="loading">Aucun document ne correspond aux filtres.</div>'; return; }
+
+  c.className = 'grid';
+  c.innerHTML = filtered.map(renderCard).join('');
+
+  document.querySelectorAll('.col-img img').forEach(img => {
+    img.addEventListener('click', e => {
+      document.getElementById('modal-img').src = e.target.src;
+      document.getElementById('modal').classList.add('open');
+    });
+  });
+}
+
+function renderCard(d) {
+  const v = d._verdict;
+  const vLabel = { good:'Exploitable', warn:'Médiocre', bad:'Inutilisable' }[v];
+  const ocr = d._ocr;
+
+  const photoHtml = d._pages.length > 0
+    ? d._pages.map((p,i) => `<img src="${p.photo_data}" alt="Page ${i+1}" loading="lazy">`).join('')
+    : (d.pdf_data ? '<div class="empty">PDF disponible — cliquer pour télécharger</div>' : '<div class="empty">Aucun visuel en base</div>');
+
+  const pdfBtn = d.pdf_data ? `<a class="pdf-link" href="${d.pdf_data}" download="${d.fournisseur_nom}_${d.reference||d.id.slice(0,6)}.pdf">📄 Télécharger PDF (${(d.pdf_data.length/1024).toFixed(0)} Ko)</a>` : '';
+
+  const c = ocr.criteria || {};
+  const tick = b => b ? '<span style="color:var(--good)">✓</span>' : '<span style="color:var(--bad)">✗</span>';
+
+  const dupBadge = d._dup > 1 ? `<span class="badge bad">Doublon ×${d._dup}</span>` : '';
+  const pdfBadge = d.pdf_data ? '<span class="badge info">PDF</span>' : '';
+  const photoBadge = d._pages.length > 0 ? `<span class="badge info">${d._pages.length} photo${d._pages.length>1?'s':''}</span>` : '';
+  const emptyBadge = (!d.pdf_data && d._pages.length === 0) ? '<span class="badge bad">Sans visuel</span>' : '';
+
+  return `
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">${escapeHtml(d.fournisseur_nom)} <span style="color:var(--muted);font-weight:400">— ${escapeHtml(d.reference||'(sans réf)')}</span></div>
+          <div class="card-meta">${fmtDate(d.date)} · ${escapeHtml(d.etablissement)} · ${escapeHtml(d.type)} · statut : ${escapeHtml(d.statut)}</div>
+        </div>
+        <div class="badges">
+          ${dupBadge}${pdfBadge}${photoBadge}${emptyBadge}
+          <span class="badge ${v}">${vLabel}</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="col-img">
+          ${photoHtml}
+          ${pdfBtn}
+        </div>
+        <div class="col-ocr">
+          <h4>Texte OCR</h4>
+          <div class="ocr-text">${escapeHtml(d.texte_ocr || '(aucun texte OCR)')}</div>
+          <div class="quality">
+            <div class="row"><span>Score qualité OCR</span><span>${ocr.score}/5</span></div>
+            <div class="row"><span>Montants détectés</span>${tick(c.montant)}</div>
+            <div class="row"><span>Dates détectées</span>${tick(c.date)}</div>
+            <div class="row"><span>SIRET / TVA</span>${tick(c.fiscal)}</div>
+            <div class="row"><span>Mots-clés (facture/total/HT)</span>${tick(c.keyword)}</div>
+            <div class="row"><span>Texte propre (peu de bruit)</span>${tick(c.cleanRatio)}</div>
+          </div>
+          <div class="verdict ${v}">${vLabel}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+loadAll().catch(e => {
+  document.getElementById('content').innerHTML = `<div style="color:var(--bad);padding:20px">Erreur : ${e.message}</div>`;
+});
+</script>
+</body>
+</html>
