@@ -6,369 +6,205 @@
   <title>Scanner — PlanB Tools</title>
   <style>
     :root {
-      --primary: #0891b2;          /* cyan-600 */
-      --primary-dark: #0e7490;     /* cyan-700 */
-      --primary-light: #cffafe;    /* cyan-100 */
-      --gray-50: #f9fafb;
-      --gray-100: #f3f4f6;
-      --gray-200: #e5e7eb;
-      --gray-300: #d1d5db;
-      --gray-400: #9ca3af;
-      --gray-500: #6b7280;
-      --gray-600: #4b5563;
-      --gray-700: #374151;
-      --gray-800: #1f2937;
-      --gray-900: #111827;
-      --green-100: #dcfce7;
-      --green-700: #15803d;
-      --orange-100: #ffedd5;
-      --orange-700: #c2410c;
-      --red-100: #fee2e2;
-      --red-700: #b91c1c;
-      --radius: 10px;
-      --radius-sm: 6px;
+      --primary: #0891b2;
+      --primary-dark: #0e7490;
+      --primary-light: #cffafe;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
       --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
       --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    /* Header */
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .btn-back:hover, .btn-back:active { background:var(--gray-200); }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
 
-    html, body {
-      height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-      color: var(--gray-900);
-      background: var(--gray-100);
-      -webkit-font-smoothing: antialiased;
-    }
+    /* Main */
+    .content { flex:1; padding:16px; max-width:800px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
 
-    body { display: flex; flex-direction: column; min-height: 100vh; }
+    /* Boutons */
+    .btn { display:flex; align-items:center; justify-content:center; gap:8px; padding:14px; font-size:15px; font-weight:600; border-radius:var(--radius); cursor:pointer; transition:all .15s; min-height:48px; border:none; width:100%; font-family:inherit; }
+    .btn:active { transform:scale(.98); }
+    .btn[disabled] { opacity:.5; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-primary:active:not([disabled]) { background:var(--primary-dark); }
+    .btn-secondary { background:white; color:var(--primary-dark); border:2px solid var(--primary); }
+    .btn-success { background:var(--green-700); color:white; }
+    .btn-danger { background:white; color:var(--red-700); border:2px solid var(--red-100); }
+    .btn-danger:active { background:var(--red-100); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-ghost:active { background:var(--gray-200); }
 
-    .header {
-      position: sticky; top: 0;
-      background: white;
-      border-bottom: 3px solid var(--primary);
-      padding: 12px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px;
-      z-index: 10;
-      box-shadow: var(--shadow);
-    }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .btn-back {
-      display: inline-flex; align-items: center;
-      padding: 8px 12px;
-      font-size: 14px; font-weight: 500;
-      color: var(--gray-700);
-      background: var(--gray-100);
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius-sm);
-      text-decoration: none;
-      transition: background 0.15s;
-    }
-    .btn-back:hover, .btn-back:active { background: var(--gray-200); }
-    .header-title {
-      font-size: 18px; font-weight: 700;
-      color: var(--gray-900);
-    }
-    .header-right {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 13px; color: var(--gray-600);
-    }
-    .header-etab {
-      padding: 4px 10px;
-      background: var(--primary-light);
-      color: var(--primary-dark);
-      border-radius: var(--radius-sm);
-      font-weight: 600; font-size: 12px;
-      text-transform: uppercase; letter-spacing: 0.3px;
-    }
+    /* Mode picker (écran d'accueil) */
+    .mode-grid { display:grid; grid-template-columns:1fr; gap:12px; }
+    .mode-card { display:flex; align-items:center; gap:14px; padding:18px; background:white; border:2px solid var(--gray-200); border-radius:var(--radius); cursor:pointer; transition:all .15s; }
+    .mode-card:active { transform:scale(.98); border-color:var(--primary); }
+    .mode-card .emoji { font-size:36px; }
+    .mode-card .mode-info { flex:1; }
+    .mode-card .mode-title { font-size:17px; font-weight:700; color:var(--gray-900); }
+    .mode-card .mode-desc { font-size:13px; color:var(--gray-600); margin-top:2px; }
 
-    .content { flex: 1; padding: 16px; max-width: 800px; width: 100%; margin: 0 auto; }
+    /* Sessions actives en home */
+    .session-summary { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--orange-100); border-radius:var(--radius-sm); margin-bottom:8px; cursor:pointer; }
+    .session-summary:hover { background:var(--orange-100); filter:brightness(.97); }
+    .session-summary .ss-info { flex:1; min-width:0; }
+    .session-summary .ss-title { font-size:14px; font-weight:600; color:var(--gray-900); }
+    .session-summary .ss-meta { font-size:12px; color:var(--orange-700); }
+    .session-summary .ss-arrow { color:var(--orange-700); }
 
-    .card {
-      background: white;
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--gray-200);
-    }
-    .card-title {
-      font-size: 14px; font-weight: 600;
-      color: var(--gray-700);
-      margin-bottom: 12px;
-      text-transform: uppercase; letter-spacing: 0.3px;
-    }
+    /* Type cards (mode unit + bl-facture) */
+    .type-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .type-card { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 6px; background:var(--gray-50); border:2px solid var(--gray-200); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; color:var(--gray-700); transition:all .15s; min-height:80px; }
+    .type-card:active { transform:scale(.97); }
+    .type-card .emoji { font-size:28px; line-height:1; }
+    .type-card.selected { background:var(--primary-light); border-color:var(--primary); color:var(--primary-dark); }
 
-    /* Type de document : 3 grosses cartes radio */
-    .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .type-card {
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      padding: 14px 6px;
-      background: var(--gray-50);
-      border: 2px solid var(--gray-200);
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-size: 13px; font-weight: 600;
-      color: var(--gray-700);
-      transition: all 0.15s;
-      min-height: 80px;
-    }
-    .type-card:active { transform: scale(0.97); }
-    .type-card .emoji { font-size: 28px; line-height: 1; }
-    .type-card.selected {
-      background: var(--primary-light);
-      border-color: var(--primary);
-      color: var(--primary-dark);
-    }
+    /* Capture */
+    .capture-zone { display:flex; flex-direction:column; gap:10px; }
+    .btn-capture { display:flex; align-items:center; justify-content:center; gap:10px; padding:18px; font-size:16px; font-weight:600; color:white; background:var(--primary); border:none; border-radius:var(--radius); cursor:pointer; min-height:56px; }
+    .btn-capture:active:not([disabled]) { background:var(--primary-dark); transform:scale(.98); }
+    .btn-capture.secondary { background:white; color:var(--primary-dark); border:2px solid var(--primary); }
+    .btn-capture[disabled] { opacity:.5; cursor:not-allowed; }
+    .btn-capture .emoji { font-size:22px; }
+    .btn-capture-big { padding:24px; font-size:18px; min-height:72px; }
+    .btn-capture-big .emoji { font-size:30px; }
 
-    /* Bouton de capture / upload */
-    .capture-zone {
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .btn-capture {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      padding: 18px;
-      font-size: 16px; font-weight: 600;
-      color: white;
-      background: var(--primary);
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: background 0.15s;
-      min-height: 56px;
-    }
-    .btn-capture:active { background: var(--primary-dark); transform: scale(0.98); }
-    .btn-capture.secondary {
-      background: white;
-      color: var(--primary-dark);
-      border: 2px solid var(--primary);
-    }
-    .btn-capture[disabled] { opacity: 0.5; cursor: not-allowed; }
-    .btn-capture .emoji { font-size: 22px; }
+    .file-info { display:none; padding:12px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:13px; color:var(--gray-700); margin-top:10px; }
+    .file-info.visible { display:block; }
+    .file-info-row { display:flex; justify-content:space-between; margin-bottom:4px; }
+    .file-info-row strong { color:var(--gray-900); }
+    .file-preview { max-width:100%; max-height:180px; border-radius:var(--radius-sm); border:1px solid var(--gray-200); margin-top:8px; display:block; }
 
-    .file-info {
-      display: none;
-      padding: 12px;
-      background: var(--gray-50);
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      color: var(--gray-700);
-    }
-    .file-info.visible { display: block; }
-    .file-info-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-    .file-info-row strong { color: var(--gray-900); }
-    .file-preview {
-      max-width: 100%;
-      max-height: 200px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--gray-200);
-      margin-top: 8px;
-      display: block;
-    }
+    /* Spinner */
+    .extracting { display:none; flex-direction:column; align-items:center; gap:16px; padding:32px 16px; text-align:center; }
+    .extracting.visible { display:flex; }
+    .spinner { width:48px; height:48px; border:4px solid var(--gray-200); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .extracting-step { font-size:14px; color:var(--gray-600); }
+    .extracting-step.active { color:var(--primary-dark); font-weight:600; }
 
-    /* Bouton extraction */
-    .btn-primary {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%;
-      padding: 16px;
-      font-size: 16px; font-weight: 700;
-      color: white;
-      background: var(--primary);
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: all 0.15s;
-      min-height: 52px;
-    }
-    .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
-    .btn-primary[disabled] { opacity: 0.5; cursor: not-allowed; }
+    /* Vue résultat (mode unit) + édition */
+    .field-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .field-grid.single { grid-template-columns:1fr; }
+    .field { display:flex; flex-direction:column; gap:4px; }
+    .field label { font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; }
+    .field input, .field textarea, .field select { padding:8px 10px; font-size:14px; color:var(--gray-900); background:white; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; width:100%; }
+    .field textarea { min-height:60px; resize:vertical; }
+    .field input:focus, .field textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+    .field.warn input, .field.warn textarea { border-color:var(--orange-700); background:var(--orange-100); }
+    .field-hint { font-size:11px; color:var(--orange-700); font-style:italic; }
 
-    /* Spinner pendant l'extraction */
-    .extracting {
-      display: none;
-      flex-direction: column; align-items: center; gap: 16px;
-      padding: 32px 16px;
-      text-align: center;
-    }
-    .extracting.visible { display: flex; }
-    .spinner {
-      width: 48px; height: 48px;
-      border: 4px solid var(--gray-200);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .extracting-step {
-      font-size: 14px; color: var(--gray-600);
-    }
-    .extracting-step.active { color: var(--primary-dark); font-weight: 600; }
+    .result-confidence { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; font-size:12px; font-weight:600; border-radius:999px; }
+    .conf-high { background:var(--green-100); color:var(--green-700); }
+    .conf-med  { background:var(--orange-100); color:var(--orange-700); }
+    .conf-low  { background:var(--red-100); color:var(--red-700); }
 
-    /* Vue de validation */
-    .result {
-      display: none;
-    }
-    .result.visible { display: block; }
-    .result-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid var(--gray-200);
-    }
-    .result-confidence {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 10px;
-      font-size: 12px; font-weight: 600;
-      border-radius: 999px;
-    }
-    .conf-high { background: var(--green-100); color: var(--green-700); }
-    .conf-med { background: var(--orange-100); color: var(--orange-700); }
-    .conf-low { background: var(--red-100); color: var(--red-700); }
+    /* Liste étiquettes en mode session */
+    .scan-tile { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; }
+    .scan-tile.warn { background:var(--red-100); border-color:var(--red-100); }
+    .scan-tile .st-icon { font-size:20px; flex-shrink:0; }
+    .scan-tile .st-info { flex:1; min-width:0; }
+    .scan-tile .st-title { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .scan-tile .st-meta { font-size:12px; color:var(--gray-500); }
+    .scan-tile .st-action { font-size:12px; color:var(--red-700); cursor:pointer; padding:6px 8px; }
 
-    .field-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    }
-    .field-grid.single { grid-template-columns: 1fr; }
-    .field {
-      display: flex; flex-direction: column; gap: 4px;
-    }
-    .field label {
-      font-size: 11px; font-weight: 600;
-      color: var(--gray-600);
-      text-transform: uppercase; letter-spacing: 0.3px;
-    }
-    .field input, .field textarea, .field select {
-      padding: 8px 10px;
-      font-size: 14px;
-      color: var(--gray-900);
-      background: white;
-      border: 1px solid var(--gray-300);
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      width: 100%;
-    }
-    .field textarea { min-height: 60px; resize: vertical; }
-    .field input:focus, .field textarea:focus, .field select:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-light);
-    }
-    .field.warn input, .field.warn textarea {
-      border-color: var(--orange-700);
-      background: var(--orange-100);
-    }
-    .field-hint {
-      font-size: 11px; color: var(--orange-700);
-      font-style: italic;
-    }
+    /* Compteurs */
+    .counters { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+    .counter-box { padding:10px; background:var(--gray-50); border-radius:var(--radius-sm); text-align:center; }
+    .counter-box .cv { font-size:24px; font-weight:700; color:var(--gray-900); line-height:1; }
+    .counter-box .cl { font-size:11px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
 
-    /* Actions de validation */
-    .actions {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-      margin-top: 16px;
-    }
-    .btn-validate {
-      padding: 14px;
-      font-size: 15px; font-weight: 700;
-      color: white;
-      background: var(--green-700);
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      min-height: 48px;
-    }
-    .btn-validate:active { transform: scale(0.98); }
-    .btn-reject {
-      padding: 14px;
-      font-size: 15px; font-weight: 600;
-      color: var(--red-700);
-      background: white;
-      border: 2px solid var(--red-100);
-      border-radius: var(--radius);
-      cursor: pointer;
-      min-height: 48px;
-    }
-    .btn-reject:active { transform: scale(0.98); background: var(--red-100); }
-    .btn-restart {
-      grid-column: 1 / -1;
-      padding: 12px;
-      font-size: 14px; font-weight: 600;
-      color: var(--gray-700);
-      background: var(--gray-100);
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius);
-      cursor: pointer;
-      min-height: 44px;
-    }
+    /* Rapprochement */
+    .reconciliation-summary { padding:12px; border-radius:var(--radius-sm); margin-bottom:12px; }
+    .reconciliation-summary.ok    { background:var(--green-100); color:var(--green-700); }
+    .reconciliation-summary.warn  { background:var(--orange-100); color:var(--orange-700); }
+    .reconciliation-summary.crit  { background:var(--red-100); color:var(--red-700); }
+    .reconciliation-summary strong { display:block; font-size:15px; margin-bottom:4px; }
+
+    .anomaly { display:flex; gap:8px; padding:8px 10px; background:white; border-radius:var(--radius-sm); margin-bottom:6px; border-left:4px solid; }
+    .anomaly.severite-info     { border-left-color:var(--blue-700); }
+    .anomaly.severite-warn     { border-left-color:var(--orange-700); }
+    .anomaly.severite-critical { border-left-color:var(--red-700); }
+    .anomaly-type { font-size:11px; text-transform:uppercase; letter-spacing:0.3px; color:var(--gray-500); }
+    .anomaly-desc { font-size:13px; color:var(--gray-800); }
+
+    .match-row { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--gray-100); font-size:13px; }
+    .match-row:last-child { border-bottom:none; }
+    .match-row .mr-bl { flex:1; }
+    .match-row .mr-arrow { color:var(--gray-400); }
+    .match-row .mr-eti { flex:1; color:var(--gray-700); }
+    .match-row .mr-ecart { font-weight:600; }
+    .match-row .ms-ok    { color:var(--green-700); }
+    .match-row .ms-mineur { color:var(--orange-700); }
+    .match-row .ms-significatif { color:var(--red-700); }
+    .match-row .ms-orphelin { color:var(--gray-500); }
+
+    /* Sélection fournisseur (autocomplete) */
+    .input-search { position:relative; }
+    .input-search input { width:100%; padding:12px; font-size:15px; border:1px solid var(--gray-300); border-radius:var(--radius); }
+    .input-search .results { display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:4px; }
+    .input-search .results.visible { display:block; }
+    .input-search .result { padding:10px 12px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--gray-100); }
+    .input-search .result:hover, .input-search .result.active { background:var(--primary-light); }
+    .input-search .result:last-child { border-bottom:none; }
 
     /* Historique */
-    .history-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px;
-      background: var(--gray-50);
-      border-radius: var(--radius-sm);
-      margin-bottom: 6px;
-      cursor: pointer;
-      border: 1px solid transparent;
-    }
-    .history-item:hover { background: white; border-color: var(--gray-200); }
-    .history-emoji { font-size: 22px; }
-    .history-info { flex: 1; min-width: 0; }
-    .history-title {
-      font-size: 14px; font-weight: 600; color: var(--gray-900);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .history-meta { font-size: 12px; color: var(--gray-500); }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      font-size: 11px; font-weight: 600;
-      border-radius: 999px;
-    }
-    .badge-attente { background: var(--orange-100); color: var(--orange-700); }
-    .badge-valide { background: var(--green-100); color: var(--green-700); }
-    .badge-rejete { background: var(--red-100); color: var(--red-700); }
-    .badge-erreur { background: var(--red-100); color: var(--red-700); }
-    .badge-cours { background: var(--gray-100); color: var(--gray-700); }
+    .history-item { display:flex; align-items:center; gap:12px; padding:12px; background:var(--gray-50); border-radius:var(--radius-sm); margin-bottom:6px; cursor:pointer; border:1px solid transparent; }
+    .history-item:hover { background:white; border-color:var(--gray-200); }
+    .history-emoji { font-size:22px; }
+    .history-info { flex:1; min-width:0; }
+    .history-title { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .history-meta { font-size:12px; color:var(--gray-500); }
+    .badge { display:inline-block; padding:2px 8px; font-size:11px; font-weight:600; border-radius:999px; }
+    .badge-attente { background:var(--orange-100); color:var(--orange-700); }
+    .badge-valide  { background:var(--green-100); color:var(--green-700); }
+    .badge-rejete  { background:var(--red-100); color:var(--red-700); }
+    .badge-erreur  { background:var(--red-100); color:var(--red-700); }
+    .badge-cours   { background:var(--gray-100); color:var(--gray-700); }
+    .badge-ok      { background:var(--green-100); color:var(--green-700); }
 
     /* Toast */
-    .toast {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
-      padding: 12px 20px;
-      background: var(--gray-900);
-      color: white;
-      border-radius: var(--radius);
-      font-size: 14px;
-      box-shadow: var(--shadow-md);
-      z-index: 100;
-      transition: transform 0.25s ease-out;
-      max-width: calc(100vw - 32px);
-    }
-    .toast.visible { transform: translateX(-50%) translateY(0); }
-    .toast.error { background: var(--red-700); }
-    .toast.success { background: var(--green-700); }
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s ease-out; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error   { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
 
-    /* Hidden file inputs */
-    .file-input-hidden { display: none; }
+    .file-input-hidden { display:none; }
 
-    /* Responsive */
-    @media (max-width: 480px) {
-      .field-grid { grid-template-columns: 1fr; }
-      .header-title { font-size: 16px; }
-      .type-card { font-size: 12px; padding: 10px 4px; min-height: 70px; }
-      .type-card .emoji { font-size: 24px; }
+    .actions-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+
+    @media (max-width:480px) {
+      .field-grid { grid-template-columns:1fr; }
+      .header-title { font-size:16px; }
+      .type-card { font-size:12px; padding:10px 4px; min-height:70px; }
+      .type-card .emoji { font-size:24px; }
     }
+
+    .screen { display:none; }
+    .screen.active { display:block; }
   </style>
 </head>
 <body>
   <header class="header">
     <div class="header-left">
-      <a href="../index.html" class="btn-back">← Portail</a>
-      <span class="header-title">Scanner</span>
+      <a href="../index.html" class="btn-back" id="btn-back">← Portail</a>
+      <span class="header-title" id="header-title">Scanner</span>
     </div>
     <div class="header-right">
       <span class="header-etab" id="header-etab">—</span>
@@ -377,98 +213,210 @@
   </header>
 
   <main class="content">
-    <!-- ÉCRAN 1 : NOUVEAU SCAN -->
-    <section id="screen-new" class="screen">
+
+    <!-- ============ ÉCRAN HOME ============ -->
+    <section id="screen-home" class="screen active">
+      <div class="card">
+        <div class="card-title">Que veux-tu faire ?</div>
+        <div class="mode-grid">
+          <div class="mode-card" data-mode="session">
+            <span class="emoji">📦</span>
+            <div class="mode-info">
+              <div class="mode-title">Réception groupée</div>
+              <div class="mode-desc">Scanner plusieurs étiquettes + BL d'un même fournisseur, rapprochement automatique.</div>
+            </div>
+          </div>
+          <div class="mode-card" data-mode="unit">
+            <span class="emoji">🥩</span>
+            <div class="mode-info">
+              <div class="mode-title">Scan unitaire</div>
+              <div class="mode-desc">Scanner une étiquette ou un document isolé avec validation immédiate.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="card-active-sessions" style="display:none;">
+        <div class="card-title">Sessions en cours</div>
+        <div id="active-sessions-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Derniers scans</div>
+        <div id="history-list">
+          <div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Chargement…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ÉCRAN NOUVELLE SESSION ============ -->
+    <section id="screen-new-session" class="screen">
+      <div class="card">
+        <div class="card-title">Fournisseur</div>
+        <div class="input-search">
+          <input type="text" id="fournisseur-search" placeholder="Chercher ou saisir le nom du fournisseur" autocomplete="off">
+          <div class="results" id="fournisseur-results"></div>
+        </div>
+        <div style="font-size:12px; color:var(--gray-500); margin-top:8px;">
+          Tape pour filtrer la liste de tes fournisseurs, ou saisis un nom libre si nouveau fournisseur.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Date de réception</div>
+        <input type="date" id="session-date" class="form-input" style="padding:10px; font-size:15px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); width:100%;">
+      </div>
+
+      <button class="btn btn-primary" id="btn-start-session" disabled>
+        <span>📦</span><span>Démarrer la réception</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-cancel-new-session" style="margin-top:8px;">Annuler</button>
+    </section>
+
+    <!-- ============ ÉCRAN SESSION EN COURS ============ -->
+    <section id="screen-session" class="screen">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div style="flex:1; min-width:0;">
+            <div class="card-title" style="margin-bottom:4px;">Réception en cours</div>
+            <div style="font-size:17px; font-weight:700;" id="session-fournisseur-name">—</div>
+            <div style="font-size:12px; color:var(--gray-500);" id="session-meta">—</div>
+          </div>
+        </div>
+        <div class="counters" style="margin-top:12px;">
+          <div class="counter-box">
+            <div class="cv" id="counter-etiquettes">0</div>
+            <div class="cl">Étiquettes</div>
+          </div>
+          <div class="counter-box">
+            <div class="cv" id="counter-extraites">0</div>
+            <div class="cl">Extraites</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <button class="btn-capture btn-capture-big" id="btn-session-camera">
+          <span class="emoji">📸</span><span>Scanner une étiquette</span>
+        </button>
+        <button class="btn-capture secondary" id="btn-session-import" style="margin-top:8px;">
+          <span class="emoji">📁</span><span>Importer une image</span>
+        </button>
+        <input type="file" class="file-input-hidden" id="input-session-camera" accept="image/*" capture="environment">
+        <input type="file" class="file-input-hidden" id="input-session-import" accept="image/*">
+      </div>
+
+      <div class="card" id="card-session-list">
+        <div class="card-title">Étiquettes scannées</div>
+        <div id="session-scans-list">
+          <div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Aucune étiquette scannée pour l'instant.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">BL / Facture</div>
+        <div id="bl-status" style="font-size:13px; color:var(--gray-500); margin-bottom:10px;">Pas encore scanné.</div>
+        <button class="btn btn-secondary" id="btn-session-bl">
+          <span>📄</span><span>Scanner BL / Facture</span>
+        </button>
+        <input type="file" class="file-input-hidden" id="input-session-bl" accept="image/*,application/pdf" capture="environment">
+      </div>
+
+      <button class="btn btn-success" id="btn-finalize-session">
+        <span>✓</span><span>Boucler &amp; rapprocher</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-leave-session" style="margin-top:8px;">Quitter sans valider (reprise possible)</button>
+    </section>
+
+    <!-- ============ ÉCRAN RAPPROCHEMENT ============ -->
+    <section id="screen-reconciliation" class="screen">
+      <div class="card">
+        <div class="card-title">Rapprochement</div>
+        <div id="reco-summary"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Anomalies</div>
+        <div id="reco-anomalies"><div style="font-size:13px; color:var(--gray-500);">Aucune anomalie.</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Détail des correspondances</div>
+        <div id="reco-matchs"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Observation</div>
+        <textarea id="reco-observation" placeholder="Optionnel : note pour la traçabilité (ex: produit X manquant, à réclamer)" style="width:100%; min-height:60px; padding:8px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; font-size:14px;"></textarea>
+      </div>
+
+      <div class="actions-grid">
+        <button class="btn btn-success" id="btn-reco-validate">✓ Valider la réception</button>
+        <button class="btn btn-danger" id="btn-reco-reject">✗ Rejeter</button>
+      </div>
+      <button class="btn btn-ghost" id="btn-reco-back" style="margin-top:8px;">↺ Retour à la session</button>
+    </section>
+
+    <!-- ============ ÉCRAN UNIT (mode V1) ============ -->
+    <section id="screen-unit" class="screen">
       <div class="card">
         <div class="card-title">Type de document</div>
         <div class="type-grid">
-          <button class="type-card" data-type="etiquette_produit">
-            <span class="emoji">🥩</span>
-            <span>Étiquette</span>
-          </button>
-          <button class="type-card" data-type="bl_facture">
-            <span class="emoji">📄</span>
-            <span>BL / Facture</span>
-          </button>
-          <button class="type-card" data-type="autre">
-            <span class="emoji">📎</span>
-            <span>Autre</span>
-          </button>
+          <button class="type-card" data-type="etiquette_produit"><span class="emoji">🥩</span><span>Étiquette</span></button>
+          <button class="type-card" data-type="bl_facture"><span class="emoji">📄</span><span>BL / Facture</span></button>
+          <button class="type-card" data-type="autre"><span class="emoji">📎</span><span>Autre</span></button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-title">Capture</div>
         <div class="capture-zone">
-          <button class="btn-capture" id="btn-camera">
-            <span class="emoji">📷</span>
-            <span>Prendre une photo</span>
-          </button>
-          <button class="btn-capture secondary" id="btn-pdf">
-            <span class="emoji">📁</span>
-            <span>Importer PDF / image</span>
-          </button>
-          <input type="file" class="file-input-hidden" id="input-camera" accept="image/*" capture="environment">
-          <input type="file" class="file-input-hidden" id="input-pdf" accept="image/*,application/pdf">
+          <button class="btn-capture" id="btn-unit-camera"><span class="emoji">📷</span><span>Prendre une photo</span></button>
+          <button class="btn-capture secondary" id="btn-unit-pdf"><span class="emoji">📁</span><span>Importer PDF / image</span></button>
+          <input type="file" class="file-input-hidden" id="input-unit-camera" accept="image/*" capture="environment">
+          <input type="file" class="file-input-hidden" id="input-unit-pdf" accept="image/*,application/pdf">
         </div>
-
-        <div class="file-info" id="file-info">
-          <div class="file-info-row">
-            <span>Fichier</span>
-            <strong id="fi-name">—</strong>
-          </div>
-          <div class="file-info-row">
-            <span>Type</span>
-            <strong id="fi-type">—</strong>
-          </div>
-          <div class="file-info-row">
-            <span>Taille</span>
-            <strong id="fi-size">—</strong>
-          </div>
-          <img id="fi-preview" class="file-preview" style="display:none;" alt="">
+        <div class="file-info" id="unit-file-info">
+          <div class="file-info-row"><span>Fichier</span><strong id="unit-fi-name">—</strong></div>
+          <div class="file-info-row"><span>Type</span><strong id="unit-fi-type">—</strong></div>
+          <div class="file-info-row"><span>Taille</span><strong id="unit-fi-size">—</strong></div>
+          <img id="unit-fi-preview" class="file-preview" style="display:none;" alt="">
         </div>
       </div>
 
-      <button class="btn-primary" id="btn-extract" disabled>
-        <span>✨</span>
-        <span>Lancer l'extraction</span>
-      </button>
+      <button class="btn btn-primary" id="btn-unit-extract" disabled><span>✨</span><span>Lancer l'extraction</span></button>
+      <button class="btn btn-ghost" id="btn-unit-cancel" style="margin-top:8px;">Annuler</button>
     </section>
 
-    <!-- ÉCRAN 2 : EXTRACTION EN COURS -->
-    <section id="screen-extracting" class="extracting">
-      <div class="spinner"></div>
-      <div class="extracting-step" id="step-upload">📤 Téléversement du fichier…</div>
-      <div class="extracting-step" id="step-analyze">🔍 Analyse Claude Vision…</div>
-      <div class="extracting-step" id="step-save">💾 Enregistrement…</div>
+    <!-- ============ ÉCRAN EXTRACTION (mode unit) ============ -->
+    <section id="screen-extracting" class="screen">
+      <div class="extracting visible">
+        <div class="spinner"></div>
+        <div class="extracting-step" id="step-upload">📤 Téléversement…</div>
+        <div class="extracting-step" id="step-analyze">🔍 Analyse Claude Vision…</div>
+        <div class="extracting-step" id="step-save">💾 Enregistrement…</div>
+      </div>
     </section>
 
-    <!-- ÉCRAN 3 : RÉSULTAT (validation) -->
-    <section id="screen-result" class="result">
+    <!-- ============ ÉCRAN RÉSULTAT (mode unit) ============ -->
+    <section id="screen-result" class="screen">
       <div class="card">
-        <div class="result-header">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
           <div>
-            <div class="card-title" style="margin-bottom:4px;">Résultat de l'extraction</div>
-            <div style="font-size:12px; color:var(--gray-500);" id="result-meta">—</div>
+            <div class="card-title" style="margin-bottom:4px;">Résultat</div>
+            <div style="font-size:12px; color:var(--gray-500);" id="unit-result-meta">—</div>
           </div>
-          <span class="result-confidence" id="result-conf">—</span>
+          <span class="result-confidence" id="unit-result-conf">—</span>
         </div>
-        <div id="result-fields"></div>
-        <div class="actions">
-          <button class="btn-validate" id="btn-validate">✓ Valider</button>
-          <button class="btn-reject" id="btn-reject">✗ Rejeter</button>
-          <button class="btn-restart" id="btn-restart">↺ Nouveau scan</button>
+        <div id="unit-result-fields"></div>
+        <div class="actions-grid">
+          <button class="btn btn-success" id="btn-unit-validate">✓ Valider</button>
+          <button class="btn btn-danger" id="btn-unit-reject">✗ Rejeter</button>
         </div>
+        <button class="btn btn-ghost" id="btn-unit-restart" style="margin-top:8px;">↺ Nouveau scan</button>
       </div>
     </section>
 
-    <!-- HISTORIQUE -->
-    <section class="card" id="card-history">
-      <div class="card-title">Derniers scans</div>
-      <div id="history-list">
-        <div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Chargement…</div>
-      </div>
-    </section>
   </main>
 
   <div class="toast" id="toast"></div>
@@ -485,274 +433,684 @@
       const userJson = sessionStorage.getItem('planb_user');
       const etab = sessionStorage.getItem('planb_etablissement');
       if (!userJson || !etab) return null;
-      try { return { user: JSON.parse(userJson), etablissement: etab }; }
-      catch { return null; }
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
     }
-    const session = getSession();
-    if (!session) { window.location.href = '../'; }
-    const currentUser = session.user;
-    const currentEtab = session.etablissement;
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
     document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
     // ====== ÉTAT GLOBAL ======
-    let selectedType = null;       // etiquette_produit | bl_facture | autre
-    let selectedFile = null;       // File
-    let selectedFromCamera = false;
-    let currentScanId = null;
-    let currentExtraction = null;
+    const State = {
+      currentScreen: 'home',
+      mode: null,                 // 'session' | 'unit'
+      // Mode unit
+      unitType: null,
+      unitFile: null,
+      unitFromCamera: false,
+      unitScanId: null,
+      // Mode session
+      currentSessionId: null,
+      sessionFournisseur: null,   // { id, nom } ou { id:null, nom: 'Texte libre' }
+      pollingInterval: null,
+      // Données fournisseurs (chargées au lancement)
+      fournisseurs: [],
+    };
 
     // ====== HELPERS ======
     function $(id) { return document.getElementById(id); }
-    function showToast(msg, kind = '') {
+    function showToast(msg, kind='') {
       const t = $('toast');
       t.textContent = msg;
       t.className = 'toast visible' + (kind ? ' ' + kind : '');
       setTimeout(() => { t.className = 'toast'; }, 3500);
     }
     function fmtBytes(n) {
-      if (n < 1024) return n + ' o';
-      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' Ko';
-      return (n / 1024 / 1024).toFixed(2) + ' Mo';
+      if (n < 1024) return n+' o';
+      if (n < 1024*1024) return (n/1024).toFixed(1)+' Ko';
+      return (n/1024/1024).toFixed(2)+' Mo';
     }
     function fmtDate(iso) {
       if (!iso) return '—';
       const d = new Date(iso);
-      const opts = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
-      return d.toLocaleString('fr-FR', opts);
+      return d.toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+    function fmtDateOnly(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' });
     }
     function showScreen(name) {
-      $('screen-new').style.display = name === 'new' ? 'block' : 'none';
-      $('screen-extracting').className = 'extracting' + (name === 'extracting' ? ' visible' : '');
-      $('screen-result').className = 'result' + (name === 'result' ? ' visible' : '');
-      $('card-history').style.display = name === 'new' ? 'block' : 'none';
-    }
-    function setExtractStep(step) {
-      ['upload', 'analyze', 'save'].forEach(s => {
-        $('step-' + s).classList.remove('active');
-      });
-      if (step) $('step-' + step).classList.add('active');
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      $('screen-' + name).classList.add('active');
+      State.currentScreen = name;
+
+      const titles = {
+        'home': 'Scanner',
+        'new-session': 'Nouvelle réception',
+        'session': 'Réception en cours',
+        'reconciliation': 'Rapprochement',
+        'unit': 'Scan unitaire',
+        'extracting': 'Extraction…',
+        'result': 'Résultat',
+      };
+      $('header-title').textContent = titles[name] || 'Scanner';
+
+      // Polling : actif uniquement en écran session
+      if (name === 'session') startPolling();
+      else stopPolling();
+
+      // Recharger l'historique en home
+      if (name === 'home') {
+        loadHistory();
+        loadActiveSessions();
+      }
     }
 
-    // ====== TYPE DE DOCUMENT ======
-    document.querySelectorAll('.type-card').forEach(card => {
+    // ====== HOME : routing modes ======
+    document.querySelectorAll('.mode-card').forEach(card => {
       card.addEventListener('click', () => {
-        document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        selectedType = card.dataset.type;
-        updateExtractButton();
+        const mode = card.dataset.mode;
+        State.mode = mode;
+        if (mode === 'unit') {
+          resetUnitScreen();
+          showScreen('unit');
+        } else if (mode === 'session') {
+          resetNewSessionScreen();
+          showScreen('new-session');
+        }
       });
     });
 
-    // ====== CHOIX FICHIER ======
-    $('btn-camera').addEventListener('click', () => $('input-camera').click());
-    $('btn-pdf').addEventListener('click', () => $('input-pdf').click());
-
-    $('input-camera').addEventListener('change', (e) => onFileChosen(e.target.files[0], true));
-    $('input-pdf').addEventListener('change', (e) => onFileChosen(e.target.files[0], false));
-
-    function onFileChosen(file, fromCamera) {
-      if (!file) return;
-      selectedFile = file;
-      selectedFromCamera = fromCamera;
-      $('fi-name').textContent = file.name;
-      $('fi-type').textContent = file.type || '?';
-      $('fi-size').textContent = fmtBytes(file.size);
-      $('file-info').classList.add('visible');
-
-      // Aperçu si image
-      const isImg = file.type.startsWith('image/');
-      const preview = $('fi-preview');
-      if (isImg) {
-        const url = URL.createObjectURL(file);
-        preview.src = url;
-        preview.style.display = 'block';
-      } else {
-        preview.style.display = 'none';
-      }
-      updateExtractButton();
-    }
-
-    function updateExtractButton() {
-      $('btn-extract').disabled = !selectedType || !selectedFile;
-    }
-
-    // ====== LANCEMENT EXTRACTION ======
-    $('btn-extract').addEventListener('click', runExtraction);
-
-    async function runExtraction() {
-      if (!selectedType || !selectedFile) return;
-      showScreen('extracting');
-      setExtractStep('upload');
-
+    // ====== ACTIVE SESSIONS (en home) ======
+    async function loadActiveSessions() {
       try {
-        // 1. Upload Storage
-        const ext = (selectedFile.name.split('.').pop() || 'bin').toLowerCase();
-        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-        const uuid = crypto.randomUUID();
-        const path = `${currentEtab}/${today}/${uuid}.${ext}`;
+        const { data, error } = await sb.from('scan_sessions')
+          .select('id, fournisseur_nom, date_reception, statut, nb_etiquettes, created_at')
+          .eq('etablissement', currentEtab)
+          .in('statut', ['en_cours', 'etiquettes_terminees', 'bl_scanne'])
+          .order('created_at', { ascending: false })
+          .limit(5);
+        if (error) throw error;
 
-        const { error: upErr } = await sb.storage.from('scans').upload(path, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: selectedFile.type || undefined,
+        const card = $('card-active-sessions');
+        const list = $('active-sessions-list');
+        if (!data || !data.length) { card.style.display = 'none'; return; }
+        card.style.display = 'block';
+        list.innerHTML = '';
+        data.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'session-summary';
+          item.innerHTML = `
+            <div class="ss-info">
+              <div class="ss-title">${s.fournisseur_nom || 'Sans fournisseur'}</div>
+              <div class="ss-meta">${fmtDateOnly(s.date_reception)} · ${s.nb_etiquettes} étiq · statut : ${s.statut}</div>
+            </div>
+            <span class="ss-arrow">→</span>
+          `;
+          item.addEventListener('click', () => resumeSession(s.id));
+          list.appendChild(item);
         });
-        if (upErr) throw new Error('Upload échoué : ' + upErr.message);
+      } catch (err) {
+        console.error('loadActiveSessions:', err);
+      }
+    }
 
-        // 2. INSERT scans
-        setExtractStep('analyze');
-        const { data: insData, error: insErr } = await sb.from('scans').insert({
+    async function resumeSession(sessionId) {
+      State.currentSessionId = sessionId;
+      State.mode = 'session';
+      const { data: s } = await sb.from('scan_sessions').select('*').eq('id', sessionId).single();
+      if (s) {
+        State.sessionFournisseur = { id: s.fournisseur_id, nom: s.fournisseur_nom };
+        $('session-fournisseur-name').textContent = s.fournisseur_nom;
+        $('session-meta').textContent = `Réception du ${fmtDateOnly(s.date_reception)}`;
+        if (s.bl_facture_scan_id) {
+          $('bl-status').innerHTML = '<span class="badge badge-ok">✓ BL/Facture scanné</span>';
+        } else {
+          $('bl-status').textContent = 'Pas encore scanné.';
+        }
+        showScreen('session');
+        await refreshSessionList();
+      }
+    }
+
+    // ====== NOUVELLE SESSION : autocomplete fournisseur ======
+    async function loadFournisseurs() {
+      const { data, error } = await sb.from('appro_fournisseurs')
+        .select('id, nom, etablissement, actif')
+        .or(`etablissement.eq.${currentEtab},etablissement.is.null`)
+        .eq('actif', true)
+        .order('nom');
+      if (!error) State.fournisseurs = data || [];
+    }
+    loadFournisseurs();
+
+    function resetNewSessionScreen() {
+      State.sessionFournisseur = null;
+      $('fournisseur-search').value = '';
+      $('fournisseur-results').classList.remove('visible');
+      $('btn-start-session').disabled = true;
+      $('session-date').value = new Date().toISOString().slice(0, 10);
+    }
+
+    $('fournisseur-search').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const res = $('fournisseur-results');
+      if (!q) { res.classList.remove('visible'); State.sessionFournisseur = null; $('btn-start-session').disabled = true; return; }
+      const matches = State.fournisseurs.filter(f => f.nom.toLowerCase().includes(q)).slice(0, 8);
+      res.innerHTML = '';
+      matches.forEach(f => {
+        const item = document.createElement('div');
+        item.className = 'result';
+        item.textContent = f.nom;
+        item.addEventListener('click', () => {
+          State.sessionFournisseur = { id: f.id, nom: f.nom };
+          $('fournisseur-search').value = f.nom;
+          res.classList.remove('visible');
+          $('btn-start-session').disabled = false;
+        });
+        res.appendChild(item);
+      });
+      // option "saisie libre"
+      if (q.length >= 3) {
+        const item = document.createElement('div');
+        item.className = 'result';
+        item.style.cssText = 'font-style:italic; color:var(--gray-600);';
+        item.textContent = `Utiliser le nom libre : "${e.target.value.trim()}"`;
+        item.addEventListener('click', () => {
+          State.sessionFournisseur = { id: null, nom: e.target.value.trim() };
+          res.classList.remove('visible');
+          $('btn-start-session').disabled = false;
+        });
+        res.appendChild(item);
+      }
+      res.classList.add('visible');
+    });
+
+    $('btn-start-session').addEventListener('click', async () => {
+      if (!State.sessionFournisseur) return;
+      const dateReception = $('session-date').value || new Date().toISOString().slice(0, 10);
+      try {
+        const { data, error } = await sb.from('scan_sessions').insert({
           etablissement: currentEtab,
-          type_document: selectedType,
-          voie_capture: selectedFromCamera ? 'camera_inapp' : 'pdf_scanner_pro',
-          storage_path: path,
-          mime_type: selectedFile.type || null,
-          taille_octets: selectedFile.size,
+          fournisseur_id: State.sessionFournisseur.id,
+          fournisseur_nom: State.sessionFournisseur.nom,
+          date_reception: dateReception,
           created_by_id: currentUser.id,
           created_by_nom: currentUser.nom,
           created_by_initiales: currentUser.initiales,
         }).select('id').single();
-        if (insErr) throw new Error('Création scan échouée : ' + insErr.message);
-        currentScanId = insData.id;
+        if (error) throw error;
+        State.currentSessionId = data.id;
+        $('session-fournisseur-name').textContent = State.sessionFournisseur.nom;
+        $('session-meta').textContent = `Réception du ${fmtDateOnly(dateReception)}`;
+        $('bl-status').textContent = 'Pas encore scanné.';
+        showScreen('session');
+        await refreshSessionList();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    });
 
-        // 3. Appel Edge Function extract-document
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-document`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_KEY,
-          },
-          body: JSON.stringify({ scan_id: currentScanId }),
+    $('btn-cancel-new-session').addEventListener('click', () => showScreen('home'));
+
+    // ====== SESSION : capture étiquettes ======
+    $('btn-session-camera').addEventListener('click', () => $('input-session-camera').click());
+    $('btn-session-import').addEventListener('click', () => $('input-session-import').click());
+    $('btn-session-bl').addEventListener('click', () => $('input-session-bl').click());
+
+    $('input-session-camera').addEventListener('change', e => onSessionFileChosen(e.target.files[0], 'etiquette_produit', true));
+    $('input-session-import').addEventListener('change', e => onSessionFileChosen(e.target.files[0], 'etiquette_produit', false));
+    $('input-session-bl').addEventListener('change',     e => onSessionFileChosen(e.target.files[0], 'bl_facture', true));
+
+    async function onSessionFileChosen(file, typeDocument, fromCamera) {
+      if (!file || !State.currentSessionId) return;
+      // Reset de l'input pour permettre de re-choisir le même fichier après
+      $('input-session-camera').value = '';
+      $('input-session-import').value = '';
+      $('input-session-bl').value = '';
+
+      try {
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+        const today = new Date().toISOString().slice(0, 10);
+        const uuid = crypto.randomUUID();
+        const path = `${currentEtab}/${today}/${uuid}.${ext}`;
+
+        const { error: upErr } = await sb.storage.from('scans').upload(path, file, {
+          cacheControl: '3600', upsert: false, contentType: file.type || undefined,
         });
-        const result = await resp.json();
-        if (!resp.ok || !result.ok) {
-          throw new Error('Extraction Claude : ' + (result.error || resp.statusText));
+        if (upErr) throw new Error('Upload : ' + upErr.message);
+
+        const { data: insData, error: insErr } = await sb.from('scans').insert({
+          etablissement: currentEtab,
+          type_document: typeDocument,
+          voie_capture: fromCamera ? 'camera_inapp' : 'pdf_scanner_pro',
+          storage_path: path,
+          mime_type: file.type || null,
+          taille_octets: file.size,
+          session_id: State.currentSessionId,
+          created_by_id: currentUser.id,
+          created_by_nom: currentUser.nom,
+          created_by_initiales: currentUser.initiales,
+        }).select('id').single();
+        if (insErr) throw new Error('INSERT scan : ' + insErr.message);
+
+        const scanId = insData.id;
+
+        // Cas BL : on met à jour la session pour lier le scan
+        if (typeDocument === 'bl_facture') {
+          await sb.from('scan_sessions').update({
+            bl_facture_scan_id: scanId,
+            statut: 'bl_scanne',
+          }).eq('id', State.currentSessionId);
+          $('bl-status').innerHTML = '<span class="badge badge-cours">⏳ BL en cours d\'analyse…</span>';
+        } else {
+          // Étiquette : incrémenter le compteur en fire-and-forget
+          await sb.rpc('increment_session_etiquettes', { session_id: State.currentSessionId }).catch(() => {});
         }
 
-        setExtractStep('save');
-        currentExtraction = result.extraction;
-        renderResult(result);
-        showScreen('result');
+        // Lancer extract-document en fire-and-forget
+        callExtract(scanId).catch(err => {
+          console.error('extract-document:', err);
+          showToast('Erreur extraction : ' + err.message, 'error');
+        });
+
+        showToast(typeDocument === 'bl_facture' ? '📄 BL téléversé' : '✓ Étiquette ajoutée');
+        await refreshSessionList();
       } catch (err) {
-        console.error('runExtraction:', err);
-        showToast(err.message, 'error');
-        showScreen('new');
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
       }
     }
 
-    // ====== AFFICHAGE RÉSULTAT ======
-    function renderResult(result) {
-      const e = result.extraction;
-      const conf = result.confiance_globale ?? e.confiance_globale ?? 0;
-      const cost = (result.cost_usd ?? 0).toFixed(4);
+    function callExtract(scanId) {
+      return fetch(`${SUPABASE_URL}/functions/v1/extract-document`, {
+        method:'POST',
+        headers:{ 'Authorization':`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json', 'apikey':SUPABASE_KEY },
+        body: JSON.stringify({ scan_id: scanId }),
+      }).then(r => r.json()).then(r => {
+        if (!r.ok) throw new Error(r.error || 'Extraction échouée');
+        return r;
+      });
+    }
 
-      // Badge confiance
-      const cb = $('result-conf');
-      cb.textContent = `Confiance ${conf}/100`;
-      cb.className = 'result-confidence ' + (conf >= 80 ? 'conf-high' : conf >= 50 ? 'conf-med' : 'conf-low');
+    async function refreshSessionList() {
+      if (!State.currentSessionId) return;
+      try {
+        const { data: scans } = await sb.from('scans')
+          .select('id, type_document, statut, claude_extraction_jsonb, claude_at, scan_tracabilite(*)')
+          .eq('session_id', State.currentSessionId)
+          .order('created_at', { ascending: true });
 
-      $('result-meta').textContent =
-        `${result.tokens_in} tokens in · ${result.tokens_out} out · $${cost}`;
+        const etiquettes = (scans || []).filter(s => s.type_document === 'etiquette_produit');
+        const bl         = (scans || []).find(s => s.type_document === 'bl_facture');
 
-      const c = $('result-fields');
-      c.innerHTML = '';
+        const nbEtiq = etiquettes.length;
+        const nbExtraites = etiquettes.filter(s => s.statut === 'extrait' || s.statut === 'en_attente_validation' || s.statut === 'valide').length;
+        $('counter-etiquettes').textContent = nbEtiq;
+        $('counter-extraites').textContent = nbExtraites;
 
-      const champsManquants = e.champs_manquants || [];
-      function field(key, label, val, opts = {}) {
-        const wrap = document.createElement('div');
-        wrap.className = 'field' + (champsManquants.includes(key) ? ' warn' : '');
-        const lab = document.createElement('label');
-        lab.textContent = label;
-        const inp = opts.textarea ? document.createElement('textarea') : document.createElement('input');
-        inp.dataset.key = key;
-        inp.value = val == null ? '' : (typeof val === 'object' ? JSON.stringify(val) : val);
-        if (opts.type) inp.type = opts.type;
-        wrap.appendChild(lab);
-        wrap.appendChild(inp);
-        if (champsManquants.includes(key)) {
-          const hint = document.createElement('div');
-          hint.className = 'field-hint';
-          hint.textContent = '⚠ Champ non lu, à vérifier';
-          wrap.appendChild(hint);
-        }
-        return wrap;
-      }
-
-      if (selectedType === 'etiquette_produit') {
-        const grid1 = document.createElement('div');
-        grid1.className = 'field-grid single';
-        grid1.appendChild(field('produit', 'Produit', e.produit));
-        c.appendChild(grid1);
-
-        const grid2 = document.createElement('div');
-        grid2.className = 'field-grid';
-        grid2.appendChild(field('categorie', 'Catégorie', e.categorie));
-        grid2.appendChild(field('fabricant', 'Fabricant', e.fabricant));
-        grid2.appendChild(field('estampille', 'Agrément', e.estampille));
-        grid2.appendChild(field('lot', 'Lot', e.lot));
-        grid2.appendChild(field('dlc', 'DLC', e.dlc, { type: 'date' }));
-        grid2.appendChild(field('ddm', 'DDM', e.ddm, { type: 'date' }));
-        grid2.appendChild(field('poids_net_kg', 'Poids net (kg)', e.poids_net_kg, { type: 'number' }));
-        grid2.appendChild(field('origine', 'Origine', e.origine));
-        grid2.appendChild(field('temp_min', 'Temp. min (°C)', e.temp_min, { type: 'number' }));
-        grid2.appendChild(field('temp_max', 'Temp. max (°C)', e.temp_max, { type: 'number' }));
-        c.appendChild(grid2);
-
-        const grid3 = document.createElement('div');
-        grid3.className = 'field-grid single';
-        grid3.appendChild(field('ingredients', 'Ingrédients', e.ingredients, { textarea: true }));
-        c.appendChild(grid3);
-      } else if (selectedType === 'bl_facture') {
-        const grid = document.createElement('div');
-        grid.className = 'field-grid';
-        grid.appendChild(field('fournisseur_nom', 'Fournisseur', e.fournisseur_nom));
-        grid.appendChild(field('numero_document', 'N° document', e.numero_document));
-        grid.appendChild(field('date_document', 'Date', e.date_document, { type: 'date' }));
-        grid.appendChild(field('total_ttc', 'Total TTC', e.total_ttc, { type: 'number' }));
-        c.appendChild(grid);
-
-        // Lignes en tableau simple
-        if (Array.isArray(e.lignes) && e.lignes.length) {
-          const ttitle = document.createElement('div');
-          ttitle.className = 'card-title';
-          ttitle.style.marginTop = '12px';
-          ttitle.textContent = `${e.lignes.length} ligne(s)`;
-          c.appendChild(ttitle);
-          e.lignes.forEach((l, i) => {
-            const row = document.createElement('div');
-            row.style.cssText = 'padding:6px 0; border-bottom:1px solid var(--gray-100); font-size:13px;';
-            row.innerHTML = `<strong>${l.designation || '?'}</strong> — ${l.quantite || '?'} ${l.unite || ''} × ${l.prix_unitaire_ht || '?'}€ = <strong>${l.montant_ht || '?'}€ HT</strong>`;
-            c.appendChild(row);
+        // Liste des étiquettes
+        const list = $('session-scans-list');
+        if (!nbEtiq) {
+          list.innerHTML = '<div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Aucune étiquette scannée pour l\'instant.</div>';
+        } else {
+          list.innerHTML = '';
+          etiquettes.forEach((s, idx) => {
+            const trac = Array.isArray(s.scan_tracabilite) ? s.scan_tracabilite[0] : s.scan_tracabilite;
+            const tile = document.createElement('div');
+            const isErr = s.statut === 'erreur';
+            tile.className = 'scan-tile' + (isErr ? ' warn' : '');
+            const icon =
+              s.statut === 'en_attente_extraction' ? '📤' :
+              s.statut === 'extraction_en_cours'   ? '⏳' :
+              s.statut === 'erreur'                ? '⚠️' :
+              '✓';
+            const titre = trac?.produit || (s.statut === 'erreur' ? 'Erreur d\'extraction' : 'Étiquette en cours…');
+            const meta =
+              trac ? `Lot ${trac.lot || '?'} · ${trac.poids_net_kg ? trac.poids_net_kg+' kg' : '?'} · DLC ${trac.dlc || '?'}` :
+              s.statut === 'erreur' ? 'Toucher pour réessayer' :
+              'Analyse en cours…';
+            tile.innerHTML = `
+              <span class="st-icon">${icon}</span>
+              <div class="st-info">
+                <div class="st-title">#${idx+1} · ${titre}</div>
+                <div class="st-meta">${meta}</div>
+              </div>
+              <span class="st-action" data-scan-id="${s.id}">Suppr</span>
+            `;
+            tile.querySelector('.st-action').addEventListener('click', async (ev) => {
+              ev.stopPropagation();
+              if (!confirm('Supprimer cette étiquette du scan ?')) return;
+              await sb.from('scans').delete().eq('id', s.id);
+              await refreshSessionList();
+            });
+            list.appendChild(tile);
           });
         }
-      } else {
-        const grid = document.createElement('div');
-        grid.className = 'field-grid single';
-        grid.appendChild(field('raw', 'Extraction brute (JSON)', JSON.stringify(e, null, 2), { textarea: true }));
-        c.appendChild(grid);
+
+        // Statut BL
+        if (bl) {
+          const blText = bl.statut === 'erreur' ? '⚠️ BL en erreur' :
+                         bl.statut === 'extraction_en_cours' || bl.statut === 'en_attente_extraction' ? '⏳ BL en cours d\'analyse…' :
+                         '✓ BL/Facture scanné';
+          $('bl-status').innerHTML = `<span class="badge badge-${bl.statut === 'erreur' ? 'erreur' : bl.statut === 'extraction_en_cours' || bl.statut === 'en_attente_extraction' ? 'cours' : 'ok'}">${blText}</span>`;
+        }
+
+        // Activer le bouton Boucler ssi : >= 1 étiquette extraite ET BL extrait
+        const blReady = bl && (bl.statut === 'extrait' || bl.statut === 'en_attente_validation' || bl.statut === 'valide');
+        $('btn-finalize-session').disabled = !(nbExtraites > 0 && blReady);
+      } catch (err) {
+        console.error('refreshSessionList:', err);
       }
     }
 
-    // ====== VALIDATION / REJET ======
-    $('btn-validate').addEventListener('click', async () => {
-      if (!currentScanId) return;
-      // Récupérer les valeurs éditées
-      const edits = {};
-      document.querySelectorAll('#result-fields [data-key]').forEach(el => {
-        edits[el.dataset.key] = el.value === '' ? null : el.value;
-      });
+    function startPolling() {
+      stopPolling();
+      State.pollingInterval = setInterval(refreshSessionList, 3000);
+    }
+    function stopPolling() {
+      if (State.pollingInterval) { clearInterval(State.pollingInterval); State.pollingInterval = null; }
+    }
+
+    $('btn-leave-session').addEventListener('click', () => {
+      State.currentSessionId = null;
+      showScreen('home');
+    });
+
+    // ====== FINALISATION (rapprochement) ======
+    $('btn-finalize-session').addEventListener('click', async () => {
+      if (!State.currentSessionId) return;
+      $('btn-finalize-session').disabled = true;
+      showScreen('extracting');
+      $('step-upload').textContent = '🔍 Rapprochement étiquettes ↔ BL…';
+      $('step-analyze').style.display = 'none';
+      $('step-save').style.display = 'none';
       try {
-        const { error } = await sb.from('scans').update({
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/reconcile-session`, {
+          method:'POST',
+          headers:{ 'Authorization':`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json', 'apikey':SUPABASE_KEY },
+          body: JSON.stringify({ session_id: State.currentSessionId }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || !result.ok) throw new Error(result.error || 'Rapprochement échoué');
+        renderReconciliation(result.rapprochement);
+        showScreen('reconciliation');
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+        $('step-analyze').style.display = '';
+        $('step-save').style.display = '';
+        showScreen('session');
+      }
+    });
+
+    function renderReconciliation(reco) {
+      // Résumé
+      const totaux = reco.totaux || {};
+      const nbCrit = totaux.nb_anomalies_critical || 0;
+      const nbWarn = totaux.nb_anomalies_warn || 0;
+      const nbInfo = totaux.nb_anomalies_info || 0;
+      const summaryClass = nbCrit > 0 ? 'crit' : nbWarn > 0 ? 'warn' : 'ok';
+      const summaryIcon  = nbCrit > 0 ? '⚠️ Anomalies critiques' : nbWarn > 0 ? '⚠ Écarts détectés' : '✓ Tout est cohérent';
+      $('reco-summary').innerHTML = `
+        <div class="reconciliation-summary ${summaryClass}">
+          <strong>${summaryIcon}</strong>
+          ${reco.resume_humain || ''}
+          <div style="font-size:12px; margin-top:6px;">
+            ${totaux.nb_etiquettes ?? '?'} étiquettes · ${totaux.nb_lignes_bl ?? '?'} lignes BL ·
+            ${nbCrit} critique${nbCrit>1?'s':''} · ${nbWarn} alerte${nbWarn>1?'s':''} · ${nbInfo} info
+            ${typeof reco.confiance_globale === 'number' ? '· Confiance ' + reco.confiance_globale + '/100' : ''}
+          </div>
+        </div>
+      `;
+
+      // Anomalies
+      const anomEl = $('reco-anomalies');
+      const anomalies = Array.isArray(reco.anomalies) ? reco.anomalies : [];
+      if (!anomalies.length) {
+        anomEl.innerHTML = '<div style="font-size:13px; color:var(--gray-500);">Aucune anomalie détectée.</div>';
+      } else {
+        anomEl.innerHTML = '';
+        anomalies.forEach(a => {
+          const div = document.createElement('div');
+          div.className = 'anomaly severite-' + (a.severite || 'info');
+          div.innerHTML = `
+            <div style="flex:1;">
+              <div class="anomaly-type">${a.type || 'autre'} · ${a.severite || 'info'}</div>
+              <div class="anomaly-desc">${a.description || ''}</div>
+            </div>
+          `;
+          anomEl.appendChild(div);
+        });
+      }
+
+      // Matchs
+      const matchsEl = $('reco-matchs');
+      const matchs = Array.isArray(reco.matchs) ? reco.matchs : [];
+      if (!matchs.length) {
+        matchsEl.innerHTML = '<div style="font-size:13px; color:var(--gray-500);">Aucune correspondance.</div>';
+      } else {
+        matchsEl.innerHTML = '';
+        matchs.forEach(m => {
+          const row = document.createElement('div');
+          row.className = 'match-row';
+          row.innerHTML = `
+            <div class="mr-bl">
+              <div style="font-weight:600;">${m.designation_bl || '— ligne BL —'}</div>
+              <div style="font-size:11px; color:var(--gray-500);">${m.qte_bl ?? '?'} ${m.unite_bl || ''}</div>
+            </div>
+            <div class="mr-arrow">↔</div>
+            <div class="mr-eti">
+              <div>${(m.produits_etiquettes || []).join(' + ') || '—'}</div>
+              <div style="font-size:11px;" class="ms-${m.statut_match || 'orphelin'}">
+                ${m.qte_etiquettes_total ?? '?'} kg · ${m.ecart_pct != null ? (m.ecart_pct >= 0 ? '+' : '') + m.ecart_pct.toFixed(1) + '%' : ''}
+              </div>
+            </div>
+          `;
+          matchsEl.appendChild(row);
+        });
+      }
+    }
+
+    $('btn-reco-back').addEventListener('click', () => showScreen('session'));
+
+    $('btn-reco-validate').addEventListener('click', async () => {
+      if (!State.currentSessionId) return;
+      const obs = $('reco-observation').value.trim() || null;
+      try {
+        const { error } = await sb.from('scan_sessions').update({
+          statut: 'validee',
+          validee_par_id: currentUser.id,
+          validee_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+          observation_validation: obs,
+          cloturee_at: new Date().toISOString(),
+        }).eq('id', State.currentSessionId);
+        if (error) throw error;
+        // Marquer toutes les étiquettes de la session comme validées
+        await sb.from('scans').update({
           statut: 'valide',
           valide_par_id: currentUser.id,
           valide_par_nom: currentUser.nom,
           date_validation: new Date().toISOString(),
-          observation: edits._observation || null,
-        }).eq('id', currentScanId);
-        if (error) throw error;
-        // Si étiquette : update scan_tracabilite avec les corrections
-        if (selectedType === 'etiquette_produit') {
+        }).eq('session_id', State.currentSessionId).in('statut', ['en_attente_validation', 'extrait']);
+        showToast('✓ Réception validée', 'success');
+        State.currentSessionId = null;
+        showScreen('home');
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    });
+
+    $('btn-reco-reject').addEventListener('click', async () => {
+      if (!State.currentSessionId) return;
+      if (!confirm('Rejeter cette réception ? Les scans restent en base mais la session est marquée rejetée.')) return;
+      const obs = $('reco-observation').value.trim() || null;
+      await sb.from('scan_sessions').update({
+        statut: 'rejetee',
+        validee_par_id: currentUser.id,
+        validee_par_nom: currentUser.nom,
+        date_validation: new Date().toISOString(),
+        observation_validation: obs,
+        cloturee_at: new Date().toISOString(),
+      }).eq('id', State.currentSessionId);
+      showToast('Réception rejetée');
+      State.currentSessionId = null;
+      showScreen('home');
+    });
+
+    // ====== MODE UNIT (V1, simplifié) ======
+    function resetUnitScreen() {
+      State.unitType = null;
+      State.unitFile = null;
+      State.unitFromCamera = false;
+      State.unitScanId = null;
+      document.querySelectorAll('#screen-unit .type-card').forEach(c => c.classList.remove('selected'));
+      $('input-unit-camera').value = '';
+      $('input-unit-pdf').value = '';
+      $('unit-file-info').classList.remove('visible');
+      $('unit-fi-preview').style.display = 'none';
+      $('btn-unit-extract').disabled = true;
+    }
+
+    document.querySelectorAll('#screen-unit .type-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('#screen-unit .type-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        State.unitType = card.dataset.type;
+        $('btn-unit-extract').disabled = !State.unitType || !State.unitFile;
+      });
+    });
+
+    $('btn-unit-camera').addEventListener('click', () => $('input-unit-camera').click());
+    $('btn-unit-pdf').addEventListener('click', () => $('input-unit-pdf').click());
+    $('input-unit-camera').addEventListener('change', e => onUnitFileChosen(e.target.files[0], true));
+    $('input-unit-pdf').addEventListener('change', e => onUnitFileChosen(e.target.files[0], false));
+    $('btn-unit-cancel').addEventListener('click', () => showScreen('home'));
+
+    function onUnitFileChosen(file, fromCamera) {
+      if (!file) return;
+      State.unitFile = file;
+      State.unitFromCamera = fromCamera;
+      $('unit-fi-name').textContent = file.name;
+      $('unit-fi-type').textContent = file.type || '?';
+      $('unit-fi-size').textContent = fmtBytes(file.size);
+      $('unit-file-info').classList.add('visible');
+      const isImg = file.type.startsWith('image/');
+      const preview = $('unit-fi-preview');
+      if (isImg) { preview.src = URL.createObjectURL(file); preview.style.display='block'; }
+      else preview.style.display = 'none';
+      $('btn-unit-extract').disabled = !State.unitType || !State.unitFile;
+    }
+
+    $('btn-unit-extract').addEventListener('click', async () => {
+      if (!State.unitType || !State.unitFile) return;
+      showScreen('extracting');
+      $('step-upload').textContent = '📤 Téléversement…';
+      $('step-analyze').style.display = '';
+      $('step-save').style.display = '';
+      try {
+        const ext = (State.unitFile.name.split('.').pop() || 'bin').toLowerCase();
+        const today = new Date().toISOString().slice(0, 10);
+        const uuid = crypto.randomUUID();
+        const path = `${currentEtab}/${today}/${uuid}.${ext}`;
+        const { error: upErr } = await sb.storage.from('scans').upload(path, State.unitFile, {
+          cacheControl:'3600', upsert:false, contentType: State.unitFile.type || undefined,
+        });
+        if (upErr) throw new Error('Upload : ' + upErr.message);
+
+        const { data: insData, error: insErr } = await sb.from('scans').insert({
+          etablissement: currentEtab,
+          type_document: State.unitType,
+          voie_capture: State.unitFromCamera ? 'camera_inapp' : 'pdf_scanner_pro',
+          storage_path: path,
+          mime_type: State.unitFile.type || null,
+          taille_octets: State.unitFile.size,
+          created_by_id: currentUser.id,
+          created_by_nom: currentUser.nom,
+          created_by_initiales: currentUser.initiales,
+        }).select('id').single();
+        if (insErr) throw new Error('INSERT : ' + insErr.message);
+        State.unitScanId = insData.id;
+
+        const result = await callExtract(insData.id);
+        renderUnitResult(result);
+        showScreen('result');
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+        showScreen('unit');
+      }
+    });
+
+    function renderUnitResult(result) {
+      const e = result.extraction;
+      const conf = result.confiance_globale ?? e.confiance_globale ?? 0;
+      const cb = $('unit-result-conf');
+      cb.textContent = `Confiance ${conf}/100`;
+      cb.className = 'result-confidence ' + (conf >= 80 ? 'conf-high' : conf >= 50 ? 'conf-med' : 'conf-low');
+      $('unit-result-meta').textContent = `${result.tokens_in} tokens in · ${result.tokens_out} out · $${(result.cost_usd ?? 0).toFixed(4)}`;
+      const c = $('unit-result-fields');
+      c.innerHTML = '';
+      const champsManquants = e.champs_manquants || [];
+      function fld(key, label, val, opts={}) {
+        const wrap = document.createElement('div');
+        wrap.className = 'field' + (champsManquants.includes(key) ? ' warn' : '');
+        const lab = document.createElement('label'); lab.textContent = label;
+        const inp = opts.textarea ? document.createElement('textarea') : document.createElement('input');
+        inp.dataset.key = key;
+        inp.value = val == null ? '' : (typeof val === 'object' ? JSON.stringify(val) : val);
+        if (opts.type) inp.type = opts.type;
+        wrap.appendChild(lab); wrap.appendChild(inp);
+        if (champsManquants.includes(key)) {
+          const hint = document.createElement('div'); hint.className = 'field-hint'; hint.textContent = '⚠ Champ non lu, à vérifier';
+          wrap.appendChild(hint);
+        }
+        return wrap;
+      }
+      if (State.unitType === 'etiquette_produit') {
+        const g1 = document.createElement('div'); g1.className = 'field-grid single';
+        g1.appendChild(fld('produit', 'Produit', e.produit));
+        c.appendChild(g1);
+        const g2 = document.createElement('div'); g2.className = 'field-grid';
+        g2.appendChild(fld('categorie', 'Catégorie', e.categorie));
+        g2.appendChild(fld('fabricant', 'Fabricant', e.fabricant));
+        g2.appendChild(fld('estampille', 'Agrément', e.estampille));
+        g2.appendChild(fld('lot', 'Lot', e.lot));
+        g2.appendChild(fld('dlc', 'DLC', e.dlc, { type:'date' }));
+        g2.appendChild(fld('ddm', 'DDM', e.ddm, { type:'date' }));
+        g2.appendChild(fld('poids_net_kg', 'Poids (kg)', e.poids_net_kg, { type:'number' }));
+        g2.appendChild(fld('origine', 'Origine', e.origine));
+        c.appendChild(g2);
+        const g3 = document.createElement('div'); g3.className = 'field-grid single';
+        g3.appendChild(fld('ingredients', 'Ingrédients', e.ingredients, { textarea:true }));
+        c.appendChild(g3);
+      } else {
+        const g = document.createElement('div'); g.className = 'field-grid single';
+        g.appendChild(fld('raw', 'Extraction (JSON)', JSON.stringify(e, null, 2), { textarea:true }));
+        c.appendChild(g);
+      }
+    }
+
+    $('btn-unit-validate').addEventListener('click', async () => {
+      if (!State.unitScanId) return;
+      const edits = {};
+      document.querySelectorAll('#unit-result-fields [data-key]').forEach(el => {
+        edits[el.dataset.key] = el.value === '' ? null : el.value;
+      });
+      try {
+        await sb.from('scans').update({
+          statut: 'valide',
+          valide_par_id: currentUser.id,
+          valide_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+        }).eq('id', State.unitScanId);
+        if (State.unitType === 'etiquette_produit') {
           await sb.from('scan_tracabilite').update({
             produit: edits.produit ?? null,
             categorie: edits.categorie ?? null,
@@ -762,102 +1120,60 @@
             dlc: edits.dlc || null,
             ddm: edits.ddm || null,
             poids_net_kg: edits.poids_net_kg ? Number(edits.poids_net_kg) : null,
-            temp_min: edits.temp_min ? Number(edits.temp_min) : null,
-            temp_max: edits.temp_max ? Number(edits.temp_max) : null,
             origine: edits.origine ?? null,
             ingredients: edits.ingredients ?? null,
-          }).eq('scan_id', currentScanId);
+          }).eq('scan_id', State.unitScanId);
         }
         showToast('✓ Scan validé', 'success');
-        resetScreen();
-        await loadHistory();
+        showScreen('home');
       } catch (err) {
-        console.error(err);
-        showToast('Erreur : ' + err.message, 'error');
+        console.error(err); showToast(err.message, 'error');
       }
     });
 
-    $('btn-reject').addEventListener('click', async () => {
-      if (!currentScanId) return;
+    $('btn-unit-reject').addEventListener('click', async () => {
+      if (!State.unitScanId) return;
       if (!confirm('Rejeter ce scan ?')) return;
-      try {
-        const { error } = await sb.from('scans').update({
-          statut: 'rejete',
-          valide_par_id: currentUser.id,
-          valide_par_nom: currentUser.nom,
-          date_validation: new Date().toISOString(),
-        }).eq('id', currentScanId);
-        if (error) throw error;
-        showToast('Scan rejeté');
-        resetScreen();
-        await loadHistory();
-      } catch (err) {
-        console.error(err);
-        showToast('Erreur : ' + err.message, 'error');
-      }
+      await sb.from('scans').update({
+        statut: 'rejete', valide_par_id: currentUser.id, valide_par_nom: currentUser.nom, date_validation: new Date().toISOString(),
+      }).eq('id', State.unitScanId);
+      showToast('Scan rejeté');
+      showScreen('home');
     });
 
-    $('btn-restart').addEventListener('click', resetScreen);
-
-    function resetScreen() {
-      selectedType = null;
-      selectedFile = null;
-      currentScanId = null;
-      currentExtraction = null;
-      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
-      $('input-camera').value = '';
-      $('input-pdf').value = '';
-      $('file-info').classList.remove('visible');
-      $('fi-preview').style.display = 'none';
-      $('btn-extract').disabled = true;
-      showScreen('new');
-    }
+    $('btn-unit-restart').addEventListener('click', () => { resetUnitScreen(); showScreen('unit'); });
 
     // ====== HISTORIQUE ======
     async function loadHistory() {
       const list = $('history-list');
       try {
         const { data, error } = await sb.from('scans')
-          .select('id, type_document, statut, claude_at, created_at, claude_extraction_jsonb, claude_cost_usd, confiance_globale')
+          .select('id, type_document, statut, claude_at, created_at, claude_extraction_jsonb, confiance_globale, session_id')
           .eq('etablissement', currentEtab)
+          .is('session_id', null)         // n'afficher que les scans hors session (les sessions sont dans Active Sessions)
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(15);
         if (error) throw error;
-
         if (!data.length) {
-          list.innerHTML = '<div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Aucun scan pour le moment.</div>';
+          list.innerHTML = '<div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Aucun scan unitaire pour le moment.</div>';
           return;
         }
-
         list.innerHTML = '';
         data.forEach(s => {
           const item = document.createElement('div');
           item.className = 'history-item';
-          const emoji =
-            s.type_document === 'etiquette_produit' ? '🥩' :
-            s.type_document === 'bl_facture'       ? '📄' : '📎';
-          const titre =
-            s.claude_extraction_jsonb?.produit ||
-            s.claude_extraction_jsonb?.fournisseur_nom ||
-            'Scan #' + s.id.slice(0, 8);
-          const badgeClass = ({
-            en_attente_validation: 'badge-attente',
-            valide: 'badge-valide',
-            rejete: 'badge-rejete',
-            erreur: 'badge-erreur',
-            extraction_en_cours: 'badge-cours',
-            en_attente_extraction: 'badge-cours',
-            extrait: 'badge-cours',
-          })[s.statut] || 'badge-cours';
-          const badgeLabel = ({
-            en_attente_validation: 'À valider',
-            valide: 'Validé',
-            rejete: 'Rejeté',
-            erreur: 'Erreur',
-            extraction_en_cours: 'En cours',
-            en_attente_extraction: 'En attente',
-            extrait: 'Extrait',
-          })[s.statut] || s.statut;
+          const emoji = s.type_document === 'etiquette_produit' ? '🥩' : s.type_document === 'bl_facture' ? '📄' : '📎';
+          const titre = s.claude_extraction_jsonb?.produit || s.claude_extraction_jsonb?.fournisseur_nom || 'Scan #' + s.id.slice(0, 8);
+          const badgeMap = {
+            en_attente_validation: ['badge-attente', 'À valider'],
+            valide: ['badge-valide', 'Validé'],
+            rejete: ['badge-rejete', 'Rejeté'],
+            erreur: ['badge-erreur', 'Erreur'],
+            extraction_en_cours: ['badge-cours', 'En cours'],
+            en_attente_extraction: ['badge-cours', 'En attente'],
+            extrait: ['badge-cours', 'Extrait'],
+          };
+          const [badgeClass, badgeLabel] = badgeMap[s.statut] || ['badge-cours', s.statut];
           item.innerHTML = `
             <span class="history-emoji">${emoji}</span>
             <div class="history-info">
@@ -869,13 +1185,12 @@
         });
       } catch (err) {
         console.error(err);
-        list.innerHTML = '<div style="color:var(--red-700); font-size:13px;">Erreur de chargement : ' + err.message + '</div>';
+        list.innerHTML = '<div style="color:var(--red-700); font-size:13px;">Erreur : ' + err.message + '</div>';
       }
     }
 
     // ====== INIT ======
-    showScreen('new');
-    loadHistory();
+    showScreen('home');
   </script>
 </body>
 </html>
