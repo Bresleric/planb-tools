@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Scanner — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #0891b2;          /* cyan-600 */
+      --primary-dark: #0e7490;     /* cyan-700 */
+      --primary-light: #cffafe;    /* cyan-100 */
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --green-100: #dcfce7;
+      --green-700: #15803d;
+      --orange-100: #ffedd5;
+      --orange-700: #c2410c;
+      --red-100: #fee2e2;
+      --red-700: #b91c1c;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--gray-900);
+      background: var(--gray-100);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    .header {
+      position: sticky; top: 0;
+      background: white;
+      border-bottom: 3px solid var(--primary);
+      padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px;
+      z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .btn-back {
+      display: inline-flex; align-items: center;
+      padding: 8px 12px;
+      font-size: 14px; font-weight: 500;
+      color: var(--gray-700);
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-back:hover, .btn-back:active { background: var(--gray-200); }
+    .header-title {
+      font-size: 18px; font-weight: 700;
+      color: var(--gray-900);
+    }
+    .header-right {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--gray-600);
+    }
+    .header-etab {
+      padding: 4px 10px;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      border-radius: var(--radius-sm);
+      font-weight: 600; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+
+    .content { flex: 1; padding: 16px; max-width: 800px; width: 100%; margin: 0 auto; }
+
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+    }
+    .card-title {
+      font-size: 14px; font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 12px;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+
+    /* Type de document : 3 grosses cartes radio */
+    .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .type-card {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 14px 6px;
+      background: var(--gray-50);
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px; font-weight: 600;
+      color: var(--gray-700);
+      transition: all 0.15s;
+      min-height: 80px;
+    }
+    .type-card:active { transform: scale(0.97); }
+    .type-card .emoji { font-size: 28px; line-height: 1; }
+    .type-card.selected {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary-dark);
+    }
+
+    /* Bouton de capture / upload */
+    .capture-zone {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .btn-capture {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 18px;
+      font-size: 16px; font-weight: 600;
+      color: white;
+      background: var(--primary);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.15s;
+      min-height: 56px;
+    }
+    .btn-capture:active { background: var(--primary-dark); transform: scale(0.98); }
+    .btn-capture.secondary {
+      background: white;
+      color: var(--primary-dark);
+      border: 2px solid var(--primary);
+    }
+    .btn-capture[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .btn-capture .emoji { font-size: 22px; }
+
+    .file-info {
+      display: none;
+      padding: 12px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--gray-700);
+    }
+    .file-info.visible { display: block; }
+    .file-info-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .file-info-row strong { color: var(--gray-900); }
+    .file-preview {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--gray-200);
+      margin-top: 8px;
+      display: block;
+    }
+
+    /* Bouton extraction */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%;
+      padding: 16px;
+      font-size: 16px; font-weight: 700;
+      color: white;
+      background: var(--primary);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.15s;
+      min-height: 52px;
+    }
+    .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
+    .btn-primary[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+    /* Spinner pendant l'extraction */
+    .extracting {
+      display: none;
+      flex-direction: column; align-items: center; gap: 16px;
+      padding: 32px 16px;
+      text-align: center;
+    }
+    .extracting.visible { display: flex; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid var(--gray-200);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .extracting-step {
+      font-size: 14px; color: var(--gray-600);
+    }
+    .extracting-step.active { color: var(--primary-dark); font-weight: 600; }
+
+    /* Vue de validation */
+    .result {
+      display: none;
+    }
+    .result.visible { display: block; }
+    .result-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--gray-200);
+    }
+    .result-confidence {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px; font-weight: 600;
+      border-radius: 999px;
+    }
+    .conf-high { background: var(--green-100); color: var(--green-700); }
+    .conf-med { background: var(--orange-100); color: var(--orange-700); }
+    .conf-low { background: var(--red-100); color: var(--red-700); }
+
+    .field-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .field-grid.single { grid-template-columns: 1fr; }
+    .field {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .field label {
+      font-size: 11px; font-weight: 600;
+      color: var(--gray-600);
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .field input, .field textarea, .field select {
+      padding: 8px 10px;
+      font-size: 14px;
+      color: var(--gray-900);
+      background: white;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      width: 100%;
+    }
+    .field textarea { min-height: 60px; resize: vertical; }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    .field.warn input, .field.warn textarea {
+      border-color: var(--orange-700);
+      background: var(--orange-100);
+    }
+    .field-hint {
+      font-size: 11px; color: var(--orange-700);
+      font-style: italic;
+    }
+
+    /* Actions de validation */
+    .actions {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      margin-top: 16px;
+    }
+    .btn-validate {
+      padding: 14px;
+      font-size: 15px; font-weight: 700;
+      color: white;
+      background: var(--green-700);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      min-height: 48px;
+    }
+    .btn-validate:active { transform: scale(0.98); }
+    .btn-reject {
+      padding: 14px;
+      font-size: 15px; font-weight: 600;
+      color: var(--red-700);
+      background: white;
+      border: 2px solid var(--red-100);
+      border-radius: var(--radius);
+      cursor: pointer;
+      min-height: 48px;
+    }
+    .btn-reject:active { transform: scale(0.98); background: var(--red-100); }
+    .btn-restart {
+      grid-column: 1 / -1;
+      padding: 12px;
+      font-size: 14px; font-weight: 600;
+      color: var(--gray-700);
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      cursor: pointer;
+      min-height: 44px;
+    }
+
+    /* Historique */
+    .history-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px;
+      background: var(--gray-50);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .history-item:hover { background: white; border-color: var(--gray-200); }
+    .history-emoji { font-size: 22px; }
+    .history-info { flex: 1; min-width: 0; }
+    .history-title {
+      font-size: 14px; font-weight: 600; color: var(--gray-900);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .history-meta { font-size: 12px; color: var(--gray-500); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 11px; font-weight: 600;
+      border-radius: 999px;
+    }
+    .badge-attente { background: var(--orange-100); color: var(--orange-700); }
+    .badge-valide { background: var(--green-100); color: var(--green-700); }
+    .badge-rejete { background: var(--red-100); color: var(--red-700); }
+    .badge-erreur { background: var(--red-100); color: var(--red-700); }
+    .badge-cours { background: var(--gray-100); color: var(--gray-700); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+      padding: 12px 20px;
+      background: var(--gray-900);
+      color: white;
+      border-radius: var(--radius);
+      font-size: 14px;
+      box-shadow: var(--shadow-md);
+      z-index: 100;
+      transition: transform 0.25s ease-out;
+      max-width: calc(100vw - 32px);
+    }
+    .toast.visible { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--red-700); }
+    .toast.success { background: var(--green-700); }
+
+    /* Hidden file inputs */
+    .file-input-hidden { display: none; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .field-grid { grid-template-columns: 1fr; }
+      .header-title { font-size: 16px; }
+      .type-card { font-size: 12px; padding: 10px 4px; min-height: 70px; }
+      .type-card .emoji { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="../index.html" class="btn-back">← Portail</a>
+      <span class="header-title">Scanner</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- ÉCRAN 1 : NOUVEAU SCAN -->
+    <section id="screen-new" class="screen">
+      <div class="card">
+        <div class="card-title">Type de document</div>
+        <div class="type-grid">
+          <button class="type-card" data-type="etiquette_produit">
+            <span class="emoji">🥩</span>
+            <span>Étiquette</span>
+          </button>
+          <button class="type-card" data-type="bl_facture">
+            <span class="emoji">📄</span>
+            <span>BL / Facture</span>
+          </button>
+          <button class="type-card" data-type="autre">
+            <span class="emoji">📎</span>
+            <span>Autre</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Capture</div>
+        <div class="capture-zone">
+          <button class="btn-capture" id="btn-camera">
+            <span class="emoji">📷</span>
+            <span>Prendre une photo</span>
+          </button>
+          <button class="btn-capture secondary" id="btn-pdf">
+            <span class="emoji">📁</span>
+            <span>Importer PDF / image</span>
+          </button>
+          <input type="file" class="file-input-hidden" id="input-camera" accept="image/*" capture="environment">
+          <input type="file" class="file-input-hidden" id="input-pdf" accept="image/*,application/pdf">
+        </div>
+
+        <div class="file-info" id="file-info">
+          <div class="file-info-row">
+            <span>Fichier</span>
+            <strong id="fi-name">—</strong>
+          </div>
+          <div class="file-info-row">
+            <span>Type</span>
+            <strong id="fi-type">—</strong>
+          </div>
+          <div class="file-info-row">
+            <span>Taille</span>
+            <strong id="fi-size">—</strong>
+          </div>
+          <img id="fi-preview" class="file-preview" style="display:none;" alt="">
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-extract" disabled>
+        <span>✨</span>
+        <span>Lancer l'extraction</span>
+      </button>
+    </section>
+
+    <!-- ÉCRAN 2 : EXTRACTION EN COURS -->
+    <section id="screen-extracting" class="extracting">
+      <div class="spinner"></div>
+      <div class="extracting-step" id="step-upload">📤 Téléversement du fichier…</div>
+      <div class="extracting-step" id="step-analyze">🔍 Analyse Claude Vision…</div>
+      <div class="extracting-step" id="step-save">💾 Enregistrement…</div>
+    </section>
+
+    <!-- ÉCRAN 3 : RÉSULTAT (validation) -->
+    <section id="screen-result" class="result">
+      <div class="card">
+        <div class="result-header">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">Résultat de l'extraction</div>
+            <div style="font-size:12px; color:var(--gray-500);" id="result-meta">—</div>
+          </div>
+          <span class="result-confidence" id="result-conf">—</span>
+        </div>
+        <div id="result-fields"></div>
+        <div class="actions">
+          <button class="btn-validate" id="btn-validate">✓ Valider</button>
+          <button class="btn-reject" id="btn-reject">✗ Rejeter</button>
+          <button class="btn-restart" id="btn-restart">↺ Nouveau scan</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIQUE -->
+    <section class="card" id="card-history">
+      <div class="card-title">Derniers scans</div>
+      <div id="history-list">
+        <div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Chargement…</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    // ====== CONFIG ======
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ====== AUTH ======
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; }
+      catch { return null; }
+    }
+    const session = getSession();
+    if (!session) { window.location.href = '../'; }
+    const currentUser = session.user;
+    const currentEtab = session.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    // ====== ÉTAT GLOBAL ======
+    let selectedType = null;       // etiquette_produit | bl_facture | autre
+    let selectedFile = null;       // File
+    let selectedFromCamera = false;
+    let currentScanId = null;
+    let currentExtraction = null;
+
+    // ====== HELPERS ======
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind = '') {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'toast visible' + (kind ? ' ' + kind : '');
+      setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+    function fmtBytes(n) {
+      if (n < 1024) return n + ' o';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' Ko';
+      return (n / 1024 / 1024).toFixed(2) + ' Mo';
+    }
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const opts = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+      return d.toLocaleString('fr-FR', opts);
+    }
+    function showScreen(name) {
+      $('screen-new').style.display = name === 'new' ? 'block' : 'none';
+      $('screen-extracting').className = 'extracting' + (name === 'extracting' ? ' visible' : '');
+      $('screen-result').className = 'result' + (name === 'result' ? ' visible' : '');
+      $('card-history').style.display = name === 'new' ? 'block' : 'none';
+    }
+    function setExtractStep(step) {
+      ['upload', 'analyze', 'save'].forEach(s => {
+        $('step-' + s).classList.remove('active');
+      });
+      if (step) $('step-' + step).classList.add('active');
+    }
+
+    // ====== TYPE DE DOCUMENT ======
+    document.querySelectorAll('.type-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedType = card.dataset.type;
+        updateExtractButton();
+      });
+    });
+
+    // ====== CHOIX FICHIER ======
+    $('btn-camera').addEventListener('click', () => $('input-camera').click());
+    $('btn-pdf').addEventListener('click', () => $('input-pdf').click());
+
+    $('input-camera').addEventListener('change', (e) => onFileChosen(e.target.files[0], true));
+    $('input-pdf').addEventListener('change', (e) => onFileChosen(e.target.files[0], false));
+
+    function onFileChosen(file, fromCamera) {
+      if (!file) return;
+      selectedFile = file;
+      selectedFromCamera = fromCamera;
+      $('fi-name').textContent = file.name;
+      $('fi-type').textContent = file.type || '?';
+      $('fi-size').textContent = fmtBytes(file.size);
+      $('file-info').classList.add('visible');
+
+      // Aperçu si image
+      const isImg = file.type.startsWith('image/');
+      const preview = $('fi-preview');
+      if (isImg) {
+        const url = URL.createObjectURL(file);
+        preview.src = url;
+        preview.style.display = 'block';
+      } else {
+        preview.style.display = 'none';
+      }
+      updateExtractButton();
+    }
+
+    function updateExtractButton() {
+      $('btn-extract').disabled = !selectedType || !selectedFile;
+    }
+
+    // ====== LANCEMENT EXTRACTION ======
+    $('btn-extract').addEventListener('click', runExtraction);
+
+    async function runExtraction() {
+      if (!selectedType || !selectedFile) return;
+      showScreen('extracting');
+      setExtractStep('upload');
+
+      try {
+        // 1. Upload Storage
+        const ext = (selectedFile.name.split('.').pop() || 'bin').toLowerCase();
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const uuid = crypto.randomUUID();
+        const path = `${currentEtab}/${today}/${uuid}.${ext}`;
+
+        const { error: upErr } = await sb.storage.from('scans').upload(path, selectedFile, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: selectedFile.type || undefined,
+        });
+        if (upErr) throw new Error('Upload échoué : ' + upErr.message);
+
+        // 2. INSERT scans
+        setExtractStep('analyze');
+        const { data: insData, error: insErr } = await sb.from('scans').insert({
+          etablissement: currentEtab,
+          type_document: selectedType,
+          voie_capture: selectedFromCamera ? 'camera_inapp' : 'pdf_scanner_pro',
+          storage_path: path,
+          mime_type: selectedFile.type || null,
+          taille_octets: selectedFile.size,
+          created_by_id: currentUser.id,
+          created_by_nom: currentUser.nom,
+          created_by_initiales: currentUser.initiales,
+        }).select('id').single();
+        if (insErr) throw new Error('Création scan échouée : ' + insErr.message);
+        currentScanId = insData.id;
+
+        // 3. Appel Edge Function extract-document
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-document`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+          },
+          body: JSON.stringify({ scan_id: currentScanId }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || !result.ok) {
+          throw new Error('Extraction Claude : ' + (result.error || resp.statusText));
+        }
+
+        setExtractStep('save');
+        currentExtraction = result.extraction;
+        renderResult(result);
+        showScreen('result');
+      } catch (err) {
+        console.error('runExtraction:', err);
+        showToast(err.message, 'error');
+        showScreen('new');
+      }
+    }
+
+    // ====== AFFICHAGE RÉSULTAT ======
+    function renderResult(result) {
+      const e = result.extraction;
+      const conf = result.confiance_globale ?? e.confiance_globale ?? 0;
+      const cost = (result.cost_usd ?? 0).toFixed(4);
+
+      // Badge confiance
+      const cb = $('result-conf');
+      cb.textContent = `Confiance ${conf}/100`;
+      cb.className = 'result-confidence ' + (conf >= 80 ? 'conf-high' : conf >= 50 ? 'conf-med' : 'conf-low');
+
+      $('result-meta').textContent =
+        `${result.tokens_in} tokens in · ${result.tokens_out} out · $${cost}`;
+
+      const c = $('result-fields');
+      c.innerHTML = '';
+
+      const champsManquants = e.champs_manquants || [];
+      function field(key, label, val, opts = {}) {
+        const wrap = document.createElement('div');
+        wrap.className = 'field' + (champsManquants.includes(key) ? ' warn' : '');
+        const lab = document.createElement('label');
+        lab.textContent = label;
+        const inp = opts.textarea ? document.createElement('textarea') : document.createElement('input');
+        inp.dataset.key = key;
+        inp.value = val == null ? '' : (typeof val === 'object' ? JSON.stringify(val) : val);
+        if (opts.type) inp.type = opts.type;
+        wrap.appendChild(lab);
+        wrap.appendChild(inp);
+        if (champsManquants.includes(key)) {
+          const hint = document.createElement('div');
+          hint.className = 'field-hint';
+          hint.textContent = '⚠ Champ non lu, à vérifier';
+          wrap.appendChild(hint);
+        }
+        return wrap;
+      }
+
+      if (selectedType === 'etiquette_produit') {
+        const grid1 = document.createElement('div');
+        grid1.className = 'field-grid single';
+        grid1.appendChild(field('produit', 'Produit', e.produit));
+        c.appendChild(grid1);
+
+        const grid2 = document.createElement('div');
+        grid2.className = 'field-grid';
+        grid2.appendChild(field('categorie', 'Catégorie', e.categorie));
+        grid2.appendChild(field('fabricant', 'Fabricant', e.fabricant));
+        grid2.appendChild(field('estampille', 'Agrément', e.estampille));
+        grid2.appendChild(field('lot', 'Lot', e.lot));
+        grid2.appendChild(field('dlc', 'DLC', e.dlc, { type: 'date' }));
+        grid2.appendChild(field('ddm', 'DDM', e.ddm, { type: 'date' }));
+        grid2.appendChild(field('poids_net_kg', 'Poids net (kg)', e.poids_net_kg, { type: 'number' }));
+        grid2.appendChild(field('origine', 'Origine', e.origine));
+        grid2.appendChild(field('temp_min', 'Temp. min (°C)', e.temp_min, { type: 'number' }));
+        grid2.appendChild(field('temp_max', 'Temp. max (°C)', e.temp_max, { type: 'number' }));
+        c.appendChild(grid2);
+
+        const grid3 = document.createElement('div');
+        grid3.className = 'field-grid single';
+        grid3.appendChild(field('ingredients', 'Ingrédients', e.ingredients, { textarea: true }));
+        c.appendChild(grid3);
+      } else if (selectedType === 'bl_facture') {
+        const grid = document.createElement('div');
+        grid.className = 'field-grid';
+        grid.appendChild(field('fournisseur_nom', 'Fournisseur', e.fournisseur_nom));
+        grid.appendChild(field('numero_document', 'N° document', e.numero_document));
+        grid.appendChild(field('date_document', 'Date', e.date_document, { type: 'date' }));
+        grid.appendChild(field('total_ttc', 'Total TTC', e.total_ttc, { type: 'number' }));
+        c.appendChild(grid);
+
+        // Lignes en tableau simple
+        if (Array.isArray(e.lignes) && e.lignes.length) {
+          const ttitle = document.createElement('div');
+          ttitle.className = 'card-title';
+          ttitle.style.marginTop = '12px';
+          ttitle.textContent = `${e.lignes.length} ligne(s)`;
+          c.appendChild(ttitle);
+          e.lignes.forEach((l, i) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'padding:6px 0; border-bottom:1px solid var(--gray-100); font-size:13px;';
+            row.innerHTML = `<strong>${l.designation || '?'}</strong> — ${l.quantite || '?'} ${l.unite || ''} × ${l.prix_unitaire_ht || '?'}€ = <strong>${l.montant_ht || '?'}€ HT</strong>`;
+            c.appendChild(row);
+          });
+        }
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'field-grid single';
+        grid.appendChild(field('raw', 'Extraction brute (JSON)', JSON.stringify(e, null, 2), { textarea: true }));
+        c.appendChild(grid);
+      }
+    }
+
+    // ====== VALIDATION / REJET ======
+    $('btn-validate').addEventListener('click', async () => {
+      if (!currentScanId) return;
+      // Récupérer les valeurs éditées
+      const edits = {};
+      document.querySelectorAll('#result-fields [data-key]').forEach(el => {
+        edits[el.dataset.key] = el.value === '' ? null : el.value;
+      });
+      try {
+        const { error } = await sb.from('scans').update({
+          statut: 'valide',
+          valide_par_id: currentUser.id,
+          valide_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+          observation: edits._observation || null,
+        }).eq('id', currentScanId);
+        if (error) throw error;
+        // Si étiquette : update scan_tracabilite avec les corrections
+        if (selectedType === 'etiquette_produit') {
+          await sb.from('scan_tracabilite').update({
+            produit: edits.produit ?? null,
+            categorie: edits.categorie ?? null,
+            fabricant: edits.fabricant ?? null,
+            estampille: edits.estampille ?? null,
+            lot: edits.lot ?? null,
+            dlc: edits.dlc || null,
+            ddm: edits.ddm || null,
+            poids_net_kg: edits.poids_net_kg ? Number(edits.poids_net_kg) : null,
+            temp_min: edits.temp_min ? Number(edits.temp_min) : null,
+            temp_max: edits.temp_max ? Number(edits.temp_max) : null,
+            origine: edits.origine ?? null,
+            ingredients: edits.ingredients ?? null,
+          }).eq('scan_id', currentScanId);
+        }
+        showToast('✓ Scan validé', 'success');
+        resetScreen();
+        await loadHistory();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    });
+
+    $('btn-reject').addEventListener('click', async () => {
+      if (!currentScanId) return;
+      if (!confirm('Rejeter ce scan ?')) return;
+      try {
+        const { error } = await sb.from('scans').update({
+          statut: 'rejete',
+          valide_par_id: currentUser.id,
+          valide_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+        }).eq('id', currentScanId);
+        if (error) throw error;
+        showToast('Scan rejeté');
+        resetScreen();
+        await loadHistory();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    });
+
+    $('btn-restart').addEventListener('click', resetScreen);
+
+    function resetScreen() {
+      selectedType = null;
+      selectedFile = null;
+      currentScanId = null;
+      currentExtraction = null;
+      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+      $('input-camera').value = '';
+      $('input-pdf').value = '';
+      $('file-info').classList.remove('visible');
+      $('fi-preview').style.display = 'none';
+      $('btn-extract').disabled = true;
+      showScreen('new');
+    }
+
+    // ====== HISTORIQUE ======
+    async function loadHistory() {
+      const list = $('history-list');
+      try {
+        const { data, error } = await sb.from('scans')
+          .select('id, type_document, statut, claude_at, created_at, claude_extraction_jsonb, claude_cost_usd, confiance_globale')
+          .eq('etablissement', currentEtab)
+          .order('created_at', { ascending: false })
+          .limit(20);
+        if (error) throw error;
+
+        if (!data.length) {
+          list.innerHTML = '<div style="color:var(--gray-500); font-size:13px; padding:8px 0;">Aucun scan pour le moment.</div>';
+          return;
+        }
+
+        list.innerHTML = '';
+        data.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          const emoji =
+            s.type_document === 'etiquette_produit' ? '🥩' :
+            s.type_document === 'bl_facture'       ? '📄' : '📎';
+          const titre =
+            s.claude_extraction_jsonb?.produit ||
+            s.claude_extraction_jsonb?.fournisseur_nom ||
+            'Scan #' + s.id.slice(0, 8);
+          const badgeClass = ({
+            en_attente_validation: 'badge-attente',
+            valide: 'badge-valide',
+            rejete: 'badge-rejete',
+            erreur: 'badge-erreur',
+            extraction_en_cours: 'badge-cours',
+            en_attente_extraction: 'badge-cours',
+            extrait: 'badge-cours',
+          })[s.statut] || 'badge-cours';
+          const badgeLabel = ({
+            en_attente_validation: 'À valider',
+            valide: 'Validé',
+            rejete: 'Rejeté',
+            erreur: 'Erreur',
+            extraction_en_cours: 'En cours',
+            en_attente_extraction: 'En attente',
+            extrait: 'Extrait',
+          })[s.statut] || s.statut;
+          item.innerHTML = `
+            <span class="history-emoji">${emoji}</span>
+            <div class="history-info">
+              <div class="history-title">${titre}</div>
+              <div class="history-meta">${fmtDate(s.claude_at || s.created_at)} · <span class="badge ${badgeClass}">${badgeLabel}</span>${s.confiance_globale != null ? ' · ' + s.confiance_globale + '/100' : ''}</div>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      } catch (err) {
+        console.error(err);
+        list.innerHTML = '<div style="color:var(--red-700); font-size:13px;">Erreur de chargement : ' + err.message + '</div>';
+      }
+    }
+
+    // ====== INIT ======
+    showScreen('new');
+    loadHistory();
+  </script>
+</body>
+</html>

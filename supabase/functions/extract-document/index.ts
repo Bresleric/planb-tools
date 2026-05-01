@@ -1,24 +1,27 @@
 // =============================================================================
-// extract-document — Edge Function PlanB-Tools
+// extract-document — Edge Function PlanB-Tools (v2 sans SDK Anthropic)
 // =============================================================================
+// Version 2 : appel direct à l'API Anthropic via fetch (sans @anthropic-ai/sdk
+// car le SDK npm posait des soucis de compat avec Deno 2.x).
+// Logging détaillé à chaque étape pour debug via Supabase Logs.
+//
 // Reçoit { scan_id } via POST.
 // Lit la ligne dans `scans`, télécharge le fichier depuis Storage `scans/`,
 // appelle Claude Haiku 4.5 Vision avec un prompt selon `type_document`,
 // parse le JSON retourné et écrit le détail dans `scan_tracabilite`
 // (étiquettes) ou `scan_lignes` (BL/factures).
-//
-// Date de création : 2026-04-30 (Phase 1 module Scanner)
 // =============================================================================
 
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import Anthropic from 'npm:@anthropic-ai/sdk@0.32.1'
 
 // ---------- Constantes ------------------------------------------------------
 const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
-// Tarifs Haiku 4.5 (USD / million de tokens) — source : doc reco mars 2026
-const PRICE_INPUT_PER_MTOK = 1.0
-const PRICE_OUTPUT_PER_MTOK = 5.0
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
+const ANTHROPIC_API_VERSION = '2023-06-01'
+const PRICE_INPUT_PER_MTOK = 1.0   // USD/Mtok
+const PRICE_OUTPUT_PER_MTOK = 5.0  // USD/Mtok
 const MAX_OUTPUT_TOKENS = 4096
+const ANTHROPIC_TIMEOUT_MS = 60_000
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -152,7 +155,6 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
-  // Conversion robuste pour gros buffers — String.fromCharCode plante au-delà de ~125k.
   let binary = ''
   const chunkSize = 0x8000
   for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -162,6 +164,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 async function markError(supabase: SupabaseClient, scanId: string, message: string) {
+  console.error(`[extract-document] markError(${scanId}) :`, message)
   await supabase
     .from('scans')
     .update({ statut: 'erreur', claude_erreur_message: message })
@@ -177,7 +180,82 @@ function extractJson(text: string): unknown {
   return JSON.parse(text.substring(start, end + 1))
 }
 
-// ---------- Insertions du détail extrait -----------------------------------
+// ---------- Appel direct à l'API Anthropic ----------------------------------
+interface AnthropicResponse {
+  content: Array<{ type: string; text?: string }>
+  usage: { input_tokens: number; output_tokens: number }
+  model: string
+  stop_reason: string
+}
+
+async function callAnthropicVision(
+  apiKey: string,
+  systemPrompt: string,
+  userText: string,
+  base64Data: string,
+  mediaType: string,
+  isPdf: boolean,
+): Promise<AnthropicResponse> {
+  const body = {
+    model: ANTHROPIC_MODEL,
+    max_tokens: MAX_OUTPUT_TOKENS,
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: isPdf ? 'document' : 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: base64Data,
+            },
+          },
+          { type: 'text', text: userText },
+        ],
+      },
+    ],
+  }
+
+  console.log(`[extract-document] Anthropic call : model=${ANTHROPIC_MODEL}, isPdf=${isPdf}, mediaType=${mediaType}, base64Len=${base64Data.length}`)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': ANTHROPIC_API_VERSION,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    clearTimeout(timeoutId)
+    if ((err as Error).name === 'AbortError') {
+      throw new Error(`Timeout Anthropic après ${ANTHROPIC_TIMEOUT_MS / 1000}s`)
+    }
+    throw new Error(`Fetch Anthropic : ${(err as Error).message}`)
+  }
+  clearTimeout(timeoutId)
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '<lecture body échouée>')
+    console.error(`[extract-document] Anthropic ${response.status} : ${errBody.slice(0, 500)}`)
+    throw new Error(`API Anthropic ${response.status} : ${errBody.slice(0, 300)}`)
+  }
+
+  const data = await response.json() as AnthropicResponse
+  console.log(`[extract-document] Anthropic OK : tokens_in=${data.usage.input_tokens}, tokens_out=${data.usage.output_tokens}, stop_reason=${data.stop_reason}`)
+  return data
+}
+
+// ---------- Insertions du détail extrait ------------------------------------
 async function insertTracabilite(
   supabase: SupabaseClient,
   scanId: string,
@@ -239,7 +317,7 @@ async function insertLignes(
   if (error) throw new Error(`INSERT scan_lignes : ${error.message}`)
 }
 
-// ---------- Handler principal ----------------------------------------------
+// ---------- Handler principal -----------------------------------------------
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS, status: 204 })
@@ -255,10 +333,17 @@ Deno.serve(async (req: Request) => {
     if (!scanId || typeof scanId !== 'string') {
       return jsonResponse({ ok: false, error: 'scan_id manquant dans le body JSON' }, 400)
     }
+    console.log(`[extract-document] START scan_id=${scanId}`)
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+    const rawAnthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+    // Nettoyage défensif : on vire tout caractère non-ASCII (newline, espace insécable, accent éventuel)
+    // qui peut se glisser au collage dans les Secrets et casser le header HTTP.
+    const anthropicKey = rawAnthropicKey
+      ? rawAnthropicKey.replace(/[^\x20-\x7E]/g, '').trim()
+      : undefined
+    console.log(`[extract-document] Env : SUPABASE_URL=${supabaseUrl ? 'ok' : 'MANQUANT'}, SERVICE_ROLE=${serviceRoleKey ? 'ok' : 'MANQUANT'}, ANTHROPIC_KEY=${anthropicKey ? `ok(rawLen=${rawAnthropicKey?.length}, cleanLen=${anthropicKey.length})` : 'MANQUANT'}`)
     if (!supabaseUrl || !serviceRoleKey) {
       return jsonResponse({ ok: false, error: 'SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquant' }, 500)
     }
@@ -270,15 +355,17 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false },
     })
 
-    // 1. Récupérer la ligne scans
+    // 1. Récupérer le scan
     const { data: scan, error: scanErr } = await supabase
       .from('scans')
       .select('*')
       .eq('id', scanId)
       .single()
     if (scanErr || !scan) {
+      console.error(`[extract-document] Scan introuvable :`, scanErr)
       return jsonResponse({ ok: false, error: `Scan introuvable : ${scanErr?.message ?? 'inconnu'}` }, 404)
     }
+    console.log(`[extract-document] Scan trouvé : type=${scan.type_document}, path=${scan.storage_path}, mime=${scan.mime_type}, statut=${scan.statut}`)
 
     if (!['en_attente_extraction', 'erreur'].includes(scan.statut)) {
       return jsonResponse({ ok: false, error: `Scan déjà traité (statut : ${scan.statut})` }, 409)
@@ -288,6 +375,7 @@ Deno.serve(async (req: Request) => {
     await supabase.from('scans').update({ statut: 'extraction_en_cours' }).eq('id', scanId)
 
     // 3. Télécharger le fichier
+    console.log(`[extract-document] Téléchargement Storage : ${scan.storage_path}`)
     const { data: fileBlob, error: dlErr } = await supabase
       .storage
       .from('scans')
@@ -300,6 +388,7 @@ Deno.serve(async (req: Request) => {
     const base64 = bytesToBase64(new Uint8Array(buffer))
     const mediaType = scan.mime_type ?? 'image/jpeg'
     const isPdf = mediaType === 'application/pdf'
+    console.log(`[extract-document] Fichier téléchargé : ${buffer.byteLength} octets, base64=${base64.length} chars, isPdf=${isPdf}`)
 
     // 4. Préparer le prompt
     let systemPrompt: string
@@ -311,44 +400,31 @@ Deno.serve(async (req: Request) => {
     }
     const userText = 'Extrais les données de ce document selon le format JSON demandé. Réponds uniquement avec le JSON, sans markdown ni texte autour.'
 
-    // 5. Appel Claude Vision
-    const anthropic = new Anthropic({ apiKey: anthropicKey })
+    // 5. Appel Claude Vision (fetch direct)
     let extraction: Record<string, unknown>
     let tokensIn = 0
     let tokensOut = 0
     try {
-      const message = await anthropic.messages.create({
-        model: ANTHROPIC_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: isPdf ? 'document' : 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mediaType,
-                  data: base64,
-                },
-              },
-              { type: 'text', text: userText },
-            ] as unknown as Anthropic.MessageParam['content'],
-          },
-        ],
-      })
+      const data = await callAnthropicVision(
+        anthropicKey,
+        systemPrompt,
+        userText,
+        base64,
+        mediaType,
+        isPdf,
+      )
+      tokensIn = data.usage.input_tokens
+      tokensOut = data.usage.output_tokens
 
-      tokensIn = message.usage.input_tokens
-      tokensOut = message.usage.output_tokens
-
-      const firstBlock = message.content[0]
-      if (!firstBlock || firstBlock.type !== 'text') {
-        throw new Error("Réponse Claude sans bloc texte")
+      const firstBlock = data.content?.[0]
+      if (!firstBlock || firstBlock.type !== 'text' || !firstBlock.text) {
+        throw new Error("Réponse Anthropic sans bloc texte")
       }
       extraction = extractJson(firstBlock.text) as Record<string, unknown>
+      console.log(`[extract-document] Extraction OK, ${Object.keys(extraction).length} clés top-level`)
     } catch (err) {
       const msg = (err as Error).message
+      console.error(`[extract-document] Erreur extraction :`, msg)
       await markError(supabase, scanId, `Anthropic ou parsing JSON : ${msg}`)
       return jsonResponse({ ok: false, error: msg }, 500)
     }
@@ -358,7 +434,7 @@ Deno.serve(async (req: Request) => {
       (tokensIn / 1_000_000) * PRICE_INPUT_PER_MTOK +
       (tokensOut / 1_000_000) * PRICE_OUTPUT_PER_MTOK
 
-    // 7. UPDATE scans avec résultat brut
+    // 7. UPDATE scans avec résultat
     const confiance = typeof extraction.confiance_globale === 'number'
       ? extraction.confiance_globale
       : null
@@ -376,10 +452,11 @@ Deno.serve(async (req: Request) => {
       })
       .eq('id', scanId)
     if (updErr) {
+      console.error(`[extract-document] UPDATE scans échec :`, updErr)
       return jsonResponse({ ok: false, error: `UPDATE scans : ${updErr.message}` }, 500)
     }
 
-    // 8. Insert détail selon type
+    // 8. Insert détail
     try {
       if (scan.type_document === 'etiquette_produit') {
         await insertTracabilite(supabase, scanId, extraction)
@@ -388,16 +465,18 @@ Deno.serve(async (req: Request) => {
       }
     } catch (err) {
       const msg = (err as Error).message
+      console.error(`[extract-document] Insertion détail échec :`, msg)
       await markError(supabase, scanId, `Insertion détail : ${msg}`)
       return jsonResponse({ ok: false, error: msg }, 500)
     }
 
-    // 9. Statut final = en_attente_validation
+    // 9. Statut final
     await supabase
       .from('scans')
       .update({ statut: 'en_attente_validation' })
       .eq('id', scanId)
 
+    console.log(`[extract-document] DONE scan_id=${scanId}, cost=$${costUsd.toFixed(5)}`)
     return jsonResponse({
       ok: true,
       scan_id: scanId,
@@ -410,6 +489,7 @@ Deno.serve(async (req: Request) => {
     })
   } catch (err) {
     const msg = (err as Error).message
+    console.error(`[extract-document] FATAL :`, msg, (err as Error).stack)
     if (scanId) {
       try {
         const supabase = createClient(
