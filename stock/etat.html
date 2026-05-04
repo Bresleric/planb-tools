@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>État du stock — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669;
+      --primary-dark: #047857;
+      --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --yellow-100:#fef9c3; --yellow-700:#a16207;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:1100px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .disclaimer { padding:10px 12px; background:var(--blue-100); color:var(--blue-700); border-radius:var(--radius-sm); font-size:12px; margin-bottom:14px; line-height:1.5; }
+    .disclaimer strong { display:block; margin-bottom:4px; }
+
+    /* Stats cards */
+    .stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:16px; }
+    .stat-box { padding:12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .stat-box .sv { font-size:22px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .stat-box .sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    .stat-box.warn { background:var(--orange-100); border-color:var(--orange-100); }
+    .stat-box.warn .sv { color:var(--orange-700); }
+    .stat-box.crit { background:var(--red-100); border-color:var(--red-100); }
+    .stat-box.crit .sv { color:var(--red-700); }
+    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(2, 1fr); } }
+
+    /* Filtres */
+    .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .search-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); flex:1; min-width:180px; }
+
+    /* Tableau articles */
+    .article-row { display:grid; grid-template-columns:1fr auto auto auto; gap:8px; padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; cursor:pointer; align-items:center; }
+    .article-row:hover { background:var(--gray-50); border-color:var(--gray-300); }
+    .ar-info { min-width:0; }
+    .ar-nom { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ar-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .ar-qty { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; text-align:right; }
+    .ar-qty .unit { font-size:11px; font-weight:500; color:var(--gray-500); }
+    .ar-dlc { font-size:11px; padding:3px 8px; border-radius:999px; font-weight:600; white-space:nowrap; }
+    .ar-arrow { color:var(--gray-400); font-size:18px; }
+    .dlc-vert    { background:var(--green-100); color:var(--green-700); }
+    .dlc-jaune   { background:var(--yellow-100); color:var(--yellow-700); }
+    .dlc-orange  { background:var(--orange-100); color:var(--orange-700); }
+    .dlc-rouge   { background:var(--red-100); color:var(--red-700); }
+    .dlc-gris    { background:var(--gray-100); color:var(--gray-500); }
+
+    /* Tri */
+    .sort-bar { display:flex; gap:4px; align-items:center; margin-bottom:8px; font-size:12px; color:var(--gray-600); }
+    .sort-btn { padding:4px 8px; background:transparent; border:none; cursor:pointer; font-size:12px; color:var(--gray-600); border-radius:var(--radius-sm); }
+    .sort-btn:hover { background:var(--gray-100); }
+    .sort-btn.active { background:var(--gray-900); color:white; }
+
+    /* Boutons */
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:8px 12px; font-size:13px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+
+    /* Modal détail */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; padding:16px; overflow-y:auto; }
+    .modal-bg.visible { display:block; }
+    .modal { background:white; border-radius:var(--radius); max-width:800px; margin:0 auto; padding:20px; }
+    .modal-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--gray-200); }
+    .modal-title { font-size:18px; font-weight:700; }
+    .modal-close { padding:6px 12px; background:var(--gray-100); border:none; border-radius:var(--radius-sm); cursor:pointer; font-size:13px; }
+
+    .scan-detail { display:flex; gap:10px; padding:10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; }
+    .scan-detail .sd-thumb { width:60px; height:60px; flex-shrink:0; background:var(--gray-100); border-radius:var(--radius-sm); overflow:hidden; cursor:zoom-in; position:relative; }
+    .scan-detail .sd-thumb img { width:100%; height:100%; object-fit:cover; }
+    .scan-detail .sd-thumb.placeholder { display:flex; align-items:center; justify-content:center; font-size:22px; color:var(--gray-400); }
+    .scan-detail .sd-info { flex:1; min-width:0; font-size:13px; }
+    .scan-detail .sd-title { font-weight:600; color:var(--gray-900); }
+    .scan-detail .sd-meta { color:var(--gray-500); font-size:12px; margin-top:2px; }
+
+    /* Lightbox */
+    .lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:70; align-items:center; justify-content:center; cursor:zoom-out; }
+    .lightbox.visible { display:flex; }
+    .lightbox img { max-width:95vw; max-height:95vh; object-fit:contain; }
+    .lightbox-close { position:fixed; top:16px; right:16px; padding:8px 14px; background:white; border:none; border-radius:var(--radius); font-size:14px; cursor:pointer; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:32px 16px; color:var(--gray-500); }
+    .empty-state .es-emoji { font-size:48px; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">État du stock</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="disclaimer">
+      <strong>📊 Vue cumulative des entrées</strong>
+      Cet écran agrège les étiquettes scannées et rattachées à un article du référentiel. C'est un <strong>cumul d'entrées</strong> — les sorties (consommation en cuisine) ne sont pas encore décomptées (à venir Phase C). Le stock affiché est donc un <em>maximum théorique</em> à la date du dernier scan.
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box"><div class="sv" id="stat-articles">—</div><div class="sl">Articles distincts</div></div>
+      <div class="stat-box"><div class="sv" id="stat-scans">—</div><div class="sl">Scans rattachés</div></div>
+      <div class="stat-box"><div class="sv" id="stat-poids">—</div><div class="sl">Poids total (kg)</div></div>
+      <div class="stat-box" id="stat-dlc-box"><div class="sv" id="stat-dlc">—</div><div class="sl">Alertes DLC ≤ 7 j</div></div>
+    </div>
+
+    <div class="card">
+      <div class="filters">
+        <span class="filter-chip active" data-filter-etab="all">Tous</span>
+        <span class="filter-chip" data-filter-etab="freddy">Freddy</span>
+        <span class="filter-chip" data-filter-etab="liesel">Liesel</span>
+        <input type="text" class="search-input" id="search" placeholder="Rechercher un article…">
+        <button class="btn btn-secondary" id="btn-export">📥 Export CSV</button>
+      </div>
+
+      <div class="filters" style="margin-bottom:0;">
+        <span class="filter-chip active" data-filter-cat="all">Toutes catégories</span>
+        <span class="filter-chip" data-filter-dlc="all">Toutes DLC</span>
+        <span class="filter-chip" data-filter-dlc="alerte">⚠ DLC ≤ 7 j</span>
+        <span class="filter-chip" data-filter-dlc="depassee">🔴 DLC dépassée</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sort-bar">
+        Trier par :
+        <button class="sort-btn active" data-sort="poids_desc">Poids ↓</button>
+        <button class="sort-btn" data-sort="poids_asc">Poids ↑</button>
+        <button class="sort-btn" data-sort="dlc">DLC proche</button>
+        <button class="sort-btn" data-sort="nom">Nom A-Z</button>
+        <button class="sort-btn" data-sort="recent">Plus récent</button>
+      </div>
+      <div id="articles-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal détail article -->
+  <div class="modal-bg" id="modal-detail">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="detail-title">—</div>
+          <div style="font-size:12px; color:var(--gray-500);" id="detail-subtitle">—</div>
+        </div>
+        <button class="modal-close" id="detail-close">✕ Fermer</button>
+      </div>
+      <div id="detail-scans"></div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightbox-close">✕</button>
+    <img id="lightbox-img" src="" alt="">
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    // ==== ÉTAT ====
+    const State = {
+      articles: [],          // [{ article_id, nom, categorie, unite, total_kg, total_pces, nb_scans, dlc_min, dlc_max, last_scan_at, etablissements:Set, scans:[] }]
+      filterEtab: 'all',
+      filterCat: 'all',
+      filterDlc: 'all',
+      search: '',
+      sort: 'poids_desc',
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') {
+      const t = $('toast'); t.textContent = msg;
+      t.className = 'toast visible' + (kind ? ' ' + kind : '');
+      setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
+    function daysToDlc(dlc) {
+      if (!dlc) return null;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const d = new Date(dlc); d.setHours(0,0,0,0);
+      return Math.round((d - today) / (1000*60*60*24));
+    }
+    function dlcClass(days) {
+      if (days == null) return 'dlc-gris';
+      if (days < 0) return 'dlc-rouge';
+      if (days <= 2) return 'dlc-rouge';
+      if (days <= 7) return 'dlc-orange';
+      if (days <= 14) return 'dlc-jaune';
+      return 'dlc-vert';
+    }
+    function dlcLabel(days) {
+      if (days == null) return 'DLC ?';
+      if (days < 0) return `Dépassée ${-days} j`;
+      if (days === 0) return "Aujourd'hui";
+      if (days === 1) return 'Demain';
+      return `Dans ${days} j`;
+    }
+
+    // ==== CHARGEMENT ====
+    async function loadAll() {
+      try {
+        // Charge tous les scans rattachés (article_id NOT NULL) + l'article + le scan parent (etablissement, statut)
+        const { data, error } = await sb.from('scan_tracabilite')
+          .select(`
+            id, scan_id, article_id, produit, lot, dlc, ddm, poids_net_kg, fabricant, origine, categorie,
+            scans!inner(id, etablissement, statut, created_at, storage_path, mime_type, created_by_nom),
+            appro_ingredients!inner(id, nom, categorie, unite)
+          `)
+          .not('article_id', 'is', null)
+          .in('scans.statut', ['valide', 'en_attente_validation', 'extrait'])
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        // Agréger par article_id
+        const byArticle = {};
+        (data || []).forEach(t => {
+          const a = t.appro_ingredients;
+          const s = t.scans;
+          if (!byArticle[a.id]) {
+            byArticle[a.id] = {
+              article_id: a.id,
+              nom: a.nom,
+              categorie: a.categorie,
+              unite: a.unite,
+              total_kg: 0,
+              nb_scans: 0,
+              dlc_min: null,
+              dlc_max: null,
+              last_scan_at: null,
+              etablissements: new Set(),
+              scans: [],
+            };
+          }
+          const agg = byArticle[a.id];
+          agg.nb_scans += 1;
+          if (t.poids_net_kg) agg.total_kg += Number(t.poids_net_kg);
+          if (t.dlc) {
+            if (!agg.dlc_min || t.dlc < agg.dlc_min) agg.dlc_min = t.dlc;
+            if (!agg.dlc_max || t.dlc > agg.dlc_max) agg.dlc_max = t.dlc;
+          }
+          if (s.created_at && (!agg.last_scan_at || s.created_at > agg.last_scan_at)) agg.last_scan_at = s.created_at;
+          if (s.etablissement) agg.etablissements.add(s.etablissement);
+          agg.scans.push({ ...t, scan: s });
+        });
+        State.articles = Object.values(byArticle);
+
+        // Compter les catégories pour le filtre
+        const cats = [...new Set(State.articles.map(a => a.categorie).filter(Boolean))].sort();
+        renderCategoryChips(cats);
+
+        // Stats globales
+        const totalKg = State.articles.reduce((s, a) => s + a.total_kg, 0);
+        const totalScans = State.articles.reduce((s, a) => s + a.nb_scans, 0);
+        const alertes = State.articles.filter(a => {
+          const d = daysToDlc(a.dlc_min);
+          return d !== null && d <= 7;
+        }).length;
+        $('stat-articles').textContent = State.articles.length;
+        $('stat-scans').textContent = totalScans;
+        $('stat-poids').textContent = totalKg.toFixed(1);
+        $('stat-dlc').textContent = alertes;
+        $('stat-dlc-box').className = 'stat-box' + (alertes > 0 ? ' warn' : '');
+
+        renderList();
+      } catch (err) {
+        console.error(err);
+        $('articles-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      }
+    }
+
+    function renderCategoryChips(cats) {
+      // Conserve la chip "Toutes" et ajoute les autres
+      const container = document.querySelector('[data-filter-cat="all"]').parentElement;
+      // Supprime les anciennes chips de catégorie (sauf Toutes/DLC)
+      [...container.querySelectorAll('[data-filter-cat]')].forEach(el => {
+        if (el.dataset.filterCat !== 'all') el.remove();
+      });
+      // Recrée les chips avant les chips DLC
+      const dlcAll = container.querySelector('[data-filter-dlc="all"]');
+      cats.forEach(cat => {
+        const chip = document.createElement('span');
+        chip.className = 'filter-chip';
+        chip.dataset.filterCat = cat;
+        chip.textContent = cat;
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('[data-filter-cat]').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          State.filterCat = cat;
+          renderList();
+        });
+        container.insertBefore(chip, dlcAll);
+      });
+    }
+
+    // ==== TRI/FILTRE/RENDU ====
+    function applyFilters() {
+      const q = State.search.toLowerCase().trim();
+      return State.articles.filter(a => {
+        if (State.filterEtab !== 'all' && !a.etablissements.has(State.filterEtab)) return false;
+        if (State.filterCat !== 'all' && a.categorie !== State.filterCat) return false;
+        const d = daysToDlc(a.dlc_min);
+        if (State.filterDlc === 'alerte' && (d == null || d > 7)) return false;
+        if (State.filterDlc === 'depassee' && (d == null || d >= 0)) return false;
+        if (q && !a.nom.toLowerCase().includes(q) && !(a.categorie || '').toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function applySort(items) {
+      const arr = [...items];
+      switch (State.sort) {
+        case 'poids_desc': arr.sort((a, b) => b.total_kg - a.total_kg); break;
+        case 'poids_asc':  arr.sort((a, b) => a.total_kg - b.total_kg); break;
+        case 'dlc':        arr.sort((a, b) => {
+          const da = a.dlc_min || '9999-12-31';
+          const db = b.dlc_min || '9999-12-31';
+          return da.localeCompare(db);
+        }); break;
+        case 'nom':        arr.sort((a, b) => a.nom.localeCompare(b.nom, 'fr')); break;
+        case 'recent':     arr.sort((a, b) => (b.last_scan_at || '').localeCompare(a.last_scan_at || '')); break;
+      }
+      return arr;
+    }
+
+    function renderList() {
+      const filtered = applyFilters();
+      const sorted = applySort(filtered);
+      const container = $('articles-list');
+      if (!sorted.length) {
+        container.innerHTML = `<div class="empty-state"><div class="es-emoji">📦</div>Aucun article ne correspond aux filtres.</div>`;
+        return;
+      }
+      container.innerHTML = '';
+      sorted.forEach(a => {
+        const days = daysToDlc(a.dlc_min);
+        const cls = dlcClass(days);
+        const lbl = dlcLabel(days);
+        const row = document.createElement('div');
+        row.className = 'article-row';
+        const etabArr = [...a.etablissements];
+        row.innerHTML = `
+          <div class="ar-info">
+            <div class="ar-nom">${escapeHtml(a.nom)}</div>
+            <div class="ar-meta">
+              ${escapeHtml(a.categorie || 'sans cat.')} ·
+              ${a.nb_scans} scan${a.nb_scans>1?'s':''} ·
+              ${etabArr.join(', ')}
+              ${a.dlc_min ? ' · DLC mini ' + fmtDate(a.dlc_min) : ''}
+            </div>
+          </div>
+          <div class="ar-qty">
+            ${a.total_kg.toFixed(2)}<span class="unit"> kg</span>
+          </div>
+          <span class="ar-dlc ${cls}">${lbl}</span>
+          <span class="ar-arrow">›</span>
+        `;
+        row.addEventListener('click', () => openDetail(a));
+        container.appendChild(row);
+      });
+    }
+
+    // ==== MODAL DÉTAIL ====
+    async function openDetail(a) {
+      $('detail-title').textContent = a.nom;
+      $('detail-subtitle').textContent = `${a.categorie || ''} · ${a.nb_scans} scan${a.nb_scans>1?'s':''} · ${a.total_kg.toFixed(2)} kg total`;
+      const list = $('detail-scans');
+      list.innerHTML = '<div class="empty-state">Chargement des photos…</div>';
+      $('modal-detail').classList.add('visible');
+
+      // Trier scans par date desc
+      const scansSorted = [...a.scans].sort((x, y) => (y.scan?.created_at || '').localeCompare(x.scan?.created_at || ''));
+
+      // Charger signed URLs en parallèle (validité 5min)
+      const enriched = await Promise.all(scansSorted.map(async t => {
+        const isImg = (t.scan?.mime_type || '').startsWith('image/');
+        let url = null;
+        if (isImg && t.scan?.storage_path) {
+          const { data } = await sb.storage.from('scans').createSignedUrl(t.scan.storage_path, 300);
+          url = data?.signedUrl;
+        }
+        return { ...t, url, isImg };
+      }));
+
+      list.innerHTML = '';
+      enriched.forEach(t => {
+        const days = daysToDlc(t.dlc);
+        const div = document.createElement('div');
+        div.className = 'scan-detail';
+        const thumb = t.isImg && t.url
+          ? `<div class="sd-thumb"><img src="${t.url}" alt="" loading="lazy"></div>`
+          : `<div class="sd-thumb placeholder">${(t.scan?.mime_type || '').includes('pdf') ? '📄' : '?'}</div>`;
+        div.innerHTML = `
+          ${thumb}
+          <div class="sd-info">
+            <div class="sd-title">${escapeHtml(t.produit || '?')}</div>
+            <div class="sd-meta">
+              Lot ${escapeHtml(t.lot || '?')} ·
+              ${t.poids_net_kg ? Number(t.poids_net_kg).toFixed(2) + ' kg' : 'poids ?'} ·
+              DLC ${fmtDate(t.dlc)} <span class="ar-dlc ${dlcClass(days)}" style="margin-left:4px;">${dlcLabel(days)}</span>
+              ${t.fabricant ? ' · ' + escapeHtml(t.fabricant) : ''}
+              <br>Scanné le ${fmtDate(t.scan?.created_at)} par ${escapeHtml(t.scan?.created_by_nom || '?')}
+            </div>
+          </div>
+        `;
+        // Clic sur la miniature → lightbox
+        const tEl = div.querySelector('.sd-thumb');
+        if (t.url) tEl.addEventListener('click', () => openLightbox(t.url));
+        list.appendChild(div);
+      });
+    }
+
+    $('detail-close').addEventListener('click', () => $('modal-detail').classList.remove('visible'));
+    $('modal-detail').addEventListener('click', (e) => {
+      if (e.target === $('modal-detail')) $('modal-detail').classList.remove('visible');
+    });
+
+    // ==== LIGHTBOX ====
+    function openLightbox(url) {
+      $('lightbox-img').src = url;
+      $('lightbox').classList.add('visible');
+    }
+    $('lightbox-close').addEventListener('click', closeLightbox);
+    $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox') || e.target === $('lightbox-img')) closeLightbox(); });
+    function closeLightbox() { $('lightbox').classList.remove('visible'); $('lightbox-img').src = ''; }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { closeLightbox(); $('modal-detail').classList.remove('visible'); }
+    });
+
+    // ==== FILTRES UI ====
+    document.querySelectorAll('[data-filter-etab]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-etab]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterEtab = chip.dataset.filterEtab;
+        renderList();
+      });
+    });
+    document.querySelectorAll('[data-filter-dlc]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-dlc]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterDlc = chip.dataset.filterDlc;
+        renderList();
+      });
+    });
+    $('search').addEventListener('input', (e) => {
+      State.search = e.target.value;
+      renderList();
+    });
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        State.sort = btn.dataset.sort;
+        renderList();
+      });
+    });
+
+    // ==== EXPORT CSV ====
+    $('btn-export').addEventListener('click', () => {
+      const filtered = applyFilters();
+      const sorted = applySort(filtered);
+      const headers = ['Article', 'Catégorie', 'Unité réf.', 'Nb scans', 'Poids total (kg)', 'DLC mini', 'DLC max', 'Établissements', 'Dernier scan'];
+      const esc = v => v == null ? '' : (/[";\n\r]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+      const rows = sorted.map(a => [
+        a.nom, a.categorie || '', a.unite || '', a.nb_scans, a.total_kg.toFixed(2),
+        a.dlc_min ? new Date(a.dlc_min).toLocaleDateString('fr-FR') : '',
+        a.dlc_max ? new Date(a.dlc_max).toLocaleDateString('fr-FR') : '',
+        [...a.etablissements].join(', '),
+        a.last_scan_at ? new Date(a.last_scan_at).toLocaleString('fr-FR') : '',
+      ].map(esc).join(';'));
+      const meta = [
+        `# État du stock — PlanB Tools`,
+        `# Date export;${new Date().toLocaleString('fr-FR')}`,
+        `# Articles;${sorted.length}`,
+        `# Note;Cumul des entrées validées (sortie cuisine non décomptée — Phase C en attente)`,
+        ``,
+      ].join('\n');
+      const csv = '﻿' + meta + headers.join(';') + '\n' + rows.join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `etat_stock_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ ${sorted.length} ligne${sorted.length>1?'s':''} exportée${sorted.length>1?'s':''}`, 'success');
+    });
+
+    // INIT
+    loadAll();
+  </script>
+</body>
+</html>
