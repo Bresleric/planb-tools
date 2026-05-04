@@ -271,17 +271,23 @@
     .btn-action.delete { color: var(--red); }
     .btn-action.start { color: var(--green); font-size: 0.85rem; }
     .btn-action.start:active { background: var(--green-bg); }
+    .btn-action.pause { color: var(--orange); font-size: 0.8rem; }
+    .btn-action.pause:active { background: var(--orange-light); }
+    .btn-action.cancel-chrono { color: var(--gray-500); font-size: 0.75rem; }
+    .btn-action.cancel-chrono:active { background: var(--gray-100); }
 
     /* ====== CHRONO TAF ====== */
-    .task-chrono-live {
-      font-size: 0.7rem; font-weight: 700; color: var(--orange);
+    .task-chrono-live, .task-chrono-paused {
+      font-size: 0.7rem; font-weight: 700;
       font-variant-numeric: tabular-nums;
       display: inline-flex; align-items: center; gap: 2px;
       white-space: nowrap;
-      background: var(--orange-light);
       padding: 2px 6px; border-radius: 10px;
     }
+    .task-chrono-live { color: var(--orange); background: var(--orange-light); }
     .task-chrono-live::before { content: '⏱'; font-size: 0.65rem; }
+    .task-chrono-paused { color: var(--gray-500); background: var(--gray-100); }
+    .task-chrono-paused::before { content: '⏸'; font-size: 0.65rem; }
     .task-duree-final {
       font-size: 0.6rem; color: var(--gray-500);
       font-variant-numeric: tabular-nums; display: block;
@@ -1612,13 +1618,26 @@
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
         ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
-        <div class="task-cell">${
-          done
-            ? `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>${(t.duree_secondes != null) ? `<span class="task-duree-final">${formatDureeShort(t.duree_secondes)}</span>` : ''}`
-            : (t.date_debut_execution ? `<span class="task-chrono-live" data-start="${t.date_debut_execution}" title="Chrono démarré par ${esc(t.debut_par_initiales || '?')}">…</span>` : '')
-        }</div>
+        <div class="task-cell">${(() => {
+          if (done) {
+            return `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>${(t.duree_secondes != null) ? `<span class="task-duree-final">${formatDureeShort(t.duree_secondes)}</span>` : ''}`;
+          }
+          const acc = t.duree_accumulee_secondes || 0;
+          if (t.date_debut_execution) {
+            // En cours : chrono live (acc + delta depuis date_debut_execution)
+            return `<span class="task-chrono-live" data-start="${t.date_debut_execution}" data-acc="${acc}" title="Chrono démarré par ${esc(t.debut_par_initiales || '?')}">…</span>`;
+          }
+          if (acc > 0) {
+            // En pause : afficher la durée accumulée figée
+            return `<span class="task-chrono-paused" title="Chrono en pause">${formatDureeLive(acc)}</span>`;
+          }
+          return '';
+        })()}</div>
         <div class="task-actions">
-          ${!done && !t.date_debut_execution && canAct ? `<button class="btn-action start" onclick="startTask('${t.id}')" title="Démarrer le chrono">▶</button>` : ''}
+          ${!done && canAct && !t.date_debut_execution && !(t.duree_accumulee_secondes > 0) ? `<button class="btn-action start" onclick="startTask('${t.id}')" title="Démarrer le chrono">▶</button>` : ''}
+          ${!done && canAct && t.date_debut_execution ? `<button class="btn-action pause" onclick="pauseTask('${t.id}')" title="Mettre en pause">⏸</button>` : ''}
+          ${!done && canAct && !t.date_debut_execution && (t.duree_accumulee_secondes > 0) ? `<button class="btn-action start" onclick="resumeTask('${t.id}')" title="Reprendre le chrono">▶</button>` : ''}
+          ${!done && canAct && (t.date_debut_execution || (t.duree_accumulee_secondes > 0)) ? `<button class="btn-action cancel-chrono" onclick="cancelChrono('${t.id}')" title="Annuler / RAZ chrono">✖</button>` : ''}
           ${!done && canAssign() ? `<button class="btn-action" onclick="showAssignModal('${t.id}')" title="Attribuer à quelqu'un">👤</button>` : ''}
           ${canAssign() ? `<button class="btn-action delete" onclick="confirmDelete('${t.id}')" title="Supprimer la tâche">✕</button>` : ''}
         </div>
@@ -1654,6 +1673,14 @@
     if (h > 0) return `${h}h${String(m).padStart(2,'0')}`;
     return `${m}min`;
   }
+  // Calcule la durée totale écoulée d'un chrono (accumulé + delta courant)
+  function elapsedSecondsFor(task) {
+    if (!task) return 0;
+    const acc = task.duree_accumulee_secondes || 0;
+    if (!task.date_debut_execution) return acc;
+    const start = new Date(task.date_debut_execution).getTime();
+    return acc + Math.max(0, Math.floor((Date.now() - start) / 1000));
+  }
   // Met à jour tous les chronos visibles
   function tickChronos() {
     const els = document.querySelectorAll('.task-chrono-live[data-start]');
@@ -1661,7 +1688,8 @@
     const now = Date.now();
     els.forEach(el => {
       const start = new Date(el.dataset.start).getTime();
-      el.textContent = formatDureeLive((now - start) / 1000);
+      const acc = parseInt(el.dataset.acc || '0', 10) || 0;
+      el.textContent = formatDureeLive(acc + (now - start) / 1000);
     });
   }
   let chronoTickerInterval = null;
@@ -1671,16 +1699,18 @@
   }
 
   // Construit le payload de validation d'une tâche, avec calcul de durée
-  // si un chrono était en cours.
+  // (accumulé + delta courant si chrono actif).
   function buildValidationPayload(task) {
     const payload = {
       fait_par_id: currentUser.id,
       fait_par_initiales: currentUser.initiales,
       date_validation: new Date().toISOString()
     };
-    if (task && task.date_debut_execution && task.duree_secondes == null) {
-      const start = new Date(task.date_debut_execution).getTime();
-      payload.duree_secondes = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    if (task && task.duree_secondes == null) {
+      const total = elapsedSecondsFor(task);
+      if (total > 0 || task.date_debut_execution || (task.duree_accumulee_secondes || 0) > 0) {
+        payload.duree_secondes = total;
+      }
     }
     return payload;
   }
@@ -1695,17 +1725,113 @@
       task.date_debut_execution = nowISO;
       task.debut_par_id = currentUser.id;
       task.debut_par_initiales = currentUser.initiales;
+      task.duree_accumulee_secondes = task.duree_accumulee_secondes || 0;
       renderFiltered();
       await DB.updateTask(id, {
         date_debut_execution: nowISO,
         debut_par_id: currentUser.id,
-        debut_par_initiales: currentUser.initiales
+        debut_par_initiales: currentUser.initiales,
+        duree_accumulee_secondes: task.duree_accumulee_secondes
       });
       showToast('Chrono démarré ⏱', 'success');
     } catch (e) {
       console.error(e);
       showToast('Erreur démarrage chrono', 'error');
-      // En cas d'échec, recharger l'état réel
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+    }
+  }
+
+  // Met en pause le chrono : on accumule le delta dans duree_accumulee_secondes
+  // et on remet date_debut_execution à NULL.
+  async function pauseTask(id) {
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task || task.fait_par_id || !task.date_debut_execution) return;
+      const total = elapsedSecondsFor(task);
+      task.duree_accumulee_secondes = total;
+      task.date_debut_execution = null;
+      renderFiltered();
+      await DB.updateTask(id, {
+        duree_accumulee_secondes: total,
+        date_debut_execution: null
+      });
+      showToast('Chrono en pause ⏸', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur pause chrono', 'error');
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+    }
+  }
+
+  // Reprend un chrono en pause : on garde duree_accumulee_secondes
+  // et on repositionne date_debut_execution = now.
+  async function resumeTask(id) {
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task || task.fait_par_id || task.date_debut_execution) return;
+      const nowISO = new Date().toISOString();
+      task.date_debut_execution = nowISO;
+      // Si la tâche n'avait pas de "démarreur" mémorisé, on prend celui qui reprend
+      if (!task.debut_par_id) {
+        task.debut_par_id = currentUser.id;
+        task.debut_par_initiales = currentUser.initiales;
+      }
+      renderFiltered();
+      const payload = { date_debut_execution: nowISO };
+      if (!task.debut_par_id || task.debut_par_id === currentUser.id) {
+        payload.debut_par_id = task.debut_par_id || currentUser.id;
+        payload.debut_par_initiales = task.debut_par_initiales || currentUser.initiales;
+      }
+      await DB.updateTask(id, payload);
+      showToast('Chrono repris ⏱', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur reprise chrono', 'error');
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+    }
+  }
+
+  // Annule complètement le chrono (RAZ).
+  // Confirmation uniquement si le chrono cumule >= 30 sec (sinon on suppose un clic d'erreur).
+  function cancelChrono(id) {
+    const task = tasks.find(t => t.id === id);
+    if (!task || task.fait_par_id) return;
+    const total = elapsedSecondsFor(task);
+    if (total >= 30) {
+      openModal('Annuler le chrono ?', `
+        <p>Le chrono affiche déjà <strong>${formatDureeLive(total)}</strong>.</p>
+        <p>Voulez-vous vraiment le remettre à zéro ?</p>
+      `, [
+        { label: 'Non, garder', action: 'closeModal()' },
+        { label: 'Oui, annuler', cls: 'danger', action: `closeModal(); doCancelChrono('${id}')` }
+      ]);
+    } else {
+      doCancelChrono(id);
+    }
+  }
+
+  async function doCancelChrono(id) {
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      task.date_debut_execution = null;
+      task.duree_accumulee_secondes = 0;
+      task.debut_par_id = null;
+      task.debut_par_initiales = null;
+      renderFiltered();
+      await DB.updateTask(id, {
+        date_debut_execution: null,
+        duree_accumulee_secondes: 0,
+        debut_par_id: null,
+        debut_par_initiales: null
+      });
+      showToast('Chrono annulé', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur annulation chrono', 'error');
       tasks = await DB.getTasks(filterDate);
       renderFiltered();
     }
@@ -1722,6 +1848,7 @@
           date_validation: null,
           duree_secondes: null,
           date_debut_execution: null,
+          duree_accumulee_secondes: 0,
           debut_par_id: null,
           debut_par_initiales: null
         });
