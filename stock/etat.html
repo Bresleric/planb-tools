@@ -144,8 +144,8 @@
 
   <main class="content">
     <div class="disclaimer">
-      <strong>📊 Vue cumulative des entrées</strong>
-      Cet écran agrège les étiquettes scannées et rattachées à un article du référentiel. C'est un <strong>cumul d'entrées</strong> — les sorties (consommation en cuisine) ne sont pas encore décomptées (à venir Phase C). Le stock affiché est donc un <em>maximum théorique</em> à la date du dernier scan.
+      <strong>📊 Stock courant après sorties</strong>
+      Quantités réelles disponibles : entrées (étiquettes scannées + rattachées) <strong>moins</strong> les sorties enregistrées via 📤 Sortir des matières. Les lots épuisés (stock = 0) sont masqués automatiquement.
     </div>
 
     <div class="stats-grid">
@@ -336,20 +336,47 @@
           .order('nom');
         State.allArticles = arts || [];
 
-        // Charge tous les scans rattachés (article_id NOT NULL) + l'article + le scan parent (etablissement, statut)
-        const { data, error } = await sb.from('scan_tracabilite')
-          .select(`
-            id, scan_id, article_id, produit, lot, dlc, ddm, poids_net_kg, fabricant, origine, categorie,
-            scans!inner(id, etablissement, statut, created_at, storage_path, mime_type, created_by_nom),
-            appro_ingredients!inner(id, nom, categorie, unite)
-          `)
-          .not('article_id', 'is', null)
-          .in('scans.statut', ['valide', 'en_attente_validation', 'extrait'])
-          .order('created_at', { ascending: false });
+        // Charge le stock courant via la vue stock_par_lot (entrées - sorties + ajustements)
+        // On ne garde que les lots avec quantité restante > 0 (= disponibles physiquement)
+        const { data: rawData, error } = await sb.from('stock_par_lot')
+          .select('*')
+          .gt('quantite_restante', 0)
+          .order('scan_at', { ascending: false });
         if (error) throw error;
 
-        // Stocker la liste brute pour la vue détail (avec article enrichi)
-        State.allScans = (data || []).map(t => ({
+        // Adapter au schéma utilisé par le reste du code (préserve compatibilité avec les fonctions existantes)
+        const data = (rawData || []).map(r => ({
+          id: r.scan_tracabilite_id,
+          scan_id: r.scan_id,
+          article_id: r.article_id,
+          produit: r.produit,
+          lot: r.lot,
+          dlc: r.dlc,
+          ddm: r.ddm,
+          poids_net_kg: r.quantite_restante,   // ⚡ qté RESTANTE (après sorties)
+          fabricant: r.fabricant,
+          origine: r.origine,
+          quantite_initiale: r.quantite_initiale,
+          qte_sortie: r.qte_sortie,
+          scans: {
+            id: r.scan_id,
+            etablissement: r.etablissement,
+            storage_path: r.storage_path,
+            mime_type: r.mime_type,
+            created_at: r.scan_at,
+            created_by_nom: r.scan_par,
+            statut: 'valide',
+          },
+          appro_ingredients: {
+            id: r.article_id,
+            nom: r.article_nom,
+            categorie: r.article_categorie,
+            unite: r.article_unite,
+          },
+        }));
+
+        // Stocker la liste pour la vue détail (avec article enrichi)
+        State.allScans = data.map(t => ({
           ...t,
           article_nom: t.appro_ingredients?.nom || '?',
           article_categorie: t.appro_ingredients?.categorie || null,
