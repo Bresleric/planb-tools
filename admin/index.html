@@ -1122,7 +1122,6 @@
             document.getElementById('user-code').value = '';
             document.getElementById('user-role').value = 'collaborateur';
             document.getElementById('user-equipe').value = 'autre';
-            document.getElementById('user-equipe').value = user.equipe || 'autre';
             document.getElementById('user-etablissement').value = 'freddy';
             document.getElementById('acces-freddy').checked = true;
             document.getElementById('acces-liesel').checked = false;
@@ -1136,6 +1135,7 @@
             document.getElementById('user-initiales').value = user.initiales;
             document.getElementById('user-code').value = user.code;
             document.getElementById('user-role').value = user.role;
+            document.getElementById('user-equipe').value = user.equipe || 'autre';
             document.getElementById('user-etablissement').value = user.etablissement;
 
             const etabs = (user.acces_etablissements && user.acces_etablissements.length > 0)
