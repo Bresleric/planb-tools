@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Rattachement fiches techniques — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669; --primary-dark: #047857; --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+
+    .content { flex:1; padding:16px; max-width:1100px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+
+    /* Stats top */
+    .stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px; }
+    .stat-box { padding:12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .stat-box .sv { font-size:22px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .stat-box .sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    .stat-box.warn { background:var(--orange-100); border-color:var(--orange-100); }
+    .stat-box.warn .sv { color:var(--orange-700); }
+    .stat-box.ok { background:var(--green-100); border-color:var(--green-100); }
+    .stat-box.ok .sv { color:var(--green-700); }
+    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(2, 1fr); } }
+
+    /* Filtres */
+    .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .search-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); flex:1; min-width:180px; }
+
+    /* Fiche card */
+    .fiche-card { background:white; border:1px solid var(--gray-200); border-radius:var(--radius); margin-bottom:10px; overflow:hidden; }
+    .fiche-card.complete { border-color:var(--green-700); background:var(--green-100); }
+    .fiche-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer; gap:12px; }
+    .fiche-header:hover { background:var(--gray-50); }
+    .fiche-header .fh-info { flex:1; min-width:0; }
+    .fiche-header .fh-nom { font-size:16px; font-weight:700; color:var(--gray-900); }
+    .fiche-header .fh-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .fiche-header .fh-progress { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-700); white-space:nowrap; }
+    .progress-bar { width:80px; height:8px; background:var(--gray-200); border-radius:999px; overflow:hidden; }
+    .progress-bar .pb-fill { height:100%; background:var(--primary); transition:width .3s; }
+    .progress-bar .pb-fill.complete { background:var(--green-700); }
+    .fiche-toggle { font-size:18px; color:var(--gray-400); transition:transform .2s; flex-shrink:0; }
+    .fiche-card.expanded .fiche-toggle { transform:rotate(90deg); }
+    .fiche-body { display:none; border-top:1px solid var(--gray-200); padding:12px 16px; background:var(--gray-50); }
+    .fiche-card.expanded .fiche-body { display:block; }
+
+    /* Ingrédient row */
+    .ing-row { display:grid; grid-template-columns:minmax(0,1.2fr) 100px minmax(0,1.5fr) 90px; gap:8px; padding:8px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; }
+    .ing-row.matched { background:var(--green-100); border-color:var(--green-100); }
+    .ing-row.unmatched { background:var(--orange-100); border-color:var(--orange-100); }
+    .ing-row .ir-nom { font-size:13px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ing-row .ir-qty { font-size:12px; color:var(--gray-600); text-align:right; }
+    .ing-row .ir-search { position:relative; }
+    .ing-row .ir-search input { width:100%; padding:6px 10px; font-size:13px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .ing-row .ir-search input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light); }
+    .ing-row .ir-search input.matched { background:var(--green-100); border-color:var(--green-700); color:var(--green-700); font-weight:600; }
+    .ing-row .ir-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:2px; }
+    .ing-row .ir-results.visible { display:block; }
+    .ing-row .ir-result { padding:8px 10px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--gray-100); }
+    .ing-row .ir-result:hover, .ing-row .ir-result.active { background:var(--primary-light); }
+    .ing-row .ir-result .ir-cat { font-size:10px; color:var(--gray-500); }
+    .ing-row .ir-result.suggestion { background:var(--blue-100); }
+    .ing-row .ir-actions { display:flex; gap:4px; justify-content:flex-end; }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:6px 10px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    .btn:active { transform:scale(.97); }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-icon { padding:4px 8px; }
+
+    /* Modal création article */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; padding:16px; overflow-y:auto; align-items:flex-start; justify-content:center; }
+    .modal-bg.visible { display:flex; }
+    .modal { background:white; border-radius:var(--radius); max-width:480px; width:100%; padding:20px; }
+    .modal-title { font-size:17px; font-weight:700; margin-bottom:14px; }
+    .modal-field { margin-bottom:12px; }
+    .modal-field label { display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+    .modal-field input, .modal-field select { width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; }
+    .modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); }
+
+    @media (max-width:680px) {
+      .ing-row { grid-template-columns:1fr; gap:4px; padding:10px; }
+      .ing-row .ir-actions { justify-content:flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Fiches techniques → articles</span>
+    </div>
+    <div class="header-right">
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="stats-grid">
+      <div class="stat-box"><div class="sv" id="stat-fiches">—</div><div class="sl">Fiches</div></div>
+      <div class="stat-box"><div class="sv" id="stat-ingredients">—</div><div class="sl">Ingrédients</div></div>
+      <div class="stat-box ok"><div class="sv" id="stat-rattaches">—</div><div class="sl">Rattachés</div></div>
+      <div class="stat-box warn"><div class="sv" id="stat-restants">—</div><div class="sl">À rattacher</div></div>
+    </div>
+
+    <div class="card">
+      <div class="filters">
+        <input type="text" class="search-input" id="search" placeholder="Rechercher une fiche ou un ingrédient…">
+        <span class="filter-chip active" data-filter="all">Toutes</span>
+        <span class="filter-chip" data-filter="incomplete">À compléter</span>
+        <span class="filter-chip" data-filter="complete">Complètes</span>
+      </div>
+    </div>
+
+    <div id="fiches-list">
+      <div class="empty-state">Chargement…</div>
+    </div>
+  </main>
+
+  <!-- Modal création article -->
+  <div class="modal-bg" id="modal-create">
+    <div class="modal">
+      <div class="modal-title">Créer un nouvel article</div>
+      <div style="font-size:12px; color:var(--gray-500); margin-bottom:12px;">
+        Ajout au référentiel <code>appro_ingredients</code>. Sera réutilisable pour tous les futurs scans et fiches.
+      </div>
+      <div class="modal-field">
+        <label>Nom</label>
+        <input type="text" id="create-nom">
+      </div>
+      <div class="modal-field">
+        <label>Catégorie</label>
+        <select id="create-categorie"></select>
+      </div>
+      <div class="modal-field">
+        <label>Unité</label>
+        <select id="create-unite">
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="L">L</option>
+          <option value="cL">cL</option>
+          <option value="pce">pièce</option>
+          <option value="Bouteille">Bouteille</option>
+          <option value="Carton">Carton</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="create-confirm">Créer + rattacher</button>
+        <button class="btn btn-ghost" id="create-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    const State = {
+      fiches: [],          // [{ id, nom, categorie, ingredients: [...] }]
+      articles: [],        // appro_ingredients actifs
+      categories: [],
+      filter: 'all',
+      search: '',
+      pendingRow: null,    // ingredient en cours de création
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') { const t = $('toast'); t.textContent = msg; t.className = 'toast visible'+(kind?' '+kind:''); setTimeout(() => t.className = 'toast', 3500); }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function nomRecherche(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); }
+
+    // ==== CHARGEMENT ====
+    async function loadAll() {
+      try {
+        // 1. Articles actifs
+        const { data: arts, error: e1 } = await sb.from('appro_ingredients')
+          .select('id, nom, categorie, unite, actif')
+          .eq('actif', true)
+          .order('nom');
+        if (e1) throw e1;
+        State.articles = arts || [];
+        State.categories = [...new Set(State.articles.map(a => a.categorie).filter(Boolean))].sort();
+        renderEditCategoriesSelect($('create-categorie'));
+
+        // 2. Fiches techniques + ingrédients
+        const { data: fiches, error: e2 } = await sb.from('fiches_techniques')
+          .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite, actif')
+          .eq('actif', true)
+          .order('nom');
+        if (e2) throw e2;
+        const ficheIds = (fiches || []).map(f => f.id);
+        const { data: ingredients, error: e3 } = await sb.from('fiche_ingredients')
+          .select('id, fiche_id, nom, quantite, unite, article_id, ordre')
+          .in('fiche_id', ficheIds)
+          .order('ordre');
+        if (e3) throw e3;
+
+        // Grouper ingrédients par fiche
+        const byFiche = {};
+        (ingredients || []).forEach(i => {
+          if (!byFiche[i.fiche_id]) byFiche[i.fiche_id] = [];
+          byFiche[i.fiche_id].push(i);
+        });
+        State.fiches = (fiches || []).map(f => ({
+          ...f,
+          ingredients: byFiche[f.id] || [],
+        }));
+
+        // Stats
+        const totalIngs = (ingredients || []).length;
+        const ratIngs = (ingredients || []).filter(i => i.article_id).length;
+        $('stat-fiches').textContent = State.fiches.length;
+        $('stat-ingredients').textContent = totalIngs;
+        $('stat-rattaches').textContent = ratIngs;
+        $('stat-restants').textContent = totalIngs - ratIngs;
+
+        renderList();
+      } catch (err) {
+        console.error(err);
+        $('fiches-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      }
+    }
+
+    function renderEditCategoriesSelect(sel) {
+      sel.innerHTML = State.categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    }
+
+    function applyFilter() {
+      const q = State.search.toLowerCase().trim();
+      return State.fiches.filter(f => {
+        const total = f.ingredients.length;
+        const matched = f.ingredients.filter(i => i.article_id).length;
+        const isComplete = total > 0 && matched === total;
+        if (State.filter === 'complete' && !isComplete) return false;
+        if (State.filter === 'incomplete' && isComplete) return false;
+        if (q) {
+          const inFiche = f.nom.toLowerCase().includes(q) || (f.categorie || '').toLowerCase().includes(q);
+          const inIng = f.ingredients.some(i => (i.nom || '').toLowerCase().includes(q));
+          if (!inFiche && !inIng) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderList() {
+      const list = applyFilter();
+      const c = $('fiches-list');
+      if (!list.length) {
+        c.innerHTML = '<div class="empty-state">Aucune fiche ne correspond.</div>';
+        return;
+      }
+      c.innerHTML = '';
+      // Trier : incomplètes en haut, puis par nom
+      list.sort((a, b) => {
+        const aDone = a.ingredients.length > 0 && a.ingredients.every(i => i.article_id);
+        const bDone = b.ingredients.length > 0 && b.ingredients.every(i => i.article_id);
+        if (aDone !== bDone) return aDone ? 1 : -1;
+        return a.nom.localeCompare(b.nom, 'fr');
+      });
+      list.forEach(f => c.appendChild(renderFiche(f)));
+    }
+
+    function renderFiche(f) {
+      const total = f.ingredients.length;
+      const matched = f.ingredients.filter(i => i.article_id).length;
+      const isComplete = total > 0 && matched === total;
+      const card = document.createElement('div');
+      card.className = 'fiche-card' + (isComplete ? ' complete' : '');
+      card.dataset.fiche = f.id;
+
+      const pct = total > 0 ? Math.round(matched/total*100) : 0;
+
+      card.innerHTML = `
+        <div class="fiche-header">
+          <div class="fh-info">
+            <div class="fh-nom">${isComplete ? '✓ ' : ''}${escapeHtml(f.nom)}</div>
+            <div class="fh-meta">
+              ${escapeHtml(f.categorie || 'sans cat.')}${f.sous_categorie ? ' · ' + escapeHtml(f.sous_categorie) : ''} ·
+              ${f.rendement_quantite || '?'} ${escapeHtml(f.rendement_unite || '')} ·
+              ${total} ingrédient${total>1?'s':''}
+            </div>
+          </div>
+          <div class="fh-progress">
+            <span>${matched}/${total}</span>
+            <div class="progress-bar"><div class="pb-fill ${isComplete ? 'complete' : ''}" style="width:${pct}%"></div></div>
+            <span class="fiche-toggle">›</span>
+          </div>
+        </div>
+        <div class="fiche-body">
+          <div class="ing-list" data-fiche="${f.id}">
+            ${total ? '' : '<div class="empty-state">Aucun ingrédient saisi pour cette fiche.</div>'}
+          </div>
+        </div>
+      `;
+      // Toggle
+      card.querySelector('.fiche-header').addEventListener('click', () => {
+        card.classList.toggle('expanded');
+        if (card.classList.contains('expanded') && total > 0) {
+          renderIngredients(f, card.querySelector('.ing-list'));
+        }
+      });
+      return card;
+    }
+
+    function renderIngredients(f, container) {
+      container.innerHTML = '';
+      f.ingredients.forEach(i => container.appendChild(renderIngredient(f, i)));
+    }
+
+    function renderIngredient(f, ing) {
+      const matched = !!ing.article_id;
+      const article = matched ? State.articles.find(a => a.id === ing.article_id) : null;
+      const div = document.createElement('div');
+      div.className = 'ing-row ' + (matched ? 'matched' : 'unmatched');
+      div.dataset.ingId = ing.id;
+      const qtyTxt = (ing.quantite != null ? ing.quantite : '?') + ' ' + (ing.unite || '');
+      div.innerHTML = `
+        <div class="ir-nom" title="${escapeHtml(ing.nom)}">${escapeHtml(ing.nom)}</div>
+        <div class="ir-qty">${escapeHtml(qtyTxt)}</div>
+        <div class="ir-search">
+          <input type="text" placeholder="Rechercher un article…" value="${escapeHtml(article ? article.nom : '')}" class="${matched ? 'matched' : ''}">
+          <div class="ir-results"></div>
+        </div>
+        <div class="ir-actions">
+          ${matched ? `<button class="btn btn-ghost btn-icon" data-action="unlink">✕</button>` : `<button class="btn btn-secondary btn-icon" data-action="create">+ Nouveau</button>`}
+        </div>
+      `;
+      const input = div.querySelector('input');
+      const results = div.querySelector('.ir-results');
+      input.addEventListener('input', () => {
+        const q = input.value.toLowerCase().trim();
+        renderAcResults(ing, f, q, results, input);
+      });
+      input.addEventListener('focus', () => {
+        renderAcResults(ing, f, input.value.toLowerCase().trim(), results, input);
+      });
+      input.addEventListener('blur', () => setTimeout(() => results.classList.remove('visible'), 200));
+      const actionBtn = div.querySelector('[data-action]');
+      if (actionBtn) {
+        actionBtn.addEventListener('click', () => {
+          const action = actionBtn.dataset.action;
+          if (action === 'unlink') unlinkIngredient(f, ing, div);
+          else if (action === 'create') openCreateModal(f, ing, div);
+        });
+      }
+      return div;
+    }
+
+    function renderAcResults(ing, fiche, q, container, input) {
+      const articlesScored = State.articles
+        .map(a => ({ a, score: scoreMatch(ing.nom, a.nom, ing.unite, a.unite) }))
+        .sort((x, y) => y.score - x.score);
+
+      let candidates;
+      if (q) {
+        candidates = State.articles
+          .filter(a => a.nom.toLowerCase().includes(q) || (a.categorie || '').toLowerCase().includes(q))
+          .slice(0, 12);
+      } else {
+        candidates = articlesScored.slice(0, 5).map(x => x.a);
+      }
+
+      if (!candidates.length) {
+        container.innerHTML = '<div class="ir-result" style="color:var(--gray-500); font-style:italic;">Aucun résultat. Crée un nouvel article →</div>';
+      } else {
+        container.innerHTML = candidates.map((a, idx) => {
+          const isSugg = !q && idx < 3;
+          return `
+            <div class="ir-result ${isSugg ? 'suggestion' : ''}" data-aid="${a.id}">
+              <div>${isSugg ? '✨ ' : ''}${escapeHtml(a.nom)}</div>
+              <div class="ir-cat">${escapeHtml(a.categorie || '')} · ${escapeHtml(a.unite || '')}</div>
+            </div>
+          `;
+        }).join('');
+        container.querySelectorAll('.ir-result[data-aid]').forEach(el => {
+          el.addEventListener('click', () => {
+            const a = State.articles.find(x => x.id === el.dataset.aid);
+            if (a) linkIngredient(fiche, ing, a, input.closest('.ing-row'));
+          });
+        });
+      }
+      container.classList.add('visible');
+    }
+
+    function scoreMatch(ingNom, articleNom, ingUnite, articleUnite) {
+      const p = (ingNom || '').toLowerCase();
+      const a = (articleNom || '').toLowerCase();
+      if (!p || !a) return 0;
+      const pWords = new Set(p.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      const aWords = new Set(a.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      let common = 0;
+      pWords.forEach(w => { if (aWords.has(w)) common++; });
+      let score = pWords.size > 0 ? common / pWords.size : 0;
+      // Bonus si même unité
+      if (ingUnite && articleUnite && ingUnite.toLowerCase() === articleUnite.toLowerCase()) score += 0.15;
+      return score;
+    }
+
+    // ==== ACTIONS ====
+    async function linkIngredient(fiche, ing, article, rowEl) {
+      try {
+        const { error } = await sb.from('fiche_ingredients')
+          .update({ article_id: article.id })
+          .eq('id', ing.id);
+        if (error) throw error;
+        ing.article_id = article.id;
+        showToast(`✓ "${ing.nom}" → ${article.nom}`, 'success');
+        // Mettre à jour la ligne UI
+        const newRow = renderIngredient(fiche, ing);
+        rowEl.replaceWith(newRow);
+        // Mettre à jour l'en-tête de la fiche (progress)
+        refreshFicheHeader(fiche);
+        // Mettre à jour les stats globales
+        updateGlobalStats();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    async function unlinkIngredient(fiche, ing, rowEl) {
+      try {
+        const { error } = await sb.from('fiche_ingredients')
+          .update({ article_id: null })
+          .eq('id', ing.id);
+        if (error) throw error;
+        ing.article_id = null;
+        showToast(`Lien retiré : "${ing.nom}"`);
+        const newRow = renderIngredient(fiche, ing);
+        rowEl.replaceWith(newRow);
+        refreshFicheHeader(fiche);
+        updateGlobalStats();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    function refreshFicheHeader(fiche) {
+      const total = fiche.ingredients.length;
+      const matched = fiche.ingredients.filter(i => i.article_id).length;
+      const isComplete = total > 0 && matched === total;
+      const pct = total > 0 ? Math.round(matched/total*100) : 0;
+      const card = document.querySelector(`.fiche-card[data-fiche="${fiche.id}"]`);
+      if (!card) return;
+      card.classList.toggle('complete', isComplete);
+      const nomEl = card.querySelector('.fh-nom');
+      nomEl.textContent = (isComplete ? '✓ ' : '') + fiche.nom;
+      const counterEl = card.querySelector('.fh-progress span:first-child');
+      counterEl.textContent = `${matched}/${total}`;
+      const fillEl = card.querySelector('.pb-fill');
+      fillEl.style.width = pct + '%';
+      fillEl.classList.toggle('complete', isComplete);
+    }
+
+    function updateGlobalStats() {
+      let totalIngs = 0, ratIngs = 0;
+      State.fiches.forEach(f => {
+        totalIngs += f.ingredients.length;
+        ratIngs += f.ingredients.filter(i => i.article_id).length;
+      });
+      $('stat-ingredients').textContent = totalIngs;
+      $('stat-rattaches').textContent = ratIngs;
+      $('stat-restants').textContent = totalIngs - ratIngs;
+    }
+
+    // ==== CRÉATION ARTICLE ====
+    function openCreateModal(fiche, ing, rowEl) {
+      State.pendingRow = { fiche, ing, rowEl };
+      $('create-nom').value = ing.nom || '';
+      // Catégorie : essayer de deviner via fiche.categorie
+      $('create-categorie').value = State.categories[0] || 'Alimentaire';
+      // Unité par défaut = celle de l'ingrédient s'elle existe parmi les options
+      const u = (ing.unite || 'kg').toLowerCase();
+      const options = ['kg','g','L','cL','pce','Bouteille','Carton'];
+      const match = options.find(o => o.toLowerCase() === u);
+      $('create-unite').value = match || 'kg';
+      $('modal-create').classList.add('visible');
+    }
+    $('create-cancel').addEventListener('click', () => { $('modal-create').classList.remove('visible'); State.pendingRow = null; });
+    $('create-confirm').addEventListener('click', async () => {
+      const nom = $('create-nom').value.trim();
+      const categorie = $('create-categorie').value;
+      const unite = $('create-unite').value;
+      if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+      try {
+        const { data, error } = await sb.from('appro_ingredients')
+          .insert({ nom, nom_recherche: nomRecherche(nom), categorie, unite, actif: true })
+          .select('id, nom, categorie, unite')
+          .single();
+        if (error) throw error;
+        State.articles.push(data);
+        State.articles.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+        showToast(`✓ Article "${nom}" créé`, 'success');
+        if (State.pendingRow) {
+          await linkIngredient(State.pendingRow.fiche, State.pendingRow.ing, data, State.pendingRow.rowEl);
+        }
+        $('modal-create').classList.remove('visible');
+        State.pendingRow = null;
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur création : ' + err.message, 'error');
+      }
+    });
+
+    // ==== FILTRES + SEARCH ====
+    document.querySelectorAll('[data-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filter = chip.dataset.filter;
+        renderList();
+      });
+    });
+    $('search').addEventListener('input', e => { State.search = e.target.value; renderList(); });
+
+    // INIT
+    loadAll();
+  </script>
+</body>
+</html>
