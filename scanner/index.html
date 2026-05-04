@@ -743,10 +743,8 @@
             statut: 'bl_scanne',
           }).eq('id', State.currentSessionId);
           $('bl-status').innerHTML = '<span class="badge badge-cours">⏳ BL en cours d\'analyse…</span>';
-        } else {
-          // Étiquette : incrémenter le compteur en fire-and-forget
-          await sb.rpc('increment_session_etiquettes', { session_id: State.currentSessionId }).catch(() => {});
         }
+        // Note : on ne maintient pas nb_etiquettes en BDD (calculé à la volée par refreshSessionList)
 
         // Lancer extract-document en fire-and-forget
         callExtract(scanId).catch(err => {
