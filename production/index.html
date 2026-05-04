@@ -246,6 +246,37 @@
     .ingredient-row .ing-unite { width: 60px; }
     .ingredient-row .ing-prix { width: 70px; text-align: right; }
     .ingredient-row .ing-total { width: 65px; text-align: right; font-weight: 600; font-size: 0.8rem; color: var(--gray-600); }
+    .ingredient-row.no-article { background: #fff5e6; border-left: 3px solid #f59e0b; padding-left: 8px; }
+    .ingredient-row.has-article { background: #ecfdf5; border-left: 3px solid #10b981; padding-left: 8px; flex-wrap: wrap; }
+    .ing-article-info { width: 100%; font-size: 11px; color: #047857; padding: 2px 4px 0 4px; font-weight: 600; }
+    .btn-link-art { width: 32px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--gray-300); background: white; cursor: pointer; font-size: 13px; flex-shrink: 0; padding: 0; }
+    .btn-link-art:hover { background: var(--gray-100); }
+    .ingredient-row.has-article .btn-link-art { background: #d1fae5; border-color: #10b981; }
+    .ingredient-row.no-article .btn-link-art { background: #fef3c7; border-color: #f59e0b; }
+
+    /* Modal article picker */
+    .ap-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; padding:16px; overflow-y:auto; }
+    .ap-modal-bg.visible { display:flex; align-items:flex-start; justify-content:center; }
+    .ap-modal { background:white; border-radius:12px; max-width:540px; width:100%; padding:18px; }
+    .ap-modal h3 { font-size:16px; font-weight:700; margin-bottom:6px; }
+    .ap-modal .ap-sub { font-size:12px; color:#6b7280; margin-bottom:12px; }
+    .ap-search { width:100%; padding:10px 12px; font-size:14px; border:1px solid #d1d5db; border-radius:6px; }
+    .ap-results { margin-top:8px; max-height:280px; overflow-y:auto; border:1px solid #e5e7eb; border-radius:6px; }
+    .ap-result { padding:9px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid #f3f4f6; }
+    .ap-result:hover { background:#d1fae5; }
+    .ap-result:last-child { border-bottom:none; }
+    .ap-result .ap-meta { font-size:11px; color:#6b7280; }
+    .ap-result.suggestion { background:#dbeafe; }
+    .ap-section { margin-top:14px; padding-top:14px; border-top:1px solid #e5e7eb; }
+    .ap-section-label { font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px; }
+    .ap-create { display:grid; grid-template-columns:1fr 100px; gap:6px; margin-bottom:6px; }
+    .ap-create input, .ap-create select { padding:8px 10px; font-size:13px; border:1px solid #d1d5db; border-radius:6px; }
+    .ap-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:14px; }
+    .ap-btn { padding:9px 12px; font-size:13px; font-weight:600; border-radius:6px; border:none; cursor:pointer; font-family:inherit; }
+    .ap-btn-primary { background:#10b981; color:white; }
+    .ap-btn-warn { background:white; color:#b45309; border:1px solid #f59e0b; }
+    .ap-btn-ghost { background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; }
+
     .btn-remove-ing {
       width: 24px; height: 24px; border-radius: 50%; border: none;
       background: var(--red-bg); color: var(--red); cursor: pointer;
@@ -668,6 +699,16 @@
           </div>
         </div>
 
+        <div class="form-group" style="background:#faf5ff; border:1px solid #c4b5fd; border-radius:8px; padding:10px;">
+          <label style="color:#5b21b6;">📦 Cette fiche produit l'article (semi-fini ou produit fini)</label>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <span id="f-article-display" style="flex:1; font-size:13px; padding:6px 10px; background:white; border:1px solid #d1d5db; border-radius:6px; color:#6b7280;">— Pas d'article rattaché —</span>
+            <button type="button" class="btn-add-ing" id="btn-link-fiche-article" style="margin-top:0; padding:6px 10px; font-size:12px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer;">🔗 Choisir / créer</button>
+          </div>
+          <input type="hidden" id="f-article-id" value="">
+          <div style="font-size:11px; color:#7c3aed; margin-top:6px;">Permet le suivi de stock du produit fait maison (fonds de tarte, sauces, mirepoix…) et son utilisation comme ingrédient dans d'autres fiches.</div>
+        </div>
+
         <div class="form-group">
           <label>Ingrédients</label>
           <div class="ingredient-rows" id="ingredient-rows"></div>
@@ -706,6 +747,37 @@
   <!-- FAB BUTTONS -->
   <button class="fab-button" id="fab-fiches" onclick="switchTab('create')" title="Nouvelle fiche technique" style="display:none;">+</button>
   <button class="fab-button" id="fab-productions" onclick="openProductionModal()" style="display:none;">+</button>
+
+  <!-- ARTICLE PICKER MODAL -->
+  <div class="ap-modal-bg" id="article-picker">
+    <div class="ap-modal">
+      <h3 id="ap-title">Rattacher à un article</h3>
+      <div class="ap-sub" id="ap-sub">Choisis un article existant ou crée-en un nouveau.</div>
+      <input type="text" class="ap-search" id="ap-search" placeholder="Rechercher dans les articles…" autocomplete="off">
+      <div class="ap-results" id="ap-results"></div>
+      <div class="ap-section">
+        <div class="ap-section-label">+ Créer un nouvel article</div>
+        <div class="ap-create">
+          <input type="text" id="ap-new-nom" placeholder="Nom de l'article">
+          <select id="ap-new-unite">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="L">L</option>
+            <option value="cL">cL</option>
+            <option value="pce">pce</option>
+            <option value="Bouteille">Bouteille</option>
+            <option value="Carton">Carton</option>
+          </select>
+        </div>
+        <select id="ap-new-categorie" style="width:100%; padding:8px 10px; font-size:13px; border:1px solid #d1d5db; border-radius:6px;"></select>
+      </div>
+      <div class="ap-actions">
+        <button class="ap-btn ap-btn-primary" id="ap-create-btn">+ Créer + rattacher</button>
+        <button class="ap-btn ap-btn-warn" id="ap-clear-btn">✕ Pas de rattachement</button>
+        <button class="ap-btn ap-btn-ghost" id="ap-cancel-btn">Annuler</button>
+      </div>
+    </div>
+  </div>
 
   <!-- PRODUCTION MODAL (New Production) -->
   <div class="modal-overlay" id="production-modal" style="display:none;">
@@ -808,6 +880,7 @@ let allFiches = [];
 let allIngredients = {}; // ficheId → [ingredients]
 let allProductions = [];
 let allLots = [];
+let allArticlesAppro = []; // référentiel appro_ingredients pour rattachement
 let currentFilter = 'all';
 let searchTerm = '';
 let editingFicheId = null;
@@ -867,6 +940,7 @@ function init() {
   setupProductionsFilters();
   setupAllergens();
   setupIngredientForm();
+  loadArticlesAppro();
   loadFiches();
   loadProductions();
 
@@ -975,6 +1049,201 @@ function setupIngredientForm() {
   document.getElementById('btn-add-ingredient').addEventListener('click', () => {
     addIngredientRow();
   });
+  // Bouton zone "Cette fiche produit l'article"
+  document.getElementById('btn-link-fiche-article').addEventListener('click', () => {
+    openArticlePicker('FICHE');
+  });
+  // Modal article picker — wire-up
+  document.getElementById('ap-search').addEventListener('input', renderArticlePickerResults);
+  document.getElementById('ap-cancel-btn').addEventListener('click', closeArticlePicker);
+  document.getElementById('ap-clear-btn').addEventListener('click', () => applyArticleSelection(null));
+  document.getElementById('ap-create-btn').addEventListener('click', createAndApplyArticle);
+  document.getElementById('article-picker').addEventListener('click', (e) => {
+    if (e.target.id === 'article-picker') closeArticlePicker();
+  });
+}
+
+// ============= APPRO_INGREDIENTS LOAD =============
+async function loadArticlesAppro() {
+  try {
+    const { data, error } = await sb.from('appro_ingredients')
+      .select('id, nom, categorie, unite, actif')
+      .eq('actif', true)
+      .order('nom');
+    if (error) throw error;
+    allArticlesAppro = data || [];
+    // Pré-remplir le select catégorie du modal de création
+    const cats = [...new Set(allArticlesAppro.map(a => a.categorie).filter(Boolean))].sort();
+    const sel = document.getElementById('ap-new-categorie');
+    sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('') +
+                    `<option value="__new__">+ Nouvelle catégorie…</option>`;
+  } catch (e) {
+    console.error('loadArticlesAppro:', e);
+  }
+}
+
+// ============= ARTICLE PICKER (ingrédient ou fiche) =============
+let articlePickerContext = null; // { kind: 'INGREDIENT', rowId } | { kind: 'FICHE' }
+
+function openArticlePicker(rowIdOrFiche) {
+  if (rowIdOrFiche === 'FICHE') {
+    articlePickerContext = { kind: 'FICHE' };
+    document.getElementById('ap-title').textContent = "Article produit par cette fiche";
+    document.getElementById('ap-sub').textContent = "Quel article du référentiel cette fiche fabrique-t-elle ?";
+    const ficheNom = document.getElementById('f-nom').value || '';
+    document.getElementById('ap-new-nom').value = ficheNom;
+    document.getElementById('ap-new-unite').value = mapUnit(document.getElementById('f-rendement-unite').value);
+  } else {
+    articlePickerContext = { kind: 'INGREDIENT', rowId: rowIdOrFiche };
+    const row = document.querySelector(`.ingredient-row[data-id="${rowIdOrFiche}"]`);
+    const ingNom = row?.querySelector('.ing-nom')?.value || '';
+    const ingUnite = row?.querySelector('.ing-unite')?.value || 'kg';
+    document.getElementById('ap-title').textContent = `Rattacher : ${ingNom || '(ingrédient)'}`;
+    document.getElementById('ap-sub').textContent = "Quel article du référentiel correspond à cet ingrédient ?";
+    document.getElementById('ap-new-nom').value = ingNom;
+    document.getElementById('ap-new-unite').value = mapUnit(ingUnite);
+  }
+  document.getElementById('ap-search').value = '';
+  renderArticlePickerResults();
+  document.getElementById('article-picker').classList.add('visible');
+  setTimeout(() => document.getElementById('ap-search').focus(), 50);
+}
+
+function closeArticlePicker() {
+  document.getElementById('article-picker').classList.remove('visible');
+  articlePickerContext = null;
+}
+
+function mapUnit(u) {
+  // Normalise les unités du module Production vers celles d'appro_ingredients
+  const map = { 'l': 'L', 'cl': 'cL', 'ml': 'cL', 'pièce': 'pce', 'pieces': 'pce', 'pces': 'pce', 'portions': 'pce' };
+  return map[u?.toLowerCase()] || u || 'kg';
+}
+
+function renderArticlePickerResults() {
+  const q = document.getElementById('ap-search').value.toLowerCase().trim();
+  const ctx = articlePickerContext;
+  if (!ctx) return;
+  // Référence pour les suggestions automatiques : nom de l'ingrédient ou de la fiche
+  let refNom = '';
+  if (ctx.kind === 'INGREDIENT') {
+    const row = document.querySelector(`.ingredient-row[data-id="${ctx.rowId}"]`);
+    refNom = row?.querySelector('.ing-nom')?.value || '';
+  } else {
+    refNom = document.getElementById('f-nom').value || '';
+  }
+  let candidates;
+  if (q) {
+    candidates = allArticlesAppro
+      .filter(a => a.nom.toLowerCase().includes(q) || (a.categorie || '').toLowerCase().includes(q))
+      .slice(0, 15);
+  } else {
+    // Suggestions auto par fuzzy match
+    candidates = allArticlesAppro
+      .map(a => ({ a, score: scoreFuzzyMatch(refNom, a.nom) }))
+      .sort((x, y) => y.score - x.score)
+      .slice(0, 6)
+      .map(x => x.a);
+  }
+  const res = document.getElementById('ap-results');
+  if (!candidates.length) {
+    res.innerHTML = `<div style="padding:12px; font-size:13px; color:#6b7280; text-align:center;">Aucun résultat. Crée un nouvel article ↓</div>`;
+  } else {
+    res.innerHTML = candidates.map((a, idx) => {
+      const isSugg = !q && idx < 3;
+      return `<div class="ap-result ${isSugg ? 'suggestion' : ''}" data-aid="${a.id}">
+        <div>${isSugg ? '✨ ' : ''}${escapeHtmlProd(a.nom)}</div>
+        <div class="ap-meta">${escapeHtmlProd(a.categorie || '')} · ${escapeHtmlProd(a.unite || '')}</div>
+      </div>`;
+    }).join('');
+    res.querySelectorAll('[data-aid]').forEach(el => {
+      el.addEventListener('click', () => {
+        const a = allArticlesAppro.find(x => x.id === el.dataset.aid);
+        if (a) applyArticleSelection(a);
+      });
+    });
+  }
+}
+
+function scoreFuzzyMatch(a, b) {
+  if (!a || !b) return 0;
+  const aw = new Set(a.toLowerCase().split(/[\s,/-]+/).filter(w => w.length >= 3));
+  const bw = new Set(b.toLowerCase().split(/[\s,/-]+/).filter(w => w.length >= 3));
+  let common = 0;
+  aw.forEach(w => { if (bw.has(w)) common++; });
+  return aw.size > 0 ? common / aw.size : 0;
+}
+
+function escapeHtmlProd(s) {
+  return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function applyArticleSelection(article) {
+  const ctx = articlePickerContext;
+  if (!ctx) return;
+  if (ctx.kind === 'INGREDIENT') {
+    const row = document.querySelector(`.ingredient-row[data-id="${ctx.rowId}"]`);
+    if (!row) { closeArticlePicker(); return; }
+    row.dataset.articleId = article ? article.id : '';
+    row.classList.toggle('has-article', !!article);
+    row.classList.toggle('no-article', !article);
+    // Mise à jour bouton + label
+    const btn = row.querySelector('.btn-link-art');
+    btn.textContent = article ? '🔗' : '🔗?';
+    btn.title = article ? `Article : ${article.nom}` : 'Pas d\'article rattaché';
+    // Info ligne
+    const oldInfo = row.querySelector('.ing-article-info');
+    if (oldInfo) oldInfo.remove();
+    if (article) {
+      const info = document.createElement('div');
+      info.className = 'ing-article-info';
+      info.textContent = `→ ${article.nom}`;
+      row.appendChild(info);
+    }
+  } else if (ctx.kind === 'FICHE') {
+    document.getElementById('f-article-id').value = article ? article.id : '';
+    const display = document.getElementById('f-article-display');
+    if (article) {
+      display.textContent = `${article.nom} (${article.categorie || '?'} · ${article.unite || '?'})`;
+      display.style.color = '#047857';
+      display.style.fontWeight = '600';
+      display.style.background = '#d1fae5';
+      display.style.borderColor = '#10b981';
+    } else {
+      display.textContent = "— Pas d'article rattaché —";
+      display.style.color = '#6b7280';
+      display.style.fontWeight = 'normal';
+      display.style.background = 'white';
+      display.style.borderColor = '#d1d5db';
+    }
+  }
+  closeArticlePicker();
+}
+
+async function createAndApplyArticle() {
+  const nom = document.getElementById('ap-new-nom').value.trim();
+  let categorie = document.getElementById('ap-new-categorie').value;
+  if (categorie === '__new__') {
+    categorie = prompt('Nouvelle catégorie :');
+    if (!categorie) return;
+  }
+  const unite = document.getElementById('ap-new-unite').value;
+  if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+  try {
+    const nomRecherche = nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    const { data, error } = await sb.from('appro_ingredients')
+      .insert({ nom, nom_recherche: nomRecherche, categorie, unite, actif: true })
+      .select('id, nom, categorie, unite')
+      .single();
+    if (error) throw error;
+    allArticlesAppro.push(data);
+    allArticlesAppro.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+    showToast(`✓ Article "${nom}" créé`, 'success');
+    applyArticleSelection(data);
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur création : ' + e.message, 'error');
+  }
 }
 
 function addIngredientRow(data = {}) {
@@ -982,9 +1251,14 @@ function addIngredientRow(data = {}) {
   const id = ingredientCounter;
   const container = document.getElementById('ingredient-rows');
 
+  const linkedArticle = data.article_id ? allArticlesAppro.find(a => a.id === data.article_id) : null;
+  const linkBtnLabel = linkedArticle ? '🔗' : '🔗?';
+  const linkBtnTitle = linkedArticle ? `Article : ${linkedArticle.nom}` : 'Pas d\'article rattaché — cliquer pour relier';
+
   const row = document.createElement('div');
-  row.className = 'ingredient-row';
+  row.className = 'ingredient-row' + (linkedArticle ? ' has-article' : ' no-article');
   row.dataset.id = id;
+  row.dataset.articleId = data.article_id || '';
   row.innerHTML = `
     <input type="text" class="ing-nom" placeholder="Ingrédient" value="${data.nom || ''}">
     <input type="number" class="ing-qty" placeholder="Qté" min="0" step="0.01" value="${data.quantite || ''}">
@@ -993,8 +1267,15 @@ function addIngredientRow(data = {}) {
     </select>
     <input type="number" class="ing-prix" placeholder="P.U. €" min="0" step="0.01" value="${data.prix_unitaire || ''}">
     <span class="ing-total">${((data.quantite || 0) * (data.prix_unitaire || 0)).toFixed(2)} €</span>
+    <button type="button" class="btn-link-art" onclick="openArticlePicker(${id})" title="${linkBtnTitle}">${linkBtnLabel}</button>
     <button class="btn-remove-ing" onclick="removeIngredientRow(${id})">×</button>
   `;
+  if (linkedArticle) {
+    const artInfo = document.createElement('div');
+    artInfo.className = 'ing-article-info';
+    artInfo.textContent = `→ ${linkedArticle.nom}`;
+    row.appendChild(artInfo);
+  }
 
   // Auto-calc on qty/price change
   const qtyInput = row.querySelector('.ing-qty');
@@ -1094,7 +1375,8 @@ const DB = {
         unite: ing.unite,
         prix_unitaire: ing.prix_unitaire,
         cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
-        ordre: i
+        ordre: i,
+        article_id: ing.article_id || null,
       }));
       const { error } = await sb.from('fiche_ingredients').insert(rows);
       if (error) throw error;
@@ -1812,6 +2094,28 @@ async function editFiche(id) {
     c.classList.toggle('active', allergens.includes(c.dataset.val));
   });
 
+  // Article rattaché (semi-fini / produit fini)
+  document.getElementById('f-article-id').value = fiche.article_id || '';
+  const fAd = document.getElementById('f-article-display');
+  if (fiche.article_id) {
+    const art = allArticlesAppro.find(a => a.id === fiche.article_id);
+    if (art) {
+      fAd.textContent = `${art.nom} (${art.categorie || '?'} · ${art.unite || '?'})`;
+      fAd.style.color = '#047857';
+      fAd.style.fontWeight = '600';
+      fAd.style.background = '#d1fae5';
+      fAd.style.borderColor = '#10b981';
+    } else {
+      fAd.textContent = '— Article rattaché introuvable —';
+    }
+  } else {
+    fAd.textContent = "— Pas d'article rattaché —";
+    fAd.style.color = '#6b7280';
+    fAd.style.fontWeight = 'normal';
+    fAd.style.background = 'white';
+    fAd.style.borderColor = '#d1d5db';
+  }
+
   // Load & populate ingredients
   const container = document.getElementById('ingredient-rows');
   container.innerHTML = '';
@@ -1938,7 +2242,8 @@ async function saveFiche() {
     const prix = parseFloat(row.querySelector('.ing-prix').value) || 0;
     const cost = qty * prix;
     coutTotal += cost;
-    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix });
+    const articleId = row.dataset.articleId || null;
+    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId });
   });
 
   const rendement = parseFloat(document.getElementById('f-rendement-qty').value) || 0;
@@ -1957,11 +2262,14 @@ async function saveFiche() {
     return;
   }
 
+  const ficheArticleId = document.getElementById('f-article-id').value || null;
+
   const fiche = {
     nom,
     code_court: codeCourt,
     categorie,
     sous_categorie: document.getElementById('f-sous-cat').value.trim() || null,
+    article_id: ficheArticleId,
     rendement_quantite: rendement || null,
     rendement_unite: document.getElementById('f-rendement-unite').value,
     temps_preparation: parseInt(document.getElementById('f-temps-prep').value) || null,
@@ -2034,6 +2342,17 @@ function resetForm() {
   document.getElementById('cost-summary').style.display = 'none';
   document.getElementById('cost-portion-summary').style.display = 'none';
   document.getElementById('btn-save-fiche').textContent = 'Enregistrer la fiche';
+
+  // Réinit zone "Cette fiche produit"
+  document.getElementById('f-article-id').value = '';
+  const fAd = document.getElementById('f-article-display');
+  if (fAd) {
+    fAd.textContent = "— Pas d'article rattaché —";
+    fAd.style.color = '#6b7280';
+    fAd.style.fontWeight = 'normal';
+    fAd.style.background = 'white';
+    fAd.style.borderColor = '#d1d5db';
+  }
 }
 
 // ============= DELETE / TOGGLE =============
