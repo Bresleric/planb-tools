@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Rattachement tâches → fiches — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669; --primary-dark: #047857; --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+
+    .content { flex:1; padding:16px; max-width:1100px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+
+    .stats-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px; }
+    .stat-box { padding:12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .stat-box .sv { font-size:22px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .stat-box .sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    .stat-box.warn { background:var(--orange-100); border-color:var(--orange-100); }
+    .stat-box.warn .sv { color:var(--orange-700); }
+    .stat-box.ok { background:var(--green-100); border-color:var(--green-100); }
+    .stat-box.ok .sv { color:var(--green-700); }
+    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(3, 1fr); } }
+
+    .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .search-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); flex:1; min-width:180px; }
+
+    .task-row { display:grid; grid-template-columns:minmax(0,1fr) 130px minmax(0,1.5fr) 60px; gap:8px; padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; }
+    .task-row.matched { background:var(--green-100); border-color:var(--green-100); }
+    .task-row.unmatched { background:var(--orange-100); border-color:var(--orange-100); }
+    .task-row .tr-nom { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .task-row .tr-cat { font-size:11px; color:var(--gray-500); display:inline-block; padding:2px 8px; background:var(--gray-100); border-radius:999px; }
+    .task-row .tr-search { position:relative; }
+    .task-row .tr-search input { width:100%; padding:6px 10px; font-size:13px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .task-row .tr-search input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light); }
+    .task-row .tr-search input.matched { background:var(--green-100); border-color:var(--green-700); color:var(--green-700); font-weight:600; }
+    .task-row .tr-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:2px; }
+    .task-row .tr-results.visible { display:block; }
+    .task-row .tr-result { padding:8px 10px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--gray-100); }
+    .task-row .tr-result:hover, .task-row .tr-result.active { background:var(--primary-light); }
+    .task-row .tr-result .tr-meta { font-size:10px; color:var(--gray-500); }
+    .task-row .tr-result.suggestion { background:var(--blue-100); }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:6px 10px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-icon { padding:4px 8px; }
+
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); }
+
+    /* Group by category */
+    .cat-group { margin-bottom:18px; }
+    .cat-header { font-size:12px; font-weight:700; color:var(--gray-700); text-transform:uppercase; letter-spacing:0.3px; padding:8px 4px; }
+    .cat-header .cat-count { color:var(--gray-500); font-weight:500; margin-left:6px; }
+
+    @media (max-width:680px) {
+      .task-row { grid-template-columns:1fr; gap:4px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Tâches → fiches techniques</span>
+    </div>
+    <div class="header-right">
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="stats-grid">
+      <div class="stat-box"><div class="sv" id="stat-total">—</div><div class="sl">Tâches de prod.</div></div>
+      <div class="stat-box ok"><div class="sv" id="stat-rattachees">—</div><div class="sl">Rattachées</div></div>
+      <div class="stat-box warn"><div class="sv" id="stat-restantes">—</div><div class="sl">À rattacher</div></div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:13px; color:var(--gray-600); margin-bottom:12px;">
+        Pour que démarrer une tâche de production déclenche automatiquement la sortie des matières premières, il faut relier chaque tâche à sa fiche technique. La fiche technique sait alors quels ingrédients consommer.
+      </div>
+      <div class="filters">
+        <input type="text" class="search-input" id="search" placeholder="Rechercher une tâche…">
+        <span class="filter-chip" data-filter="all">Toutes</span>
+        <span class="filter-chip active" data-filter="incomplete">À rattacher</span>
+        <span class="filter-chip" data-filter="complete">Rattachées</span>
+      </div>
+    </div>
+
+    <div id="tasks-list">
+      <div class="empty-state">Chargement…</div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    const State = {
+      tasks: [],       // predefined_tasks (is_production=true)
+      fiches: [],      // fiches_techniques actives
+      filter: 'incomplete',
+      search: '',
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') { const t = $('toast'); t.textContent = msg; t.className = 'toast visible'+(kind?' '+kind:''); setTimeout(() => t.className = 'toast', 3500); }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    async function loadAll() {
+      try {
+        const [{ data: tasks, error: e1 }, { data: fiches, error: e2 }] = await Promise.all([
+          sb.from('predefined_tasks')
+            .select('id, nom, categorie, etablissement, fiche_id, categorie_production')
+            .eq('is_production', true)
+            .order('categorie')
+            .order('nom'),
+          sb.from('fiches_techniques')
+            .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite')
+            .eq('actif', true)
+            .order('nom')
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+        State.tasks = tasks || [];
+        State.fiches = fiches || [];
+
+        $('stat-total').textContent = State.tasks.length;
+        $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
+        $('stat-restantes').textContent = State.tasks.filter(t => !t.fiche_id).length;
+
+        renderList();
+      } catch (err) {
+        console.error(err);
+        $('tasks-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      }
+    }
+
+    function applyFilter() {
+      const q = State.search.toLowerCase().trim();
+      return State.tasks.filter(t => {
+        const matched = !!t.fiche_id;
+        if (State.filter === 'complete' && !matched) return false;
+        if (State.filter === 'incomplete' && matched) return false;
+        if (q && !t.nom.toLowerCase().includes(q) && !(t.categorie || '').toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function renderList() {
+      const list = applyFilter();
+      const c = $('tasks-list');
+      if (!list.length) {
+        c.innerHTML = '<div class="empty-state">Aucune tâche ne correspond.</div>';
+        return;
+      }
+      // Grouper par catégorie
+      const byCat = {};
+      list.forEach(t => {
+        const cat = t.categorie || 'Sans catégorie';
+        if (!byCat[cat]) byCat[cat] = [];
+        byCat[cat].push(t);
+      });
+      c.innerHTML = '';
+      Object.keys(byCat).sort().forEach(cat => {
+        const group = document.createElement('div');
+        group.className = 'cat-group';
+        group.innerHTML = `<div class="cat-header">${escapeHtml(cat)}<span class="cat-count">${byCat[cat].length} tâche${byCat[cat].length>1?'s':''}</span></div>`;
+        byCat[cat].forEach(t => group.appendChild(renderTask(t)));
+        c.appendChild(group);
+      });
+    }
+
+    function renderTask(t) {
+      const matched = !!t.fiche_id;
+      const fiche = matched ? State.fiches.find(f => f.id === t.fiche_id) : null;
+      const div = document.createElement('div');
+      div.className = 'task-row ' + (matched ? 'matched' : 'unmatched');
+      div.dataset.id = t.id;
+      div.innerHTML = `
+        <div class="tr-nom" title="${escapeHtml(t.nom)}">${matched ? '✓ ' : ''}${escapeHtml(t.nom)}</div>
+        <div><span class="tr-cat">${escapeHtml(t.categorie_production || t.categorie || '')}</span></div>
+        <div class="tr-search">
+          <input type="text" placeholder="Rechercher la fiche technique…" value="${escapeHtml(fiche ? fiche.nom : '')}" class="${matched ? 'matched' : ''}">
+          <div class="tr-results"></div>
+        </div>
+        <div style="text-align:right;">
+          ${matched ? `<button class="btn btn-ghost btn-icon" data-action="unlink">✕</button>` : ''}
+        </div>
+      `;
+      const input = div.querySelector('input');
+      const results = div.querySelector('.tr-results');
+      input.addEventListener('input', () => renderResults(t, input.value.toLowerCase().trim(), results, div));
+      input.addEventListener('focus', () => renderResults(t, input.value.toLowerCase().trim(), results, div));
+      input.addEventListener('blur', () => setTimeout(() => results.classList.remove('visible'), 200));
+      const btnUnlink = div.querySelector('[data-action="unlink"]');
+      if (btnUnlink) btnUnlink.addEventListener('click', () => unlinkTask(t, div));
+      return div;
+    }
+
+    function renderResults(task, q, results, taskEl) {
+      const fiches = State.fiches;
+      let candidates;
+      if (q) {
+        candidates = fiches.filter(f => f.nom.toLowerCase().includes(q) || (f.categorie || '').toLowerCase().includes(q)).slice(0, 12);
+      } else {
+        // Suggestions : fuzzy match sur le nom de la tâche
+        candidates = fiches
+          .map(f => ({ f, score: scoreMatch(task.nom, f.nom) }))
+          .sort((x, y) => y.score - x.score)
+          .slice(0, 5)
+          .map(x => x.f);
+      }
+      if (!candidates.length) {
+        results.innerHTML = '<div class="tr-result" style="color:var(--gray-500); font-style:italic;">Aucune fiche correspondante.</div>';
+      } else {
+        results.innerHTML = candidates.map((f, idx) => {
+          const isSugg = !q && idx < 3;
+          return `
+            <div class="tr-result ${isSugg ? 'suggestion' : ''}" data-fid="${f.id}">
+              <div>${isSugg ? '✨ ' : ''}${escapeHtml(f.nom)}</div>
+              <div class="tr-meta">${escapeHtml(f.categorie || '')} · ${f.rendement_quantite || '?'} ${escapeHtml(f.rendement_unite || '')}</div>
+            </div>
+          `;
+        }).join('');
+        results.querySelectorAll('[data-fid]').forEach(el => {
+          el.addEventListener('click', () => {
+            const f = fiches.find(x => x.id === el.dataset.fid);
+            if (f) linkTask(task, f, taskEl);
+          });
+        });
+      }
+      results.classList.add('visible');
+    }
+
+    function scoreMatch(taskNom, ficheNom) {
+      const t = (taskNom || '').toLowerCase();
+      const f = (ficheNom || '').toLowerCase();
+      if (!t || !f) return 0;
+      const tWords = new Set(t.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      const fWords = new Set(f.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      let common = 0;
+      tWords.forEach(w => { if (fWords.has(w)) common++; });
+      return tWords.size > 0 ? common / tWords.size : 0;
+    }
+
+    async function linkTask(task, fiche, taskEl) {
+      try {
+        const { error } = await sb.from('predefined_tasks').update({ fiche_id: fiche.id }).eq('id', task.id);
+        if (error) throw error;
+        task.fiche_id = fiche.id;
+        showToast(`✓ "${task.nom}" → ${fiche.nom}`, 'success');
+        const newRow = renderTask(task);
+        taskEl.replaceWith(newRow);
+        // Mise à jour stats
+        $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
+        $('stat-restantes').textContent = State.tasks.filter(t => !t.fiche_id).length;
+      } catch (err) {
+        console.error(err); showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    async function unlinkTask(task, taskEl) {
+      if (!confirm(`Retirer le lien entre "${task.nom}" et sa fiche ?`)) return;
+      try {
+        const { error } = await sb.from('predefined_tasks').update({ fiche_id: null }).eq('id', task.id);
+        if (error) throw error;
+        task.fiche_id = null;
+        showToast('Lien retiré');
+        const newRow = renderTask(task);
+        taskEl.replaceWith(newRow);
+        $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
+        $('stat-restantes').textContent = State.tasks.filter(t => !t.fiche_id).length;
+      } catch (err) {
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    document.querySelectorAll('[data-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filter = chip.dataset.filter;
+        renderList();
+      });
+    });
+    $('search').addEventListener('input', e => { State.search = e.target.value; renderList(); });
+
+    loadAll();
+  </script>
+</body>
+</html>
