@@ -108,6 +108,27 @@
 
     .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); }
 
+    /* Zone "Cette fiche produit" en haut de chaque fiche */
+    .fiche-product { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px; align-items:center; padding:10px 12px; background:#f5f3ff; border:1px solid #c4b5fd; border-radius:var(--radius-sm); margin-bottom:10px; }
+    .fiche-product.linked { background:#ede9fe; border-color:#7c3aed; }
+    .fiche-product .fp-label { font-size:12px; font-weight:600; color:#5b21b6; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; }
+    .fiche-product .fp-search { position:relative; }
+    .fiche-product .fp-search input { width:100%; padding:7px 10px; font-size:13px; border:1px solid #c4b5fd; border-radius:var(--radius-sm); background:white; }
+    .fiche-product .fp-search input:focus { outline:none; border-color:#7c3aed; box-shadow:0 0 0 2px #ede9fe; }
+    .fiche-product .fp-search input.linked { background:#ede9fe; border-color:#7c3aed; color:#5b21b6; font-weight:600; }
+    .fiche-product .fp-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:2px; }
+    .fiche-product .fp-results.visible { display:block; }
+    .fiche-product .fp-result { padding:7px 10px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--gray-100); }
+    .fiche-product .fp-result:hover { background:#ede9fe; }
+    .fiche-product .fp-actions { display:flex; gap:4px; }
+    .btn-violet { background:#7c3aed; color:white; }
+    .btn-violet:hover { background:#6d28d9; }
+
+    @media (max-width:680px) {
+      .fiche-product { grid-template-columns:1fr; }
+      .fiche-product .fp-actions { justify-content:flex-start; }
+    }
+
     @media (max-width:680px) {
       .ing-row { grid-template-columns:1fr; gap:4px; padding:10px; }
       .ing-row .ir-actions { justify-content:flex-start; }
@@ -201,12 +222,12 @@
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
     const State = {
-      fiches: [],          // [{ id, nom, categorie, ingredients: [...] }]
+      fiches: [],          // [{ id, nom, categorie, article_id, ingredients: [...] }]
       articles: [],        // appro_ingredients actifs
       categories: [],
       filter: 'all',
       search: '',
-      pendingRow: null,    // ingredient en cours de création
+      pendingCreate: null, // { kind: 'ingredient' | 'fiche', ... }
     };
 
     function $(id) { return document.getElementById(id); }
@@ -229,7 +250,7 @@
 
         // 2. Fiches techniques + ingrédients
         const { data: fiches, error: e2 } = await sb.from('fiches_techniques')
-          .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite, actif')
+          .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite, actif, article_id')
           .eq('actif', true)
           .order('nom');
         if (e2) throw e2;
@@ -332,6 +353,7 @@
           </div>
         </div>
         <div class="fiche-body">
+          <div class="fp-zone" data-fiche="${f.id}"></div>
           <div class="ing-list" data-fiche="${f.id}">
             ${total ? '' : '<div class="empty-state">Aucun ingrédient saisi pour cette fiche.</div>'}
           </div>
@@ -340,11 +362,80 @@
       // Toggle
       card.querySelector('.fiche-header').addEventListener('click', () => {
         card.classList.toggle('expanded');
-        if (card.classList.contains('expanded') && total > 0) {
-          renderIngredients(f, card.querySelector('.ing-list'));
+        if (card.classList.contains('expanded')) {
+          renderProductZone(f, card.querySelector('.fp-zone'));
+          if (total > 0) renderIngredients(f, card.querySelector('.ing-list'));
         }
       });
       return card;
+    }
+
+    function renderProductZone(f, container) {
+      const linkedArticle = f.article_id ? State.articles.find(a => a.id === f.article_id) : null;
+      const linked = !!linkedArticle;
+      container.innerHTML = `
+        <div class="fiche-product ${linked ? 'linked' : ''}">
+          <div class="fp-label">Cette fiche produit :</div>
+          <div class="fp-search">
+            <input type="text" placeholder="Lier à un article (ex: Fond de tarte)…" value="${escapeHtml(linkedArticle ? linkedArticle.nom : '')}" class="${linked ? 'linked' : ''}">
+            <div class="fp-results"></div>
+          </div>
+          <div class="fp-actions">
+            ${linked
+              ? `<button class="btn btn-ghost btn-icon" data-action="unlink-fiche">✕ Délier</button>`
+              : `<button class="btn btn-violet btn-icon" data-action="create-product">+ Créer l'article</button>`}
+          </div>
+        </div>
+      `;
+      const input = container.querySelector('.fp-search input');
+      const results = container.querySelector('.fp-results');
+      input.addEventListener('input', () => {
+        const q = input.value.toLowerCase().trim();
+        renderFicheProductResults(f, q, results, container);
+      });
+      input.addEventListener('focus', () => {
+        renderFicheProductResults(f, input.value.toLowerCase().trim(), results, container);
+      });
+      input.addEventListener('blur', () => setTimeout(() => results.classList.remove('visible'), 200));
+      const actionBtn = container.querySelector('[data-action]');
+      if (actionBtn) {
+        actionBtn.addEventListener('click', () => {
+          const action = actionBtn.dataset.action;
+          if (action === 'unlink-fiche') unlinkFicheArticle(f, container);
+          else if (action === 'create-product') openCreateProductModal(f, container);
+        });
+      }
+    }
+
+    function renderFicheProductResults(fiche, q, results, container) {
+      let candidates;
+      if (q) {
+        candidates = State.articles.filter(a => a.nom.toLowerCase().includes(q)).slice(0, 10);
+      } else {
+        // Suggestion top match basée sur le nom de la fiche
+        candidates = State.articles
+          .map(a => ({ a, score: scoreMatch(fiche.nom, a.nom, fiche.rendement_unite, a.unite) }))
+          .sort((x, y) => y.score - x.score)
+          .slice(0, 5)
+          .map(x => x.a);
+      }
+      if (!candidates.length) {
+        results.innerHTML = '<div class="fp-result" style="color:var(--gray-500); font-style:italic;">Aucun résultat. Crée l\'article →</div>';
+      } else {
+        results.innerHTML = candidates.map(a => `
+          <div class="fp-result" data-aid="${a.id}">
+            <div>${escapeHtml(a.nom)}</div>
+            <div style="font-size:10px; color:var(--gray-500);">${escapeHtml(a.categorie || '')} · ${escapeHtml(a.unite || '')}</div>
+          </div>
+        `).join('');
+        results.querySelectorAll('[data-aid]').forEach(el => {
+          el.addEventListener('click', () => {
+            const a = State.articles.find(x => x.id === el.dataset.aid);
+            if (a) linkFicheArticle(fiche, a, container);
+          });
+        });
+      }
+      results.classList.add('visible');
     }
 
     function renderIngredients(f, container) {
@@ -509,20 +600,63 @@
       $('stat-restants').textContent = totalIngs - ratIngs;
     }
 
-    // ==== CRÉATION ARTICLE ====
+    // ==== LIEN FICHE → ARTICLE (semi-fini / produit intermédiaire) ====
+    async function linkFicheArticle(fiche, article, container) {
+      try {
+        const { error } = await sb.from('fiches_techniques')
+          .update({ article_id: article.id })
+          .eq('id', fiche.id);
+        if (error) throw error;
+        fiche.article_id = article.id;
+        showToast(`✓ "${fiche.nom}" produit l'article ${article.nom}`, 'success');
+        renderProductZone(fiche, container);
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    async function unlinkFicheArticle(fiche, container) {
+      if (!confirm(`Délier la fiche "${fiche.nom}" de son article ?`)) return;
+      try {
+        const { error } = await sb.from('fiches_techniques')
+          .update({ article_id: null })
+          .eq('id', fiche.id);
+        if (error) throw error;
+        fiche.article_id = null;
+        showToast('Lien retiré');
+        renderProductZone(fiche, container);
+      } catch (err) {
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    function openCreateProductModal(fiche, container) {
+      State.pendingCreate = { kind: 'fiche', fiche, container };
+      $('create-nom').value = fiche.nom;
+      // Catégorie suggérée : "Préparation maison" si elle existe, sinon créer
+      const prefCat = State.categories.find(c => /pr[eé]paration|maison|interne/i.test(c)) || State.categories[0];
+      $('create-categorie').value = prefCat || 'Alimentaire';
+      // Unité = rendement de la fiche
+      const u = (fiche.rendement_unite || 'pce').toLowerCase();
+      const options = ['kg','g','L','cL','pce','Bouteille','Carton'];
+      const match = options.find(o => o.toLowerCase() === u);
+      $('create-unite').value = match || 'pce';
+      $('modal-create').classList.add('visible');
+    }
+
+    // ==== CRÉATION ARTICLE (depuis ingrédient ou depuis fiche) ====
     function openCreateModal(fiche, ing, rowEl) {
-      State.pendingRow = { fiche, ing, rowEl };
+      State.pendingCreate = { kind: 'ingredient', fiche, ing, rowEl };
       $('create-nom').value = ing.nom || '';
-      // Catégorie : essayer de deviner via fiche.categorie
       $('create-categorie').value = State.categories[0] || 'Alimentaire';
-      // Unité par défaut = celle de l'ingrédient s'elle existe parmi les options
       const u = (ing.unite || 'kg').toLowerCase();
       const options = ['kg','g','L','cL','pce','Bouteille','Carton'];
       const match = options.find(o => o.toLowerCase() === u);
       $('create-unite').value = match || 'kg';
       $('modal-create').classList.add('visible');
     }
-    $('create-cancel').addEventListener('click', () => { $('modal-create').classList.remove('visible'); State.pendingRow = null; });
+    $('create-cancel').addEventListener('click', () => { $('modal-create').classList.remove('visible'); State.pendingCreate = null; });
     $('create-confirm').addEventListener('click', async () => {
       const nom = $('create-nom').value.trim();
       const categorie = $('create-categorie').value;
@@ -537,11 +671,16 @@
         State.articles.push(data);
         State.articles.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
         showToast(`✓ Article "${nom}" créé`, 'success');
-        if (State.pendingRow) {
-          await linkIngredient(State.pendingRow.fiche, State.pendingRow.ing, data, State.pendingRow.rowEl);
+        const pc = State.pendingCreate;
+        if (pc) {
+          if (pc.kind === 'ingredient') {
+            await linkIngredient(pc.fiche, pc.ing, data, pc.rowEl);
+          } else if (pc.kind === 'fiche') {
+            await linkFicheArticle(pc.fiche, data, pc.container);
+          }
         }
         $('modal-create').classList.remove('visible');
-        State.pendingRow = null;
+        State.pendingCreate = null;
       } catch (err) {
         console.error(err);
         showToast('Erreur création : ' + err.message, 'error');
