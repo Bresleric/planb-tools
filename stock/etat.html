@@ -186,6 +186,56 @@
     </div>
   </div>
 
+  <!-- Modal édition scan -->
+  <div class="modal-bg" id="modal-edit-scan">
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-header">
+        <span class="modal-title">Corriger les données du scan</span>
+        <button class="modal-close" id="edit-scan-close">✕</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div style="grid-column:1/-1;">
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Produit (libellé étiquette)</label>
+          <input type="text" id="es-produit" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Lot</label>
+          <input type="text" id="es-lot" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Poids net (kg)</label>
+          <input type="number" step="0.001" id="es-poids" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">DLC</label>
+          <input type="date" id="es-dlc" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">DDM</label>
+          <input type="date" id="es-ddm" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Fabricant</label>
+          <input type="text" id="es-fabricant" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Origine</label>
+          <input type="text" id="es-origine" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+        </div>
+        <div style="grid-column:1/-1; position:relative;">
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Article rattaché</label>
+          <input type="text" id="es-article-search" placeholder="Rechercher un autre article…" autocomplete="off" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+          <div id="es-article-results" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); max-height:200px; overflow-y:auto; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:10; margin-top:2px;"></div>
+          <div style="font-size:11px; color:var(--gray-500); margin-top:4px;" id="es-article-current">—</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px;">
+        <button class="btn btn-secondary" id="edit-scan-save">Enregistrer</button>
+        <button class="btn btn-ghost" id="edit-scan-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Lightbox -->
   <div class="lightbox" id="lightbox">
     <button class="lightbox-close" id="lightbox-close">✕</button>
@@ -215,12 +265,15 @@
 
     // ==== ÉTAT ====
     const State = {
-      articles: [],          // [{ article_id, nom, categorie, unite, total_kg, total_pces, nb_scans, dlc_min, dlc_max, last_scan_at, etablissements:Set, scans:[] }]
+      articles: [],
+      allArticles: [],       // référentiel appro_ingredients pour autocomplete réaffectation
       filterEtab: 'all',
       filterCat: 'all',
       filterDlc: 'all',
       search: '',
       sort: 'poids_desc',
+      editingScan: null,     // ligne scan_tracabilite en cours d'édition
+      newArticleId: null,    // article_id sélectionné pour réaffectation
     };
 
     function $(id) { return document.getElementById(id); }
@@ -256,6 +309,13 @@
     // ==== CHARGEMENT ====
     async function loadAll() {
       try {
+        // 0. Référentiel articles pour autocomplete réaffectation
+        const { data: arts } = await sb.from('appro_ingredients')
+          .select('id, nom, categorie, unite, actif')
+          .eq('actif', true)
+          .order('nom');
+        State.allArticles = arts || [];
+
         // Charge tous les scans rattachés (article_id NOT NULL) + l'article + le scan parent (etablissement, statut)
         const { data, error } = await sb.from('scan_tracabilite')
           .select(`
@@ -458,10 +518,13 @@
               <br>Scanné le ${fmtDate(t.scan?.created_at)} par ${escapeHtml(t.scan?.created_by_nom || '?')}
             </div>
           </div>
+          <button class="btn btn-ghost" data-edit-id="${t.id}" style="padding:6px 10px; font-size:12px;">✏️</button>
         `;
         // Clic sur la miniature → lightbox
         const tEl = div.querySelector('.sd-thumb');
         if (t.url) tEl.addEventListener('click', () => openLightbox(t.url));
+        // Clic sur ✏️ → modal édition
+        div.querySelector('[data-edit-id]').addEventListener('click', () => openEditScanModal(t, a));
         list.appendChild(div);
       });
     }
@@ -469,6 +532,90 @@
     $('detail-close').addEventListener('click', () => $('modal-detail').classList.remove('visible'));
     $('modal-detail').addEventListener('click', (e) => {
       if (e.target === $('modal-detail')) $('modal-detail').classList.remove('visible');
+    });
+
+    // ==== ÉDITION SCAN ====
+    function openEditScanModal(t, parentArticle) {
+      State.editingScan = t;
+      State.newArticleId = parentArticle.article_id;  // par défaut = article actuel
+      $('es-produit').value = t.produit || '';
+      $('es-lot').value = t.lot || '';
+      $('es-poids').value = t.poids_net_kg || '';
+      $('es-dlc').value = t.dlc || '';
+      $('es-ddm').value = t.ddm || '';
+      $('es-fabricant').value = t.fabricant || '';
+      $('es-origine').value = t.origine || '';
+      $('es-article-search').value = '';
+      $('es-article-results').style.display = 'none';
+      $('es-article-current').textContent = `Actuellement rattaché à : ${parentArticle.nom}`;
+      $('modal-edit-scan').classList.add('visible');
+    }
+
+    $('es-article-search').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const res = $('es-article-results');
+      if (!q) { res.style.display = 'none'; return; }
+      const matches = State.allArticles.filter(a => a.nom.toLowerCase().includes(q)).slice(0, 8);
+      if (!matches.length) {
+        res.innerHTML = `<div style="padding:8px 12px; color:var(--gray-500); font-size:13px; font-style:italic;">Aucun résultat</div>`;
+      } else {
+        res.innerHTML = matches.map(a => `
+          <div data-aid="${a.id}" style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--gray-100);">
+            ${escapeHtml(a.nom)} <span style="font-size:11px; color:var(--gray-500);">· ${escapeHtml(a.categorie || '')} · ${escapeHtml(a.unite || '')}</span>
+          </div>
+        `).join('');
+        res.querySelectorAll('[data-aid]').forEach(el => {
+          el.addEventListener('click', () => {
+            const a = State.allArticles.find(x => x.id === el.dataset.aid);
+            State.newArticleId = a.id;
+            $('es-article-search').value = a.nom;
+            $('es-article-current').textContent = `Sera rattaché à : ${a.nom}`;
+            $('es-article-current').style.color = 'var(--primary-dark)';
+            $('es-article-current').style.fontWeight = '600';
+            res.style.display = 'none';
+          });
+        });
+      }
+      res.style.display = 'block';
+    });
+
+    $('edit-scan-cancel').addEventListener('click', () => closeEditScan());
+    $('edit-scan-close').addEventListener('click', () => closeEditScan());
+    function closeEditScan() {
+      $('modal-edit-scan').classList.remove('visible');
+      State.editingScan = null;
+      State.newArticleId = null;
+      $('es-article-current').style.color = '';
+      $('es-article-current').style.fontWeight = '';
+    }
+
+    $('edit-scan-save').addEventListener('click', async () => {
+      if (!State.editingScan) return;
+      const update = {
+        produit: $('es-produit').value.trim() || null,
+        lot: $('es-lot').value.trim() || null,
+        poids_net_kg: $('es-poids').value === '' ? null : Number($('es-poids').value),
+        dlc: $('es-dlc').value || null,
+        ddm: $('es-ddm').value || null,
+        fabricant: $('es-fabricant').value.trim() || null,
+        origine: $('es-origine').value.trim() || null,
+      };
+      if (State.newArticleId) {
+        update.article_id = State.newArticleId;
+        update.match_par_id = currentUser.id;
+        update.match_par_nom = currentUser.nom;
+        update.match_at = new Date().toISOString();
+      }
+      try {
+        const { error } = await sb.from('scan_tracabilite').update(update).eq('id', State.editingScan.id);
+        if (error) throw error;
+        showToast('✓ Scan mis à jour', 'success');
+        closeEditScan();
+        $('modal-detail').classList.remove('visible');
+        await loadAll();
+      } catch (err) {
+        console.error(err); showToast('Erreur : ' + err.message, 'error');
+      }
     });
 
     // ==== LIGHTBOX ====

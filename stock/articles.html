@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Gestion des ingrédients — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669; --primary-dark: #047857; --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:1200px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+
+    /* Stats */
+    .stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:16px; }
+    .stat-box { padding:10px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .stat-box .sv { font-size:20px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .stat-box .sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(2, 1fr); } }
+
+    /* Filtres + barre d'actions */
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+    .search-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); flex:1; min-width:200px; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:8px 14px; font-size:13px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; transition:all .15s; }
+    .btn:active { transform:scale(.98); }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-danger { background:white; color:var(--red-700); border:1px solid var(--red-100); }
+    .btn-icon { padding:6px 8px; font-size:12px; }
+
+    /* Table articles */
+    .articles-list { display:flex; flex-direction:column; gap:4px; }
+    .article-row { display:grid; grid-template-columns:minmax(0,1fr) 140px 80px 90px 140px; gap:8px; padding:8px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); align-items:center; }
+    .article-row.inactive { opacity:.55; background:var(--gray-50); }
+    .ar-nom { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .ar-cat-chip { display:inline-block; padding:2px 8px; font-size:11px; background:var(--gray-100); color:var(--gray-700); border-radius:999px; }
+    .ar-unit { font-size:12px; color:var(--gray-500); text-align:center; }
+    .ar-count { font-size:12px; color:var(--gray-700); text-align:center; }
+    .ar-count.zero { color:var(--gray-400); }
+    .ar-count.has { color:var(--green-700); font-weight:600; }
+    .ar-actions { display:flex; gap:4px; justify-content:flex-end; }
+    @media (max-width:680px) {
+      .article-row { grid-template-columns:1fr; gap:4px; padding:10px; }
+      .ar-actions { justify-content:flex-start; flex-wrap:wrap; }
+    }
+
+    /* Modal */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; padding:16px; overflow-y:auto; align-items:flex-start; justify-content:center; }
+    .modal-bg.visible { display:flex; }
+    .modal { background:white; border-radius:var(--radius); max-width:520px; width:100%; padding:20px; }
+    .modal-title { font-size:17px; font-weight:700; margin-bottom:14px; }
+    .modal-field { margin-bottom:12px; }
+    .modal-field label { display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+    .modal-field input, .modal-field select { width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; }
+    .modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+
+    .merge-summary { background:var(--blue-100); color:var(--blue-700); padding:12px; border-radius:var(--radius-sm); font-size:13px; margin-bottom:12px; line-height:1.5; }
+    .merge-summary strong { display:block; margin-bottom:6px; }
+
+    /* Autocomplete */
+    .autocomplete { position:relative; }
+    .autocomplete input { width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .autocomplete-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:4px; }
+    .autocomplete-results.visible { display:block; }
+    .ac-result { padding:9px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--gray-100); }
+    .ac-result:hover, .ac-result.active { background:var(--primary-light); }
+    .ac-result .ac-cat { font-size:11px; color:var(--gray-500); }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:32px 16px; color:var(--gray-500); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Ingrédients</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="stats-grid">
+      <div class="stat-box"><div class="sv" id="stat-total">—</div><div class="sl">Total</div></div>
+      <div class="stat-box"><div class="sv" id="stat-actifs">—</div><div class="sl">Actifs</div></div>
+      <div class="stat-box"><div class="sv" id="stat-avec-scans">—</div><div class="sl">Avec scans</div></div>
+      <div class="stat-box"><div class="sv" id="stat-orphelins">—</div><div class="sl">Sans scan ni cat.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="search" placeholder="Rechercher (nom, catégorie)…">
+        <button class="btn btn-primary" id="btn-create">+ Nouvel article</button>
+      </div>
+      <div class="toolbar" style="margin-bottom:0;">
+        <span class="filter-chip active" data-filter-actif="actifs">Actifs</span>
+        <span class="filter-chip" data-filter-actif="inactifs">Inactifs</span>
+        <span class="filter-chip" data-filter-actif="tous">Tous</span>
+        <span class="filter-chip active" data-filter-cat="all">Toutes catégories</span>
+        <span class="filter-chip" data-filter-scans="avec">Avec scans uniqt</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 140px 80px 90px 140px; gap:8px; padding:0 12px 8px 12px; font-size:11px; font-weight:600; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px;" id="th-row">
+        <div>Article</div>
+        <div>Catégorie</div>
+        <div style="text-align:center;">Unité</div>
+        <div style="text-align:center;">Scans</div>
+        <div style="text-align:right;">Actions</div>
+      </div>
+      <div class="articles-list" id="articles-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal édition -->
+  <div class="modal-bg" id="modal-edit">
+    <div class="modal">
+      <div class="modal-title" id="edit-title">Modifier l'article</div>
+      <div class="modal-field">
+        <label>Nom</label>
+        <input type="text" id="edit-nom">
+      </div>
+      <div class="modal-field">
+        <label>Catégorie</label>
+        <select id="edit-categorie"></select>
+      </div>
+      <div class="modal-field">
+        <label>Unité</label>
+        <select id="edit-unite">
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="L">L</option>
+          <option value="cL">cL</option>
+          <option value="pce">pièce</option>
+          <option value="Bouteille">Bouteille</option>
+          <option value="Carton">Carton</option>
+          <option value="Forfait">Forfait</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label><input type="checkbox" id="edit-actif" style="width:auto; margin-right:8px;">Article actif (visible dans les autocompletes)</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="edit-save">Enregistrer</button>
+        <button class="btn btn-ghost" id="edit-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal création -->
+  <div class="modal-bg" id="modal-create">
+    <div class="modal">
+      <div class="modal-title">Nouvel article</div>
+      <div class="modal-field">
+        <label>Nom</label>
+        <input type="text" id="create-nom" placeholder="Ex: Briques d'œufs entiers">
+      </div>
+      <div class="modal-field">
+        <label>Catégorie</label>
+        <select id="create-categorie"></select>
+      </div>
+      <div class="modal-field">
+        <label>Unité</label>
+        <select id="create-unite">
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="L">L</option>
+          <option value="cL">cL</option>
+          <option value="pce">pièce</option>
+          <option value="Bouteille">Bouteille</option>
+          <option value="Carton">Carton</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="create-save">Créer</button>
+        <button class="btn btn-ghost" id="create-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal fusion -->
+  <div class="modal-bg" id="modal-merge">
+    <div class="modal">
+      <div class="modal-title">Fusionner cet article vers un autre</div>
+      <div style="font-size:13px; color:var(--gray-600); margin-bottom:14px;">
+        L'article <strong id="merge-source-name">—</strong> sera désactivé et toutes ses références seront déplacées vers l'article cible. Action irréversible (mais l'article source est juste désactivé, on peut le réactiver si erreur).
+      </div>
+
+      <div class="modal-field">
+        <label>Article cible</label>
+        <div class="autocomplete">
+          <input type="text" id="merge-search" placeholder="Rechercher l'article cible…" autocomplete="off">
+          <div class="autocomplete-results" id="merge-results"></div>
+        </div>
+      </div>
+
+      <div id="merge-summary" class="merge-summary" style="display:none;"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="merge-confirm" disabled>Confirmer la fusion</button>
+        <button class="btn btn-ghost" id="merge-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    // ==== ÉTAT ====
+    const State = {
+      articles: [],          // articles enrichis avec nb_scans, nb_catalogue, nb_besoins
+      categories: [],
+      filterActif: 'actifs',
+      filterCat: 'all',
+      filterScans: 'all',
+      search: '',
+      editingId: null,
+      mergingSource: null,
+      mergeTarget: null,
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') { const t = $('toast'); t.textContent = msg; t.className = 'toast visible'+(kind?' '+kind:''); setTimeout(() => t.className = 'toast', 3500); }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function nomRecherche(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); }
+
+    // ==== CHARGEMENT ====
+    async function loadAll() {
+      try {
+        // 1. Articles
+        const { data: arts, error: e1 } = await sb.from('appro_ingredients')
+          .select('id, nom, categorie, unite, actif')
+          .order('nom');
+        if (e1) throw e1;
+
+        // 2. Compteurs scan_tracabilite par article_id
+        const { data: scanCounts, error: e2 } = await sb.from('scan_tracabilite')
+          .select('article_id', { count: 'exact', head: false });
+        // Comptage côté client (faute de groupBy direct dans supabase-js)
+        const scanCountByArticle = {};
+        // Pour avoir les compteurs réels, on fait une vraie agrégation via raw SQL via une vue ? Plus simple : on compte côté JS
+        // mais limit 1000 articles, et 68+ scans, donc on récupère tous les article_id
+        const { data: tracaAll, error: e2b } = await sb.from('scan_tracabilite')
+          .select('article_id')
+          .not('article_id', 'is', null);
+        if (e2b) throw e2b;
+        (tracaAll || []).forEach(r => {
+          scanCountByArticle[r.article_id] = (scanCountByArticle[r.article_id] || 0) + 1;
+        });
+
+        State.articles = (arts || []).map(a => ({
+          ...a,
+          nb_scans: scanCountByArticle[a.id] || 0,
+        }));
+
+        // Catégories distinctes
+        State.categories = [...new Set(State.articles.map(a => a.categorie).filter(Boolean))].sort();
+        renderCategoryChips();
+        renderEditCategoriesSelect($('edit-categorie'));
+        renderEditCategoriesSelect($('create-categorie'));
+
+        // Stats
+        $('stat-total').textContent = State.articles.length;
+        $('stat-actifs').textContent = State.articles.filter(a => a.actif).length;
+        $('stat-avec-scans').textContent = State.articles.filter(a => a.nb_scans > 0).length;
+        $('stat-orphelins').textContent = State.articles.filter(a => !a.categorie || a.categorie === 'Alimentaire').length;
+
+        renderList();
+      } catch (err) {
+        console.error(err);
+        $('articles-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      }
+    }
+
+    function renderCategoryChips() {
+      // Reconstruit dynamiquement les chips de catégorie
+      const container = document.querySelector('[data-filter-cat="all"]').parentElement;
+      [...container.querySelectorAll('[data-filter-cat]')].forEach(el => {
+        if (el.dataset.filterCat !== 'all') el.remove();
+      });
+      const scanFilter = container.querySelector('[data-filter-scans]');
+      State.categories.forEach(cat => {
+        const chip = document.createElement('span');
+        chip.className = 'filter-chip';
+        chip.dataset.filterCat = cat;
+        chip.textContent = cat;
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('[data-filter-cat]').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          State.filterCat = cat;
+          renderList();
+        });
+        container.insertBefore(chip, scanFilter);
+      });
+    }
+
+    function renderEditCategoriesSelect(sel) {
+      sel.innerHTML = State.categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('') +
+                      `<option value="__new__">+ Nouvelle catégorie…</option>`;
+    }
+
+    function applyFilters() {
+      const q = State.search.toLowerCase().trim();
+      return State.articles.filter(a => {
+        if (State.filterActif === 'actifs' && !a.actif) return false;
+        if (State.filterActif === 'inactifs' && a.actif) return false;
+        if (State.filterCat !== 'all' && a.categorie !== State.filterCat) return false;
+        if (State.filterScans === 'avec' && a.nb_scans === 0) return false;
+        if (q && !a.nom.toLowerCase().includes(q) && !(a.categorie || '').toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function renderList() {
+      const list = applyFilters();
+      const c = $('articles-list');
+      if (!list.length) {
+        c.innerHTML = `<div class="empty-state">Aucun article ne correspond.</div>`;
+        return;
+      }
+      c.innerHTML = '';
+      list.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'article-row' + (a.actif ? '' : ' inactive');
+        row.innerHTML = `
+          <div class="ar-nom" title="${escapeHtml(a.nom)}">${escapeHtml(a.nom)}</div>
+          <div><span class="ar-cat-chip">${escapeHtml(a.categorie || 'sans cat.')}</span></div>
+          <div class="ar-unit">${escapeHtml(a.unite || '?')}</div>
+          <div class="ar-count ${a.nb_scans > 0 ? 'has' : 'zero'}">${a.nb_scans}</div>
+          <div class="ar-actions">
+            <button class="btn btn-ghost btn-icon" data-action="edit" data-id="${a.id}">✏️</button>
+            <button class="btn btn-ghost btn-icon" data-action="merge" data-id="${a.id}">🔄</button>
+            <button class="btn btn-ghost btn-icon" data-action="toggle" data-id="${a.id}" title="${a.actif ? 'Désactiver' : 'Réactiver'}">${a.actif ? '⏸' : '▶'}</button>
+          </div>
+        `;
+        row.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = btn.dataset.action;
+            const id = btn.dataset.id;
+            const article = State.articles.find(x => x.id === id);
+            if (!article) return;
+            if (action === 'edit') openEditModal(article);
+            else if (action === 'merge') openMergeModal(article);
+            else if (action === 'toggle') toggleActive(article);
+          });
+        });
+        c.appendChild(row);
+      });
+    }
+
+    // ==== ÉDITION ====
+    function openEditModal(a) {
+      State.editingId = a.id;
+      $('edit-title').textContent = `Modifier "${a.nom}"`;
+      $('edit-nom').value = a.nom;
+      // Si la catégorie n'est pas dans la liste, on l'ajoute temporairement
+      const sel = $('edit-categorie');
+      if (a.categorie && !State.categories.includes(a.categorie)) {
+        const opt = document.createElement('option');
+        opt.value = a.categorie;
+        opt.textContent = a.categorie;
+        sel.insertBefore(opt, sel.firstChild);
+      }
+      sel.value = a.categorie || '';
+      $('edit-unite').value = a.unite || 'kg';
+      $('edit-actif').checked = !!a.actif;
+      $('modal-edit').classList.add('visible');
+    }
+    $('edit-cancel').addEventListener('click', () => { $('modal-edit').classList.remove('visible'); State.editingId = null; });
+    $('edit-save').addEventListener('click', async () => {
+      if (!State.editingId) return;
+      const nom = $('edit-nom').value.trim();
+      let categorie = $('edit-categorie').value;
+      if (categorie === '__new__') {
+        categorie = prompt('Nouvelle catégorie :');
+        if (!categorie) return;
+      }
+      const unite = $('edit-unite').value;
+      const actif = $('edit-actif').checked;
+      if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+      try {
+        const { error } = await sb.from('appro_ingredients').update({
+          nom, nom_recherche: nomRecherche(nom),
+          categorie, unite, actif,
+        }).eq('id', State.editingId);
+        if (error) throw error;
+        showToast('✓ Article enregistré', 'success');
+        $('modal-edit').classList.remove('visible');
+        State.editingId = null;
+        await loadAll();
+      } catch (err) {
+        console.error(err); showToast('Erreur : ' + err.message, 'error');
+      }
+    });
+
+    // ==== TOGGLE ACTIF ====
+    async function toggleActive(a) {
+      if (!confirm(`${a.actif ? 'Désactiver' : 'Réactiver'} "${a.nom}" ?`)) return;
+      try {
+        const { error } = await sb.from('appro_ingredients')
+          .update({ actif: !a.actif })
+          .eq('id', a.id);
+        if (error) throw error;
+        showToast(`✓ ${a.actif ? 'Désactivé' : 'Réactivé'}`, 'success');
+        await loadAll();
+      } catch (err) {
+        console.error(err); showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    // ==== CRÉATION ====
+    $('btn-create').addEventListener('click', () => {
+      $('create-nom').value = '';
+      const cat = $('create-categorie');
+      cat.value = State.categories[0] || 'Alimentaire';
+      $('create-unite').value = 'kg';
+      $('modal-create').classList.add('visible');
+    });
+    $('create-cancel').addEventListener('click', () => $('modal-create').classList.remove('visible'));
+    $('create-save').addEventListener('click', async () => {
+      const nom = $('create-nom').value.trim();
+      let categorie = $('create-categorie').value;
+      if (categorie === '__new__') {
+        categorie = prompt('Nouvelle catégorie :');
+        if (!categorie) return;
+      }
+      const unite = $('create-unite').value;
+      if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+      try {
+        const { error } = await sb.from('appro_ingredients').insert({
+          nom, nom_recherche: nomRecherche(nom),
+          categorie, unite, actif: true,
+        });
+        if (error) throw error;
+        showToast('✓ Article créé', 'success');
+        $('modal-create').classList.remove('visible');
+        await loadAll();
+      } catch (err) {
+        console.error(err); showToast('Erreur : ' + err.message, 'error');
+      }
+    });
+
+    // ==== FUSION ====
+    function openMergeModal(a) {
+      State.mergingSource = a;
+      State.mergeTarget = null;
+      $('merge-source-name').textContent = a.nom;
+      $('merge-search').value = '';
+      $('merge-results').classList.remove('visible');
+      $('merge-summary').style.display = 'none';
+      $('merge-confirm').disabled = true;
+      $('modal-merge').classList.add('visible');
+    }
+    $('merge-cancel').addEventListener('click', () => {
+      $('modal-merge').classList.remove('visible');
+      State.mergingSource = null; State.mergeTarget = null;
+    });
+
+    $('merge-search').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const results = $('merge-results');
+      if (!q) { results.classList.remove('visible'); return; }
+      const candidates = State.articles
+        .filter(a => a.id !== State.mergingSource?.id && a.actif && a.nom.toLowerCase().includes(q))
+        .slice(0, 10);
+      if (!candidates.length) {
+        results.innerHTML = `<div class="ac-result" style="color:var(--gray-500); font-style:italic;">Aucun résultat</div>`;
+      } else {
+        results.innerHTML = candidates.map(c => `
+          <div class="ac-result" data-id="${c.id}">
+            <div>${escapeHtml(c.nom)}</div>
+            <div class="ac-cat">${escapeHtml(c.categorie || '')} · ${escapeHtml(c.unite || '')}</div>
+          </div>
+        `).join('');
+        results.querySelectorAll('[data-id]').forEach(el => {
+          el.addEventListener('click', () => {
+            const target = State.articles.find(x => x.id === el.dataset.id);
+            selectMergeTarget(target);
+          });
+        });
+      }
+      results.classList.add('visible');
+    });
+
+    async function selectMergeTarget(target) {
+      State.mergeTarget = target;
+      $('merge-search').value = target.nom;
+      $('merge-results').classList.remove('visible');
+
+      // Compter les références à déplacer
+      $('merge-summary').innerHTML = `<strong>Calcul en cours…</strong>`;
+      $('merge-summary').style.display = 'block';
+
+      try {
+        const sourceId = State.mergingSource.id;
+        const [r1, r2, r3, r4] = await Promise.all([
+          sb.from('scan_tracabilite').select('id', { count: 'exact', head: true }).eq('article_id', sourceId),
+          sb.from('appro_catalogue').select('id', { count: 'exact', head: true }).eq('ingredient_id', sourceId),
+          sb.from('appro_besoins').select('id', { count: 'exact', head: true }).eq('ingredient_id', sourceId),
+          sb.from('fiche_ingredients').select('id', { count: 'exact', head: true }).eq('article_id', sourceId),
+        ]);
+        const total = (r1.count || 0) + (r2.count || 0) + (r3.count || 0) + (r4.count || 0);
+        $('merge-summary').innerHTML = `
+          <strong>Récap de la fusion</strong>
+          <div style="font-size:13px;">
+            <strong>${escapeHtml(State.mergingSource.nom)}</strong> → <strong>${escapeHtml(target.nom)}</strong>
+          </div>
+          <div style="font-size:12px; margin-top:6px;">
+            • ${r1.count || 0} scan${r1.count===1?'':'s'} (étiquette)<br>
+            • ${r2.count || 0} ligne${r2.count===1?'':'s'} de catalogue<br>
+            • ${r3.count || 0} ligne${r3.count===1?'':'s'} de besoins<br>
+            • ${r4.count || 0} ligne${r4.count===1?'':'s'} de fiches techniques<br>
+            <strong>Total : ${total} référence${total===1?'':'s'} à déplacer</strong>
+          </div>
+        `;
+        $('merge-confirm').disabled = false;
+      } catch (err) {
+        $('merge-summary').innerHTML = `<strong>Erreur</strong> ${err.message}`;
+      }
+    }
+
+    $('merge-confirm').addEventListener('click', async () => {
+      if (!State.mergingSource || !State.mergeTarget) return;
+      const sourceId = State.mergingSource.id;
+      const targetId = State.mergeTarget.id;
+      if (!confirm(`Fusionner définitivement "${State.mergingSource.nom}" vers "${State.mergeTarget.nom}" ?`)) return;
+      $('merge-confirm').disabled = true;
+      try {
+        // Déplacer toutes les références
+        const updates = await Promise.all([
+          sb.from('scan_tracabilite').update({ article_id: targetId }).eq('article_id', sourceId),
+          sb.from('appro_catalogue').update({ ingredient_id: targetId }).eq('ingredient_id', sourceId),
+          sb.from('appro_besoins').update({ ingredient_id: targetId }).eq('ingredient_id', sourceId),
+          sb.from('fiche_ingredients').update({ article_id: targetId }).eq('article_id', sourceId),
+        ]);
+        const errs = updates.filter(u => u.error);
+        if (errs.length) throw new Error('UPDATE: ' + errs.map(e => e.error.message).join(' / '));
+
+        // Désactiver l'article source
+        const { error: e2 } = await sb.from('appro_ingredients')
+          .update({ actif: false })
+          .eq('id', sourceId);
+        if (e2) throw e2;
+
+        showToast(`✓ Fusion effectuée. "${State.mergingSource.nom}" désactivé.`, 'success');
+        $('modal-merge').classList.remove('visible');
+        State.mergingSource = null; State.mergeTarget = null;
+        await loadAll();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur fusion : ' + err.message, 'error');
+        $('merge-confirm').disabled = false;
+      }
+    });
+
+    // ==== FILTRES ====
+    document.querySelectorAll('[data-filter-actif]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-actif]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterActif = chip.dataset.filterActif;
+        renderList();
+      });
+    });
+    document.querySelector('[data-filter-cat="all"]').addEventListener('click', (e) => {
+      document.querySelectorAll('[data-filter-cat]').forEach(c => c.classList.remove('active'));
+      e.target.classList.add('active');
+      State.filterCat = 'all';
+      renderList();
+    });
+    document.querySelector('[data-filter-scans]').addEventListener('click', (e) => {
+      const isActive = e.target.classList.contains('active');
+      e.target.classList.toggle('active');
+      State.filterScans = isActive ? 'all' : 'avec';
+      renderList();
+    });
+    $('search').addEventListener('input', (e) => { State.search = e.target.value; renderList(); });
+
+    // INIT
+    loadAll();
+  </script>
+</body>
+</html>
