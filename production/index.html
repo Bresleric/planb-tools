@@ -2470,7 +2470,10 @@ function printEtiquette(productionId) {
 <meta name="viewport" content="width=235, initial-scale=1">
 <title> </title>
 <style>
-  @page { size: 62mm 29mm; margin: 0; }
+  /* Format adapté à la coupe imposée par iOS AirPrint (~60mm sur iPhone, ~100mm sur iPad).
+     On dessine pour 62×60mm. Sur iPhone tout est lu. Sur iPad il y a du blanc en bas
+     mais le contenu reste en haut, gros et lisible. */
+  @page { size: 62mm 60mm; margin: 0; }
   * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0 !important; padding: 0 !important;
@@ -2520,85 +2523,93 @@ function printEtiquette(productionId) {
       overflow: hidden !important;
     }
   }
-  /* Impression PAYSAGE forcée pour DK-22251 (62mm continu, coupe à 29mm).
-     Plus de mode portrait/rotation : @page size landscape impose le sens à AirPrint
-     et au pilote QL-820NWB qui coupe alors à 29mm pile. */
+  /* Layout grand format pour DK-22251 — étiquette 62×60mm.
+     Polices ~2× plus grandes pour être lisibles à distance.
+     Hiérarchie visuelle : Nom produit > DLC > reste. */
   @media print {
-    html, body { width: 62mm !important; height: 29mm !important; }
-    .preview-frame { width: 62mm; height: 29mm; }
-    .label { width: 62mm; height: 29mm; }
+    html, body { width: 62mm !important; height: 60mm !important; }
+    .preview-frame { width: 62mm; height: 60mm; }
+    .label { width: 62mm; height: 60mm; }
   }
   .label {
-    width: 62mm; height: 29mm;
-    max-width: 62mm; max-height: 29mm;
-    padding: 1mm 1.5mm;
+    width: 62mm; height: 60mm;
+    max-width: 62mm; max-height: 60mm;
+    padding: 2mm 2mm;
     position: relative;
     overflow: hidden;
+    display: flex; flex-direction: column;
+    gap: 1.5mm;
   }
   .label * { margin: 0; padding: 0; }
-  .row1 {
-    display: flex; align-items: center; gap: 1mm;
-    border-bottom: 0.3mm solid #000;
-    padding-bottom: 0.5mm; margin-bottom: 0.8mm;
-    width: 59mm; max-width: 59mm;
+  .row-top {
+    display: flex; align-items: center; gap: 2mm;
+    width: 58mm;
   }
   .day {
-    font-size: 7pt; font-weight: 900; text-transform: uppercase;
-    padding: 0.3mm 1mm; letter-spacing: 0.2px;
+    font-size: 13pt; font-weight: 900; text-transform: uppercase;
+    padding: 1mm 2mm; letter-spacing: 0.3px;
     white-space: nowrap; flex: 0 0 auto;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .day-red { color: #d00; border: 0.3mm solid #d00; border-radius: 0.5mm; }
-  .day-black { color: white; background: #000; border-radius: 0.5mm; }
-  .product {
-    font-size: 8pt; font-weight: 800;
-    flex: 1 1 0; min-width: 0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    color: #000;
-  }
+  .day-red { color: #d00; border: 0.5mm solid #d00; border-radius: 1mm; }
+  .day-black { color: white; background: #000; border-radius: 1mm; }
   .etab {
-    font-size: 6pt; font-weight: 800; color: #000;
-    white-space: nowrap; flex: 0 0 auto;
+    font-size: 11pt; font-weight: 800; color: #000;
+    white-space: nowrap; margin-left: auto;
   }
-  .row2 {
-    display: flex; align-items: baseline; gap: 1.5mm;
-    font-size: 6.5pt; margin-bottom: 0.8mm;
-    width: 59mm; max-width: 59mm;
+  .product {
+    font-size: 18pt; font-weight: 900;
+    line-height: 1.05;
+    color: #000;
+    width: 58mm; max-width: 58mm;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    border-bottom: 0.4mm solid #000;
+    padding-bottom: 1.5mm;
   }
-  .row2 > *, .row3 > * { min-width: 0; }
-  .lot { font-weight: 700; font-family: 'Courier New', monospace; white-space: nowrap; }
-  .qty { font-weight: 600; white-space: nowrap; }
-  .by { font-weight: 600; margin-left: auto; white-space: nowrap; }
-  .row3 {
+  .row-meta {
     display: flex; align-items: baseline; gap: 2mm;
-    font-size: 6.5pt;
-    width: 59mm; max-width: 59mm;
+    font-size: 10pt;
+    width: 58mm;
   }
-  .prod-date { color: #000; font-weight: 600; white-space: nowrap; }
+  .row-meta > * { min-width: 0; }
+  .lot { font-weight: 700; font-family: 'Courier New', monospace; white-space: nowrap; font-size: 9pt; }
+  .qty { font-weight: 800; white-space: nowrap; font-size: 12pt; }
+  .by { font-weight: 700; margin-left: auto; white-space: nowrap; }
+  .row-dates {
+    display: flex; align-items: baseline; gap: 2mm;
+    width: 58mm;
+    margin-top: auto;
+    border-top: 0.4mm solid #000;
+    padding-top: 1.5mm;
+  }
+  .prod-date { color: #000; font-weight: 700; white-space: nowrap; font-size: 9pt; }
   .dlc {
-    margin-left: auto; font-size: 9pt; font-weight: 900;
+    margin-left: auto; font-size: 14pt; font-weight: 900;
     color: #d00; white-space: nowrap;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .dlc small { font-size: 5pt; font-weight: 700; }
+  .dlc small { font-size: 7pt; font-weight: 700; }
 </style>
 </head>
 <body>
   <div class="screen-wrap">
-    <h1>Aperçu étiquette — DK-22251 (62mm continu, coupe 29mm)</h1>
+    <h1>Aperçu étiquette — DK-22251 (grand format 62×60mm)</h1>
     <div class="preview-frame">
       <div class="label">
-        <div class="row1">
+        <div class="row-top">
           <span class="day ${dayClass}">${dayName}</span>
-          <span class="product">${produitEsc}</span>
           <span class="etab">${etabShort}</span>
         </div>
-        <div class="row2">
+        <div class="product">${produitEsc}</div>
+        <div class="row-meta">
           <span class="lot">Lot:${escapeHtml(lotNum)}</span>
           <span class="qty">${qte}${escapeHtml(unite)}</span>
           <span class="by">${escapeHtml(producteur)}</span>
         </div>
-        <div class="row3">
+        <div class="row-dates">
           <span class="prod-date">P:${prodDateStr}</span>
           <span class="dlc"><small>DLC </small>${dlcStr}</span>
         </div>
