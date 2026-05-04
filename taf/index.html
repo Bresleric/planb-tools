@@ -139,18 +139,18 @@
     .tab-badge.visible { display: inline-block; }
 
     /* ====== TASK TABLE ====== */
-    /* Colonnes : Créneau(72) | De(32) | À(32) | Tâche(flex) | Note(flex) | Prio(40) | ✓(30) | Statut(70) | Actions(48) */
+    /* Colonnes : Créneau(72) | Éch.(48) | De(32) | À(32) | Retard(52) | Catégorie(90) | Tâche(flex) | Note(flex) | Prio(40) | ✓(30) | Statut(70) | Actions(48) */
     .content { flex: 1; overflow-x: auto; overflow-y: auto; padding: 4px 6px; }
 
     .taf-grid {
       display: grid;
-      grid-template-columns: 28px 72px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: 28px 72px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -169,7 +169,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: 28px 72px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -245,6 +245,12 @@
     .task-done-info {
       font-size: 0.65rem; color: var(--green); white-space: nowrap;
     }
+
+    .task-echeance {
+      font-size: 0.7rem; color: var(--gray-500); font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .task-row.done .task-echeance { color: var(--gray-400); }
 
     .task-actions { display: flex; gap: 2px; justify-content: center; }
     .btn-action {
@@ -481,39 +487,6 @@
     .etiquette-row .val { font-weight: 600; color: var(--gray-800); margin-top: 2px; }
     .etiquette-row .val.dlc { color: var(--red); font-size: 1.05rem; }
 
-    /* ====== MULTI-SELECT & BATCH ACTION BAR ====== */
-    .task-select-check {
-      width: 20px; height: 20px; border-radius: 4px;
-      border: 2px solid var(--gray-300); background: white;
-      cursor: pointer; display: flex; align-items: center; justify-content: center;
-      font-size: 0.65rem; color: white; margin: 0 auto;
-      transition: all .15s;
-    }
-    .task-select-check:hover { border-color: var(--blue); }
-    .task-select-check.checked { background: var(--blue); border-color: var(--blue); }
-    .task-row.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 1px var(--blue), var(--shadow); }
-    .task-row.selected.done { opacity: 0.7; }
-
-    .batch-bar {
-      display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 150;
-      background: white; border-top: 2px solid var(--blue);
-      padding: 10px 16px; box-shadow: 0 -4px 12px rgba(0,0,0,.12);
-      align-items: center; justify-content: space-between; gap: 8px;
-    }
-    .batch-bar.show { display: flex; }
-    .batch-bar-left { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-700); }
-    .batch-bar-left .count { font-weight: 700; color: var(--blue); font-size: 1rem; }
-    .batch-bar-actions { display: flex; gap: 8px; }
-    .btn-batch {
-      padding: 8px 16px; border-radius: var(--radius-sm); border: none;
-      font-size: 0.85rem; font-weight: 600; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 6px;
-    }
-    .btn-batch.assign { background: var(--blue); color: white; }
-    .btn-batch.assign:active { background: #2563eb; }
-    .btn-batch.cancel { background: var(--gray-200); color: var(--gray-600); }
-    .btn-batch.cancel:active { background: var(--gray-300); }
-
     /* ====== TOAST ====== */
     .toast {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -739,18 +712,6 @@
   </div>
 </div>
 
-<!-- BATCH ACTION BAR -->
-<div class="batch-bar" id="batch-bar">
-  <div class="batch-bar-left">
-    <span class="count" id="batch-count">0</span>
-    <span>tâche(s) sélectionnée(s)</span>
-  </div>
-  <div class="batch-bar-actions">
-    <button class="btn-batch cancel" onclick="clearSelection()">✕ Annuler</button>
-    <button class="btn-batch assign" onclick="showBatchAssignModal()">👤 Attribuer à…</button>
-  </div>
-</div>
-
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -788,7 +749,6 @@
   let productionFiches = []; // fiches techniques en cache
   let sortColumn = 'default'; // colonne de tri active
   let sortDir = 'asc'; // 'asc' ou 'desc'
-  let selectedTaskIds = new Set(); // multi-select pour attribution batch
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -1140,10 +1100,6 @@
   // ====== DATA LOADING ======
   async function refreshData() {
     try {
-      // Clear multi-select on data refresh
-      selectedTaskIds.clear();
-      updateBatchBar();
-
       // Report automatique des tâches en retard AVANT le chargement,
       // uniquement quand on visualise aujourd'hui
       if (isToday(filterDate)) {
@@ -1321,6 +1277,10 @@
             va = creneauOrder[a.creneau] || 9;
             vb = creneauOrder[b.creneau] || 9;
             break;
+          case 'echeance':
+            va = a.echeance || '';
+            vb = b.echeance || '';
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
           case 'createur':
             va = (a.createur_nom || '').toLowerCase();
             vb = (b.createur_nom || '').toLowerCase();
@@ -1425,13 +1385,10 @@
     // Table header with sortable columns
     const sa = (col) => sortColumn === col ? 'active' : '';
     const arrow = (col) => sortColumn === col ? (sortDir === 'asc' ? '▲' : '▼') : '▲';
-    const showSelect = canAssign(); // responsable+ can multi-select
-    const allFilteredIds = filtered.filter(t => !t.fait_par_id).map(t => t.id);
-    const allSelected = showSelect && allFilteredIds.length > 0 && allFilteredIds.every(id => selectedTaskIds.has(id));
 
     let html = `<div class="task-table-header">
-      <span style="text-align:center">${showSelect ? `<span class="task-select-check ${allSelected ? 'checked' : ''}" onclick="toggleSelectAll()" title="Tout sélectionner">${allSelected ? '✓' : ''}</span>` : ''}</span>
       <span class="th-sort ${sa('creneau')}" onclick="toggleSort('creneau')">Crén.<span class="sort-arrow">${arrow('creneau')}</span></span>
+      <span class="th-sort th-center ${sa('echeance')}" onclick="toggleSort('echeance')">Éch.<span class="sort-arrow">${arrow('echeance')}</span></span>
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
       <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
@@ -1466,13 +1423,13 @@
       const isLate = !done && t.echeance_initiale && t.echeance_initiale < t.echeance;
       const daysLate = isLate ? Math.max(1, Math.round((new Date(t.echeance) - new Date(t.echeance_initiale)) / 86400000)) : 0;
       const lateClass = isLate ? ' task-late' : '';
+      // Échéance compacte au format jj/mm (ex: "04/05")
+      const echShort = t.echeance ? `${t.echeance.slice(8,10)}/${t.echeance.slice(5,7)}` : '';
+      const echTitle = t.echeance ? `Échéance : ${new Date(t.echeance).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}` : '';
 
-      const isSelected = selectedTaskIds.has(t.id);
-      const selClass = isSelected ? ' selected' : '';
-
-      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}${lateClass}${selClass}">
-        <div class="task-cell">${showSelect && !done ? `<span class="task-select-check ${isSelected ? 'checked' : ''}" onclick="toggleTaskSelection('${t.id}')">${isSelected ? '✓' : ''}</span>` : ''}</div>
+      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}${lateClass}">
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
+        <div class="task-cell"><span class="task-echeance" title="${echTitle}">${echShort}</span></div>
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
@@ -1495,117 +1452,6 @@
   }
 
   function renderFiltered() { if (currentTab === 'taches') renderTasksTab(); }
-
-  // ====== MULTI-SELECT & BATCH ASSIGN ======
-  function toggleTaskSelection(taskId) {
-    if (selectedTaskIds.has(taskId)) {
-      selectedTaskIds.delete(taskId);
-    } else {
-      selectedTaskIds.add(taskId);
-    }
-    updateBatchBar();
-    renderFiltered();
-  }
-
-  function toggleSelectAll() {
-    const filtered = getFilteredTasks().filter(t => !t.fait_par_id);
-    const allIds = filtered.map(t => t.id);
-    const allSelected = allIds.length > 0 && allIds.every(id => selectedTaskIds.has(id));
-    if (allSelected) {
-      // Deselect all
-      allIds.forEach(id => selectedTaskIds.delete(id));
-    } else {
-      // Select all non-done
-      allIds.forEach(id => selectedTaskIds.add(id));
-    }
-    updateBatchBar();
-    renderFiltered();
-  }
-
-  function clearSelection() {
-    selectedTaskIds.clear();
-    updateBatchBar();
-    renderFiltered();
-  }
-
-  function updateBatchBar() {
-    const bar = document.getElementById('batch-bar');
-    const count = selectedTaskIds.size;
-    if (count > 0) {
-      document.getElementById('batch-count').textContent = count;
-      bar.classList.add('show');
-    } else {
-      bar.classList.remove('show');
-    }
-  }
-
-  function showBatchAssignModal() {
-    if (selectedTaskIds.size === 0) return;
-
-    // Build user picker grouped by equipe (same logic as showAssignModal)
-    const presentList = usersPresentToday();
-    const grouped = {};
-    presentList.forEach(u => {
-      const eq = u.equipe || 'autre';
-      if (!grouped[eq]) grouped[eq] = [];
-      grouped[eq].push(u);
-    });
-
-    let userHtml = '';
-    const equipeOrder = [...EQUIPES];
-    equipeOrder.forEach(eq => {
-      if (!grouped[eq] || grouped[eq].length === 0) return;
-      const label = eq.charAt(0).toUpperCase() + eq.slice(1);
-      userHtml += `<div style="padding:4px 8px;font-size:0.75rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-top:6px">${label}</div>`;
-      grouped[eq].forEach(u => {
-        userHtml += `
-          <div class="user-pick-item"
-               onclick="doBatchAssign('${u.id}', '${esc(u.nom)}', '${esc(u.initiales)}')">
-            <span class="user-initials-sm">${esc(u.initiales)}</span>
-            <span>${esc(u.nom)}</span>
-          </div>`;
-      });
-    });
-
-    const count = selectedTaskIds.size;
-    openModal(`Attribuer ${count} tâche${count > 1 ? 's' : ''}`, `
-      ${hasPlanning() ? `<p style="margin-bottom:8px;font-size:0.72rem;color:var(--blue);font-style:italic">👥 ${presentList.length} collaborateur(s) présent(s) au planning</p>` : `<p style="margin-bottom:8px;font-size:0.72rem;color:var(--gray-400);font-style:italic">⚠ Aucun planning pour cette date</p>`}
-      <div class="user-list-picker" style="max-height:350px;overflow-y:auto">
-        <div class="user-pick-item" onclick="doBatchAssign(null, null, null)" style="color:var(--gray-400);font-style:italic">
-          Retirer l'attribution
-        </div>
-        ${userHtml}
-      </div>
-    `, []);
-  }
-
-  async function doBatchAssign(userId, nom, initiales) {
-    if (selectedTaskIds.size === 0) return;
-    try {
-      const ids = [...selectedTaskIds];
-      // Update all selected tasks in parallel
-      await Promise.all(ids.map(id =>
-        DB.updateTask(id, {
-          attribue_a_id: userId,
-          attribue_a_nom: nom,
-          attribue_a_initiales: initiales
-        })
-      ));
-      tasks = await DB.getTasks(filterDate);
-      closeModal();
-      const count = ids.length;
-      clearSelection();
-      showToast(
-        userId
-          ? `${count} tâche${count > 1 ? 's' : ''} attribuée${count > 1 ? 's' : ''} à ${nom}`
-          : `Attribution retirée (${count} tâche${count > 1 ? 's' : ''})`,
-        'success'
-      );
-    } catch (e) {
-      console.error('Batch assign error:', e);
-      showToast('Erreur attribution', 'error');
-    }
-  }
 
   // ====== TASK ACTIONS ======
   async function toggleTask(id, isDone) {
