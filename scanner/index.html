@@ -332,6 +332,9 @@
       <button class="btn btn-success" id="btn-finalize-session">
         <span>✓</span><span>Boucler &amp; rapprocher</span>
       </button>
+      <button class="btn btn-secondary" id="btn-validate-no-bl" style="margin-top:8px;">
+        <span>📋</span><span>Valider sans BL (registre HACCP)</span>
+      </button>
       <button class="btn btn-ghost" id="btn-leave-session" style="margin-top:8px;">Quitter sans valider (reprise possible)</button>
     </section>
 
@@ -837,6 +840,8 @@
         // Activer le bouton Boucler ssi : >= 1 étiquette extraite ET BL extrait
         const blReady = bl && (bl.statut === 'extrait' || bl.statut === 'en_attente_validation' || bl.statut === 'valide');
         $('btn-finalize-session').disabled = !(nbExtraites > 0 && blReady);
+        // Le bouton "Valider sans BL" est actif dès qu'il y a au moins 1 étiquette extraite
+        $('btn-validate-no-bl').disabled = nbExtraites === 0;
       } catch (err) {
         console.error('refreshSessionList:', err);
       }
@@ -853,6 +858,38 @@
     $('btn-leave-session').addEventListener('click', () => {
       State.currentSessionId = null;
       showScreen('home');
+    });
+
+    // ====== VALIDATION SANS BL (registre HACCP) ======
+    $('btn-validate-no-bl').addEventListener('click', async () => {
+      if (!State.currentSessionId) return;
+      if (!confirm('Valider la session sans rapprochement BL ?\n\nLes étiquettes seront archivées comme registre HACCP. Tu pourras toujours retrouver les lots, DLC, etc.')) return;
+      try {
+        const { error: e1 } = await sb.from('scan_sessions').update({
+          statut: 'validee',
+          validee_par_id: currentUser.id,
+          validee_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+          observation_validation: 'Validation sans BL/facture — registre HACCP',
+          cloturee_at: new Date().toISOString(),
+        }).eq('id', State.currentSessionId);
+        if (e1) throw e1;
+
+        const { error: e2 } = await sb.from('scans').update({
+          statut: 'valide',
+          valide_par_id: currentUser.id,
+          valide_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+        }).eq('session_id', State.currentSessionId).in('statut', ['en_attente_validation', 'extrait']);
+        if (e2) throw e2;
+
+        showToast('✓ Session validée comme registre HACCP', 'success');
+        State.currentSessionId = null;
+        showScreen('home');
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
     });
 
     // ====== FINALISATION (rapprochement) ======
