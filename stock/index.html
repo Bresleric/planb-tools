@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Stock — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669;        /* emerald-600 */
+      --primary-dark: #047857;
+      --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:900px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .btn { display:flex; align-items:center; justify-content:center; gap:8px; padding:10px 14px; font-size:14px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; transition:all .15s; border:none; font-family:inherit; }
+    .btn:active { transform:scale(.98); }
+    .btn[disabled] { opacity:.5; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-primary:active:not([disabled]) { background:var(--primary-dark); }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-danger { background:white; color:var(--red-700); border:1px solid var(--red-100); }
+
+    /* Stats top */
+    .stats-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:16px; }
+    .stat-box { padding:10px 12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .stat-box .sv { font-size:24px; font-weight:700; color:var(--gray-900); line-height:1; }
+    .stat-box .sl { font-size:11px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+
+    /* Filters */
+    .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+
+    /* Group card */
+    .group-card { background:white; border:1px solid var(--gray-200); border-radius:var(--radius); padding:12px; margin-bottom:10px; }
+    .group-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+    .group-title { font-size:16px; font-weight:700; color:var(--gray-900); }
+    .group-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .group-badge { padding:2px 8px; background:var(--orange-100); color:var(--orange-700); border-radius:999px; font-size:11px; font-weight:600; flex-shrink:0; }
+    .group-actions { display:flex; flex-direction:column; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--gray-100); }
+    .group-actions.expanded { display:flex; }
+
+    /* Autocomplete */
+    .autocomplete { position:relative; }
+    .autocomplete input { width:100%; padding:10px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .autocomplete input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+    .autocomplete-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:280px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:4px; }
+    .autocomplete-results.visible { display:block; }
+    .ac-result { padding:10px 12px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--gray-100); }
+    .ac-result:hover, .ac-result.active { background:var(--primary-light); }
+    .ac-result:last-child { border-bottom:none; }
+    .ac-result .ac-cat { font-size:11px; color:var(--gray-500); }
+    .ac-result.suggestion { background:var(--blue-100); }
+    .ac-result.suggestion .ac-cat { color:var(--blue-700); }
+
+    /* Modal création */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:50; align-items:center; justify-content:center; padding:16px; }
+    .modal-bg.visible { display:flex; }
+    .modal { background:white; border-radius:var(--radius); padding:20px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; }
+    .modal-title { font-size:17px; font-weight:700; margin-bottom:12px; }
+    .modal-field { margin-bottom:12px; }
+    .modal-field label { display:block; font-size:12px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+    .modal-field input, .modal-field select { width:100%; padding:10px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; }
+    .modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:32px 16px; color:var(--gray-500); }
+    .empty-state .es-emoji { font-size:48px; margin-bottom:12px; }
+    .empty-state .es-msg { font-size:15px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="../index.html" class="btn-back">← Portail</a>
+      <span class="header-title">Stock</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="card">
+      <div class="card-title">Rattachement étiquettes → articles</div>
+      <div style="font-size:13px; color:var(--gray-600); margin-bottom:14px;">
+        Les étiquettes scannées en réception sont identifiées par leur nom de produit (ex: "Saucisse de Strasbourg"). Pour suivre le stock, il faut les rattacher au référentiel des articles d'approvisionnement. Cet outil te permet de le faire en lot.
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="sv" id="stat-a-rattacher">—</div>
+          <div class="sl">À rattacher</div>
+        </div>
+        <div class="stat-box">
+          <div class="sv" id="stat-rattaches">—</div>
+          <div class="sl">Rattachés</div>
+        </div>
+        <div class="stat-box">
+          <div class="sv" id="stat-articles">—</div>
+          <div class="sl">Articles total</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <span class="filter-chip active" data-etab="all">Tous établissements</span>
+        <span class="filter-chip" data-etab="freddy">Freddy</span>
+        <span class="filter-chip" data-etab="liesel">Liesel</span>
+      </div>
+    </div>
+
+    <div id="groups-container">
+      <div style="color:var(--gray-500); font-size:14px; padding:20px; text-align:center;">Chargement…</div>
+    </div>
+  </main>
+
+  <!-- Modal création article -->
+  <div class="modal-bg" id="modal-create">
+    <div class="modal">
+      <div class="modal-title">Créer un nouvel article</div>
+      <div style="font-size:12px; color:var(--gray-500); margin-bottom:12px;">
+        Cet article sera ajouté au référentiel <code>appro_ingredients</code> et utilisé pour tous les scans avec ce produit.
+      </div>
+      <div class="modal-field">
+        <label>Nom de l'article</label>
+        <input type="text" id="create-nom" placeholder="Ex: Saucisse de Strasbourg">
+      </div>
+      <div class="modal-field">
+        <label>Catégorie</label>
+        <select id="create-categorie"></select>
+      </div>
+      <div class="modal-field">
+        <label>Unité</label>
+        <select id="create-unite">
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="L">L</option>
+          <option value="cL">cL</option>
+          <option value="pce">pièce</option>
+          <option value="Bouteille">Bouteille</option>
+          <option value="Carton">Carton</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="create-confirm">Créer + rattacher</button>
+        <button class="btn btn-ghost" id="create-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    // ========= ÉTAT =========
+    const State = {
+      filterEtab: 'all',
+      articles: [],         // référentiel appro_ingredients
+      categories: [],       // catégories distinctes
+      groups: [],           // groupes de scans à rattacher
+      pendingGroup: null,   // groupe en cours d'édition (pour modal création)
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'toast visible' + (kind ? ' ' + kind : '');
+      setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+
+    // ========= CHARGEMENT =========
+    async function loadAll() {
+      try {
+        // 1. Référentiel articles
+        const { data: articles, error: e1 } = await sb.from('appro_ingredients')
+          .select('id, nom, categorie, unite, actif')
+          .eq('actif', true)
+          .order('nom');
+        if (e1) throw e1;
+        State.articles = articles || [];
+
+        // Catégories distinctes pour le modal de création
+        State.categories = [...new Set(State.articles.map(a => a.categorie).filter(Boolean))].sort();
+        const sel = $('create-categorie');
+        sel.innerHTML = State.categories.map(c => `<option value="${c}">${c}</option>`).join('') +
+                        `<option value="__new__">+ Nouvelle catégorie…</option>`;
+
+        // 2. Scans à rattacher : join scan_tracabilite + scans pour filtrer par etablissement et statut
+        const etabFilter = State.filterEtab === 'all' ? null : State.filterEtab;
+        let q = sb.from('scan_tracabilite')
+          .select('id, scan_id, produit, lot, poids_net_kg, dlc, categorie, fabricant, scans!inner(id, etablissement, statut, created_at)')
+          .is('article_id', null);
+        if (etabFilter) q = q.eq('scans.etablissement', etabFilter);
+        const { data: scans, error: e2 } = await q.in('scans.statut', ['valide', 'en_attente_validation', 'extrait']).limit(500);
+        if (e2) throw e2;
+
+        // Grouper côté JS par produit (lower+trim)
+        const byKey = {};
+        (scans || []).forEach(s => {
+          const key = (s.produit || '__sans_nom__').toLowerCase().trim();
+          if (!byKey[key]) {
+            byKey[key] = {
+              key,
+              produit: s.produit || '(sans nom)',
+              scans: [],
+              poids_total: 0,
+              lots: new Set(),
+              etablissements: new Set(),
+              fabricants: new Set(),
+              categorie_haccp: s.categorie,
+            };
+          }
+          byKey[key].scans.push(s);
+          if (s.poids_net_kg) byKey[key].poids_total += Number(s.poids_net_kg);
+          if (s.lot) byKey[key].lots.add(s.lot);
+          if (s.scans?.etablissement) byKey[key].etablissements.add(s.scans.etablissement);
+          if (s.fabricant) byKey[key].fabricants.add(s.fabricant);
+        });
+        State.groups = Object.values(byKey).sort((a, b) => b.scans.length - a.scans.length);
+
+        // 3. Stats globales
+        const { count: nRattaches } = await sb.from('scan_tracabilite')
+          .select('id', { count: 'exact', head: true })
+          .not('article_id', 'is', null);
+        const totalScans = (await sb.from('scan_tracabilite').select('id', { count: 'exact', head: true })).count || 0;
+
+        $('stat-a-rattacher').textContent = totalScans - (nRattaches || 0);
+        $('stat-rattaches').textContent = nRattaches || 0;
+        $('stat-articles').textContent = State.articles.length;
+
+        renderGroups();
+      } catch (err) {
+        console.error(err);
+        $('groups-container').innerHTML = `<div class="empty-state"><div class="es-emoji">⚠️</div><div class="es-msg">Erreur de chargement : ${err.message}</div></div>`;
+      }
+    }
+
+    // ========= RENDU =========
+    function renderGroups() {
+      const container = $('groups-container');
+      if (!State.groups.length) {
+        container.innerHTML = `
+          <div class="card empty-state">
+            <div class="es-emoji">✓</div>
+            <div class="es-msg">Tous les scans sont rattachés à un article du référentiel. Beau travail.</div>
+          </div>`;
+        return;
+      }
+      container.innerHTML = '';
+      State.groups.forEach(g => container.appendChild(renderGroup(g)));
+    }
+
+    function renderGroup(g) {
+      const div = document.createElement('div');
+      div.className = 'group-card';
+      const lotsArr = [...g.lots];
+      const etabArr = [...g.etablissements];
+      div.innerHTML = `
+        <div class="group-header">
+          <div style="flex:1; min-width:0;">
+            <div class="group-title">${escapeHtml(g.produit)}</div>
+            <div class="group-meta">
+              ${g.scans.length} scan${g.scans.length>1?'s':''} ·
+              ${g.poids_total ? g.poids_total.toFixed(2) + ' kg total' : 'poids ?'} ·
+              ${lotsArr.length} lot${lotsArr.length>1?'s':''} ${lotsArr.length ? '(' + lotsArr.slice(0,3).join(', ') + (lotsArr.length>3?'…':'') + ')' : ''} ·
+              ${etabArr.join(', ')}
+              ${g.categorie_haccp ? ' · cat: ' + g.categorie_haccp : ''}
+            </div>
+          </div>
+          <span class="group-badge">${g.scans.length}</span>
+        </div>
+        <div class="group-actions">
+          <div class="autocomplete">
+            <input type="text" placeholder="Rechercher dans les ${State.articles.length} articles…" data-key="${g.key}">
+            <div class="autocomplete-results" data-key="${g.key}"></div>
+          </div>
+          <button class="btn btn-secondary" data-action="create" data-key="${g.key}">+ Créer un nouvel article "${escapeHtml(g.produit).slice(0,40)}"</button>
+        </div>
+      `;
+      // Wire autocomplete
+      const input = div.querySelector('input[data-key]');
+      const results = div.querySelector('.autocomplete-results');
+      input.addEventListener('input', () => {
+        const q = input.value.toLowerCase().trim();
+        renderAutocomplete(g, q, results);
+      });
+      input.addEventListener('focus', () => {
+        renderAutocomplete(g, input.value.toLowerCase().trim(), results);
+      });
+      // Délai sur blur pour permettre le clic
+      input.addEventListener('blur', () => setTimeout(() => results.classList.remove('visible'), 200));
+      // Wire bouton Créer
+      div.querySelector('[data-action="create"]').addEventListener('click', () => openCreateModal(g));
+      return div;
+    }
+
+    function renderAutocomplete(g, q, container) {
+      // Trois sections : suggestions auto (top match), résultats query, all
+      const articlesByScore = State.articles
+        .map(a => ({ a, score: scoreMatch(g.produit, a.nom, g.categorie_haccp, a.categorie) }))
+        .sort((x, y) => y.score - x.score);
+
+      let candidates = [];
+      if (q) {
+        candidates = State.articles
+          .filter(a => a.nom.toLowerCase().includes(q) || (a.categorie || '').toLowerCase().includes(q))
+          .slice(0, 12);
+      } else {
+        // Sans query, montrer top 5 suggestions
+        candidates = articlesByScore.slice(0, 5).map(x => x.a);
+      }
+
+      if (!candidates.length) {
+        container.innerHTML = `<div class="ac-result" style="color:var(--gray-500); font-style:italic;">Aucun résultat. Crée un nouvel article ↓</div>`;
+      } else {
+        container.innerHTML = candidates.map((a, idx) => {
+          const isSuggestion = !q && idx < 3;
+          return `
+            <div class="ac-result ${isSuggestion ? 'suggestion' : ''}" data-article-id="${a.id}">
+              <div>${isSuggestion ? '✨ ' : ''}${escapeHtml(a.nom)}</div>
+              <div class="ac-cat">${escapeHtml(a.categorie || '')} · ${escapeHtml(a.unite || '')}</div>
+            </div>
+          `;
+        }).join('');
+        container.querySelectorAll('.ac-result[data-article-id]').forEach(el => {
+          el.addEventListener('click', () => {
+            const articleId = el.dataset.articleId;
+            const article = State.articles.find(a => a.id === articleId);
+            if (article) attachGroup(g, article);
+          });
+        });
+      }
+      container.classList.add('visible');
+    }
+
+    function scoreMatch(produit, articleNom, catHaccp, catArticle) {
+      const p = (produit || '').toLowerCase();
+      const a = (articleNom || '').toLowerCase();
+      if (!p || !a) return 0;
+      const pWords = new Set(p.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      const aWords = new Set(a.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      let common = 0;
+      pWords.forEach(w => { if (aWords.has(w)) common++; });
+      let score = pWords.size > 0 ? common / pWords.size : 0;
+      // Bonus si même catégorie sémantique
+      if (catHaccp && catArticle) {
+        const haccpToAppro = {
+          'viande_bovine': 'Viande & charcuterie',
+          'viande_porcine': 'Viande & charcuterie',
+          'viande_volaille': 'Viande & charcuterie',
+          'viande_ovine': 'Viande & charcuterie',
+          'fromage': 'Frais',
+          'bof_lait': 'Frais',
+          'fruit_legume': 'Fruits & Légumes',
+          'poisson': 'Poisson',
+          'epicerie': 'Alimentaire',
+          'boisson': 'Boisson sans alcool',
+        };
+        if (haccpToAppro[catHaccp] === catArticle) score += 0.2;
+      }
+      return score;
+    }
+
+    // ========= RATTACHEMENT =========
+    async function attachGroup(g, article) {
+      const scanIds = g.scans.map(s => s.id);
+      try {
+        const { error } = await sb.from('scan_tracabilite')
+          .update({
+            article_id: article.id,
+            match_par_id: currentUser.id,
+            match_par_nom: currentUser.nom,
+            match_at: new Date().toISOString(),
+          })
+          .in('id', scanIds);
+        if (error) throw error;
+        showToast(`✓ ${scanIds.length} scan${scanIds.length>1?'s':''} rattaché${scanIds.length>1?'s':''} à "${article.nom}"`, 'success');
+        await loadAll();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    // ========= MODAL CRÉATION =========
+    function openCreateModal(g) {
+      State.pendingGroup = g;
+      $('create-nom').value = g.produit || '';
+      // Pré-sélection catégorie selon mapping HACCP -> appro
+      const haccpToAppro = {
+        'viande_bovine': 'Viande & charcuterie', 'viande_porcine': 'Viande & charcuterie',
+        'viande_volaille': 'Viande & charcuterie', 'viande_ovine': 'Viande & charcuterie',
+        'fromage': 'Frais', 'bof_lait': 'Frais',
+        'fruit_legume': 'Fruits & Légumes', 'poisson': 'Poisson',
+        'epicerie': 'Alimentaire', 'boisson': 'Boisson sans alcool',
+      };
+      const sugg = haccpToAppro[g.categorie_haccp];
+      if (sugg && State.categories.includes(sugg)) $('create-categorie').value = sugg;
+      $('create-unite').value = 'kg';
+      $('modal-create').classList.add('visible');
+    }
+    $('create-cancel').addEventListener('click', () => {
+      $('modal-create').classList.remove('visible');
+      State.pendingGroup = null;
+    });
+    $('create-confirm').addEventListener('click', async () => {
+      const nom = $('create-nom').value.trim();
+      let categorie = $('create-categorie').value;
+      if (categorie === '__new__') {
+        categorie = prompt('Nouvelle catégorie :');
+        if (!categorie) return;
+      }
+      const unite = $('create-unite').value;
+      if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+      try {
+        const { data, error } = await sb.from('appro_ingredients')
+          .insert({ nom, categorie, unite, actif: true })
+          .select('id, nom, categorie, unite')
+          .single();
+        if (error) throw error;
+        State.articles.push(data);
+        showToast(`✓ Article "${nom}" créé`, 'success');
+        if (State.pendingGroup) {
+          await attachGroup(State.pendingGroup, data);
+        }
+        $('modal-create').classList.remove('visible');
+        State.pendingGroup = null;
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur création : ' + err.message, 'error');
+      }
+    });
+
+    // ========= FILTRES =========
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterEtab = chip.dataset.etab;
+        loadAll();
+      });
+    });
+
+    // ========= UTIL =========
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // ========= INIT =========
+    loadAll();
+  </script>
+</body>
+</html>

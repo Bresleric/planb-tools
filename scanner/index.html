@@ -244,7 +244,7 @@
       </div>
 
       <div class="card" id="card-active-sessions" style="display:none;">
-        <div class="card-title">Sessions en cours</div>
+        <div class="card-title">Sessions récentes</div>
         <div id="active-sessions-list"></div>
       </div>
 
@@ -335,7 +335,10 @@
       <button class="btn btn-secondary" id="btn-validate-no-bl" style="margin-top:8px;">
         <span>📋</span><span>Valider sans BL (registre HACCP)</span>
       </button>
-      <button class="btn btn-ghost" id="btn-leave-session" style="margin-top:8px;">Quitter sans valider (reprise possible)</button>
+      <button class="btn btn-ghost" id="btn-export-csv" style="margin-top:8px;">
+        <span>📥</span><span>Exporter en CSV</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-leave-session" style="margin-top:8px;">Quitter (reprise possible)</button>
     </section>
 
     <!-- ============ ÉCRAN RAPPROCHEMENT ============ -->
@@ -566,12 +569,12 @@
     // ====== ACTIVE SESSIONS (en home) ======
     async function loadActiveSessions() {
       try {
+        // Récupère toutes les sessions récentes + le compte d'étiquettes par session (calculé à la volée)
         const { data, error } = await sb.from('scan_sessions')
-          .select('id, fournisseur_nom, date_reception, statut, nb_etiquettes, created_at')
+          .select('id, fournisseur_nom, date_reception, statut, nb_etiquettes, created_at, scans(id, type_document)')
           .eq('etablissement', currentEtab)
-          .in('statut', ['en_cours', 'etiquettes_terminees', 'bl_scanne'])
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(10);
         if (error) throw error;
 
         const card = $('card-active-sessions');
@@ -579,13 +582,33 @@
         if (!data || !data.length) { card.style.display = 'none'; return; }
         card.style.display = 'block';
         list.innerHTML = '';
+
+        const statutBadges = {
+          en_cours: ['badge-cours', 'En cours'],
+          etiquettes_terminees: ['badge-cours', 'Étiq. terminées'],
+          bl_scanne: ['badge-cours', 'BL scanné'],
+          rapprochement_en_cours: ['badge-cours', 'Rapprochement…'],
+          rapprochee: ['badge-attente', 'À valider'],
+          validee: ['badge-valide', 'Validée'],
+          rejetee: ['badge-rejete', 'Rejetée'],
+        };
+
+        const isOpen = (statut) => ['en_cours', 'etiquettes_terminees', 'bl_scanne', 'rapprochement_en_cours', 'rapprochee'].includes(statut);
+
         data.forEach(s => {
+          const nbEtiq = (s.scans || []).filter(sc => sc.type_document === 'etiquette_produit').length;
+          const [badgeClass, badgeLabel] = statutBadges[s.statut] || ['badge-cours', s.statut];
           const item = document.createElement('div');
           item.className = 'session-summary';
+          if (!isOpen(s.statut)) {
+            // Style atténué pour les sessions terminées
+            item.style.background = 'var(--gray-50)';
+            item.style.borderColor = 'var(--gray-200)';
+          }
           item.innerHTML = `
             <div class="ss-info">
               <div class="ss-title">${s.fournisseur_nom || 'Sans fournisseur'}</div>
-              <div class="ss-meta">${fmtDateOnly(s.date_reception)} · ${s.nb_etiquettes} étiq · statut : ${s.statut}</div>
+              <div class="ss-meta">${fmtDateOnly(s.date_reception)} · ${nbEtiq} étiq · <span class="badge ${badgeClass}">${badgeLabel}</span></div>
             </div>
             <span class="ss-arrow">→</span>
           `;
@@ -859,6 +882,115 @@
       State.currentSessionId = null;
       showScreen('home');
     });
+
+    // ====== EXPORT CSV ======
+    $('btn-export-csv').addEventListener('click', exportSessionCsv);
+
+    async function exportSessionCsv() {
+      if (!State.currentSessionId) return;
+      try {
+        // Récupère la session
+        const { data: sess, error: e1 } = await sb.from('scan_sessions')
+          .select('fournisseur_nom, date_reception, statut, validee_par_nom, date_validation, observation_validation, rapprochement_anomalies_count')
+          .eq('id', State.currentSessionId)
+          .single();
+        if (e1) throw e1;
+
+        // Récupère tous les scans avec leur traçabilité
+        const { data: scans, error: e2 } = await sb.from('scans')
+          .select(`
+            id, type_document, statut, confiance_globale,
+            created_by_nom, created_at,
+            valide_par_nom, date_validation,
+            scan_tracabilite(*)
+          `)
+          .eq('session_id', State.currentSessionId)
+          .order('created_at', { ascending: true });
+        if (e2) throw e2;
+
+        // Construire le CSV
+        const headers = [
+          '#', 'Type', 'Statut', 'Confiance',
+          'Produit', 'Catégorie', 'Fabricant', 'Agrément', 'Code barres',
+          'Lot', 'DLC', 'DDM', 'Date fab.', 'Date emb.', 'Date abat.',
+          'Poids net (kg)', 'Tare (kg)', 'Temp min (°C)', 'Temp max (°C)',
+          'Origine', 'Allergènes', 'Ingrédients',
+          'Scanné par', 'Scanné le', 'Validé par', 'Validé le',
+        ];
+
+        const esc = (v) => {
+          if (v == null) return '';
+          const s = String(v).replace(/"/g, '""');
+          return /[";\n\r]/.test(s) ? `"${s}"` : s;
+        };
+
+        const rows = (scans || []).map((s, idx) => {
+          const t = Array.isArray(s.scan_tracabilite) ? s.scan_tracabilite[0] : s.scan_tracabilite;
+          return [
+            idx + 1,
+            s.type_document,
+            s.statut,
+            s.confiance_globale ?? '',
+            t?.produit ?? '',
+            t?.categorie ?? '',
+            t?.fabricant ?? '',
+            t?.estampille ?? '',
+            t?.code_barres ?? '',
+            t?.lot ?? '',
+            t?.dlc ?? '',
+            t?.ddm ?? '',
+            t?.date_fabrication ?? '',
+            t?.date_emballage ?? '',
+            t?.date_abattage ?? '',
+            t?.poids_net_kg ?? '',
+            t?.tare_kg ?? '',
+            t?.temp_min ?? '',
+            t?.temp_max ?? '',
+            t?.origine ?? '',
+            (t?.allergenes ?? []).join(', '),
+            t?.ingredients ?? '',
+            s.created_by_nom ?? '',
+            s.created_at ? new Date(s.created_at).toLocaleString('fr-FR') : '',
+            s.valide_par_nom ?? '',
+            s.date_validation ? new Date(s.date_validation).toLocaleString('fr-FR') : '',
+          ].map(esc).join(';');
+        });
+
+        // Métadonnées en haut du fichier
+        const meta = [
+          `# Récap session Scanner — PlanB Tools`,
+          `# Fournisseur;${esc(sess.fournisseur_nom)}`,
+          `# Date réception;${esc(sess.date_reception)}`,
+          `# Statut session;${esc(sess.statut)}`,
+          `# Validée par;${esc(sess.validee_par_nom ?? '')}`,
+          `# Date validation;${esc(sess.date_validation ? new Date(sess.date_validation).toLocaleString('fr-FR') : '')}`,
+          `# Anomalies rapprochement;${sess.rapprochement_anomalies_count ?? 0}`,
+          `# Observation;${esc(sess.observation_validation ?? '')}`,
+          `# Nombre d'étiquettes;${rows.length}`,
+          ``,
+        ].join('\n');
+
+        const csv = '﻿' + meta + headers.join(';') + '\n' + rows.join('\n');
+
+        // Téléchargement
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const fournSlug = (sess.fournisseur_nom || 'session').replace(/[^a-z0-9]/gi, '_').slice(0, 30);
+        const filename = `scanner_${fournSlug}_${sess.date_reception || 'sans-date'}.csv`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast(`✓ ${rows.length} ligne${rows.length>1?'s':''} exportée${rows.length>1?'s':''}`, 'success');
+      } catch (err) {
+        console.error('exportSessionCsv:', err);
+        showToast('Erreur export : ' + err.message, 'error');
+      }
+    }
 
     // ====== VALIDATION SANS BL (registre HACCP) ======
     $('btn-validate-no-bl').addEventListener('click', async () => {
