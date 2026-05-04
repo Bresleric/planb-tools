@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sortie de matière — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669; --primary-dark: #047857; --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --yellow-100:#fef9c3; --yellow-700:#a16207;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:900px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    /* Boutons */
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    .btn:active:not([disabled]) { transform:scale(.98); }
+    .btn[disabled] { opacity:.5; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-primary:active:not([disabled]) { background:var(--primary-dark); }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-big { padding:14px; font-size:16px; min-height:52px; width:100%; }
+
+    /* Recherche article */
+    .autocomplete { position:relative; }
+    .autocomplete input { width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .autocomplete input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+    .autocomplete-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:280px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:4px; }
+    .autocomplete-results.visible { display:block; }
+    .ac-result { padding:10px 12px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--gray-100); }
+    .ac-result:hover, .ac-result.active { background:var(--primary-light); }
+    .ac-result .ac-cat { font-size:11px; color:var(--gray-500); }
+
+    /* Article sélectionné */
+    .selected-article { display:flex; justify-content:space-between; align-items:center; padding:14px; background:var(--primary-light); border:1px solid var(--primary); border-radius:var(--radius-sm); }
+    .selected-article .sa-info .sa-nom { font-size:16px; font-weight:700; color:var(--gray-900); }
+    .selected-article .sa-info .sa-meta { font-size:12px; color:var(--primary-dark); margin-top:2px; }
+    .selected-article .sa-stock { font-size:18px; font-weight:700; color:var(--primary-dark); white-space:nowrap; }
+    .selected-article .sa-stock .unit { font-size:11px; font-weight:500; color:var(--gray-600); }
+
+    /* Liste lots */
+    .lot-row { display:grid; grid-template-columns:auto minmax(0,1fr) 100px 100px; gap:10px; padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; }
+    .lot-row.selected { background:var(--primary-light); border-color:var(--primary); }
+    .lot-row.depasse { background:var(--red-100); border-color:var(--red-100); }
+    .lot-row input[type=checkbox] { width:20px; height:20px; cursor:pointer; }
+    .lot-row .lot-info { min-width:0; }
+    .lot-row .lot-title { font-size:14px; font-weight:600; color:var(--gray-900); }
+    .lot-row .lot-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .lot-row .lot-qty { font-weight:600; text-align:right; font-size:14px; }
+    .lot-row .lot-qty .unit { font-size:10px; color:var(--gray-500); display:block; }
+    .lot-row .lot-input { display:flex; align-items:center; gap:4px; }
+    .lot-row .lot-input input { width:70px; padding:6px 8px; text-align:right; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-size:13px; font-family:inherit; }
+    .lot-row .lot-input span { font-size:11px; color:var(--gray-500); }
+    .dlc-badge { display:inline-block; padding:2px 8px; font-size:10px; border-radius:999px; font-weight:600; margin-left:4px; }
+    .dlc-vert    { background:var(--green-100); color:var(--green-700); }
+    .dlc-jaune   { background:var(--yellow-100); color:var(--yellow-700); }
+    .dlc-orange  { background:var(--orange-100); color:var(--orange-700); }
+    .dlc-rouge   { background:var(--red-100); color:var(--red-700); }
+    .dlc-gris    { background:var(--gray-100); color:var(--gray-500); }
+
+    /* Récap */
+    .summary-box { padding:12px 14px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .summary-box.warn { background:var(--orange-100); border-color:var(--orange-100); color:var(--orange-700); }
+    .summary-box.crit { background:var(--red-100); border-color:var(--red-100); color:var(--red-700); }
+    .summary-label { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; }
+    .summary-value { font-size:18px; font-weight:700; }
+
+    .field { margin-bottom:12px; }
+    .field label { display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+    .field input, .field textarea, .field select { width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; }
+    .field input:focus, .field textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); font-size:14px; }
+
+    /* Historique sorties */
+    .history-row { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) 80px 110px; gap:8px; padding:8px 12px; background:var(--gray-50); border-radius:var(--radius-sm); margin-bottom:4px; font-size:13px; align-items:center; }
+    .history-row .hr-strong { font-weight:600; color:var(--gray-900); }
+    .history-row .hr-muted { font-size:11px; color:var(--gray-500); }
+
+    @media (max-width:600px) {
+      .lot-row { grid-template-columns:auto 1fr; }
+      .lot-row .lot-qty, .lot-row .lot-input { grid-column:2; }
+      .history-row { grid-template-columns:1fr; gap:2px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Sortie de matière</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- Étape 1 : choix article -->
+    <div class="card">
+      <div class="card-title">1. Choisir un article</div>
+      <div class="autocomplete">
+        <input type="text" id="search" placeholder="Tape le nom d'un article (ex: lard, oignon, kassler)…" autocomplete="off">
+        <div class="autocomplete-results" id="search-results"></div>
+      </div>
+    </div>
+
+    <!-- Étape 2 : lots disponibles (apparaît une fois article choisi) -->
+    <div class="card" id="card-lots" style="display:none;">
+      <div class="selected-article" id="selected-article" style="margin-bottom:12px;"></div>
+      <div class="card-title" style="margin-top:0;">2. Sélectionner les lots à sortir (FEFO)</div>
+      <div style="font-size:12px; color:var(--gray-500); margin-bottom:10px;">
+        Lots triés par DLC croissante. Coche un lot et indique la quantité à sortir. Si tu sors plusieurs lots, on cumule.
+      </div>
+      <div id="lots-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Étape 3 : récap + motif + validation -->
+    <div class="card" id="card-validation" style="display:none;">
+      <div class="card-title">3. Confirmer la sortie</div>
+      <div class="summary-box" id="summary-total">
+        <div>
+          <div class="summary-label">Total à sortir</div>
+          <div class="summary-value" id="summary-value">0,00 kg</div>
+        </div>
+        <div style="font-size:12px; color:var(--gray-600); text-align:right;" id="summary-detail">Aucun lot sélectionné</div>
+      </div>
+      <div class="field">
+        <label>Motif de la sortie</label>
+        <input type="text" id="motif" placeholder="Ex: Mise en place service midi · Choucroute pour 12 couverts · Réservé pour traiteur ce soir">
+      </div>
+      <button class="btn btn-primary btn-big" id="btn-validate" disabled>✓ Valider la sortie</button>
+    </div>
+
+    <!-- Historique des dernières sorties -->
+    <div class="card">
+      <div class="card-title">Dernières sorties</div>
+      <div id="history-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    // ==== ÉTAT ====
+    const State = {
+      articles: [],            // référentiel appro_ingredients (actifs uniqt) avec stock dispo
+      selectedArticle: null,
+      lots: [],                // lots dispo de l'article sélectionné
+      selections: {},          // {scan_tracabilite_id: quantite_a_sortir}
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') { const t = $('toast'); t.textContent = msg; t.className = 'toast visible'+(kind?' '+kind:''); setTimeout(() => t.className = 'toast', 3500); }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
+    function fmtDateTime(iso) { if (!iso) return '—'; return new Date(iso).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+    function daysToDlc(dlc) { if (!dlc) return null; const td = new Date(); td.setHours(0,0,0,0); const d = new Date(dlc); d.setHours(0,0,0,0); return Math.round((d-td)/(1000*60*60*24)); }
+    function dlcClass(d) { if (d == null) return 'dlc-gris'; if (d < 0) return 'dlc-rouge'; if (d <= 2) return 'dlc-rouge'; if (d <= 7) return 'dlc-orange'; if (d <= 14) return 'dlc-jaune'; return 'dlc-vert'; }
+    function dlcLabel(d) { if (d == null) return 'DLC ?'; if (d < 0) return `Dépassée ${-d}j`; if (d === 0) return "Aujourd'hui"; if (d === 1) return 'Demain'; return `Dans ${d}j`; }
+
+    // ==== CHARGEMENT INITIAL ====
+    async function loadArticlesAvecStock() {
+      // Charge les articles qui ont du stock dispo (vue stock_par_article filtré sur etab)
+      const { data, error } = await sb.from('stock_par_article')
+        .select('*')
+        .eq('etablissement', currentEtab)
+        .gt('quantite_restante_total', 0)
+        .order('article_nom');
+      if (error) { console.error(error); return; }
+      State.articles = data || [];
+    }
+
+    // ==== AUTOCOMPLETE ====
+    $('search').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const res = $('search-results');
+      if (!q) { res.classList.remove('visible'); return; }
+      const matches = State.articles.filter(a => a.article_nom.toLowerCase().includes(q)).slice(0, 12);
+      if (!matches.length) {
+        res.innerHTML = `<div class="ac-result" style="color:var(--gray-500); font-style:italic;">Aucun article avec stock dispo dans ${currentEtab === 'liesel' ? 'Liesel' : 'Freddy'}.</div>`;
+      } else {
+        res.innerHTML = matches.map(a => `
+          <div class="ac-result" data-id="${a.article_id}">
+            <div>${escapeHtml(a.article_nom)} — <strong>${Number(a.quantite_restante_total).toFixed(2)} ${escapeHtml(a.article_unite || 'kg')}</strong></div>
+            <div class="ac-cat">${escapeHtml(a.article_categorie || '')} · ${a.nb_lots_dispo} lot${a.nb_lots_dispo>1?'s':''}${a.dlc_min_dispo ? ' · DLC mini ' + fmtDate(a.dlc_min_dispo) : ''}</div>
+          </div>
+        `).join('');
+        res.querySelectorAll('[data-id]').forEach(el => {
+          el.addEventListener('click', () => selectArticle(el.dataset.id));
+        });
+      }
+      res.classList.add('visible');
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.autocomplete')) $('search-results').classList.remove('visible');
+    });
+
+    // ==== SÉLECTION D'UN ARTICLE ====
+    async function selectArticle(articleId) {
+      const a = State.articles.find(x => x.article_id === articleId);
+      if (!a) return;
+      State.selectedArticle = a;
+      State.selections = {};
+      $('search').value = a.article_nom;
+      $('search-results').classList.remove('visible');
+
+      $('selected-article').innerHTML = `
+        <div class="sa-info">
+          <div class="sa-nom">${escapeHtml(a.article_nom)}</div>
+          <div class="sa-meta">${escapeHtml(a.article_categorie || 'sans cat.')} · ${a.nb_lots_dispo} lot${a.nb_lots_dispo>1?'s':''} dispo</div>
+        </div>
+        <div class="sa-stock">
+          ${Number(a.quantite_restante_total).toFixed(2)}<span class="unit"> ${escapeHtml(a.article_unite || 'kg')}</span>
+        </div>
+      `;
+      $('card-lots').style.display = 'block';
+      $('card-validation').style.display = 'block';
+
+      // Charger les lots
+      const { data: lots, error } = await sb.from('stock_par_lot')
+        .select('*')
+        .eq('article_id', articleId)
+        .eq('etablissement', currentEtab)
+        .gt('quantite_restante', 0)
+        .order('dlc', { ascending: true, nullsFirst: false });
+      if (error) {
+        $('lots-list').innerHTML = `<div class="empty-state">Erreur : ${error.message}</div>`;
+        return;
+      }
+      State.lots = lots || [];
+      renderLots();
+      updateSummary();
+    }
+
+    function renderLots() {
+      const list = $('lots-list');
+      if (!State.lots.length) {
+        list.innerHTML = `<div class="empty-state">Aucun lot dispo pour cet article.</div>`;
+        return;
+      }
+      list.innerHTML = '';
+      State.lots.forEach((l, idx) => {
+        const days = daysToDlc(l.dlc);
+        const cls = dlcClass(days);
+        const lbl = dlcLabel(days);
+        const restant = Number(l.quantite_restante);
+        const taken = State.selections[l.scan_tracabilite_id] ?? 0;
+        const isSelected = taken > 0;
+        const depasse = taken > restant;
+        const row = document.createElement('div');
+        row.className = 'lot-row' + (isSelected ? ' selected' : '') + (depasse ? ' depasse' : '');
+        row.innerHTML = `
+          <input type="checkbox" data-id="${l.scan_tracabilite_id}" ${isSelected ? 'checked' : ''}>
+          <div class="lot-info">
+            <div class="lot-title">Lot ${escapeHtml(l.lot || '?')}<span class="dlc-badge ${cls}">${lbl}</span></div>
+            <div class="lot-meta">DLC ${fmtDate(l.dlc)} · ${escapeHtml(l.fabricant || '')}${idx === 0 ? ' · ⚡ FEFO suggéré' : ''}</div>
+          </div>
+          <div class="lot-qty">
+            ${restant.toFixed(2)}<span class="unit">${escapeHtml(l.article_unite || 'kg')} restant</span>
+          </div>
+          <div class="lot-input">
+            <input type="number" step="0.01" min="0" data-id="${l.scan_tracabilite_id}" value="${taken || ''}" placeholder="0">
+            <span>${escapeHtml(l.article_unite || 'kg')}</span>
+          </div>
+        `;
+        // Wire checkbox
+        row.querySelector('input[type=checkbox]').addEventListener('change', (e) => {
+          const id = e.target.dataset.id;
+          if (e.target.checked) {
+            // Pré-rempli avec la qté restante
+            State.selections[id] = restant;
+          } else {
+            delete State.selections[id];
+          }
+          renderLots();
+          updateSummary();
+        });
+        // Wire input qté
+        row.querySelector('input[type=number]').addEventListener('input', (e) => {
+          const id = e.target.dataset.id;
+          const v = parseFloat(e.target.value);
+          if (isNaN(v) || v <= 0) {
+            delete State.selections[id];
+          } else {
+            State.selections[id] = v;
+          }
+          updateSummary();
+          // Re-render uniquement la classe sans tout regénérer (pour ne pas perdre le focus)
+          const restantNow = Number(State.lots.find(x => x.scan_tracabilite_id === id)?.quantite_restante || 0);
+          const checkbox = row.querySelector('input[type=checkbox]');
+          checkbox.checked = (State.selections[id] ?? 0) > 0;
+          row.classList.toggle('selected', (State.selections[id] ?? 0) > 0);
+          row.classList.toggle('depasse', (State.selections[id] ?? 0) > restantNow);
+        });
+        list.appendChild(row);
+      });
+    }
+
+    function updateSummary() {
+      const total = Object.values(State.selections).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+      const nb = Object.keys(State.selections).filter(k => (State.selections[k] || 0) > 0).length;
+      const stockDispo = State.selectedArticle ? Number(State.selectedArticle.quantite_restante_total) : 0;
+      const unit = State.selectedArticle?.article_unite || 'kg';
+      $('summary-value').textContent = `${total.toFixed(2)} ${unit}`;
+      $('summary-detail').textContent = nb === 0 ? 'Aucun lot sélectionné' : `${nb} lot${nb>1?'s':''} · stock connu : ${stockDispo.toFixed(2)} ${unit}`;
+      const box = $('summary-total');
+      box.classList.remove('warn', 'crit');
+      if (total > stockDispo) box.classList.add('warn');
+      $('btn-validate').disabled = total <= 0;
+    }
+
+    // ==== VALIDATION ====
+    $('btn-validate').addEventListener('click', async () => {
+      const total = Object.values(State.selections).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+      if (total <= 0) return;
+      const stockDispo = Number(State.selectedArticle.quantite_restante_total);
+      if (total > stockDispo) {
+        if (!confirm(`⚠ Tu sors ${total.toFixed(2)} ${State.selectedArticle.article_unite} mais le stock connu n'est que de ${stockDispo.toFixed(2)} ${State.selectedArticle.article_unite}.\n\nLe stock va devenir négatif. Confirmer quand même ?`)) return;
+      }
+      const motif = $('motif').value.trim() || null;
+      const articleId = State.selectedArticle.article_id;
+      const unit = State.selectedArticle.article_unite || 'kg';
+
+      $('btn-validate').disabled = true;
+      try {
+        // Construire les rows à insérer
+        const rows = Object.entries(State.selections)
+          .filter(([_, v]) => parseFloat(v) > 0)
+          .map(([scan_tracabilite_id, qte]) => ({
+            type: 'SORTIE',
+            article_id: articleId,
+            scan_tracabilite_id,
+            quantite: parseFloat(qte),
+            unite: unit,
+            etablissement: currentEtab,
+            motif,
+            source_table: 'sortie_manuelle',
+            source_id: null,
+            created_by_id: currentUser.id,
+            created_by_nom: currentUser.nom,
+            created_by_initiales: currentUser.initiales,
+          }));
+        const { error } = await sb.from('stock_mouvements').insert(rows);
+        if (error) throw error;
+        showToast(`✓ Sortie de ${total.toFixed(2)} ${unit} enregistrée (${rows.length} lot${rows.length>1?'s':''})`, 'success');
+        // Reset
+        State.selectedArticle = null;
+        State.selections = {};
+        State.lots = [];
+        $('search').value = '';
+        $('motif').value = '';
+        $('card-lots').style.display = 'none';
+        $('card-validation').style.display = 'none';
+        await loadArticlesAvecStock();
+        await loadHistory();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+        $('btn-validate').disabled = false;
+      }
+    });
+
+    // ==== HISTORIQUE ====
+    async function loadHistory() {
+      try {
+        const { data, error } = await sb.from('stock_mouvements')
+          .select('*, appro_ingredients(nom, unite)')
+          .eq('type', 'SORTIE')
+          .eq('etablissement', currentEtab)
+          .order('created_at', { ascending: false })
+          .limit(15);
+        if (error) throw error;
+        const list = $('history-list');
+        if (!data || !data.length) {
+          list.innerHTML = `<div class="empty-state">Aucune sortie pour le moment.</div>`;
+          return;
+        }
+        list.innerHTML = '';
+        data.forEach(m => {
+          const row = document.createElement('div');
+          row.className = 'history-row';
+          row.innerHTML = `
+            <div>
+              <div class="hr-strong">${escapeHtml(m.appro_ingredients?.nom || '?')}</div>
+              <div class="hr-muted">${escapeHtml(m.motif || '(sans motif)')}</div>
+            </div>
+            <div class="hr-muted">${escapeHtml(m.created_by_nom)}</div>
+            <div style="text-align:right; font-weight:600;">${Number(m.quantite).toFixed(2)} ${escapeHtml(m.unite || 'kg')}</div>
+            <div class="hr-muted" style="text-align:right;">${fmtDateTime(m.created_at)}</div>
+          `;
+          list.appendChild(row);
+        });
+      } catch (err) {
+        console.error(err);
+        $('history-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      }
+    }
+
+    // INIT
+    loadArticlesAvecStock().then(() => loadHistory());
+  </script>
+</body>
+</html>
