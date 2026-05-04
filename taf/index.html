@@ -108,6 +108,15 @@
       display: flex; align-items: center; gap: 4px;
     }
     .toggle-completed input { accent-color: var(--orange); }
+    .btn-selection-mode {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.72rem; color: var(--gray-600); cursor: pointer;
+      font-weight: 500; transition: all 0.15s;
+    }
+    .btn-selection-mode:hover { border-color: var(--blue); color: var(--blue); }
+    .btn-selection-mode.active {
+      background: var(--blue); color: white; border-color: var(--blue);
+    }
 
     /* ====== TABS ====== */
     .tabs-bar {
@@ -314,6 +323,53 @@
       box-shadow: 0 0 0 1px #fecaca, var(--shadow);
     }
     .task-row.task-late.task-mine { background: #fff4ec; }
+    /* Mode sélection multiple : ajoute une 13e colonne de 32px à gauche */
+    .task-table-header.selection-mode,
+    .task-row.selection-mode,
+    .taf-grid.selection-mode {
+      grid-template-columns: 32px 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+    }
+    .task-row.selected {
+      background: #eff6ff;
+      box-shadow: 0 0 0 2px var(--blue), var(--shadow);
+    }
+    .task-row.selected.task-mine { background: #e0edff; }
+    .task-select-cb {
+      width: 18px; height: 18px; cursor: pointer;
+      accent-color: var(--blue);
+    }
+    .task-row.task-done .task-select-cb { opacity: 0.4; cursor: not-allowed; }
+    .select-all-wrap {
+      display: flex; align-items: center; justify-content: center;
+    }
+    /* ====== BULK ACTION BAR ====== */
+    .bulk-action-bar {
+      position: sticky; bottom: 0; left: 0; right: 0;
+      background: white; border-top: 2px solid var(--blue);
+      padding: 10px 16px; display: none;
+      align-items: center; gap: 10px;
+      box-shadow: 0 -4px 12px rgba(0,0,0,.08);
+      z-index: 50;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    }
+    .bulk-counter {
+      font-size: 0.85rem; font-weight: 600; color: var(--blue);
+      flex: 1;
+    }
+    .bulk-btn {
+      padding: 8px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--gray-200); background: white;
+      font-size: 0.82rem; color: var(--gray-700); cursor: pointer;
+      font-weight: 500;
+    }
+    .bulk-btn.primary {
+      background: var(--blue); color: white; border-color: var(--blue);
+    }
+    .bulk-btn.primary:disabled {
+      background: var(--gray-200); color: var(--gray-400); border-color: var(--gray-200); cursor: not-allowed;
+    }
+    .bulk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .bulk-btn:active:not(:disabled) { transform: scale(0.97); }
     .badge-late {
       display: inline-block;
       background: #dc2626;
@@ -619,6 +675,7 @@
       <button class="filter-chip" data-creneau="Midi" onclick="setFilterCreneau('Midi')">🌤 Midi</button>
       <button class="filter-chip" data-creneau="Soir" onclick="setFilterCreneau('Soir')">🌙 Soir</button>
       <div class="filter-right">
+        <button class="btn-selection-mode" id="btn-selection-mode" onclick="toggleSelectionMode()" style="display:none" title="Sélectionner plusieurs tâches pour les attribuer en lot">☑︎ Sélection</button>
         <label class="toggle-completed">
           <input type="checkbox" id="chk-completed" onchange="toggleShowCompleted()"> Terminées
         </label>
@@ -640,6 +697,14 @@
 
   <!-- CONTENT -->
   <div class="content" id="main-content"></div>
+
+  <!-- BULK ACTION BAR (mode sélection multiple) -->
+  <div class="bulk-action-bar" id="bulk-action-bar">
+    <span class="bulk-counter" id="bulk-counter">Aucune tâche sélectionnée</span>
+    <button class="bulk-btn" id="bulk-clear-btn" onclick="clearSelection()" disabled>Tout désélectionner</button>
+    <button class="bulk-btn primary" id="bulk-assign-btn" onclick="showBulkAssignModal()" disabled>👤 Attribuer à...</button>
+    <button class="bulk-btn" onclick="exitSelectionMode()">Annuler</button>
+  </div>
 </div>
 
 <!-- MODAL -->
@@ -749,6 +814,8 @@
   let productionFiches = []; // fiches techniques en cache
   let sortColumn = 'default'; // colonne de tri active
   let sortDir = 'asc'; // 'asc' ou 'desc'
+  let selectionMode = false; // mode sélection multiple (managers+)
+  let selectedTaskIds = new Set(); // ids des tâches sélectionnées
 
   // ====== UTILITIES ======
   function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -770,7 +837,81 @@
   function hasPlanning() { return planningInitiales && planningInitiales.size > 0; }
   function canAssign() { return userRole() >= 2; } // responsable+
   function canManageRecurrences() { return userRole() >= 3; } // manager+
+  function canBulkSelect() { return userRole() >= 3; } // manager+ : sélection multiple
   function isAdmin() { return userRole() >= 4; }
+
+  // ====== MODE SÉLECTION MULTIPLE ======
+  function toggleSelectionMode() {
+    if (!canBulkSelect()) return;
+    selectionMode = !selectionMode;
+    if (!selectionMode) selectedTaskIds.clear();
+    const btn = document.getElementById('btn-selection-mode');
+    if (btn) {
+      btn.classList.toggle('active', selectionMode);
+      btn.textContent = selectionMode ? '✕ Annuler sélection' : '☑︎ Sélection';
+    }
+    renderFiltered();
+    updateBulkActionBar();
+  }
+  function exitSelectionMode() {
+    selectionMode = false;
+    selectedTaskIds.clear();
+    const btn = document.getElementById('btn-selection-mode');
+    if (btn) {
+      btn.classList.remove('active');
+      btn.textContent = '☑︎ Sélection';
+    }
+    renderFiltered();
+    updateBulkActionBar();
+  }
+  function toggleTaskSelection(id) {
+    if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
+    else selectedTaskIds.add(id);
+    updateBulkActionBar();
+    // Mise à jour visuelle de la ligne (cocher/décocher) sans tout re-render
+    const row = document.querySelector(`.task-row[data-id="${id}"]`);
+    if (row) row.classList.toggle('selected', selectedTaskIds.has(id));
+    const cb = document.querySelector(`.task-select-cb[data-id="${id}"]`);
+    if (cb) cb.checked = selectedTaskIds.has(id);
+    syncSelectAllCheckbox();
+  }
+  function toggleSelectAll() {
+    const visibleIds = getFilteredTasks().filter(t => !t.fait_par_id).map(t => t.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedTaskIds.has(id));
+    if (allSelected) visibleIds.forEach(id => selectedTaskIds.delete(id));
+    else visibleIds.forEach(id => selectedTaskIds.add(id));
+    renderFiltered();
+    updateBulkActionBar();
+  }
+  function syncSelectAllCheckbox() {
+    const cb = document.getElementById('select-all-cb');
+    if (!cb) return;
+    const visibleIds = getFilteredTasks().filter(t => !t.fait_par_id).map(t => t.id);
+    const selectedCount = visibleIds.filter(id => selectedTaskIds.has(id)).length;
+    cb.checked = visibleIds.length > 0 && selectedCount === visibleIds.length;
+    cb.indeterminate = selectedCount > 0 && selectedCount < visibleIds.length;
+  }
+  function clearSelection() {
+    selectedTaskIds.clear();
+    renderFiltered();
+    updateBulkActionBar();
+  }
+  function updateBulkActionBar() {
+    const bar = document.getElementById('bulk-action-bar');
+    if (!bar) return;
+    const count = selectedTaskIds.size;
+    if (selectionMode) {
+      bar.style.display = 'flex';
+      const counter = document.getElementById('bulk-counter');
+      if (counter) counter.textContent = count === 0 ? 'Aucune tâche sélectionnée' : `${count} tâche${count > 1 ? 's' : ''} sélectionnée${count > 1 ? 's' : ''}`;
+      const btn = document.getElementById('bulk-assign-btn');
+      if (btn) btn.disabled = count === 0;
+      const btnClear = document.getElementById('bulk-clear-btn');
+      if (btnClear) btnClear.disabled = count === 0;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
 
   // ====== SUPABASE INIT ======
   function initSupabase() {
@@ -1026,6 +1167,9 @@
     // Show/hide tabs based on role
     document.getElementById('tab-recurrences').style.display = canManageRecurrences() ? '' : 'none';
     document.getElementById('tab-admin').style.display = isAdmin() ? '' : 'none';
+    // Bouton sélection multiple : managers+ uniquement
+    const selBtn = document.getElementById('btn-selection-mode');
+    if (selBtn) selBtn.style.display = canBulkSelect() ? '' : 'none';
 
     // Set default equipe filter : tout le monde voit toutes les tâches par défaut
     filterEquipe = 'all';
@@ -1063,12 +1207,14 @@
   }
 
   function changeDate(delta) {
+    if (selectionMode) exitSelectionMode();
     filterDate.setDate(filterDate.getDate() + delta);
     updateDateDisplay();
     refreshData();
   }
 
   function goToday() {
+    if (selectionMode) exitSelectionMode();
     filterDate = new Date();
     updateDateDisplay();
     refreshData();
@@ -1336,6 +1482,8 @@
 
   // ====== TAB SWITCHING ======
   function switchTab(tab) {
+    // Quitter le mode sélection multiple si on change d'onglet
+    if (selectionMode && tab !== 'taches') exitSelectionMode();
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
@@ -1386,7 +1534,9 @@
     const sa = (col) => sortColumn === col ? 'active' : '';
     const arrow = (col) => sortColumn === col ? (sortDir === 'asc' ? '▲' : '▼') : '▲';
 
-    let html = `<div class="task-table-header">
+    const selCls = selectionMode ? ' selection-mode' : '';
+    let html = `<div class="task-table-header${selCls}">
+      ${selectionMode ? `<span class="select-all-wrap"><input type="checkbox" id="select-all-cb" class="task-select-cb" onclick="toggleSelectAll()" title="Tout sélectionner / désélectionner"></span>` : ''}
       <span class="th-sort ${sa('creneau')}" onclick="toggleSort('creneau')">Crén.<span class="sort-arrow">${arrow('creneau')}</span></span>
       <span class="th-sort th-center ${sa('echeance')}" onclick="toggleSort('echeance')">Éch.<span class="sort-arrow">${arrow('echeance')}</span></span>
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
@@ -1426,8 +1576,12 @@
       // Échéance compacte au format jj/mm (ex: "04/05")
       const echShort = t.echeance ? `${t.echeance.slice(8,10)}/${t.echeance.slice(5,7)}` : '';
       const echTitle = t.echeance ? `Échéance : ${new Date(t.echeance).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}` : '';
+      // Mode sélection multiple : checkbox à gauche (uniquement tâches non terminées)
+      const isSelected = selectedTaskIds.has(t.id);
+      const selectedClass = isSelected ? ' selected' : '';
 
-      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}${lateClass}">
+      return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}${lateClass}${selCls}${selectedClass}" data-id="${t.id}">
+        ${selectionMode ? `<div class="select-all-wrap">${done ? '' : `<input type="checkbox" class="task-select-cb" data-id="${t.id}" ${isSelected ? 'checked' : ''} onclick="toggleTaskSelection('${t.id}')">`}</div>` : ''}
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
         <div class="task-cell"><span class="task-echeance" title="${echTitle}">${echShort}</span></div>
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
@@ -1449,6 +1603,8 @@
     }).join('');
 
     mc.innerHTML = html;
+    // Synchroniser la checkbox "tout sélectionner" (état mixte/coché)
+    if (selectionMode) syncSelectAllCheckbox();
   }
 
   function renderFiltered() { if (currentTab === 'taches') renderTasksTab(); }
@@ -1600,6 +1756,89 @@
       renderFiltered();
       showToast(userId ? `Attribuée à ${nom}` : 'Attribution retirée', 'success');
     } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  // ====== ATTRIBUTION GROUPÉE (bulk assign) ======
+  function showBulkAssignModal() {
+    if (!canBulkSelect()) return;
+    if (selectedTaskIds.size === 0) {
+      showToast('Aucune tâche sélectionnée', 'error');
+      return;
+    }
+    const ids = Array.from(selectedTaskIds);
+    const selectedTasks = tasks.filter(t => ids.includes(t.id));
+    // Récap des équipes concernées (pour afficher d'abord les équipes les plus représentées)
+    const equipesCount = {};
+    selectedTasks.forEach(t => {
+      const eq = t.equipe || 'autre';
+      equipesCount[eq] = (equipesCount[eq] || 0) + 1;
+    });
+    const equipeOrder = [...EQUIPES].sort((a, b) => (equipesCount[b] || 0) - (equipesCount[a] || 0));
+
+    // Liste des collaborateurs présents au planning, groupés par équipe
+    const presentList = usersPresentToday();
+    const grouped = {};
+    presentList.forEach(u => {
+      const eq = u.equipe || 'autre';
+      if (!grouped[eq]) grouped[eq] = [];
+      grouped[eq].push(u);
+    });
+
+    let userHtml = '';
+    equipeOrder.forEach(eq => {
+      if (!grouped[eq] || grouped[eq].length === 0) return;
+      const label = eq.charAt(0).toUpperCase() + eq.slice(1);
+      const tasksInEq = equipesCount[eq] || 0;
+      userHtml += `<div style="padding:4px 8px;font-size:0.75rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-top:6px">${label}${tasksInEq > 0 ? ` <span style="color:var(--blue);font-weight:500;text-transform:none">(${tasksInEq} tâche${tasksInEq > 1 ? 's' : ''})</span>` : ''}</div>`;
+      grouped[eq].forEach(u => {
+        userHtml += `
+          <div class="user-pick-item"
+               onclick="doBulkAssignTasks('${u.id}', '${esc(u.nom)}', '${esc(u.initiales)}')">
+            <span class="user-initials-sm">${esc(u.initiales)}</span>
+            <span>${esc(u.nom)}</span>
+          </div>`;
+      });
+    });
+
+    const recapEquipes = Object.entries(equipesCount)
+      .map(([eq, n]) => `${n} ${eq}`)
+      .join(', ');
+
+    openModal(`Attribuer ${selectedTaskIds.size} tâche${selectedTaskIds.size > 1 ? 's' : ''}`, `
+      <p style="margin-bottom:4px;font-size:0.85rem;color:var(--gray-500)">
+        Sélection : ${esc(recapEquipes)}
+      </p>
+      ${hasPlanning() ? `<p style="margin-bottom:8px;font-size:0.72rem;color:var(--blue);font-style:italic">👥 ${presentList.length} collaborateur(s) présent(s) au planning</p>` : `<p style="margin-bottom:8px;font-size:0.72rem;color:var(--gray-400);font-style:italic">⚠ Aucun planning pour cette date — toute la liste est affichée</p>`}
+      <div class="user-list-picker" style="max-height:340px;overflow-y:auto">
+        <div class="user-pick-item" onclick="doBulkAssignTasks(null, null, null)" style="color:var(--gray-400);font-style:italic">
+          Retirer l'attribution
+        </div>
+        ${userHtml}
+      </div>
+    `, []);
+  }
+
+  async function doBulkAssignTasks(userId, nom, initiales) {
+    if (!canBulkSelect()) return;
+    const ids = Array.from(selectedTaskIds);
+    if (ids.length === 0) return;
+    closeModal();
+    try {
+      await Promise.all(ids.map(id => DB.updateTask(id, {
+        attribue_a_id: userId,
+        attribue_a_nom: nom,
+        attribue_a_initiales: initiales
+      })));
+      tasks = await DB.getTasks(filterDate);
+      const msg = userId
+        ? `${ids.length} tâche${ids.length > 1 ? 's' : ''} attribuée${ids.length > 1 ? 's' : ''} à ${nom}`
+        : `${ids.length} attribution${ids.length > 1 ? 's retirées' : ' retirée'}`;
+      exitSelectionMode();
+      showToast(msg, 'success');
+    } catch (e) {
+      console.error('bulk assign error', e);
+      showToast('Erreur lors de l\'attribution groupée', 'error');
+    }
   }
 
   // ====== EDIT TASK MODAL (manager+admin) ======
