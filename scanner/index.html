@@ -233,6 +233,13 @@
               <div class="mode-desc">Scanner une étiquette ou un document isolé avec validation immédiate.</div>
             </div>
           </div>
+          <div class="mode-card" data-mode="inventory">
+            <span class="emoji">🔍</span>
+            <div class="mode-info">
+              <div class="mode-title">Inventaire (vérif stock)</div>
+              <div class="mode-desc">Scanner une étiquette pour vérifier si le lot est connu en stock, sa DLC et la réception d'origine.</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -355,6 +362,31 @@
         <button class="btn btn-danger" id="btn-reco-reject">✗ Rejeter</button>
       </div>
       <button class="btn btn-ghost" id="btn-reco-back" style="margin-top:8px;">↺ Retour à la session</button>
+    </section>
+
+    <!-- ============ ÉCRAN INVENTAIRE (vérif stock) ============ -->
+    <section id="screen-inventory" class="screen">
+      <div class="card">
+        <div class="card-title">Vérification stock</div>
+        <div style="font-size:13px; color:var(--gray-600); margin-bottom:12px;">
+          Scanne une étiquette de produit. Le système te dira si le lot est connu (déjà reçu en livraison) et te rappellera la DLC.
+        </div>
+        <button class="btn-capture btn-capture-big" id="btn-inv-camera">
+          <span class="emoji">📸</span><span>Scanner l'étiquette</span>
+        </button>
+        <input type="file" class="file-input-hidden" id="input-inv-camera" accept="image/*" capture="environment">
+      </div>
+
+      <!-- Résultat -->
+      <div class="card" id="card-inv-result" style="display:none;">
+        <div id="inv-result-content"></div>
+        <div class="actions-grid" style="margin-top:12px;">
+          <button class="btn btn-success" id="btn-inv-keep">✓ Garder en historique</button>
+          <button class="btn btn-danger" id="btn-inv-discard">🗑 C'était juste une vérif</button>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" id="btn-inv-back" style="margin-top:8px;">← Retour</button>
     </section>
 
     <!-- ============ ÉCRAN UNIT (mode V1) ============ -->
@@ -495,6 +527,7 @@
         'unit': 'Scan unitaire',
         'extracting': 'Extraction…',
         'result': 'Résultat',
+        'inventory': 'Inventaire',
       };
       $('header-title').textContent = titles[name] || 'Scanner';
 
@@ -520,6 +553,9 @@
         } else if (mode === 'session') {
           resetNewSessionScreen();
           showScreen('new-session');
+        } else if (mode === 'inventory') {
+          resetInventoryScreen();
+          showScreen('inventory');
         }
       });
     });
@@ -1142,6 +1178,203 @@
     });
 
     $('btn-unit-restart').addEventListener('click', () => { resetUnitScreen(); showScreen('unit'); });
+
+    // ====== MODE INVENTAIRE (vérif stock) ======
+    const InvState = { scanId: null, extraction: null };
+
+    function resetInventoryScreen() {
+      InvState.scanId = null;
+      InvState.extraction = null;
+      $('input-inv-camera').value = '';
+      $('card-inv-result').style.display = 'none';
+      $('inv-result-content').innerHTML = '';
+    }
+
+    $('btn-inv-back').addEventListener('click', () => showScreen('home'));
+    $('btn-inv-camera').addEventListener('click', () => $('input-inv-camera').click());
+    $('input-inv-camera').addEventListener('change', e => onInventoryFileChosen(e.target.files[0]));
+
+    async function onInventoryFileChosen(file) {
+      if (!file) return;
+      $('input-inv-camera').value = '';
+      // Spinner sur le bouton lui-même
+      const btn = $('btn-inv-camera');
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="emoji">⏳</span><span>Analyse en cours…</span>';
+      try {
+        // 1. Upload Storage
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+        const today = new Date().toISOString().slice(0, 10);
+        const uuid = crypto.randomUUID();
+        const path = `${currentEtab}/${today}/inv-${uuid}.${ext}`;
+
+        const { error: upErr } = await sb.storage.from('scans').upload(path, file, {
+          cacheControl: '3600', upsert: false, contentType: file.type || undefined,
+        });
+        if (upErr) throw new Error('Upload : ' + upErr.message);
+
+        // 2. INSERT scan (sans session_id, type étiquette)
+        const { data: insData, error: insErr } = await sb.from('scans').insert({
+          etablissement: currentEtab,
+          type_document: 'etiquette_produit',
+          voie_capture: 'camera_inapp',
+          storage_path: path,
+          mime_type: file.type || null,
+          taille_octets: file.size,
+          observation: 'Vérification inventaire',
+          created_by_id: currentUser.id,
+          created_by_nom: currentUser.nom,
+          created_by_initiales: currentUser.initiales,
+        }).select('id').single();
+        if (insErr) throw new Error('INSERT : ' + insErr.message);
+        InvState.scanId = insData.id;
+
+        // 3. Extract Claude (synchrone : on attend le résultat)
+        const result = await callExtract(insData.id);
+        InvState.extraction = result.extraction;
+
+        // 4. Recherche en base sur le lot
+        const lot = result.extraction?.lot;
+        const produit = result.extraction?.produit;
+        const dlc = result.extraction?.dlc;
+
+        let matches = [];
+        if (lot) {
+          const { data: m, error: mErr } = await sb.from('scan_tracabilite')
+            .select('scan_id, produit, lot, dlc, fabricant, poids_net_kg, created_at, scans!inner(id, statut, created_at, created_by_nom, session_id, scan_sessions(fournisseur_nom, date_reception))')
+            .eq('lot', lot)
+            .neq('scan_id', insData.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          if (!mErr && m) matches = m;
+        }
+
+        // 5. Affichage du résultat
+        displayInventoryResult({ produit, lot, dlc, extraction: result.extraction }, matches);
+      } catch (err) {
+        console.error('Inventaire:', err);
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    }
+
+    function displayInventoryResult(scanned, matches) {
+      const c = $('inv-result-content');
+      const today = new Date().toISOString().slice(0, 10);
+      const dlcDate = scanned.dlc ? new Date(scanned.dlc) : null;
+      const todayDate = new Date(today);
+      const daysToDlc = dlcDate ? Math.ceil((dlcDate - todayDate) / (1000*60*60*24)) : null;
+
+      let dlcClass = 'badge-cours', dlcLabel = 'DLC ?';
+      if (dlcDate) {
+        if (daysToDlc < 0) { dlcClass = 'badge-erreur'; dlcLabel = `⚠ DLC dépassée de ${-daysToDlc} j`; }
+        else if (daysToDlc === 0) { dlcClass = 'badge-erreur'; dlcLabel = '⚠ DLC aujourd\'hui'; }
+        else if (daysToDlc <= 2) { dlcClass = 'badge-attente'; dlcLabel = `⚠ DLC dans ${daysToDlc} j`; }
+        else if (daysToDlc <= 7) { dlcClass = 'badge-attente'; dlcLabel = `DLC dans ${daysToDlc} j`; }
+        else { dlcClass = 'badge-ok'; dlcLabel = `DLC dans ${daysToDlc} j`; }
+      }
+
+      let html = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:12px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:17px; font-weight:700; color:var(--gray-900);">${scanned.produit || 'Produit non lu'}</div>
+            <div style="font-size:13px; color:var(--gray-600); margin-top:4px;">
+              Lot : <strong>${scanned.lot || '?'}</strong>
+              ${scanned.extraction?.poids_net_kg ? ' · ' + scanned.extraction.poids_net_kg + ' kg' : ''}
+              ${scanned.extraction?.fabricant ? ' · ' + scanned.extraction.fabricant : ''}
+            </div>
+            <div style="margin-top:8px;">
+              <span class="badge ${dlcClass}">${dlcLabel}</span>
+              ${scanned.dlc ? '<span style="font-size:12px; color:var(--gray-500); margin-left:6px;">' + new Date(scanned.dlc).toLocaleDateString('fr-FR') + '</span>' : ''}
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (!scanned.lot) {
+        html += `
+          <div class="reconciliation-summary warn">
+            <strong>⚠ Lot non lu</strong>
+            Le numéro de lot n'a pas pu être lu sur l'étiquette. Impossible de retrouver la réception d'origine. Recadre la photo sur le lot et réessaye, ou saisis-le manuellement.
+          </div>`;
+      } else if (!matches.length) {
+        html += `
+          <div class="reconciliation-summary warn">
+            <strong>⚠ Lot inconnu</strong>
+            Ce lot <code>${scanned.lot}</code> n'apparaît dans aucune réception scannée. Soit il vient d'une livraison non scannée, soit l'étiquette a été lue avec une erreur de caractère (vérifie la lecture).
+          </div>`;
+      } else {
+        html += `
+          <div class="reconciliation-summary ok">
+            <strong>✓ Lot connu en stock</strong>
+            ${matches.length} scan${matches.length>1?'s':''} précédent${matches.length>1?'s':''} pour ce lot.
+          </div>
+          <div class="card-title" style="margin-top:12px;">Historique du lot</div>
+        `;
+        matches.forEach(m => {
+          const s = m.scans;
+          const sess = s?.scan_sessions;
+          const statutBadge =
+            s?.statut === 'valide' ? '<span class="badge badge-valide">Validé</span>' :
+            s?.statut === 'en_attente_validation' ? '<span class="badge badge-attente">À valider</span>' :
+            s?.statut === 'rejete' ? '<span class="badge badge-rejete">Rejeté</span>' :
+            '<span class="badge badge-cours">' + (s?.statut || '?') + '</span>';
+          html += `
+            <div class="scan-tile">
+              <span class="st-icon">📦</span>
+              <div class="st-info">
+                <div class="st-title">${m.produit || 'Produit ?'} · ${m.poids_net_kg ? m.poids_net_kg + ' kg' : ''}</div>
+                <div class="st-meta">
+                  Scanné le ${fmtDate(s?.created_at)} par ${s?.created_by_nom || '?'} ·
+                  ${sess?.fournisseur_nom ? 'Réception ' + sess.fournisseur_nom + ' du ' + fmtDateOnly(sess.date_reception) : 'Scan unitaire'}
+                  · ${statutBadge}
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      c.innerHTML = html;
+      $('card-inv-result').style.display = 'block';
+    }
+
+    $('btn-inv-keep').addEventListener('click', async () => {
+      if (!InvState.scanId) return;
+      try {
+        await sb.from('scans').update({
+          statut: 'valide',
+          valide_par_id: currentUser.id,
+          valide_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+        }).eq('id', InvState.scanId);
+        showToast('✓ Scan conservé en historique', 'success');
+        resetInventoryScreen();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+
+    $('btn-inv-discard').addEventListener('click', async () => {
+      if (!InvState.scanId) return;
+      try {
+        // Marquer rejete (on garde le fichier dans Storage et la ligne en BDD pour audit, mais hors historique principal)
+        await sb.from('scans').update({
+          statut: 'rejete',
+          valide_par_id: currentUser.id,
+          valide_par_nom: currentUser.nom,
+          date_validation: new Date().toISOString(),
+          observation: 'Vérification inventaire (non conservée)',
+        }).eq('id', InvState.scanId);
+        showToast('Scan effacé de l\'historique');
+        resetInventoryScreen();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
 
     // ====== HISTORIQUE ======
     async function loadHistory() {
