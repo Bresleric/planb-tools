@@ -269,6 +269,24 @@
     }
     .btn-action:active { background: var(--gray-100); }
     .btn-action.delete { color: var(--red); }
+    .btn-action.start { color: var(--green); font-size: 0.85rem; }
+    .btn-action.start:active { background: var(--green-bg); }
+
+    /* ====== CHRONO TAF ====== */
+    .task-chrono-live {
+      font-size: 0.7rem; font-weight: 700; color: var(--orange);
+      font-variant-numeric: tabular-nums;
+      display: inline-flex; align-items: center; gap: 2px;
+      white-space: nowrap;
+      background: var(--orange-light);
+      padding: 2px 6px; border-radius: 10px;
+    }
+    .task-chrono-live::before { content: '⏱'; font-size: 0.65rem; }
+    .task-duree-final {
+      font-size: 0.6rem; color: var(--gray-500);
+      font-variant-numeric: tabular-nums; display: block;
+      margin-top: 1px;
+    }
 
     /* ====== EMPTY STATE ====== */
     .empty-state {
@@ -1594,8 +1612,13 @@
         <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
         ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
-        <div class="task-cell">${done ? `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>` : ''}</div>
+        <div class="task-cell">${
+          done
+            ? `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>${(t.duree_secondes != null) ? `<span class="task-duree-final">${formatDureeShort(t.duree_secondes)}</span>` : ''}`
+            : (t.date_debut_execution ? `<span class="task-chrono-live" data-start="${t.date_debut_execution}" title="Chrono démarré par ${esc(t.debut_par_initiales || '?')}">…</span>` : '')
+        }</div>
         <div class="task-actions">
+          ${!done && !t.date_debut_execution && canAct ? `<button class="btn-action start" onclick="startTask('${t.id}')" title="Démarrer le chrono">▶</button>` : ''}
           ${!done && canAssign() ? `<button class="btn-action" onclick="showAssignModal('${t.id}')" title="Attribuer à quelqu'un">👤</button>` : ''}
           ${canAssign() ? `<button class="btn-action delete" onclick="confirmDelete('${t.id}')" title="Supprimer la tâche">✕</button>` : ''}
         </div>
@@ -1605,16 +1628,103 @@
     mc.innerHTML = html;
     // Synchroniser la checkbox "tout sélectionner" (état mixte/coché)
     if (selectionMode) syncSelectAllCheckbox();
+    // Démarrer le ticker des chronos visibles, et faire un premier rendu immédiat
+    tickChronos();
+    startChronoTicker();
   }
 
   function renderFiltered() { if (currentTab === 'taches') renderTasksTab(); }
+
+  // ====== CHRONO ======
+  // Format pour le live : MM:SS, ou H:MM:SS au-delà d'une heure
+  function formatDureeLive(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }
+  // Format compact pour l'affichage post-validation : 45s, 12min, 1h05
+  function formatDureeShort(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    if (s < 60) return `${s}s`;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (h > 0) return `${h}h${String(m).padStart(2,'0')}`;
+    return `${m}min`;
+  }
+  // Met à jour tous les chronos visibles
+  function tickChronos() {
+    const els = document.querySelectorAll('.task-chrono-live[data-start]');
+    if (!els.length) return;
+    const now = Date.now();
+    els.forEach(el => {
+      const start = new Date(el.dataset.start).getTime();
+      el.textContent = formatDureeLive((now - start) / 1000);
+    });
+  }
+  let chronoTickerInterval = null;
+  function startChronoTicker() {
+    if (chronoTickerInterval) return;
+    chronoTickerInterval = setInterval(tickChronos, 1000);
+  }
+
+  // Construit le payload de validation d'une tâche, avec calcul de durée
+  // si un chrono était en cours.
+  function buildValidationPayload(task) {
+    const payload = {
+      fait_par_id: currentUser.id,
+      fait_par_initiales: currentUser.initiales,
+      date_validation: new Date().toISOString()
+    };
+    if (task && task.date_debut_execution && task.duree_secondes == null) {
+      const start = new Date(task.date_debut_execution).getTime();
+      payload.duree_secondes = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    }
+    return payload;
+  }
+
+  // Démarre le chrono d'une tâche (sauvegarde côté DB pour persistance)
+  async function startTask(id) {
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task || task.fait_par_id || task.date_debut_execution) return;
+      const nowISO = new Date().toISOString();
+      // Mise à jour optimiste en local pour un retour visuel immédiat
+      task.date_debut_execution = nowISO;
+      task.debut_par_id = currentUser.id;
+      task.debut_par_initiales = currentUser.initiales;
+      renderFiltered();
+      await DB.updateTask(id, {
+        date_debut_execution: nowISO,
+        debut_par_id: currentUser.id,
+        debut_par_initiales: currentUser.initiales
+      });
+      showToast('Chrono démarré ⏱', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur démarrage chrono', 'error');
+      // En cas d'échec, recharger l'état réel
+      tasks = await DB.getTasks(filterDate);
+      renderFiltered();
+    }
+  }
 
   // ====== TASK ACTIONS ======
   async function toggleTask(id, isDone) {
     try {
       if (isDone) {
-        // Réouverture : supprimer validation (et production_id si existait)
-        await DB.updateTask(id, { fait_par_id: null, fait_par_initiales: null, date_validation: null });
+        // Réouverture : supprimer validation, durée et chrono (recommencer à zéro)
+        await DB.updateTask(id, {
+          fait_par_id: null,
+          fait_par_initiales: null,
+          date_validation: null,
+          duree_secondes: null,
+          date_debut_execution: null,
+          debut_par_id: null,
+          debut_par_initiales: null
+        });
         tasks = await DB.getTasks(filterDate);
         renderFiltered();
         showToast('Tâche réouverte', 'success');
@@ -1625,12 +1735,8 @@
           // Ouvrir la modale de saisie production
           openProductionModal(task);
         } else {
-          // Tâche normale : valider directement
-          await DB.updateTask(id, {
-            fait_par_id: currentUser.id,
-            fait_par_initiales: currentUser.initiales,
-            date_validation: new Date().toISOString()
-          });
+          // Tâche normale : valider directement (avec durée si chrono actif)
+          await DB.updateTask(id, buildValidationPayload(task));
           tasks = await DB.getTasks(filterDate);
           renderFiltered();
 
@@ -2378,11 +2484,8 @@
   async function skipProduction() {
     const taskId = document.getElementById('prod-task-id').value;
     try {
-      await DB.updateTask(taskId, {
-        fait_par_id: currentUser.id,
-        fait_par_initiales: currentUser.initiales,
-        date_validation: new Date().toISOString()
-      });
+      const task = tasks.find(t => t.id === taskId);
+      await DB.updateTask(taskId, buildValidationPayload(task));
       closeProductionModal();
       tasks = await DB.getTasks(filterDate);
       renderFiltered();
@@ -2469,12 +2572,12 @@
       const saved = await DB.createProduction(production);
 
       // Marquer la tâche comme terminée et lier la production
-      await DB.updateTask(taskId, {
-        fait_par_id: currentUser.id,
-        fait_par_initiales: currentUser.initiales,
-        date_validation: now.toISOString(),
-        production_id: saved.id
-      });
+      const taskForDuree = tasks.find(t => t.id === taskId);
+      const valPayload = buildValidationPayload(taskForDuree);
+      // skipProduction utilise Date.now(), ici on conserve le now de la modal
+      valPayload.date_validation = now.toISOString();
+      valPayload.production_id = saved.id;
+      await DB.updateTask(taskId, valPayload);
 
       closeProductionModal();
       tasks = await DB.getTasks(filterDate);
