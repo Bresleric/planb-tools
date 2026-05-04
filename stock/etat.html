@@ -113,6 +113,21 @@
 
     .empty-state { text-align:center; padding:32px 16px; color:var(--gray-500); }
     .empty-state .es-emoji { font-size:48px; margin-bottom:12px; }
+
+    /* Vue détail : tableau de scans */
+    .detail-row { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 90px 80px 110px 100px 80px; gap:8px; padding:8px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:4px; align-items:center; cursor:pointer; font-size:13px; }
+    .detail-row:hover { background:var(--gray-50); border-color:var(--gray-300); }
+    .detail-row .dr-cell { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .detail-row .dr-strong { font-weight:600; color:var(--gray-900); }
+    .detail-row .dr-muted { color:var(--gray-500); font-size:11px; }
+    .detail-row .dr-poids { font-weight:600; text-align:right; }
+    .detail-row .dr-dlc { font-size:10px; padding:2px 6px; border-radius:999px; font-weight:600; white-space:nowrap; text-align:center; }
+    .detail-th { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 90px 80px 110px 100px 80px; gap:8px; padding:0 12px 8px 12px; font-size:11px; font-weight:600; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; }
+    .detail-th .dr-poids { text-align:right; }
+    @media (max-width:780px) {
+      .detail-row { grid-template-columns:1fr; gap:2px; padding:10px; }
+      .detail-th { display:none; }
+    }
   </style>
 </head>
 <body>
@@ -142,10 +157,13 @@
 
     <div class="card">
       <div class="filters">
+        <span class="filter-chip active" data-view="aggregated">🗂 Agrégé</span>
+        <span class="filter-chip" data-view="detail">📑 Détail</span>
+        <span style="width:1px; height:20px; background:var(--gray-300);"></span>
         <span class="filter-chip active" data-filter-etab="all">Tous</span>
         <span class="filter-chip" data-filter-etab="freddy">Freddy</span>
         <span class="filter-chip" data-filter-etab="liesel">Liesel</span>
-        <input type="text" class="search-input" id="search" placeholder="Rechercher un article…">
+        <input type="text" class="search-input" id="search" placeholder="Rechercher…">
         <button class="btn btn-secondary" id="btn-export">📥 Export CSV</button>
       </div>
 
@@ -267,6 +285,8 @@
     const State = {
       articles: [],
       allArticles: [],       // référentiel appro_ingredients pour autocomplete réaffectation
+      allScans: [],          // toutes les lignes scan_tracabilite (vue détail)
+      view: 'aggregated',    // 'aggregated' | 'detail'
       filterEtab: 'all',
       filterCat: 'all',
       filterDlc: 'all',
@@ -327,6 +347,14 @@
           .in('scans.statut', ['valide', 'en_attente_validation', 'extrait'])
           .order('created_at', { ascending: false });
         if (error) throw error;
+
+        // Stocker la liste brute pour la vue détail (avec article enrichi)
+        State.allScans = (data || []).map(t => ({
+          ...t,
+          article_nom: t.appro_ingredients?.nom || '?',
+          article_categorie: t.appro_ingredients?.categorie || null,
+          etablissement: t.scans?.etablissement || null,
+        }));
 
         // Agréger par article_id
         const byArticle = {};
@@ -440,6 +468,7 @@
     }
 
     function renderList() {
+      if (State.view === 'detail') return renderDetail();
       const filtered = applyFilters();
       const sorted = applySort(filtered);
       const container = $('articles-list');
@@ -472,6 +501,95 @@
           <span class="ar-arrow">›</span>
         `;
         row.addEventListener('click', () => openDetail(a));
+        container.appendChild(row);
+      });
+    }
+
+    function applyFiltersDetail(scans) {
+      const q = State.search.toLowerCase().trim();
+      return scans.filter(s => {
+        if (State.filterEtab !== 'all' && s.etablissement !== State.filterEtab) return false;
+        if (State.filterCat !== 'all' && s.article_categorie !== State.filterCat) return false;
+        const d = daysToDlc(s.dlc);
+        if (State.filterDlc === 'alerte' && (d == null || d > 7)) return false;
+        if (State.filterDlc === 'depassee' && (d == null || d >= 0)) return false;
+        if (q) {
+          const blob = `${s.article_nom} ${s.produit||''} ${s.lot||''} ${s.fabricant||''}`.toLowerCase();
+          if (!blob.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function applySortDetail(items) {
+      const arr = [...items];
+      switch (State.sort) {
+        case 'poids_desc': arr.sort((a, b) => (b.poids_net_kg || 0) - (a.poids_net_kg || 0)); break;
+        case 'poids_asc':  arr.sort((a, b) => (a.poids_net_kg || 0) - (b.poids_net_kg || 0)); break;
+        case 'dlc':        arr.sort((a, b) => (a.dlc || '9999-12-31').localeCompare(b.dlc || '9999-12-31')); break;
+        case 'nom':        arr.sort((a, b) => a.article_nom.localeCompare(b.article_nom, 'fr')); break;
+        case 'recent':     arr.sort((a, b) => (b.scans?.created_at || '').localeCompare(a.scans?.created_at || '')); break;
+      }
+      return arr;
+    }
+
+    function renderDetail() {
+      const filtered = applyFiltersDetail(State.allScans);
+      const sorted = applySortDetail(filtered);
+      const container = $('articles-list');
+      // Remplace l'en-tête par celui du mode détail
+      const thRow = document.getElementById('th-row-detail');
+      if (!sorted.length) {
+        container.innerHTML = `<div class="empty-state"><div class="es-emoji">📦</div>Aucun scan ne correspond aux filtres.</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="detail-th">
+          <div>Article / Produit étiquette</div>
+          <div>Lot · Fabricant</div>
+          <div class="dr-poids">Poids (kg)</div>
+          <div style="text-align:center;">Étab.</div>
+          <div style="text-align:center;">DLC</div>
+          <div style="text-align:center;">Date scan</div>
+          <div style="text-align:center;">Action</div>
+        </div>
+      `;
+      sorted.forEach(s => {
+        const days = daysToDlc(s.dlc);
+        const cls = dlcClass(days);
+        const row = document.createElement('div');
+        row.className = 'detail-row';
+        row.innerHTML = `
+          <div class="dr-cell">
+            <div class="dr-strong" title="${escapeHtml(s.article_nom)}">${escapeHtml(s.article_nom)}</div>
+            <div class="dr-muted" title="${escapeHtml(s.produit || '')}">${escapeHtml(s.produit || '?')}</div>
+          </div>
+          <div class="dr-cell">
+            <div>${escapeHtml(s.lot || '—')}</div>
+            <div class="dr-muted">${escapeHtml(s.fabricant || '')}</div>
+          </div>
+          <div class="dr-poids">${s.poids_net_kg ? Number(s.poids_net_kg).toFixed(2) : '—'}</div>
+          <div style="text-align:center; font-size:11px; color:var(--gray-600);">${escapeHtml(s.etablissement || '?')}</div>
+          <div style="text-align:center;">
+            <div class="dr-dlc ${cls}">${s.dlc ? fmtDate(s.dlc) : '?'}</div>
+          </div>
+          <div style="text-align:center; font-size:11px; color:var(--gray-500);">${s.scans?.created_at ? fmtDate(s.scans.created_at) : '—'}</div>
+          <div style="text-align:center;">
+            <button class="btn btn-ghost" data-edit-scan-id="${s.id}" style="padding:4px 8px; font-size:11px;">✏️</button>
+          </div>
+        `;
+        // Click sur la ligne (hors bouton ✏️) → ouvre le détail de l'article parent
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('[data-edit-scan-id]')) return;
+          const article = State.articles.find(a => a.article_id === s.article_id);
+          if (article) openDetail(article);
+        });
+        // Click sur le bouton ✏️ → ouvre le modal d'édition directement
+        row.querySelector('[data-edit-scan-id]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const article = State.articles.find(a => a.article_id === s.article_id);
+          if (article) openEditScanModal(s, article);
+        });
         container.appendChild(row);
       });
     }
@@ -630,6 +748,16 @@
       if (e.key === 'Escape') { closeLightbox(); $('modal-detail').classList.remove('visible'); }
     });
 
+    // ==== TOGGLE VUE ====
+    document.querySelectorAll('[data-view]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-view]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.view = chip.dataset.view;
+        renderList();
+      });
+    });
+
     // ==== FILTRES UI ====
     document.querySelectorAll('[data-filter-etab]').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -662,33 +790,56 @@
 
     // ==== EXPORT CSV ====
     $('btn-export').addEventListener('click', () => {
-      const filtered = applyFilters();
-      const sorted = applySort(filtered);
-      const headers = ['Article', 'Catégorie', 'Unité réf.', 'Nb scans', 'Poids total (kg)', 'DLC mini', 'DLC max', 'Établissements', 'Dernier scan'];
       const esc = v => v == null ? '' : (/[";\n\r]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-      const rows = sorted.map(a => [
-        a.nom, a.categorie || '', a.unite || '', a.nb_scans, a.total_kg.toFixed(2),
-        a.dlc_min ? new Date(a.dlc_min).toLocaleDateString('fr-FR') : '',
-        a.dlc_max ? new Date(a.dlc_max).toLocaleDateString('fr-FR') : '',
-        [...a.etablissements].join(', '),
-        a.last_scan_at ? new Date(a.last_scan_at).toLocaleString('fr-FR') : '',
-      ].map(esc).join(';'));
-      const meta = [
-        `# État du stock — PlanB Tools`,
-        `# Date export;${new Date().toLocaleString('fr-FR')}`,
-        `# Articles;${sorted.length}`,
-        `# Note;Cumul des entrées validées (sortie cuisine non décomptée — Phase C en attente)`,
-        ``,
-      ].join('\n');
+      let headers, rows, meta, fileSuffix;
+      if (State.view === 'aggregated') {
+        const sorted = applySort(applyFilters());
+        headers = ['Article', 'Catégorie', 'Unité réf.', 'Nb scans', 'Poids total (kg)', 'DLC mini', 'DLC max', 'Établissements', 'Dernier scan'];
+        rows = sorted.map(a => [
+          a.nom, a.categorie || '', a.unite || '', a.nb_scans, a.total_kg.toFixed(2),
+          a.dlc_min ? new Date(a.dlc_min).toLocaleDateString('fr-FR') : '',
+          a.dlc_max ? new Date(a.dlc_max).toLocaleDateString('fr-FR') : '',
+          [...a.etablissements].join(', '),
+          a.last_scan_at ? new Date(a.last_scan_at).toLocaleString('fr-FR') : '',
+        ].map(esc).join(';'));
+        meta = [
+          `# État du stock (vue agrégée) — PlanB Tools`,
+          `# Date export;${new Date().toLocaleString('fr-FR')}`,
+          `# Articles;${sorted.length}`,
+          `# Note;Cumul des entrées validées (sortie cuisine non décomptée — Phase C en attente)`,
+          ``,
+        ].join('\n');
+        fileSuffix = 'agrege';
+      } else {
+        const sorted = applySortDetail(applyFiltersDetail(State.allScans));
+        headers = ['Article rattaché', 'Catégorie', 'Produit étiquette', 'Lot', 'Poids (kg)', 'DLC', 'DDM', 'Fabricant', 'Origine', 'Établissement', 'Date scan', 'Scanné par'];
+        rows = sorted.map(s => [
+          s.article_nom, s.article_categorie || '', s.produit || '', s.lot || '',
+          s.poids_net_kg ? Number(s.poids_net_kg).toFixed(3) : '',
+          s.dlc ? new Date(s.dlc).toLocaleDateString('fr-FR') : '',
+          s.ddm ? new Date(s.ddm).toLocaleDateString('fr-FR') : '',
+          s.fabricant || '', s.origine || '', s.etablissement || '',
+          s.scans?.created_at ? new Date(s.scans.created_at).toLocaleString('fr-FR') : '',
+          s.scans?.created_by_nom || '',
+        ].map(esc).join(';'));
+        meta = [
+          `# État du stock (vue détaillée) — PlanB Tools`,
+          `# Date export;${new Date().toLocaleString('fr-FR')}`,
+          `# Lignes;${sorted.length}`,
+          `# Note;1 ligne = 1 étiquette scannée. Cumul des entrées (sorties non décomptées).`,
+          ``,
+        ].join('\n');
+        fileSuffix = 'detail';
+      }
       const csv = '﻿' + meta + headers.join(';') + '\n' + rows.join('\n');
       const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `etat_stock_${new Date().toISOString().slice(0,10)}.csv`;
+      a.download = `etat_stock_${fileSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast(`✓ ${sorted.length} ligne${sorted.length>1?'s':''} exportée${sorted.length>1?'s':''}`, 'success');
+      showToast(`✓ ${rows.length} ligne${rows.length>1?'s':''} exportée${rows.length>1?'s':''}`, 'success');
     });
 
     // INIT
