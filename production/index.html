@@ -2775,6 +2775,19 @@ function printEtiquette(productionId) {
   const produit = production.nom_produit || '';
   const produitEsc = escapeHtml(produit);
 
+  // Format d'étiquette par établissement.
+  // Adapter ici quand on change physiquement de rouleau dans l'imprimante :
+  //   - DK-11209 (pré-découpé 62×29mm) → 'compact'
+  //   - DK-22251 (continu 62mm noir/rouge) → 'large' (62×60mm pour exploiter le format
+  //     imposé par iOS AirPrint en l'absence de configuration "Cut Length" sur l'imprimante)
+  const LABEL_FORMATS = {
+    freddy: { height: 60, mode: 'large' },   // DK-22251 actuellement
+    liesel: { height: 29, mode: 'compact' }, // DK-11209 actuellement
+  };
+  const labelFormat = LABEL_FORMATS[currentEtablissement] || LABEL_FORMATS.liesel;
+  const pageH = labelFormat.height;
+  const formatClass = 'format-' + labelFormat.mode;
+
   // Données pour la génération PDF (utilisée par le bouton "Imprimer")
   const pdfData = { dayName, dayClass, etabShort, produit, lotNum, qte, unite, producteur, prodDateStr, dlcStr };
   // On expose la fonction de génération à la page imprimable (capture des data via fermeture)
@@ -2789,7 +2802,7 @@ function printEtiquette(productionId) {
 <meta name="viewport" content="width=235, initial-scale=1">
 <title> </title>
 <style>
-  @page { size: 62mm 29mm; margin: 0; }
+  @page { size: 62mm ${pageH}mm; margin: 0; }
   * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0 !important; padding: 0 !important;
@@ -2839,15 +2852,16 @@ function printEtiquette(productionId) {
       overflow: hidden !important;
     }
   }
-  /* Layout compact 62×29mm pour rouleaux pré-découpés type DK-11209. */
+  /* Layout de base : compact 62×29mm pour rouleaux pré-découpés type DK-11209.
+     Les overrides .format-large étendent à 62×60mm pour DK-22251 + iOS. */
   @media print {
-    html, body { width: 62mm !important; height: 29mm !important; }
-    .preview-frame { width: 62mm; height: 29mm; }
-    .label { width: 62mm; height: 29mm; }
+    html, body { width: 62mm !important; height: ${pageH}mm !important; }
+    .preview-frame { width: 62mm; height: ${pageH}mm; }
+    .label { width: 62mm; height: ${pageH}mm; }
   }
   .label {
-    width: 62mm; height: 29mm;
-    max-width: 62mm; max-height: 29mm;
+    width: 62mm; height: ${pageH}mm;
+    max-width: 62mm; max-height: ${pageH}mm;
     padding: 1mm 1.5mm;
     position: relative;
     overflow: hidden;
@@ -2898,11 +2912,43 @@ function printEtiquette(productionId) {
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .dlc small { font-size: 5pt; font-weight: 700; }
+
+  /* === Overrides GRAND FORMAT (Freddy DK-22251) ===
+     Active uniquement quand body.format-large. Polices ~2x, layout réorganisé en colonne. */
+  body.format-large .label {
+    padding: 2mm; display: flex; flex-direction: column; gap: 1.2mm;
+  }
+  body.format-large .row1 {
+    gap: 2mm; padding-bottom: 1.5mm; margin-bottom: 1mm;
+    border-bottom: 0.4mm solid #000;
+  }
+  body.format-large .day {
+    font-size: 13pt; padding: 1mm 2mm; letter-spacing: 0.3px;
+  }
+  body.format-large .day-red { border-width: 0.5mm; border-radius: 1mm; }
+  body.format-large .day-black { border-radius: 1mm; }
+  body.format-large .product {
+    font-size: 16pt; line-height: 1.05;
+  }
+  body.format-large .etab { font-size: 11pt; }
+  body.format-large .row2 {
+    font-size: 10pt; gap: 2.5mm; margin-bottom: 1mm;
+  }
+  body.format-large .row2 .lot { font-size: 9pt; }
+  body.format-large .row2 .qty { font-size: 12pt; }
+  body.format-large .row3 {
+    font-size: 9pt; gap: 3mm;
+    margin-top: auto; padding-top: 1.5mm;
+    border-top: 0.4mm solid #000;
+  }
+  body.format-large .row3 .prod-date { font-size: 9pt; }
+  body.format-large .dlc { font-size: 14pt; }
+  body.format-large .dlc small { font-size: 7pt; }
 </style>
 </head>
-<body>
+<body class="${formatClass}">
   <div class="screen-wrap">
-    <h1>Aperçu étiquette (62×29mm)</h1>
+    <h1>Aperçu étiquette ${labelFormat.mode === 'large' ? '(grand format 62×60mm)' : '(62×29mm)'}</h1>
     <div class="preview-frame">
       <div class="label">
         <div class="row1">
