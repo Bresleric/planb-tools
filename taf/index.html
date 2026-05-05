@@ -153,13 +153,13 @@
 
     .taf-grid {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -178,7 +178,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -192,11 +192,11 @@
     .task-row.priority-1 { border-left-color: var(--gray-300); }
 
     .task-check {
-      width: 22px; height: 22px; border-radius: 50%;
+      width: 26px; height: 26px; border-radius: 50%;
       border: 2px solid var(--gray-300); background: white;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.7rem; color: white; margin: 0 auto;
+      font-size: 0.85rem; color: white; margin: 0 auto;
     }
     .task-check.checked { background: var(--green); border-color: var(--green); }
     .task-check:active { transform: scale(0.9); }
@@ -261,37 +261,39 @@
     }
     .task-row.done .task-echeance { color: var(--gray-400); }
 
-    .task-actions { display: flex; gap: 2px; justify-content: center; }
+    .task-actions { display: flex; gap: 4px; justify-content: center; align-items: center; }
     .btn-action {
-      width: 24px; height: 24px; border-radius: 50%;
-      border: none; background: none; cursor: pointer;
-      font-size: 0.75rem; display: flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--gray-200); background: white; cursor: pointer;
+      font-size: 0.95rem; display: flex; align-items: center; justify-content: center;
+      transition: transform .1s, background .15s;
     }
-    .btn-action:active { background: var(--gray-100); }
-    .btn-action.delete { color: var(--red); }
-    .btn-action.start { color: var(--green); font-size: 0.85rem; }
+    .btn-action:active { background: var(--gray-100); transform: scale(0.92); }
+    .btn-action.delete { color: var(--red); border-color: #fecaca; }
+    .btn-action.delete:active { background: var(--red-bg); }
+    .btn-action.start { color: var(--green); border-color: #bbf7d0; font-size: 1rem; }
     .btn-action.start:active { background: var(--green-bg); }
-    .btn-action.pause { color: var(--orange); font-size: 0.8rem; }
+    .btn-action.pause { color: var(--orange); border-color: #fed7aa; font-size: 0.95rem; }
     .btn-action.pause:active { background: var(--orange-light); }
-    .btn-action.cancel-chrono { color: var(--gray-500); font-size: 0.75rem; }
+    .btn-action.cancel-chrono { color: var(--gray-500); font-size: 0.85rem; }
     .btn-action.cancel-chrono:active { background: var(--gray-100); }
 
     /* ====== CHRONO TAF ====== */
     .task-chrono-live, .task-chrono-paused {
-      font-size: 0.7rem; font-weight: 700;
+      font-size: 0.8rem; font-weight: 700;
       font-variant-numeric: tabular-nums;
-      display: inline-flex; align-items: center; gap: 2px;
+      display: inline-flex; align-items: center; gap: 3px;
       white-space: nowrap;
-      padding: 2px 6px; border-radius: 10px;
+      padding: 3px 8px; border-radius: 12px;
     }
-    .task-chrono-live { color: var(--orange); background: var(--orange-light); }
-    .task-chrono-live::before { content: '⏱'; font-size: 0.65rem; }
-    .task-chrono-paused { color: var(--gray-500); background: var(--gray-100); }
-    .task-chrono-paused::before { content: '⏸'; font-size: 0.65rem; }
+    .task-chrono-live { color: var(--orange); background: var(--orange-light); border: 1px solid #fed7aa; }
+    .task-chrono-live::before { content: '⏱'; font-size: 0.75rem; }
+    .task-chrono-paused { color: var(--gray-500); background: var(--gray-100); border: 1px solid var(--gray-200); }
+    .task-chrono-paused::before { content: '⏸'; font-size: 0.75rem; }
     .task-duree-final {
-      font-size: 0.6rem; color: var(--gray-500);
+      font-size: 0.65rem; color: var(--gray-500);
       font-variant-numeric: tabular-nums; display: block;
-      margin-top: 1px;
+      margin-top: 2px;
     }
 
     /* ====== EMPTY STATE ====== */
@@ -351,7 +353,7 @@
     .task-table-header.selection-mode,
     .task-row.selection-mode,
     .taf-grid.selection-mode {
-      grid-template-columns: 32px 72px 48px 32px 32px 52px 90px minmax(120px, 2fr) minmax(80px, 1fr) 40px 30px 70px 48px;
+      grid-template-columns: 32px 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
     }
     .task-row.selected {
       background: #eff6ff;
@@ -1576,8 +1578,8 @@
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
       <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
       <span class="th-sort ${sa('categorie')}" onclick="toggleSort('categorie')">Catégorie<span class="sort-arrow">${arrow('categorie')}</span></span>
-      <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
       <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
+      <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
       <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
       <span class="th-center">✓</span>
       <span class="th-sort th-center ${sa('statut')}" onclick="toggleSort('statut')">Statut<span class="sort-arrow">${arrow('statut')}</span></span>
@@ -1621,10 +1623,10 @@
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
         <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
+        <div class="task-note-cell">${t.observation ? `<span class="task-note" title="${esc(t.observation)}">${esc(t.observation)}</span>` : ''}</div>
         <div class="task-main">
           <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
         </div>
-        <div class="task-note-cell"><span class="task-note">${t.observation ? esc(t.observation) : ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
         ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
         <div class="task-cell">${(() => {
