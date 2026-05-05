@@ -48,6 +48,8 @@
     .pc-nom { font-size:15px; font-weight:600; color:var(--gray-900); }
     .pc-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
     .pc-status { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+    .btn-edit-prod { padding:4px 8px; font-size:11px; font-weight:600; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); cursor:pointer; }
+    .btn-edit-prod:hover { background:var(--gray-200); }
     .status-badge { padding:2px 8px; font-size:11px; font-weight:600; border-radius:999px; white-space:nowrap; }
     .status-no-sortie { background:var(--orange-100); color:var(--orange-700); }
     .status-has-sortie { background:var(--green-100); color:var(--green-700); }
@@ -144,6 +146,31 @@
     </div>
   </main>
 
+  <!-- Modal édition production -->
+  <div id="prod-edit-bg" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:80; padding:16px; overflow-y:auto;">
+    <div style="background:white; border-radius:10px; max-width:520px; margin:0 auto; padding:20px;">
+      <div style="font-size:17px; font-weight:700; margin-bottom:14px;">Corriger la production</div>
+      <div style="font-size:12px; color:var(--gray-500); margin-bottom:14px;">
+        Si MP a saisi un mauvais libellé ou n'a pas lié la fiche technique au moment de l'étiquette, tu peux corriger ici. La production existante sera mise à jour, l'étiquette imprimée reste valide.
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; margin-bottom:4px;">Nom du produit</label>
+        <input type="text" id="pe-nom" style="width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:6px;">
+      </div>
+      <div style="margin-bottom:12px; position:relative;">
+        <label style="display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; margin-bottom:4px;">Fiche technique liée</label>
+        <input type="text" id="pe-fiche-search" placeholder="Tape le nom d'une fiche…" autocomplete="off" style="width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:6px;">
+        <div id="pe-fiche-results" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:220px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:6px; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:5; margin-top:2px;"></div>
+        <div id="pe-fiche-current" style="font-size:11px; color:var(--gray-500); margin-top:4px;">—</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:16px;">
+        <button class="btn btn-primary" id="pe-save">Enregistrer</button>
+        <button class="btn btn-ghost" id="pe-clear-fiche">✕ Délier fiche</button>
+        <button class="btn btn-ghost" id="pe-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -167,12 +194,15 @@
 
     const State = {
       prods: [],
+      allFiches: [],            // toutes les fiches pour autocomplete édition
       filter: 'without',
       selectedProd: null,
       ficheData: null,
       ingredients: [],
       lotsByArticle: {},
       selections: {}, // ingredient_id → { lot_id: qty }
+      editingProd: null,
+      editingFicheId: null,
     };
 
     function $(id) { return document.getElementById(id); }
@@ -185,8 +215,18 @@
     function dlcLbl(d) { if (d == null) return 'DLC ?'; if (d < 0) return `Dépassée ${-d}j`; if (d === 0) return "Auj."; if (d === 1) return 'Demain'; return `${d}j`; }
 
     // ==== CHARGEMENT ====
+    async function loadFiches() {
+      const { data, error } = await sb.from('fiches_techniques')
+        .select('id, nom, categorie, sous_categorie, rendement_quantite, rendement_unite, etablissement')
+        .eq('actif', true)
+        .order('nom');
+      if (!error) State.allFiches = data || [];
+    }
+
     async function loadProductions() {
       try {
+        if (State.allFiches.length === 0) await loadFiches();
+
         // Productions des 14 derniers jours pour l'établissement
         const since = new Date(Date.now() - 14*24*60*60*1000).toISOString();
         const { data: prods, error } = await sb.from('productions')
@@ -252,13 +292,22 @@
               ${p.quantite_produite} ${escapeHtml(p.unite || '')}
             </div>
           </div>
-          <div class="pc-status">${badge}</div>
+          <div class="pc-status">
+            ${badge}
+            <button class="btn-edit-prod" data-edit-prod="${p.id}" title="Corriger nom / fiche">✏️ Corriger</button>
+          </div>
         `;
-        if (hasFiche) {
-          card.addEventListener('click', () => selectProduction(p));
-        } else {
-          card.title = 'Cette production n\'a pas de fiche technique liée — impossible de proposer les ingrédients automatiquement.';
-        }
+        // Click sur la carte (hors bouton ✏️) → sélection si fiche
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('[data-edit-prod]')) return;
+          if (hasFiche) selectProduction(p);
+        });
+        if (!hasFiche) card.title = 'Pas de fiche technique liée — clique ✏️ Corriger pour en assigner une.';
+        // Bouton ✏️
+        card.querySelector('[data-edit-prod]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditProd(p);
+        });
         c.appendChild(card);
       });
     }
@@ -496,6 +545,121 @@
       $('card-matieres').style.display = 'none';
       $('card-list').style.display = '';
       State.selectedProd = null;
+    });
+
+    // ==== ÉDITION PRODUCTION (correction nom / fiche) ====
+    function openEditProd(p) {
+      State.editingProd = p;
+      State.editingFicheId = p.fiche_id || null;
+      $('pe-nom').value = p.nom_produit || '';
+      const currentFiche = p.fiche_id ? State.allFiches.find(f => f.id === p.fiche_id) : null;
+      $('pe-fiche-search').value = currentFiche ? currentFiche.nom : '';
+      $('pe-fiche-current').textContent = currentFiche
+        ? `Fiche actuelle : ${currentFiche.nom}`
+        : '— Pas de fiche liée —';
+      $('pe-fiche-results').style.display = 'none';
+      $('prod-edit-bg').style.display = 'block';
+    }
+
+    $('pe-fiche-search').addEventListener('input', () => {
+      const q = $('pe-fiche-search').value.toLowerCase().trim();
+      const res = $('pe-fiche-results');
+      if (!q) {
+        // Suggestions auto par fuzzy match avec le nom de la production
+        const refNom = (State.editingProd?.nom_produit || '').toLowerCase();
+        const candidates = State.allFiches
+          .map(f => ({ f, score: scoreFuzzy(refNom, f.nom.toLowerCase()) }))
+          .sort((x, y) => y.score - x.score)
+          .slice(0, 5)
+          .map(x => x.f);
+        if (!candidates.length) { res.style.display = 'none'; return; }
+        res.innerHTML = candidates.map(f => `
+          <div data-fid="${f.id}" style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--gray-100);">
+            ✨ ${escapeHtml(f.nom)} <span style="font-size:11px; color:var(--gray-500);">· ${escapeHtml(f.categorie || '')}</span>
+          </div>
+        `).join('');
+        wireFicheResults(res);
+        res.style.display = 'block';
+        return;
+      }
+      const matches = State.allFiches.filter(f => f.nom.toLowerCase().includes(q)).slice(0, 10);
+      if (!matches.length) {
+        res.innerHTML = '<div style="padding:8px 12px; color:var(--gray-500); font-style:italic; font-size:13px;">Aucune fiche correspondante</div>';
+      } else {
+        res.innerHTML = matches.map(f => `
+          <div data-fid="${f.id}" style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--gray-100);">
+            ${escapeHtml(f.nom)} <span style="font-size:11px; color:var(--gray-500);">· ${escapeHtml(f.categorie || '')}</span>
+          </div>
+        `).join('');
+        wireFicheResults(res);
+      }
+      res.style.display = 'block';
+    });
+
+    $('pe-fiche-search').addEventListener('focus', () => {
+      $('pe-fiche-search').dispatchEvent(new Event('input'));
+    });
+    $('pe-fiche-search').addEventListener('blur', () => setTimeout(() => $('pe-fiche-results').style.display = 'none', 200));
+
+    function wireFicheResults(res) {
+      res.querySelectorAll('[data-fid]').forEach(el => {
+        el.addEventListener('click', () => {
+          const f = State.allFiches.find(x => x.id === el.dataset.fid);
+          if (!f) return;
+          State.editingFicheId = f.id;
+          $('pe-fiche-search').value = f.nom;
+          $('pe-fiche-current').textContent = `Sera lié à : ${f.nom}`;
+          $('pe-fiche-current').style.color = 'var(--primary-dark)';
+          $('pe-fiche-current').style.fontWeight = '600';
+          res.style.display = 'none';
+        });
+      });
+    }
+
+    function scoreFuzzy(a, b) {
+      if (!a || !b) return 0;
+      const aw = new Set(a.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      const bw = new Set(b.split(/[\s,/-]+/).filter(w => w.length >= 3));
+      let common = 0;
+      aw.forEach(w => { if (bw.has(w)) common++; });
+      return aw.size > 0 ? common / aw.size : 0;
+    }
+
+    $('pe-clear-fiche').addEventListener('click', () => {
+      State.editingFicheId = null;
+      $('pe-fiche-search').value = '';
+      $('pe-fiche-current').textContent = '— Aucune fiche liée —';
+      $('pe-fiche-current').style.color = 'var(--gray-500)';
+      $('pe-fiche-current').style.fontWeight = 'normal';
+    });
+
+    $('pe-cancel').addEventListener('click', closeEditProd);
+    $('prod-edit-bg').addEventListener('click', (e) => {
+      if (e.target.id === 'prod-edit-bg') closeEditProd();
+    });
+    function closeEditProd() {
+      $('prod-edit-bg').style.display = 'none';
+      State.editingProd = null;
+      State.editingFicheId = null;
+    }
+
+    $('pe-save').addEventListener('click', async () => {
+      if (!State.editingProd) return;
+      const nom = $('pe-nom').value.trim();
+      if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+      try {
+        const { error } = await sb.from('productions').update({
+          nom_produit: nom,
+          fiche_id: State.editingFicheId || null,
+        }).eq('id', State.editingProd.id);
+        if (error) throw error;
+        showToast('✓ Production corrigée', 'success');
+        closeEditProd();
+        await loadProductions();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
     });
 
     // INIT
