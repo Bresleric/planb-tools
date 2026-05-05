@@ -748,6 +748,38 @@
   <button class="fab-button" id="fab-fiches" onclick="switchTab('create')" title="Nouvelle fiche technique" style="display:none;">+</button>
   <button class="fab-button" id="fab-productions" onclick="openProductionModal()" style="display:none;">+</button>
 
+  <!-- PRODUCTION EDIT MODAL (correction nom / fiche / quantité) -->
+  <div id="prodedit-bg" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:210; padding:16px; overflow-y:auto;">
+    <div style="background:white; border-radius:10px; max-width:540px; margin:0 auto; padding:20px;">
+      <div style="font-size:17px; font-weight:700; margin-bottom:6px;">Corriger une production</div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:14px;" id="prodedit-context">—</div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; margin-bottom:4px;">Nom du produit</label>
+        <input type="text" id="prodedit-nom" style="width:100%; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; margin-bottom:4px;">Quantité produite</label>
+        <div style="display:flex; gap:6px;">
+          <input type="number" step="0.01" id="prodedit-qty" style="flex:1; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+          <select id="prodedit-unite" style="width:90px; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+            <option value="kg">kg</option><option value="g">g</option><option value="l">l</option><option value="cl">cl</option><option value="ml">ml</option><option value="pièce">pièce</option><option value="portions">portions</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:12px; position:relative;">
+        <label style="display:block; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; margin-bottom:4px;">Fiche technique liée</label>
+        <input type="text" id="prodedit-fiche-search" placeholder="Tape le nom d'une fiche…" autocomplete="off" style="width:100%; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+        <div id="prodedit-fiche-results" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:220px; overflow-y:auto; background:white; border:1px solid #e5e7eb; border-radius:6px; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:5; margin-top:2px;"></div>
+        <div id="prodedit-fiche-current" style="font-size:11px; color:#6b7280; margin-top:4px;">—</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:16px;">
+        <button onclick="saveProductionEdit()" style="padding:10px; background:#10b981; color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Enregistrer</button>
+        <button onclick="clearProductionEditFiche()" style="padding:10px; background:white; color:#b45309; border:1px solid #f59e0b; border-radius:6px; font-weight:600; cursor:pointer;">✕ Délier fiche</button>
+        <button onclick="closeProductionEdit()" style="padding:10px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:6px; font-weight:600; cursor:pointer;">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ARTICLE PICKER MODAL -->
   <div class="ap-modal-bg" id="article-picker">
     <div class="ap-modal">
@@ -1049,6 +1081,7 @@ function setupIngredientForm() {
   document.getElementById('btn-add-ingredient').addEventListener('click', () => {
     addIngredientRow();
   });
+  setupProductionEditModal();
   // Bouton zone "Cette fiche produit l'article"
   document.getElementById('btn-link-fiche-article').addEventListener('click', () => {
     openArticlePicker('FICHE');
@@ -1218,6 +1251,121 @@ function applyArticleSelection(article) {
     }
   }
   closeArticlePicker();
+}
+
+// ============= PRODUCTION EDIT (correction nom / fiche / quantité) =============
+let editingProductionId = null;
+let editingProdSelectedFicheId = null;
+
+function openProductionEdit(productionId) {
+  const p = allProductions.find(x => x.id === productionId);
+  if (!p) { showToast('Production introuvable', 'error'); return; }
+  editingProductionId = p.id;
+  editingProdSelectedFicheId = p.fiche_id || null;
+
+  const fiche = p.fiche_id ? allFiches.find(f => f.id === p.fiche_id) : null;
+  const lot = allLots.find(l => l.id === p.lot_id);
+
+  document.getElementById('prodedit-context').textContent =
+    `Lot ${lot?.numero_lot || '?'} · Produit le ${p.date_production ? new Date(p.date_production).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '?'} par ${p.producteur_nom || '?'}`;
+
+  document.getElementById('prodedit-nom').value = p.nom_produit || '';
+  document.getElementById('prodedit-qty').value = p.quantite_produite ?? '';
+  document.getElementById('prodedit-unite').value = p.unite || 'kg';
+  document.getElementById('prodedit-fiche-search').value = fiche ? fiche.nom : '';
+  document.getElementById('prodedit-fiche-current').textContent = fiche ? `Fiche actuelle : ${fiche.nom}` : '— Aucune fiche liée —';
+  document.getElementById('prodedit-fiche-current').style.color = '';
+  document.getElementById('prodedit-fiche-current').style.fontWeight = '';
+  document.getElementById('prodedit-fiche-results').style.display = 'none';
+  document.getElementById('prodedit-bg').style.display = 'block';
+}
+
+function closeProductionEdit() {
+  document.getElementById('prodedit-bg').style.display = 'none';
+  editingProductionId = null;
+  editingProdSelectedFicheId = null;
+}
+
+function clearProductionEditFiche() {
+  editingProdSelectedFicheId = null;
+  document.getElementById('prodedit-fiche-search').value = '';
+  document.getElementById('prodedit-fiche-current').textContent = '— Aucune fiche liée —';
+  document.getElementById('prodedit-fiche-current').style.color = '';
+  document.getElementById('prodedit-fiche-current').style.fontWeight = '';
+}
+
+function setupProductionEditModal() {
+  const search = document.getElementById('prodedit-fiche-search');
+  const results = document.getElementById('prodedit-fiche-results');
+  if (!search) return;
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase().trim();
+    let candidates;
+    if (q) {
+      candidates = allFiches.filter(f => f.nom.toLowerCase().includes(q)).slice(0, 12);
+    } else {
+      // Suggestions auto par fuzzy match avec le nom de production saisi
+      const refNom = (document.getElementById('prodedit-nom').value || '').toLowerCase();
+      candidates = allFiches
+        .map(f => ({ f, score: scoreFuzzyMatch(refNom, f.nom.toLowerCase()) }))
+        .sort((x, y) => y.score - x.score)
+        .slice(0, 5)
+        .map(x => x.f);
+    }
+    if (!candidates.length) {
+      results.innerHTML = '<div style="padding:8px 12px; color:#6b7280; font-style:italic; font-size:13px;">Aucune fiche correspondante</div>';
+    } else {
+      results.innerHTML = candidates.map((f, idx) => {
+        const isSugg = !q && idx < 3;
+        return `<div data-fid="${f.id}" style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid #f3f4f6; ${isSugg ? 'background:#dbeafe;' : ''}">
+          ${isSugg ? '✨ ' : ''}${escapeHtmlProd(f.nom)} <span style="font-size:11px; color:#6b7280;">· ${escapeHtmlProd(f.categorie || '')}</span>
+        </div>`;
+      }).join('');
+      results.querySelectorAll('[data-fid]').forEach(el => {
+        el.addEventListener('click', () => {
+          const f = allFiches.find(x => x.id === el.dataset.fid);
+          if (!f) return;
+          editingProdSelectedFicheId = f.id;
+          search.value = f.nom;
+          document.getElementById('prodedit-fiche-current').textContent = `Sera lié à : ${f.nom}`;
+          document.getElementById('prodedit-fiche-current').style.color = '#047857';
+          document.getElementById('prodedit-fiche-current').style.fontWeight = '600';
+          results.style.display = 'none';
+        });
+      });
+    }
+    results.style.display = 'block';
+  });
+  search.addEventListener('focus', () => search.dispatchEvent(new Event('input')));
+  search.addEventListener('blur', () => setTimeout(() => results.style.display = 'none', 200));
+  // Click outside modal closes it
+  document.getElementById('prodedit-bg').addEventListener('click', (e) => {
+    if (e.target.id === 'prodedit-bg') closeProductionEdit();
+  });
+}
+
+async function saveProductionEdit() {
+  if (!editingProductionId) return;
+  const nom = document.getElementById('prodedit-nom').value.trim();
+  if (!nom) { showToast('Nom obligatoire', 'error'); return; }
+  const qty = parseFloat(document.getElementById('prodedit-qty').value);
+  const unite = document.getElementById('prodedit-unite').value;
+  try {
+    const update = {
+      nom_produit: nom,
+      fiche_id: editingProdSelectedFicheId || null,
+      unite: unite || null,
+    };
+    if (!isNaN(qty) && qty > 0) update.quantite_produite = qty;
+    const { error } = await sb.from('productions').update(update).eq('id', editingProductionId);
+    if (error) throw error;
+    showToast('✓ Production corrigée', 'success');
+    closeProductionEdit();
+    await loadProductions();
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur : ' + e.message, 'error');
+  }
 }
 
 async function createAndApplyArticle() {
@@ -1671,17 +1819,19 @@ function renderProductions() {
     const producteur = p.producteur_initiales || p.producteur_nom || '—';
     const obs = (p.observation || '').replace(/"/g, '&quot;');
 
+    const ficheLinked = !!p.fiche_id;
     return `
-      <tr class="${rowClass}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">
-        <td class="cat-cell" title="${p.categorie || ''}">${icon}</td>
-        <td class="nom" title="${(p.nom_produit || '').replace(/"/g, '&quot;')}">${p.nom_produit || ''}</td>
-        <td class="num">${qte}</td>
-        <td>${unite}</td>
-        <td><span class="lot-cell">${lotNum}</span></td>
-        <td>${dProd}</td>
-        <td class="dlc-cell ${dlcClass}">${dlcTxt}</td>
-        <td>${producteur}</td>
-        <td class="obs-cell" title="${obs}">${obs || ''}</td>
+      <tr class="${rowClass}">
+        <td class="cat-cell" title="${p.categorie || ''}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${icon}</td>
+        <td class="nom" title="${(p.nom_produit || '').replace(/"/g, '&quot;')}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${p.nom_produit || ''}${ficheLinked ? ' <span style=&quot;font-size:10px;color:#7c3aed;&quot;>📜</span>' : ''}</td>
+        <td class="num" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${qte}</td>
+        <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${unite}</td>
+        <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))"><span class="lot-cell">${lotNum}</span></td>
+        <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${dProd}</td>
+        <td class="dlc-cell ${dlcClass}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${dlcTxt}</td>
+        <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${producteur}</td>
+        <td class="obs-cell" title="${obs}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${obs || ''}</td>
+        <td style="text-align:center; padding:0 4px;"><button onclick="event.stopPropagation(); openProductionEdit('${p.id}')" style="padding:4px 8px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; font-size:11px; cursor:pointer;" title="Corriger nom / fiche">✏️</button></td>
       </tr>
     `;
   }).join('');
@@ -1701,6 +1851,7 @@ function renderProductions() {
               <th>DLC</th>
               <th>Par</th>
               <th>Observation</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
