@@ -1081,6 +1081,15 @@ function setupIngredientForm() {
   document.getElementById('btn-add-ingredient').addEventListener('click', () => {
     addIngredientRow();
   });
+
+  // Chips de catégorie de fiche : permettre la sélection (Produit fini / intermédiaire / Mise en place)
+  document.querySelectorAll('#f-categorie .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#f-categorie .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+
   setupProductionEditModal();
   // Bouton zone "Cette fiche produit l'article"
   document.getElementById('btn-link-fiche-article').addEventListener('click', () => {
