@@ -96,6 +96,25 @@
 
     .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); }
 
+    /* Produit · Action sous le nom */
+    .tr-pa { font-size:11px; color:var(--gray-500); margin-top:2px; }
+    .tr-pa-set { color:var(--primary-dark); font-weight:600; }
+    .pa-chip { display:inline-block; padding:1px 6px; background:var(--primary-light); color:var(--primary-dark); border-radius:4px; font-size:10px; font-weight:600; margin-right:3px; }
+
+    /* Modal édition produit/action */
+    .pa-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; padding:16px; overflow-y:auto; }
+    .pa-modal-bg.visible { display:flex; align-items:flex-start; justify-content:center; }
+    .pa-modal { background:white; border-radius:12px; max-width:520px; width:100%; padding:20px; }
+    .pa-modal h3 { font-size:16px; font-weight:700; margin-bottom:6px; }
+    .pa-context { font-size:12px; color:var(--gray-500); margin-bottom:14px; padding:8px 10px; background:var(--gray-50); border-radius:6px; }
+    .pa-field { margin-bottom:10px; }
+    .pa-field label { display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+    .pa-field input { width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:6px; font-family:inherit; }
+    .pa-suggestions { margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; }
+    .pa-suggestion { padding:3px 8px; background:var(--blue-100); color:var(--blue-700); border-radius:999px; font-size:11px; cursor:pointer; border:1px solid var(--blue-100); }
+    .pa-suggestion:hover { background:var(--primary-light); color:var(--primary-dark); }
+    .pa-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:14px; }
+
     .cat-group { margin-bottom:18px; }
     .cat-header { font-size:12px; font-weight:700; color:var(--gray-700); text-transform:uppercase; letter-spacing:0.3px; padding:8px 4px; }
     .cat-header .cat-count { color:var(--gray-500); font-weight:500; margin-left:6px; }
@@ -133,6 +152,14 @@
       <button class="bulk-btn" id="bulk-btn">⏸ Tout désactiver</button>
     </div>
 
+    <div class="bulk-card hidden" id="bulk-pa-card" style="background:#dbeafe; border-color:#1d4ed8;">
+      <div class="bulk-info">
+        <div class="bi-title" id="bulk-pa-title" style="color:#1e40af;">🏷 N tâches sans Produit/Action — auto-suggestion possible</div>
+        <div class="bi-desc" style="color:#1e40af;">Le système peut deviner Produit + Action à partir des noms ("Cuire bourguignon" → Bourguignon · Cuire). Tu pourras corriger après.</div>
+      </div>
+      <button class="bulk-btn" id="bulk-pa-btn" style="background:#1d4ed8;">🏷 Auto-suggérer</button>
+    </div>
+
     <div class="card">
       <div style="font-size:13px; color:var(--gray-600); margin-bottom:12px;">
         Liste des tâches que les équipes voient quand elles créent une production. Pour chaque tâche tu peux la rattacher à sa fiche, la renommer, la désactiver, ou la supprimer si elle n'a jamais servi.
@@ -160,6 +187,29 @@
       <div class="empty-state">Chargement…</div>
     </div>
   </main>
+
+  <!-- Modal édition Produit + Action -->
+  <div class="pa-modal-bg" id="pa-modal">
+    <div class="pa-modal">
+      <h3>Décomposer en Produit + Action</h3>
+      <div class="pa-context" id="pa-ctx">—</div>
+      <div class="pa-field">
+        <label>Produit</label>
+        <input type="text" id="pa-produit" placeholder="Ex: Carottes, Œufs, Paleron, Choucroute…">
+        <div class="pa-suggestions" id="pa-produit-sugg"></div>
+      </div>
+      <div class="pa-field">
+        <label>Action</label>
+        <input type="text" id="pa-action" placeholder="Ex: Éplucher, Tailler en cubes, Cuire, Sous-vide…">
+        <div class="pa-suggestions" id="pa-action-sugg"></div>
+      </div>
+      <div class="pa-actions">
+        <button class="btn btn-success" id="pa-save">Enregistrer</button>
+        <button class="btn btn-warn" id="pa-clear">✕ Effacer</button>
+        <button class="btn btn-ghost" id="pa-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
 
   <div class="toast" id="toast"></div>
 
@@ -199,7 +249,7 @@
       try {
         const [{ data: tasks, error: e1 }, { data: fiches, error: e2 }, { data: usage, error: e3 }] = await Promise.all([
           sb.from('predefined_tasks')
-            .select('id, nom, categorie, etablissement, fiche_id, categorie_production, actif, is_production, equipe, creneau')
+            .select('id, nom, categorie, etablissement, fiche_id, categorie_production, actif, is_production, equipe, creneau, produit, action')
             .eq('is_production', true)
             .order('categorie')
             .order('nom'),
@@ -252,27 +302,39 @@
     }
 
     function renderBulk() {
-      // Bulk : tâches actives jamais utilisées (ou inutilisées depuis 60j+)
+      // Bulk désactivation : tâches actives jamais utilisées (ou inutilisées depuis 60j+)
       const candidates = State.tasks.filter(t => t.actif && (t.nb_uses === 0 || (t.last_use && daysSince(t.last_use) > 60)));
       const card = $('bulk-card');
       if (candidates.length === 0) {
         card.classList.add('hidden');
-        return;
+      } else {
+        card.classList.remove('hidden');
+        $('bulk-title').textContent = `⚠ ${candidates.length} tâches actives jamais utilisées (ou inutilisées depuis 60j+)`;
+        $('bulk-btn').onclick = async () => {
+          if (!confirm(`Désactiver ${candidates.length} tâches d'un coup ?\n\nTu pourras les réactiver individuellement si besoin (filtre "Inactives").`)) return;
+          try {
+            const ids = candidates.map(t => t.id);
+            const { error } = await sb.from('predefined_tasks').update({ actif: false }).in('id', ids);
+            if (error) throw error;
+            showToast(`✓ ${ids.length} tâches désactivées`, 'success');
+            await loadAll();
+          } catch (err) {
+            showToast('Erreur : ' + err.message, 'error');
+          }
+        };
       }
-      card.classList.remove('hidden');
-      $('bulk-title').textContent = `⚠ ${candidates.length} tâches actives jamais utilisées (ou inutilisées depuis 60j+)`;
-      $('bulk-btn').onclick = async () => {
-        if (!confirm(`Désactiver ${candidates.length} tâches d'un coup ?\n\nTu pourras les réactiver individuellement si besoin (filtre "Inactives").`)) return;
-        try {
-          const ids = candidates.map(t => t.id);
-          const { error } = await sb.from('predefined_tasks').update({ actif: false }).in('id', ids);
-          if (error) throw error;
-          showToast(`✓ ${ids.length} tâches désactivées`, 'success');
-          await loadAll();
-        } catch (err) {
-          showToast('Erreur : ' + err.message, 'error');
-        }
-      };
+
+      // Bulk Produit/Action : tâches actives sans produit/action ET dont le nom matche un pattern
+      const paCandidates = State.tasks.filter(t => t.actif && !t.produit && !t.action);
+      const paParseable = paCandidates.map(t => ({ t, ...parseProductAction(t.nom) })).filter(x => x.produit || x.action);
+      const paCard = $('bulk-pa-card');
+      if (paParseable.length === 0) {
+        paCard.classList.add('hidden');
+      } else {
+        paCard.classList.remove('hidden');
+        $('bulk-pa-title').textContent = `🏷 ${paParseable.length} tâches sans Produit/Action — auto-suggestion possible (sur ${paCandidates.length} sans P/A)`;
+        $('bulk-pa-btn').onclick = bulkAutoSuggest;
+      }
     }
 
     function applyFilter() {
@@ -333,10 +395,16 @@
         ? `<button class="btn btn-danger" data-action="delete" title="Supprimer définitivement (zero usage)">🗑</button>`
         : '';
 
+      const paLine = (t.produit || t.action)
+        ? `<div class="tr-pa tr-pa-set"><span class="pa-chip">${escapeHtml(t.produit || '?')}</span> · ${escapeHtml(t.action || '?')}</div>`
+        : `<div class="tr-pa">— Produit · Action non défini —</div>`;
       div.innerHTML = `
         <div class="tr-nom">
           ${matched ? '🔗' : '⚠'}
-          <div class="tr-nom-text" title="${escapeHtml(t.nom)}">${!t.actif ? '⏸ ' : ''}${escapeHtml(t.nom)}</div>
+          <div style="min-width:0; flex:1;">
+            <div class="tr-nom-text" title="${escapeHtml(t.nom)}">${!t.actif ? '⏸ ' : ''}${escapeHtml(t.nom)}</div>
+            ${paLine}
+          </div>
         </div>
         <div><span class="tr-cat">${escapeHtml(t.categorie_production || t.categorie || '')}</span></div>
         <div class="tr-uses ${usesCls}">
@@ -348,6 +416,7 @@
           <div class="tr-results"></div>
         </div>
         <div class="tr-actions">
+          <button class="btn btn-ghost" data-action="pa" title="Produit + Action">🏷</button>
           <button class="btn btn-ghost" data-action="rename" title="Renommer">✏️</button>
           ${matched
             ? `<button class="btn btn-ghost" data-action="unlink" title="Délier la fiche">🔗✕</button>`
@@ -372,6 +441,7 @@
           else if (action === 'unlink') unlinkTask(t, div);
           else if (action === 'toggle') toggleTask(t);
           else if (action === 'delete') deleteTask(t);
+          else if (action === 'pa') openPaModal(t);
         });
       });
       return div;
@@ -479,6 +549,148 @@
         await loadAll();
       } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
     }
+
+    // ==== HEURISTIQUE PRODUIT/ACTION ====
+    // Verbes d'action courants (préfixe du nom → action, reste → produit)
+    const ACTION_VERBS = [
+      'cuire', 'tailler', 'éplucher', 'eplucher', 'préparer', 'preparer',
+      'sous-vide', 'sous vide', 'hacher', 'mariner', 'mixer', 'émincer',
+      'eminc', 'découper', 'decouper', 'effilocher', 'ciseler', 'fariner',
+      'paner', 'rouler', 'former', 'pétrir', 'petrir', 'fondre', 'gratiner',
+      'griller', 'rotir', 'rôtir', 'pocher', 'frire', 'blanchir', 'glacer',
+      'flamber', 'caraméliser', 'carameliser', 'sauter', 'mijoter', 'monter',
+      'mouler', 'dresser', 'trancher', 'parer', 'dégraisser', 'degraisser',
+      'plumer', 'écailler', 'ecailler', 'décortiquer', 'decortiquer',
+      'congeler', 'décongeler', 'decongeler', 'réhydrater', 'rehydrater',
+      'broyer', 'concasser', 'fouetter', 'foncer', 'abaisser', 'tourner',
+    ];
+
+    function parseProductAction(nom) {
+      if (!nom) return { produit: null, action: null };
+      const trimmed = nom.trim();
+
+      // Pattern 1 : "X - Y" → produit=X, action=Y
+      const tiret = trimmed.split(/\s+[-–—]\s+/);
+      if (tiret.length === 2) {
+        return { produit: tiret[0].trim(), action: tiret[1].trim() };
+      }
+
+      // Pattern 2 : "VERBE produit..." → action=verbe, produit=reste
+      const lower = trimmed.toLowerCase();
+      // Trier les verbes par longueur décroissante (matcher "sous-vide" avant "sous")
+      const sorted = [...ACTION_VERBS].sort((a, b) => b.length - a.length);
+      for (const verb of sorted) {
+        if (lower.startsWith(verb + ' ') || lower === verb) {
+          const rest = trimmed.substring(verb.length).trim();
+          if (rest) {
+            // Première lettre du verbe en majuscule
+            const action = verb.charAt(0).toUpperCase() + verb.slice(1);
+            // Première lettre du produit en majuscule
+            const produit = rest.charAt(0).toUpperCase() + rest.slice(1);
+            return { produit, action };
+          }
+        }
+      }
+
+      // Pattern 3 : pas de match → on laisse vide pour saisie manuelle
+      return { produit: null, action: null };
+    }
+
+    // Bulk : suggérer pour toutes les tâches sans produit/action
+    async function bulkAutoSuggest() {
+      const nonRemplies = State.tasks.filter(t => !t.produit && !t.action && t.actif);
+      const suggestables = nonRemplies.map(t => ({ t, ...parseProductAction(t.nom) })).filter(x => x.produit || x.action);
+      if (!suggestables.length) {
+        showToast('Aucune tâche n\'a de pattern reconnaissable', 'error');
+        return;
+      }
+      // Aperçu
+      const preview = suggestables.slice(0, 5).map(x => `• ${x.t.nom} → ${x.produit || '?'} · ${x.action || '?'}`).join('\n');
+      const confirm1 = confirm(`Auto-suggérer Produit/Action pour ${suggestables.length} tâches ?\n\nAperçu (${Math.min(5, suggestables.length)} premières) :\n${preview}\n\n(Tu pourras corriger manuellement après)`);
+      if (!confirm1) return;
+      try {
+        // UPDATE en bulk via plusieurs requêtes parallèles
+        const updates = suggestables.map(x =>
+          sb.from('predefined_tasks').update({ produit: x.produit, action: x.action }).eq('id', x.t.id)
+        );
+        const results = await Promise.all(updates);
+        const errors = results.filter(r => r.error);
+        if (errors.length) {
+          showToast(`${suggestables.length - errors.length} succès, ${errors.length} erreurs`, 'error');
+        } else {
+          showToast(`✓ ${suggestables.length} tâches enrichies`, 'success');
+        }
+        await loadAll();
+      } catch (err) {
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    // ==== MODAL ÉDITION PRODUIT + ACTION ====
+    let paEditingTask = null;
+
+    function openPaModal(task) {
+      paEditingTask = task;
+      $('pa-ctx').textContent = `Tâche : "${task.nom}"`;
+      $('pa-produit').value = task.produit || '';
+      $('pa-action').value = task.action || '';
+
+      // Suggestions automatiques basées sur le nom
+      const suggested = parseProductAction(task.nom);
+      const sP = $('pa-produit-sugg');
+      const sA = $('pa-action-sugg');
+      sP.innerHTML = '';
+      sA.innerHTML = '';
+      if (suggested.produit) {
+        sP.innerHTML = `<span class="pa-suggestion" data-v="${escapeHtml(suggested.produit)}">✨ ${escapeHtml(suggested.produit)}</span>`;
+      }
+      if (suggested.action) {
+        sA.innerHTML = `<span class="pa-suggestion" data-v="${escapeHtml(suggested.action)}">✨ ${escapeHtml(suggested.action)}</span>`;
+      }
+      // Suggestions de produits existants similaires
+      const existingProduits = [...new Set(State.tasks.map(t => t.produit).filter(Boolean))];
+      const existingActions = [...new Set(State.tasks.map(t => t.action).filter(Boolean))];
+      // Top 5 produits/actions les plus utilisés
+      const topP = countAndSort(State.tasks.map(t => t.produit).filter(Boolean)).slice(0, 5);
+      const topA = countAndSort(State.tasks.map(t => t.action).filter(Boolean)).slice(0, 5);
+      topP.forEach(p => { if (p !== suggested.produit) sP.innerHTML += `<span class="pa-suggestion" data-v="${escapeHtml(p)}">${escapeHtml(p)}</span>`; });
+      topA.forEach(a => { if (a !== suggested.action) sA.innerHTML += `<span class="pa-suggestion" data-v="${escapeHtml(a)}">${escapeHtml(a)}</span>`; });
+
+      // Wire suggestion clicks
+      sP.querySelectorAll('[data-v]').forEach(el => el.addEventListener('click', () => $('pa-produit').value = el.dataset.v));
+      sA.querySelectorAll('[data-v]').forEach(el => el.addEventListener('click', () => $('pa-action').value = el.dataset.v));
+
+      $('pa-modal').classList.add('visible');
+    }
+
+    function countAndSort(arr) {
+      const counts = {};
+      arr.forEach(v => counts[v] = (counts[v] || 0) + 1);
+      return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    }
+
+    $('pa-cancel').addEventListener('click', () => $('pa-modal').classList.remove('visible'));
+    $('pa-modal').addEventListener('click', (e) => { if (e.target.id === 'pa-modal') $('pa-modal').classList.remove('visible'); });
+    $('pa-clear').addEventListener('click', async () => {
+      if (!paEditingTask) return;
+      try {
+        await sb.from('predefined_tasks').update({ produit: null, action: null }).eq('id', paEditingTask.id);
+        showToast('Effacé');
+        $('pa-modal').classList.remove('visible');
+        await loadAll();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    });
+    $('pa-save').addEventListener('click', async () => {
+      if (!paEditingTask) return;
+      const produit = $('pa-produit').value.trim() || null;
+      const action = $('pa-action').value.trim() || null;
+      try {
+        await sb.from('predefined_tasks').update({ produit, action }).eq('id', paEditingTask.id);
+        showToast('✓ Produit/Action enregistrés', 'success');
+        $('pa-modal').classList.remove('visible');
+        await loadAll();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    });
 
     document.querySelectorAll('[data-filter-actif]').forEach(chip => {
       chip.addEventListener('click', () => {
