@@ -793,6 +793,15 @@
         <label>Observation</label>
         <textarea class="form-textarea" id="prod-observation" rows="2" placeholder="Notes..."></textarea>
       </div>
+
+      <!-- MATIÈRES PREMIÈRES (apparaît si la fiche a des ingrédients rattachés) -->
+      <div class="form-group" id="prod-matieres-section" style="display:none;">
+        <label>📦 Matières premières utilisées</label>
+        <div id="prod-matieres-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        <div style="font-size:11px; color:var(--gray-500); margin-top:8px; line-height:1.4;">
+          Lots triés par DLC croissante (FEFO). Quantités calculées selon le ratio quantité produite / rendement de la fiche. Ajustables si besoin.
+        </div>
+      </div>
     </div>
     <div class="production-footer">
       <button class="btn-production skip" onclick="skipProduction()">Valider sans saisie</button>
@@ -2562,6 +2571,10 @@
   }
 
   // ====== PRODUCTION MODAL (TAF integration) ======
+  // État des matières premières pour la production en cours
+  let prodMatieres = []; // [{ ingredient_id, article_id, article_nom, qty_theorique, lots: [...], selections: { lot_id: qty } }]
+  let prodFicheRendement = null;
+
   async function openProductionModal(task) {
     // Pré-remplir la modale avec les infos de la tâche
     document.getElementById('prod-task-id').value = task.id;
@@ -2572,6 +2585,10 @@
     document.getElementById('prod-quantite').value = '';
     document.getElementById('prod-unite').value = 'kg';
     document.getElementById('prod-observation').value = '';
+    document.getElementById('prod-matieres-section').style.display = 'none';
+    document.getElementById('prod-matieres-list').innerHTML = '';
+    prodMatieres = [];
+    prodFicheRendement = null;
 
     // Activer le chip de catégorie correspondant
     document.querySelectorAll('#prod-cat-chips .chip').forEach(c => {
@@ -2588,7 +2605,10 @@
         if (fiche) {
           if (fiche.rendement_quantite) document.getElementById('prod-quantite').value = fiche.rendement_quantite;
           if (fiche.rendement_unite) document.getElementById('prod-unite').value = fiche.rendement_unite;
+          prodFicheRendement = fiche.rendement_quantite || null;
         }
+        // Charger les ingrédients de la fiche + lots disponibles
+        await loadProductionMatieres(task.fiche_id);
       } catch (e) {
         console.error('Erreur chargement fiche:', e);
       }
@@ -2596,6 +2616,176 @@
 
     document.getElementById('production-overlay').classList.add('show');
   }
+
+  async function loadProductionMatieres(ficheId) {
+    try {
+      // 1. Ingrédients de la fiche AVEC article_id rattaché
+      const { data: ings, error: e1 } = await sb.from('fiche_ingredients')
+        .select('id, nom, quantite, unite, article_id, ordre')
+        .eq('fiche_id', ficheId)
+        .not('article_id', 'is', null)
+        .order('ordre');
+      if (e1) throw e1;
+      if (!ings || !ings.length) {
+        // Aucun ingrédient rattaché → pas de section
+        return;
+      }
+
+      // 2. Pour chaque article rattaché, charger les lots disponibles via la vue stock_par_lot
+      const articleIds = [...new Set(ings.map(i => i.article_id))];
+      const { data: lots, error: e2 } = await sb.from('stock_par_lot')
+        .select('scan_tracabilite_id, article_id, article_nom, lot, dlc, quantite_restante, fabricant')
+        .in('article_id', articleIds)
+        .eq('etablissement', currentEtablissement)
+        .gt('quantite_restante', 0)
+        .order('dlc', { ascending: true, nullsFirst: false });
+      if (e2) throw e2;
+
+      // 3. Construire prodMatieres
+      prodMatieres = ings.map(ing => ({
+        ingredient_id: ing.id,
+        ingredient_nom: ing.nom,
+        article_id: ing.article_id,
+        qty_fiche: ing.quantite,
+        unite_fiche: ing.unite,
+        lots: (lots || []).filter(l => l.article_id === ing.article_id),
+        selections: {}, // { lot_id: qty }
+      }));
+
+      // 4. Pré-remplir avec les lots FEFO selon la quantité produite saisie
+      recalcMatieresFefo();
+
+      // 5. Afficher la section
+      document.getElementById('prod-matieres-section').style.display = '';
+      renderMatieresList();
+
+      // 6. Recalcul live quand la quantité produite change
+      const qtyInput = document.getElementById('prod-quantite');
+      qtyInput.removeEventListener('input', _onQtyChange);
+      qtyInput.addEventListener('input', _onQtyChange);
+    } catch (e) {
+      console.error('loadProductionMatieres:', e);
+    }
+  }
+
+  function _onQtyChange() {
+    recalcMatieresFefo();
+    renderMatieresList();
+  }
+
+  function recalcMatieresFefo() {
+    const qtyProd = parseFloat(document.getElementById('prod-quantite').value) || 0;
+    const ratio = (qtyProd > 0 && prodFicheRendement > 0) ? qtyProd / prodFicheRendement : 1;
+    prodMatieres.forEach(m => {
+      const qtyTheo = (parseFloat(m.qty_fiche) || 0) * ratio;
+      m.qty_theorique = qtyTheo;
+      // Pré-remplir les lots FEFO jusqu'à atteindre qtyTheo
+      m.selections = {};
+      let restant = qtyTheo;
+      for (const lot of m.lots) {
+        if (restant <= 0) break;
+        const dispo = Number(lot.quantite_restante);
+        const prendre = Math.min(restant, dispo);
+        m.selections[lot.scan_tracabilite_id] = Number(prendre.toFixed(3));
+        restant -= prendre;
+      }
+      if (restant > 0.001 && m.lots.length > 0) {
+        // Stock insuffisant — on pousse le surplus sur le 1er lot FEFO (qui sera en alerte)
+        const firstLot = m.lots[0];
+        m.selections[firstLot.scan_tracabilite_id] = Number(((m.selections[firstLot.scan_tracabilite_id] || 0) + restant).toFixed(3));
+      }
+      m.qty_manque = restant > 0.001 ? restant : 0;
+    });
+  }
+
+  function renderMatieresList() {
+    const container = document.getElementById('prod-matieres-list');
+    if (!prodMatieres.length) { container.innerHTML = ''; return; }
+    container.innerHTML = '';
+    prodMatieres.forEach((m, idx) => {
+      const total = Object.values(m.selections).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+      const ecart = total - (m.qty_theorique || 0);
+      const div = document.createElement('div');
+      div.className = 'matiere-block';
+      div.style.cssText = 'padding:8px 10px; background:white; border:1px solid var(--gray-200); border-radius:6px;';
+      let lotsHtml = '';
+      if (!m.lots.length) {
+        lotsHtml = `<div style="font-size:12px; color:var(--red,#b91c1c); padding:4px 0;">⚠ Aucun lot dispo en stock — sera enregistré sans lot précis (stock négatif).</div>`;
+      } else {
+        m.lots.forEach(l => {
+          const days = _daysToDlc(l.dlc);
+          const dlcCls = days == null ? '#6b7280' : days < 0 ? '#b91c1c' : days <= 2 ? '#b91c1c' : days <= 7 ? '#c2410c' : days <= 14 ? '#a16207' : '#15803d';
+          const dlcLabel = days == null ? 'DLC ?' : days < 0 ? `Dépassée ${-days}j` : days === 0 ? 'Aujourd\'hui' : days === 1 ? 'Demain' : `Dans ${days}j`;
+          const isSelected = (m.selections[l.scan_tracabilite_id] || 0) > 0;
+          const qtyVal = m.selections[l.scan_tracabilite_id] || '';
+          lotsHtml += `
+            <div style="display:flex; align-items:center; gap:6px; padding:4px 0; ${isSelected ? '' : 'opacity:.7;'}">
+              <input type="checkbox" data-mat="${idx}" data-lot="${l.scan_tracabilite_id}" ${isSelected ? 'checked' : ''} style="width:18px; height:18px;">
+              <div style="flex:1; min-width:0; font-size:12px;">
+                Lot <strong>${_esc(l.lot || '?')}</strong>
+                <span style="color:${dlcCls}; font-weight:600;">· ${dlcLabel}</span>
+                <span style="color:#6b7280;">· ${Number(l.quantite_restante).toFixed(2)} restant</span>
+              </div>
+              <input type="number" step="0.001" min="0" data-mat-qty="${idx}" data-lot="${l.scan_tracabilite_id}" value="${qtyVal}" placeholder="0" style="width:70px; padding:4px 6px; font-size:12px; border:1px solid #d1d5db; border-radius:4px; text-align:right;">
+            </div>
+          `;
+        });
+      }
+      const ecartCls = Math.abs(ecart) < 0.01 ? '#15803d' : ecart < 0 ? '#c2410c' : '#b91c1c';
+      div.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:600; color:#111827;">${_esc(m.ingredient_nom)}</div>
+            <div style="font-size:11px; color:#6b7280;">→ ${_esc(m.lots[0]?.article_nom || 'Article inconnu')}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:#6b7280;">Théorique</div>
+            <div style="font-size:14px; font-weight:700; color:${ecartCls};">
+              ${(m.qty_theorique || 0).toFixed(2)} ${_esc(m.unite_fiche || '')}
+            </div>
+            ${m.qty_manque > 0 ? `<div style="font-size:10px; color:#b91c1c;">⚠ Manque ${m.qty_manque.toFixed(2)}</div>` : ''}
+          </div>
+        </div>
+        ${lotsHtml}
+      `;
+      // Wire up checkbox + qty input
+      div.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const matIdx = +cb.dataset.mat;
+          const lotId = cb.dataset.lot;
+          const lot = prodMatieres[matIdx].lots.find(x => x.scan_tracabilite_id === lotId);
+          if (cb.checked) {
+            prodMatieres[matIdx].selections[lotId] = Number(lot.quantite_restante);
+          } else {
+            delete prodMatieres[matIdx].selections[lotId];
+          }
+          renderMatieresList();
+        });
+      });
+      div.querySelectorAll('input[type=number]').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const matIdx = +input.dataset.matQty;
+          const lotId = input.dataset.lot;
+          const v = parseFloat(input.value);
+          if (isNaN(v) || v <= 0) {
+            delete prodMatieres[matIdx].selections[lotId];
+          } else {
+            prodMatieres[matIdx].selections[lotId] = v;
+          }
+          // Sans full re-render pour ne pas perdre le focus
+        });
+      });
+      container.appendChild(div);
+    });
+  }
+
+  function _daysToDlc(dlc) {
+    if (!dlc) return null;
+    const td = new Date(); td.setHours(0,0,0,0);
+    const d = new Date(dlc); d.setHours(0,0,0,0);
+    return Math.round((d - td) / (1000*60*60*24));
+  }
+  function _esc(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function selectProdCat(el) {
     document.querySelectorAll('#prod-cat-chips .chip').forEach(c => c.classList.remove('active'));
@@ -2697,6 +2887,40 @@
       };
 
       const saved = await DB.createProduction(production);
+
+      // Créer les mouvements SORTIE de stock pour chaque lot sélectionné
+      try {
+        const sortieRows = [];
+        prodMatieres.forEach(m => {
+          Object.entries(m.selections).forEach(([lotId, qty]) => {
+            const q = parseFloat(qty);
+            if (!q || q <= 0) return;
+            sortieRows.push({
+              type: 'SORTIE',
+              article_id: m.article_id,
+              scan_tracabilite_id: lotId,
+              quantite: q,
+              unite: m.unite_fiche || 'kg',
+              etablissement: currentEtablissement,
+              motif: `Production : ${nom}`,
+              source_table: 'production',
+              source_id: saved.id,
+              created_by_id: currentUser.id,
+              created_by_nom: currentUser.nom,
+              created_by_initiales: currentUser.initiales || null,
+            });
+          });
+        });
+        if (sortieRows.length > 0) {
+          const { error: errMov } = await sb.from('stock_mouvements').insert(sortieRows);
+          if (errMov) {
+            console.error('Erreur SORTIE:', errMov);
+            showToast('⚠ Production OK mais sorties non enregistrées : ' + errMov.message, 'error');
+          }
+        }
+      } catch (movErr) {
+        console.error('Erreur création mouvements:', movErr);
+      }
 
       // Marquer la tâche comme terminée et lier la production
       const taskForDuree = tasks.find(t => t.id === taskId);

@@ -16,6 +16,7 @@ echo "==> Sync iCloud -> ~/planb-tools/"
 cp -r "$ICLOUD_DIR/stock"      "$LOCAL_DIR/" 2>/dev/null || true
 cp -r "$ICLOUD_DIR/scanner"    "$LOCAL_DIR/" 2>/dev/null || true
 cp -r "$ICLOUD_DIR/production" "$LOCAL_DIR/" 2>/dev/null || true
+cp -r "$ICLOUD_DIR/taf"        "$LOCAL_DIR/" 2>/dev/null || true
 cp -r "$ICLOUD_DIR/supabase"   "$LOCAL_DIR/" 2>/dev/null || true
 cp -r "$ICLOUD_DIR/scripts"    "$LOCAL_DIR/" 2>/dev/null || true
 cp    "$ICLOUD_DIR/index.html"  "$LOCAL_DIR/"
@@ -25,9 +26,9 @@ git status --short
 
 echo ""
 echo "==> git add + commit + push"
-git add stock/ scanner/ production/ supabase/ scripts/ index.html 2>/dev/null || true
+git add stock/ scanner/ production/ taf/ supabase/ scripts/ index.html 2>/dev/null || true
 if ! git diff --cached --quiet; then
-  git commit -m "feat(production): rattachement articles directement dans editeur fiche"
+  git commit -m "feat(production): consommation auto matieres premieres au demarrage tache"
   git push
   echo ""
   echo "==> Pousse OK. GitHub Pages va redeployer en ~1 minute."
