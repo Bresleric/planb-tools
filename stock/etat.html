@@ -160,7 +160,7 @@
         <span class="filter-chip active" data-view="aggregated">🗂 Agrégé</span>
         <span class="filter-chip" data-view="detail">📑 Détail</span>
         <span style="width:1px; height:20px; background:var(--gray-300);"></span>
-        <span class="filter-chip active" data-filter-etab="all">Tous</span>
+        <span class="filter-chip" data-filter-etab="all">Tous</span>
         <span class="filter-chip" data-filter-etab="freddy">Freddy</span>
         <span class="filter-chip" data-filter-etab="liesel">Liesel</span>
         <input type="text" class="search-input" id="search" placeholder="Rechercher…">
@@ -281,13 +281,18 @@
     document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
+    // Activer par défaut la chip de l'établissement courant
+    document.querySelectorAll('.filter-chip[data-filter-etab]').forEach(c => {
+      c.classList.toggle('active', c.dataset.filterEtab === currentEtab);
+    });
+
     // ==== ÉTAT ====
     const State = {
       articles: [],
       allArticles: [],       // référentiel appro_ingredients pour autocomplete réaffectation
       allScans: [],          // toutes les lignes scan_tracabilite (vue détail)
       view: 'aggregated',    // 'aggregated' | 'detail'
-      filterEtab: 'all',
+      filterEtab: currentEtab,    // Par défaut, on filtre sur l'établissement de la session
       filterCat: 'all',
       filterDlc: 'all',
       search: '',

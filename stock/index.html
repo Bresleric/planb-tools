@@ -212,9 +212,9 @@
       </div>
 
       <div class="filters">
-        <span class="filter-chip active" data-etab="all">Tous établissements</span>
-        <span class="filter-chip" data-etab="freddy">Freddy</span>
-        <span class="filter-chip" data-etab="liesel">Liesel</span>
+        <span class="filter-chip" data-etab="all">Tous établissements</span>
+        <span class="filter-chip" data-etab="freddy" id="chip-etab-freddy">Freddy</span>
+        <span class="filter-chip" data-etab="liesel" id="chip-etab-liesel">Liesel</span>
       </div>
     </div>
 
@@ -295,9 +295,14 @@
     document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
+    // Activer par défaut la chip de l'établissement courant
+    document.querySelectorAll('.filter-chip[data-etab]').forEach(c => {
+      c.classList.toggle('active', c.dataset.etab === currentEtab);
+    });
+
     // ========= ÉTAT =========
     const State = {
-      filterEtab: 'all',
+      filterEtab: currentEtab,    // Par défaut, on filtre sur l'établissement de la session
       articles: [],         // référentiel appro_ingredients
       categories: [],       // catégories distinctes
       groups: [],           // groupes de scans à rattacher
