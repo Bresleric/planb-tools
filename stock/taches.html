@@ -228,6 +228,13 @@
     const userSession = getSession();
     if (!userSession) window.location.href = '../';
     const currentUser = userSession.user;
+
+    // Page admin only — gestion structurelle des tâches prédéfinies
+    if (currentUser.role !== 'admin') {
+      alert('Accès réservé aux administrateurs.\nLa gestion des tâches de production est réservée aux comptes admin.');
+      window.location.href = './index.html';
+    }
+
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
     const State = {

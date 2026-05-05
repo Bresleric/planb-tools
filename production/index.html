@@ -988,7 +988,8 @@ function logout() {
 }
 
 function canEdit() {
-  return (roleHierarchy[currentUser.role] || 0) >= roleHierarchy.manager;
+  // Création/édition de fiches techniques : admin only (référentiel structurant)
+  return currentUser.role === 'admin';
 }
 
 // ============= TABS =============

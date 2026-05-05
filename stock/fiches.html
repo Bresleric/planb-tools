@@ -219,6 +219,14 @@
     const userSession = getSession();
     if (!userSession) window.location.href = '../';
     const currentUser = userSession.user;
+
+    // Page responsable+ — rattachement fiches techniques aux articles
+    const ALLOWED = ['responsable', 'manager', 'admin'];
+    if (!ALLOWED.includes(currentUser.role)) {
+      alert('Accès réservé aux responsables et administrateurs.');
+      window.location.href = './index.html';
+    }
+
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
     const State = {

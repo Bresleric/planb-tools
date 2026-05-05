@@ -257,6 +257,13 @@
     if (!userSession) window.location.href = '../';
     const currentUser = userSession.user;
     const currentEtab = userSession.etablissement;
+
+    // Page admin only — gestion du référentiel structurant
+    if (currentUser.role !== 'admin') {
+      alert('Accès réservé aux administrateurs.\nLa gestion du référentiel des ingrédients est réservée aux comptes admin.');
+      window.location.href = './index.html';
+    }
+
     document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
