@@ -221,8 +221,9 @@
           <input type="text" id="es-lot" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
         </div>
         <div>
-          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Poids net (kg)</label>
+          <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">Poids initial (kg)</label>
           <input type="number" step="0.001" id="es-poids" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); margin-top:4px;">
+          <div id="es-poids-info" style="font-size:11px; color:var(--gray-500); margin-top:3px;"></div>
         </div>
         <div>
           <label style="font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase;">DLC</label>
@@ -697,10 +698,22 @@
     // ==== ÉDITION SCAN ====
     function openEditScanModal(t, parentArticle) {
       State.editingScan = t;
-      State.newArticleId = parentArticle.article_id;  // par défaut = article actuel
+      State.editingScanInitialPoids = Number(t.quantite_initiale != null ? t.quantite_initiale : t.poids_net_kg) || 0;
+      State.newArticleId = parentArticle.article_id;
       $('es-produit').value = t.produit || '';
       $('es-lot').value = t.lot || '';
-      $('es-poids').value = t.poids_net_kg || '';
+      // Affichage du poids INITIAL (pas la qté restante après sorties)
+      $('es-poids').value = State.editingScanInitialPoids || '';
+      const sortie = Number(t.qte_sortie || 0);
+      const restant = Number(t.poids_net_kg || 0);
+      const info = $('es-poids-info');
+      if (sortie > 0) {
+        info.innerHTML = `Sorties enregistrées : <strong>${sortie.toFixed(2)} kg</strong> · Reste en stock : <strong>${restant.toFixed(2)} kg</strong>. Modifier le poids initial corrige l'entrée d'origine.`;
+        info.style.color = 'var(--orange-700)';
+      } else {
+        info.textContent = 'Aucune sortie enregistrée pour ce lot.';
+        info.style.color = 'var(--gray-500)';
+      }
       $('es-dlc').value = t.dlc || '';
       $('es-ddm').value = t.ddm || '';
       $('es-fabricant').value = t.fabricant || '';
@@ -751,10 +764,11 @@
 
     $('edit-scan-save').addEventListener('click', async () => {
       if (!State.editingScan) return;
+      const newPoids = $('es-poids').value === '' ? null : Number($('es-poids').value);
       const update = {
         produit: $('es-produit').value.trim() || null,
         lot: $('es-lot').value.trim() || null,
-        poids_net_kg: $('es-poids').value === '' ? null : Number($('es-poids').value),
+        poids_net_kg: newPoids,
         dlc: $('es-dlc').value || null,
         ddm: $('es-ddm').value || null,
         fabricant: $('es-fabricant').value.trim() || null,
@@ -767,9 +781,27 @@
         update.match_at = new Date().toISOString();
       }
       try {
+        // 1. Update scan_tracabilite
         const { error } = await sb.from('scan_tracabilite').update(update).eq('id', State.editingScan.id);
         if (error) throw error;
-        showToast('✓ Scan mis à jour', 'success');
+
+        // 2. Si le poids initial a changé, synchroniser le mouvement ENTREE associé
+        // (sinon la vue stock_par_lot continue à utiliser l'ancien poids puisque c'est le mouvement qui fait foi)
+        const initialPoids = Number(State.editingScanInitialPoids || 0);
+        if (newPoids !== null && Math.abs(newPoids - initialPoids) > 0.001) {
+          const { error: errMov } = await sb.from('stock_mouvements')
+            .update({ quantite: newPoids })
+            .eq('scan_tracabilite_id', State.editingScan.id)
+            .eq('type', 'ENTREE');
+          if (errMov) {
+            console.error('Sync ENTREE échoué:', errMov);
+            showToast(`✓ Scan mis à jour, mais entrée stock non synchronisée : ${errMov.message}`, 'error');
+          } else {
+            showToast(`✓ Scan + entrée stock mis à jour (${initialPoids.toFixed(2)} kg → ${newPoids.toFixed(2)} kg)`, 'success');
+          }
+        } else {
+          showToast('✓ Scan mis à jour', 'success');
+        }
         closeEditScan();
         $('modal-detail').classList.remove('visible');
         await loadAll();
