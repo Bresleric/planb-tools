@@ -758,6 +758,27 @@
       <input type="hidden" id="prod-fiche-id">
       <input type="hidden" id="prod-categorie">
 
+      <!-- ZONE CHOIX PRODUIT (apparaît si task.fiche_id est null) -->
+      <div class="form-group" id="prod-choice-section" style="display:none; padding:12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px;">
+        <label style="color:#92400e; font-weight:700;">⚠ Cette tâche n'a pas de fiche technique liée. Choisis :</label>
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="prod-choice-btn" id="prod-btn-existing" style="flex:1; min-width:160px; padding:10px; background:white; border:2px solid #d1d5db; border-radius:6px; font-weight:600; cursor:pointer;">🔗 Fiche existante</button>
+          <button type="button" class="prod-choice-btn" id="prod-btn-new" style="flex:1; min-width:160px; padding:10px; background:white; border:2px solid #d1d5db; border-radius:6px; font-weight:600; cursor:pointer;">🆕 Nouveau produit</button>
+        </div>
+        <!-- Autocomplete fiche -->
+        <div id="prod-fiche-search-zone" style="display:none; margin-top:10px; position:relative;">
+          <input type="text" id="prod-fiche-search" placeholder="Tape le nom d'une fiche…" autocomplete="off" style="width:100%; padding:10px 12px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+          <div id="prod-fiche-results" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid #d1d5db; border-radius:6px; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:5; margin-top:2px;"></div>
+          <div id="prod-fiche-status" style="font-size:11px; color:#6b7280; margin-top:4px;">— Pas de fiche choisie —</div>
+        </div>
+        <!-- Saisie motif "à créer" -->
+        <div id="prod-new-zone" style="display:none; margin-top:10px;">
+          <label style="font-size:12px; color:#92400e; font-weight:600;">Description du produit (obligatoire pour traçabilité)</label>
+          <textarea id="prod-motif" rows="2" placeholder="Ex: Tarte aux quetsches saison · Soupe de potiron du jeudi · Plat éphémère carte été" style="width:100%; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px; margin-top:4px; font-family:inherit;"></textarea>
+          <div style="font-size:11px; color:#92400e; margin-top:4px;">⚠ Cette production sera signalée à un admin pour création de fiche technique ou rattachement à une fiche existante.</div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label>Nom du produit *</label>
         <input type="text" class="form-input" id="prod-nom" placeholder="Nom du produit">
@@ -2576,6 +2597,8 @@
   // État des matières premières pour la production en cours
   let prodMatieres = []; // [{ ingredient_id, article_id, article_nom, qty_theorique, lots: [...], selections: { lot_id: qty } }]
   let prodFicheRendement = null;
+  let prodChoiceMode = null; // 'existing' | 'new' | null (si task a déjà une fiche)
+  let prodChosenFicheId = null;
 
   async function openProductionModal(task) {
     // Pré-remplir la modale avec les infos de la tâche
@@ -2589,8 +2612,11 @@
     document.getElementById('prod-observation').value = '';
     document.getElementById('prod-matieres-section').style.display = 'none';
     document.getElementById('prod-matieres-list').innerHTML = '';
+    document.getElementById('prod-motif').value = '';
     prodMatieres = [];
     prodFicheRendement = null;
+    prodChoiceMode = null;
+    prodChosenFicheId = null;
 
     // Activer le chip de catégorie correspondant
     document.querySelectorAll('#prod-cat-chips .chip').forEach(c => {
@@ -2599,6 +2625,8 @@
 
     // Charger la fiche technique pour pré-remplir rendement/unité
     if (task.fiche_id) {
+      // Cas standard : fiche déjà liée → on cache la zone choix
+      document.getElementById('prod-choice-section').style.display = 'none';
       try {
         if (productionFiches.length === 0) {
           productionFiches = await DB.getFiches(currentEtablissement);
@@ -2614,9 +2642,111 @@
       } catch (e) {
         console.error('Erreur chargement fiche:', e);
       }
+    } else {
+      // Tâche sans fiche → on force le choix
+      document.getElementById('prod-choice-section').style.display = '';
+      document.getElementById('prod-fiche-search-zone').style.display = 'none';
+      document.getElementById('prod-new-zone').style.display = 'none';
+      // Pré-charger les fiches pour l'autocomplete
+      if (productionFiches.length === 0) {
+        try { productionFiches = await DB.getFiches(currentEtablissement); } catch(e) {}
+      }
     }
 
     document.getElementById('production-overlay').classList.add('show');
+  }
+
+  // Setup choix produit (clic sur les 2 boutons)
+  document.addEventListener('DOMContentLoaded', () => {
+    const btnE = document.getElementById('prod-btn-existing');
+    const btnN = document.getElementById('prod-btn-new');
+    if (!btnE || !btnN) return;
+
+    btnE.addEventListener('click', () => {
+      prodChoiceMode = 'existing';
+      btnE.style.background = '#dbeafe';
+      btnE.style.borderColor = '#1d4ed8';
+      btnN.style.background = 'white';
+      btnN.style.borderColor = '#d1d5db';
+      document.getElementById('prod-fiche-search-zone').style.display = '';
+      document.getElementById('prod-new-zone').style.display = 'none';
+      document.getElementById('prod-fiche-search').focus();
+    });
+
+    btnN.addEventListener('click', () => {
+      prodChoiceMode = 'new';
+      btnN.style.background = '#fed7aa';
+      btnN.style.borderColor = '#c2410c';
+      btnE.style.background = 'white';
+      btnE.style.borderColor = '#d1d5db';
+      document.getElementById('prod-new-zone').style.display = '';
+      document.getElementById('prod-fiche-search-zone').style.display = 'none';
+      prodChosenFicheId = null;
+      document.getElementById('prod-fiche-id').value = '';
+      document.getElementById('prod-motif').focus();
+    });
+
+    // Autocomplete fiches
+    const search = document.getElementById('prod-fiche-search');
+    const results = document.getElementById('prod-fiche-results');
+    if (search) {
+      search.addEventListener('input', () => {
+        const q = search.value.toLowerCase().trim();
+        const refNom = (document.getElementById('prod-nom').value || '').toLowerCase();
+        let candidates;
+        if (q) {
+          candidates = productionFiches.filter(f => f.nom.toLowerCase().includes(q)).slice(0, 12);
+        } else {
+          // Suggestions auto par fuzzy match avec nom de la tâche
+          candidates = productionFiches
+            .map(f => ({ f, score: prodFuzzyScore(refNom, f.nom.toLowerCase()) }))
+            .sort((x, y) => y.score - x.score)
+            .slice(0, 5)
+            .map(x => x.f);
+        }
+        if (!candidates.length) {
+          results.innerHTML = '<div style="padding:8px 12px; color:#6b7280; font-style:italic; font-size:13px;">Aucune fiche correspondante</div>';
+        } else {
+          results.innerHTML = candidates.map((f, idx) => {
+            const isSugg = !q && idx < 3;
+            return `<div data-fid="${f.id}" style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid #f3f4f6; ${isSugg ? 'background:#dbeafe;' : ''}">
+              ${isSugg ? '✨ ' : ''}${prodEsc(f.nom)} <span style="font-size:11px; color:#6b7280;">· ${prodEsc(f.categorie || '')} · ${f.rendement_quantite || '?'} ${prodEsc(f.rendement_unite || '')}</span>
+            </div>`;
+          }).join('');
+          results.querySelectorAll('[data-fid]').forEach(el => {
+            el.addEventListener('click', async () => {
+              const f = productionFiches.find(x => x.id === el.dataset.fid);
+              if (!f) return;
+              prodChosenFicheId = f.id;
+              document.getElementById('prod-fiche-id').value = f.id;
+              search.value = f.nom;
+              document.getElementById('prod-fiche-status').textContent = `✓ Liée à : ${f.nom}`;
+              document.getElementById('prod-fiche-status').style.color = '#15803d';
+              document.getElementById('prod-fiche-status').style.fontWeight = '600';
+              results.style.display = 'none';
+              // Pré-remplir qté/unité depuis la fiche
+              if (f.rendement_quantite) document.getElementById('prod-quantite').value = f.rendement_quantite;
+              if (f.rendement_unite) document.getElementById('prod-unite').value = f.rendement_unite;
+              prodFicheRendement = f.rendement_quantite || null;
+              await loadProductionMatieres(f.id);
+            });
+          });
+        }
+        results.style.display = 'block';
+      });
+      search.addEventListener('focus', () => search.dispatchEvent(new Event('input')));
+      search.addEventListener('blur', () => setTimeout(() => results.style.display = 'none', 200));
+    }
+  });
+
+  function prodEsc(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function prodFuzzyScore(a, b) {
+    if (!a || !b) return 0;
+    const aw = new Set(a.split(/[\s,/-]+/).filter(w => w.length >= 3));
+    const bw = new Set(b.split(/[\s,/-]+/).filter(w => w.length >= 3));
+    let common = 0;
+    aw.forEach(w => { if (bw.has(w)) common++; });
+    return aw.size > 0 ? common / aw.size : 0;
   }
 
   async function loadProductionMatieres(ficheId) {
@@ -2835,9 +2965,32 @@
     const quantite = parseFloat(document.getElementById('prod-quantite').value);
     const unite = document.getElementById('prod-unite').value;
     const observation = document.getElementById('prod-observation').value.trim();
-    const ficheId = document.getElementById('prod-fiche-id').value || null;
+    let ficheId = document.getElementById('prod-fiche-id').value || null;
     const categorie = document.getElementById('prod-categorie').value ||
       document.querySelector('#prod-cat-chips .chip.active')?.dataset.val;
+    const motifACreer = document.getElementById('prod-motif').value.trim();
+    let aCreerMotif = null;
+
+    // Validation : si la zone choix est visible, on doit avoir fait un choix
+    const choiceVisible = document.getElementById('prod-choice-section').style.display !== 'none';
+    if (choiceVisible) {
+      if (!prodChoiceMode) {
+        showToast('Choisis "Fiche existante" ou "Nouveau produit" d\'abord', 'error');
+        return;
+      }
+      if (prodChoiceMode === 'existing' && !ficheId) {
+        showToast('Sélectionne la fiche correspondante', 'error');
+        return;
+      }
+      if (prodChoiceMode === 'new') {
+        if (!motifACreer || motifACreer.length < 5) {
+          showToast('Décris le produit en au moins 5 caractères (pour qu\'un admin puisse traiter)', 'error');
+          return;
+        }
+        aCreerMotif = motifACreer;
+        ficheId = null;
+      }
+    }
 
     if (!nom || !quantite || !categorie) {
       showToast('Remplissez nom, quantité et catégorie', 'error');
@@ -2871,6 +3024,7 @@
       const now = new Date();
       const production = {
         fiche_id: ficheId,
+        a_creer_motif: aCreerMotif,
         lot_id: lot.id,
         nom_produit: nom,
         categorie: categorie,

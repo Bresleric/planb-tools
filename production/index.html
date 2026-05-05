@@ -1253,6 +1253,16 @@ function applyArticleSelection(article) {
   closeArticlePicker();
 }
 
+// Filtre rapide vers les productions "à créer" (filtre catégorie 'all' + tri qui les remonte)
+function filterToACreer() {
+  // Bascule sur tab productions, scroll vers la première à créer
+  switchTab('productions');
+  setTimeout(() => {
+    const first = document.querySelector('.productions-table tr[style*="background:#fef3c7"]');
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 200);
+}
+
 // ============= PRODUCTION EDIT (correction nom / fiche / quantité) =============
 let editingProductionId = null;
 let editingProdSelectedFicheId = null;
@@ -1266,8 +1276,14 @@ function openProductionEdit(productionId) {
   const fiche = p.fiche_id ? allFiches.find(f => f.id === p.fiche_id) : null;
   const lot = allLots.find(l => l.id === p.lot_id);
 
-  document.getElementById('prodedit-context').textContent =
-    `Lot ${lot?.numero_lot || '?'} · Produit le ${p.date_production ? new Date(p.date_production).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '?'} par ${p.producteur_nom || '?'}`;
+  let ctxHtml = `Lot ${lot?.numero_lot || '?'} · Produit le ${p.date_production ? new Date(p.date_production).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '?'} par ${p.producteur_nom || '?'}`;
+  if (p.a_creer_motif) {
+    ctxHtml += `<div style="margin-top:8px; padding:8px 10px; background:#fff7ed; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-size:12px;">
+      <strong>⚠ Motif "À créer" saisi par le producteur :</strong><br>
+      ${escapeHtmlProd(p.a_creer_motif)}
+    </div>`;
+  }
+  document.getElementById('prodedit-context').innerHTML = ctxHtml;
 
   document.getElementById('prodedit-nom').value = p.nom_produit || '';
   document.getElementById('prodedit-qty').value = p.quantite_produite ?? '';
@@ -1356,6 +1372,10 @@ async function saveProductionEdit() {
       fiche_id: editingProdSelectedFicheId || null,
       unite: unite || null,
     };
+    // Si on lie à une fiche, on efface le motif "à créer" (problème résolu)
+    if (editingProdSelectedFicheId) {
+      update.a_creer_motif = null;
+    }
     if (!isNaN(qty) && qty > 0) update.quantite_produite = qty;
     const { error } = await sb.from('productions').update(update).eq('id', editingProductionId);
     if (error) throw error;
@@ -1772,8 +1792,21 @@ function renderProductions() {
     productions = productions.filter(p => p.categorie === selectedProductionCategory);
   }
 
+  // Compter les productions "à créer" (avec motif et sans fiche)
+  const aCreerCount = allProductions.filter(p => p.a_creer_motif && !p.fiche_id).length;
+  const aCreerBanner = aCreerCount > 0
+    ? `<div style="padding:12px 14px; background:#fff7ed; border:1px solid #f59e0b; border-radius:8px; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+         <span style="font-size:24px;">⚠️</span>
+         <div style="flex:1;">
+           <div style="font-weight:700; color:#92400e;">${aCreerCount} production${aCreerCount>1?'s':''} à traiter</div>
+           <div style="font-size:12px; color:#92400e;">Saisies par les équipes comme "Nouveau produit" — à rattacher à une fiche existante ou à transformer en nouvelle fiche technique.</div>
+         </div>
+         <button onclick="filterToACreer()" style="padding:8px 14px; background:#f59e0b; color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Traiter →</button>
+       </div>`
+    : '';
+
   if (productions.length === 0) {
-    container.innerHTML = `
+    container.innerHTML = aCreerBanner + `
       <div class="empty-state">
         <div class="emoji">📦</div>
         <h3>Aucune production</h3>
@@ -1820,10 +1853,14 @@ function renderProductions() {
     const obs = (p.observation || '').replace(/"/g, '&quot;');
 
     const ficheLinked = !!p.fiche_id;
+    const aCreer = !!p.a_creer_motif && !p.fiche_id;
+    const motifTooltip = aCreer ? p.a_creer_motif.replace(/"/g, '&quot;') : '';
+    const trStyle = aCreer ? ' style="background:#fef3c7;"' : '';
+    const ficheBadge = ficheLinked ? ' <span style=&quot;font-size:10px;color:#7c3aed;&quot;>📜</span>' : (aCreer ? ' <span style=&quot;font-size:11px;color:#c2410c;font-weight:600;&quot;>⚠ À créer</span>' : '');
     return `
-      <tr class="${rowClass}">
+      <tr class="${rowClass}"${trStyle}>
         <td class="cat-cell" title="${p.categorie || ''}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${icon}</td>
-        <td class="nom" title="${(p.nom_produit || '').replace(/"/g, '&quot;')}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${p.nom_produit || ''}${ficheLinked ? ' <span style=&quot;font-size:10px;color:#7c3aed;&quot;>📜</span>' : ''}</td>
+        <td class="nom" title="${aCreer ? 'Motif: ' + motifTooltip : (p.nom_produit || '').replace(/"/g, '&quot;')}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${p.nom_produit || ''}${ficheBadge}</td>
         <td class="num" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${qte}</td>
         <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${unite}</td>
         <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))"><span class="lot-cell">${lotNum}</span></td>
