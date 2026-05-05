@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Rattachement tâches → fiches — PlanB Tools</title>
+  <title>Tâches de production — gestion & nettoyage</title>
   <style>
     :root {
       --primary: #059669; --primary-dark: #047857; --primary-light: #d1fae5;
@@ -14,6 +14,7 @@
       --orange-100:#ffedd5; --orange-700:#c2410c;
       --red-100:#fee2e2; --red-700:#b91c1c;
       --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --yellow-100:#fef9c3; --yellow-700:#a16207;
       --radius:10px; --radius-sm:6px;
       --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
       --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
@@ -31,40 +32,62 @@
     .content { flex:1; padding:16px; max-width:1100px; width:100%; margin:0 auto; }
     .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
 
-    .stats-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px; }
     .stat-box { padding:12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
-    .stat-box .sv { font-size:22px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .stat-box .sv { font-size:20px; font-weight:700; color:var(--gray-900); line-height:1.1; }
     .stat-box .sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
     .stat-box.warn { background:var(--orange-100); border-color:var(--orange-100); }
     .stat-box.warn .sv { color:var(--orange-700); }
+    .stat-box.crit { background:var(--red-100); border-color:var(--red-100); }
+    .stat-box.crit .sv { color:var(--red-700); }
     .stat-box.ok { background:var(--green-100); border-color:var(--green-100); }
     .stat-box.ok .sv { color:var(--green-700); }
-    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(3, 1fr); } }
+    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(2, 1fr); } }
 
     .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
     .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
     .search-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); flex:1; min-width:180px; }
 
-    .task-row { display:grid; grid-template-columns:minmax(0,1fr) 130px minmax(0,1.5fr) 60px; gap:8px; padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; }
-    .task-row.matched { background:var(--green-100); border-color:var(--green-100); }
-    .task-row.unmatched { background:var(--orange-100); border-color:var(--orange-100); }
-    .task-row .tr-nom { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .task-row .tr-cat { font-size:11px; color:var(--gray-500); display:inline-block; padding:2px 8px; background:var(--gray-100); border-radius:999px; }
-    .task-row .tr-search { position:relative; }
-    .task-row .tr-search input { width:100%; padding:6px 10px; font-size:13px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
-    .task-row .tr-search input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light); }
-    .task-row .tr-search input.matched { background:var(--green-100); border-color:var(--green-700); color:var(--green-700); font-weight:600; }
-    .task-row .tr-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:2px; }
-    .task-row .tr-results.visible { display:block; }
-    .task-row .tr-result { padding:8px 10px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--gray-100); }
-    .task-row .tr-result:hover, .task-row .tr-result.active { background:var(--primary-light); }
-    .task-row .tr-result .tr-meta { font-size:10px; color:var(--gray-500); }
-    .task-row .tr-result.suggestion { background:var(--blue-100); }
+    /* Bulk action card */
+    .bulk-card { padding:14px; background:#fff7ed; border:2px solid #f59e0b; border-radius:var(--radius); margin-bottom:14px; display:flex; align-items:center; gap:12px; }
+    .bulk-card.hidden { display:none; }
+    .bulk-info { flex:1; }
+    .bulk-info .bi-title { font-weight:700; color:#92400e; }
+    .bulk-info .bi-desc { font-size:12px; color:#92400e; }
+    .bulk-btn { padding:10px 16px; background:#f59e0b; color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer; }
+    .bulk-btn:hover { background:#d97706; }
 
-    .btn { display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:6px 10px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    /* Tâche row */
+    .task-row { display:grid; grid-template-columns:minmax(0,2fr) 110px 90px minmax(0,1fr) 200px; gap:8px; padding:8px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:5px; align-items:center; }
+    .task-row.matched { border-left:4px solid var(--green-700); }
+    .task-row.unmatched { border-left:4px solid #f59e0b; }
+    .task-row.zero-uses { background:#f9fafb; opacity:.85; }
+    .task-row.inactive { opacity:.5; background:var(--gray-100); }
+    .tr-nom { display:flex; align-items:center; gap:6px; min-width:0; }
+    .tr-nom-text { font-size:14px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tr-cat { font-size:11px; padding:2px 8px; background:var(--gray-100); border-radius:999px; color:var(--gray-600); white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+    .tr-uses { text-align:center; font-size:12px; }
+    .tr-uses .nb { font-weight:700; font-size:14px; }
+    .tr-uses.ok .nb { color:var(--green-700); }
+    .tr-uses.zero .nb { color:var(--gray-400); }
+    .tr-uses .last { font-size:10px; color:var(--gray-500); }
+    .tr-fiche { position:relative; }
+    .tr-fiche input { width:100%; padding:6px 8px; font-size:12px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .tr-fiche input.matched { background:var(--green-100); border-color:var(--green-700); color:var(--green-700); font-weight:600; }
+    .tr-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:220px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:var(--shadow-md); z-index:5; margin-top:2px; }
+    .tr-results.visible { display:block; }
+    .tr-result { padding:6px 10px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--gray-100); }
+    .tr-result:hover { background:var(--primary-light); }
+    .tr-result.suggestion { background:var(--blue-100); }
+    .tr-actions { display:flex; gap:3px; justify-content:flex-end; }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:5px 8px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
     .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
-    .btn-icon { padding:4px 8px; }
+    .btn-warn { background:#fff7ed; color:#c2410c; border:1px solid #f59e0b; }
+    .btn-danger { background:white; color:var(--red-700); border:1px solid var(--red-100); }
+    .btn-success { background:var(--green-100); color:var(--green-700); border:1px solid var(--green-700); }
+    .btn:hover { filter:brightness(.97); }
 
     .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
     .toast.visible { transform:translateX(-50%) translateY(0); }
@@ -73,13 +96,13 @@
 
     .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); }
 
-    /* Group by category */
     .cat-group { margin-bottom:18px; }
     .cat-header { font-size:12px; font-weight:700; color:var(--gray-700); text-transform:uppercase; letter-spacing:0.3px; padding:8px 4px; }
     .cat-header .cat-count { color:var(--gray-500); font-weight:500; margin-left:6px; }
 
-    @media (max-width:680px) {
-      .task-row { grid-template-columns:1fr; gap:4px; }
+    @media (max-width:700px) {
+      .task-row { grid-template-columns:1fr; gap:4px; padding:10px; }
+      .tr-actions { flex-wrap:wrap; }
     }
   </style>
 </head>
@@ -87,7 +110,7 @@
   <header class="header">
     <div class="header-left">
       <a href="./index.html" class="btn-back">← Stock</a>
-      <span class="header-title">Tâches → fiches techniques</span>
+      <span class="header-title">Tâches de production</span>
     </div>
     <div class="header-right">
       <span id="header-user">—</span>
@@ -96,20 +119,40 @@
 
   <main class="content">
     <div class="stats-grid">
-      <div class="stat-box"><div class="sv" id="stat-total">—</div><div class="sl">Tâches de prod.</div></div>
-      <div class="stat-box ok"><div class="sv" id="stat-rattachees">—</div><div class="sl">Rattachées</div></div>
-      <div class="stat-box warn"><div class="sv" id="stat-restantes">—</div><div class="sl">À rattacher</div></div>
+      <div class="stat-box"><div class="sv" id="stat-total">—</div><div class="sl">Total tâches prod.</div></div>
+      <div class="stat-box ok"><div class="sv" id="stat-rattachees">—</div><div class="sl">Avec fiche</div></div>
+      <div class="stat-box warn"><div class="sv" id="stat-sans-fiche">—</div><div class="sl">Sans fiche</div></div>
+      <div class="stat-box crit"><div class="sv" id="stat-fantomes">—</div><div class="sl">Jamais utilisées</div></div>
+    </div>
+
+    <div class="bulk-card hidden" id="bulk-card">
+      <div class="bulk-info">
+        <div class="bi-title" id="bulk-title">⚠ N tâches jamais utilisées depuis 60+ jours</div>
+        <div class="bi-desc">Action bulk : les désactiver d'un coup. Tu pourras les réactiver individuellement si besoin.</div>
+      </div>
+      <button class="bulk-btn" id="bulk-btn">⏸ Tout désactiver</button>
     </div>
 
     <div class="card">
       <div style="font-size:13px; color:var(--gray-600); margin-bottom:12px;">
-        Pour que démarrer une tâche de production déclenche automatiquement la sortie des matières premières, il faut relier chaque tâche à sa fiche technique. La fiche technique sait alors quels ingrédients consommer.
+        Liste des tâches que les équipes voient quand elles créent une production. Pour chaque tâche tu peux la rattacher à sa fiche, la renommer, la désactiver, ou la supprimer si elle n'a jamais servi.
+      </div>
+      <div class="filters" style="margin-bottom:8px;">
+        <input type="text" class="search-input" id="search" placeholder="Rechercher une tâche…">
+      </div>
+      <div class="filters" style="margin-bottom:8px;">
+        <span class="filter-chip active" data-filter-actif="actives">Actives</span>
+        <span class="filter-chip" data-filter-actif="inactives">Inactives</span>
+        <span class="filter-chip" data-filter-actif="all">Toutes</span>
       </div>
       <div class="filters">
-        <input type="text" class="search-input" id="search" placeholder="Rechercher une tâche…">
-        <span class="filter-chip" data-filter="all">Toutes</span>
-        <span class="filter-chip active" data-filter="incomplete">À rattacher</span>
-        <span class="filter-chip" data-filter="complete">Rattachées</span>
+        <span class="filter-chip active" data-filter-fiche="all">Toutes</span>
+        <span class="filter-chip" data-filter-fiche="without">Sans fiche</span>
+        <span class="filter-chip" data-filter-fiche="with">Avec fiche</span>
+        <span class="filter-chip" data-filter-uses="all">Toutes</span>
+        <span class="filter-chip" data-filter-uses="zero">Jamais utilisées</span>
+        <span class="filter-chip" data-filter-uses="inactive60">Pas utilisées depuis 60j+</span>
+        <span class="filter-chip" data-filter-uses="active">Utilisées récemment</span>
       </div>
     </div>
 
@@ -138,38 +181,62 @@
     document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
     const State = {
-      tasks: [],       // predefined_tasks (is_production=true)
-      fiches: [],      // fiches_techniques actives
-      filter: 'incomplete',
+      tasks: [],          // [{id, nom, categorie, ..., nb_uses, last_use}]
+      fiches: [],
+      filterActif: 'actives',
+      filterFiche: 'all',
+      filterUses: 'all',
       search: '',
     };
 
     function $(id) { return document.getElementById(id); }
     function showToast(msg, kind='') { const t = $('toast'); t.textContent = msg; t.className = 'toast visible'+(kind?' '+kind:''); setTimeout(() => t.className = 'toast', 3500); }
     function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtDate(iso) { if (!iso) return null; return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
+    function daysSince(iso) { if (!iso) return null; const d = new Date(iso); return Math.round((Date.now() - d.getTime()) / 86400000); }
 
     async function loadAll() {
       try {
-        const [{ data: tasks, error: e1 }, { data: fiches, error: e2 }] = await Promise.all([
+        const [{ data: tasks, error: e1 }, { data: fiches, error: e2 }, { data: usage, error: e3 }] = await Promise.all([
           sb.from('predefined_tasks')
-            .select('id, nom, categorie, etablissement, fiche_id, categorie_production')
+            .select('id, nom, categorie, etablissement, fiche_id, categorie_production, actif, is_production, equipe, creneau')
             .eq('is_production', true)
             .order('categorie')
             .order('nom'),
           sb.from('fiches_techniques')
             .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite')
             .eq('actif', true)
-            .order('nom')
+            .order('nom'),
+          // Toutes les tasks récentes pour calculer usage par nom
+          sb.from('tasks')
+            .select('tache, created_at')
+            .gte('created_at', new Date(Date.now() - 365 * 86400000).toISOString())
+            .limit(5000),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
-        State.tasks = tasks || [];
+        if (e3) throw e3;
+
+        // Grouper l'usage par nom
+        const usageMap = {};
+        (usage || []).forEach(t => {
+          if (!t.tache) return;
+          if (!usageMap[t.tache]) usageMap[t.tache] = { nb_uses: 0, last_use: null };
+          usageMap[t.tache].nb_uses++;
+          if (!usageMap[t.tache].last_use || t.created_at > usageMap[t.tache].last_use) {
+            usageMap[t.tache].last_use = t.created_at;
+          }
+        });
+
+        State.tasks = (tasks || []).map(t => ({
+          ...t,
+          nb_uses: usageMap[t.nom]?.nb_uses || 0,
+          last_use: usageMap[t.nom]?.last_use || null,
+        }));
         State.fiches = fiches || [];
 
-        $('stat-total').textContent = State.tasks.length;
-        $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
-        $('stat-restantes').textContent = State.tasks.filter(t => !t.fiche_id).length;
-
+        renderStats();
+        renderBulk();
         renderList();
       } catch (err) {
         console.error(err);
@@ -177,12 +244,51 @@
       }
     }
 
+    function renderStats() {
+      $('stat-total').textContent = State.tasks.length;
+      $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
+      $('stat-sans-fiche').textContent = State.tasks.filter(t => !t.fiche_id).length;
+      $('stat-fantomes').textContent = State.tasks.filter(t => t.nb_uses === 0).length;
+    }
+
+    function renderBulk() {
+      // Bulk : tâches actives jamais utilisées (ou inutilisées depuis 60j+)
+      const candidates = State.tasks.filter(t => t.actif && (t.nb_uses === 0 || (t.last_use && daysSince(t.last_use) > 60)));
+      const card = $('bulk-card');
+      if (candidates.length === 0) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+      $('bulk-title').textContent = `⚠ ${candidates.length} tâches actives jamais utilisées (ou inutilisées depuis 60j+)`;
+      $('bulk-btn').onclick = async () => {
+        if (!confirm(`Désactiver ${candidates.length} tâches d'un coup ?\n\nTu pourras les réactiver individuellement si besoin (filtre "Inactives").`)) return;
+        try {
+          const ids = candidates.map(t => t.id);
+          const { error } = await sb.from('predefined_tasks').update({ actif: false }).in('id', ids);
+          if (error) throw error;
+          showToast(`✓ ${ids.length} tâches désactivées`, 'success');
+          await loadAll();
+        } catch (err) {
+          showToast('Erreur : ' + err.message, 'error');
+        }
+      };
+    }
+
     function applyFilter() {
       const q = State.search.toLowerCase().trim();
       return State.tasks.filter(t => {
-        const matched = !!t.fiche_id;
-        if (State.filter === 'complete' && !matched) return false;
-        if (State.filter === 'incomplete' && matched) return false;
+        // Actif
+        if (State.filterActif === 'actives' && !t.actif) return false;
+        if (State.filterActif === 'inactives' && t.actif) return false;
+        // Fiche
+        if (State.filterFiche === 'with' && !t.fiche_id) return false;
+        if (State.filterFiche === 'without' && t.fiche_id) return false;
+        // Usage
+        if (State.filterUses === 'zero' && t.nb_uses > 0) return false;
+        if (State.filterUses === 'inactive60' && (t.nb_uses === 0 || (t.last_use && daysSince(t.last_use) <= 60))) return false;
+        if (State.filterUses === 'active' && (t.nb_uses === 0 || daysSince(t.last_use) > 60)) return false;
+        // Search
         if (q && !t.nom.toLowerCase().includes(q) && !(t.categorie || '').toLowerCase().includes(q)) return false;
         return true;
       });
@@ -195,7 +301,6 @@
         c.innerHTML = '<div class="empty-state">Aucune tâche ne correspond.</div>';
         return;
       }
-      // Grouper par catégorie
       const byCat = {};
       list.forEach(t => {
         const cat = t.categorie || 'Sans catégorie';
@@ -216,57 +321,86 @@
       const matched = !!t.fiche_id;
       const fiche = matched ? State.fiches.find(f => f.id === t.fiche_id) : null;
       const div = document.createElement('div');
-      div.className = 'task-row ' + (matched ? 'matched' : 'unmatched');
+      div.className = 'task-row' + (matched ? ' matched' : ' unmatched') + (t.nb_uses === 0 ? ' zero-uses' : '') + (!t.actif ? ' inactive' : '');
       div.dataset.id = t.id;
+
+      const usesCls = t.nb_uses > 0 ? 'ok' : 'zero';
+      const lastUseStr = t.last_use ? fmtDate(t.last_use) : '—';
+      const daysAgo = t.last_use ? daysSince(t.last_use) : null;
+
+      const canDelete = t.nb_uses === 0;
+      const deleteBtn = canDelete
+        ? `<button class="btn btn-danger" data-action="delete" title="Supprimer définitivement (zero usage)">🗑</button>`
+        : '';
+
       div.innerHTML = `
-        <div class="tr-nom" title="${escapeHtml(t.nom)}">${matched ? '✓ ' : ''}${escapeHtml(t.nom)}</div>
+        <div class="tr-nom">
+          ${matched ? '🔗' : '⚠'}
+          <div class="tr-nom-text" title="${escapeHtml(t.nom)}">${!t.actif ? '⏸ ' : ''}${escapeHtml(t.nom)}</div>
+        </div>
         <div><span class="tr-cat">${escapeHtml(t.categorie_production || t.categorie || '')}</span></div>
-        <div class="tr-search">
-          <input type="text" placeholder="Rechercher la fiche technique…" value="${escapeHtml(fiche ? fiche.nom : '')}" class="${matched ? 'matched' : ''}">
+        <div class="tr-uses ${usesCls}">
+          <div class="nb">${t.nb_uses}</div>
+          <div class="last">${lastUseStr}${daysAgo != null ? ' · '+daysAgo+'j' : ''}</div>
+        </div>
+        <div class="tr-fiche">
+          <input type="text" placeholder="Lier à une fiche…" value="${escapeHtml(fiche ? fiche.nom : '')}" class="${matched ? 'matched' : ''}">
           <div class="tr-results"></div>
         </div>
-        <div style="text-align:right;">
-          ${matched ? `<button class="btn btn-ghost btn-icon" data-action="unlink">✕</button>` : ''}
+        <div class="tr-actions">
+          <button class="btn btn-ghost" data-action="rename" title="Renommer">✏️</button>
+          ${matched
+            ? `<button class="btn btn-ghost" data-action="unlink" title="Délier la fiche">🔗✕</button>`
+            : ''}
+          <button class="btn ${t.actif ? 'btn-warn' : 'btn-success'}" data-action="toggle" title="${t.actif ? 'Désactiver' : 'Réactiver'}">${t.actif ? '⏸' : '▶'}</button>
+          ${deleteBtn}
         </div>
       `;
+
+      // Wire autocomplete fiche
       const input = div.querySelector('input');
       const results = div.querySelector('.tr-results');
       input.addEventListener('input', () => renderResults(t, input.value.toLowerCase().trim(), results, div));
       input.addEventListener('focus', () => renderResults(t, input.value.toLowerCase().trim(), results, div));
       input.addEventListener('blur', () => setTimeout(() => results.classList.remove('visible'), 200));
-      const btnUnlink = div.querySelector('[data-action="unlink"]');
-      if (btnUnlink) btnUnlink.addEventListener('click', () => unlinkTask(t, div));
+
+      // Wire actions
+      div.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          if (action === 'rename') renameTask(t);
+          else if (action === 'unlink') unlinkTask(t, div);
+          else if (action === 'toggle') toggleTask(t);
+          else if (action === 'delete') deleteTask(t);
+        });
+      });
       return div;
     }
 
     function renderResults(task, q, results, taskEl) {
-      const fiches = State.fiches;
       let candidates;
       if (q) {
-        candidates = fiches.filter(f => f.nom.toLowerCase().includes(q) || (f.categorie || '').toLowerCase().includes(q)).slice(0, 12);
+        candidates = State.fiches.filter(f => f.nom.toLowerCase().includes(q)).slice(0, 12);
       } else {
-        // Suggestions : fuzzy match sur le nom de la tâche
-        candidates = fiches
+        candidates = State.fiches
           .map(f => ({ f, score: scoreMatch(task.nom, f.nom) }))
           .sort((x, y) => y.score - x.score)
           .slice(0, 5)
           .map(x => x.f);
       }
       if (!candidates.length) {
-        results.innerHTML = '<div class="tr-result" style="color:var(--gray-500); font-style:italic;">Aucune fiche correspondante.</div>';
+        results.innerHTML = '<div class="tr-result" style="color:var(--gray-500); font-style:italic;">Aucune fiche</div>';
       } else {
         results.innerHTML = candidates.map((f, idx) => {
           const isSugg = !q && idx < 3;
-          return `
-            <div class="tr-result ${isSugg ? 'suggestion' : ''}" data-fid="${f.id}">
-              <div>${isSugg ? '✨ ' : ''}${escapeHtml(f.nom)}</div>
-              <div class="tr-meta">${escapeHtml(f.categorie || '')} · ${f.rendement_quantite || '?'} ${escapeHtml(f.rendement_unite || '')}</div>
-            </div>
-          `;
+          return `<div class="tr-result ${isSugg ? 'suggestion' : ''}" data-fid="${f.id}">
+            ${isSugg ? '✨ ' : ''}${escapeHtml(f.nom)}
+            <div style="font-size:10px; color:var(--gray-500);">${escapeHtml(f.categorie || '')}</div>
+          </div>`;
         }).join('');
         results.querySelectorAll('[data-fid]').forEach(el => {
           el.addEventListener('click', () => {
-            const f = fiches.find(x => x.id === el.dataset.fid);
+            const f = State.fiches.find(x => x.id === el.dataset.fid);
             if (f) linkTask(task, f, taskEl);
           });
         });
@@ -274,15 +408,12 @@
       results.classList.add('visible');
     }
 
-    function scoreMatch(taskNom, ficheNom) {
-      const t = (taskNom || '').toLowerCase();
-      const f = (ficheNom || '').toLowerCase();
-      if (!t || !f) return 0;
-      const tWords = new Set(t.split(/[\s,/-]+/).filter(w => w.length >= 3));
-      const fWords = new Set(f.split(/[\s,/-]+/).filter(w => w.length >= 3));
+    function scoreMatch(a, b) {
+      const aW = new Set((a || '').toLowerCase().split(/[\s,/-]+/).filter(w => w.length >= 3));
+      const bW = new Set((b || '').toLowerCase().split(/[\s,/-]+/).filter(w => w.length >= 3));
       let common = 0;
-      tWords.forEach(w => { if (fWords.has(w)) common++; });
-      return tWords.size > 0 ? common / tWords.size : 0;
+      aW.forEach(w => { if (bW.has(w)) common++; });
+      return aW.size > 0 ? common / aW.size : 0;
     }
 
     async function linkTask(task, fiche, taskEl) {
@@ -293,16 +424,12 @@
         showToast(`✓ "${task.nom}" → ${fiche.nom}`, 'success');
         const newRow = renderTask(task);
         taskEl.replaceWith(newRow);
-        // Mise à jour stats
-        $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
-        $('stat-restantes').textContent = State.tasks.filter(t => !t.fiche_id).length;
-      } catch (err) {
-        console.error(err); showToast('Erreur : ' + err.message, 'error');
-      }
+        renderStats();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
     }
 
     async function unlinkTask(task, taskEl) {
-      if (!confirm(`Retirer le lien entre "${task.nom}" et sa fiche ?`)) return;
+      if (!confirm(`Délier "${task.nom}" de sa fiche ?`)) return;
       try {
         const { error } = await sb.from('predefined_tasks').update({ fiche_id: null }).eq('id', task.id);
         if (error) throw error;
@@ -310,18 +437,70 @@
         showToast('Lien retiré');
         const newRow = renderTask(task);
         taskEl.replaceWith(newRow);
-        $('stat-rattachees').textContent = State.tasks.filter(t => t.fiche_id).length;
-        $('stat-restantes').textContent = State.tasks.filter(t => !t.fiche_id).length;
-      } catch (err) {
-        showToast('Erreur : ' + err.message, 'error');
-      }
+        renderStats();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
     }
 
-    document.querySelectorAll('[data-filter]').forEach(chip => {
+    async function renameTask(task) {
+      const nouveau = prompt(`Renommer la tâche "${task.nom}" en :`, task.nom);
+      if (!nouveau || nouveau.trim() === task.nom) return;
+      const trimmed = nouveau.trim();
+      try {
+        const { error } = await sb.from('predefined_tasks').update({ nom: trimmed }).eq('id', task.id);
+        if (error) throw error;
+        task.nom = trimmed;
+        showToast(`✓ Renommée en "${trimmed}"`, 'success');
+        await loadAll();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    }
+
+    async function toggleTask(task) {
+      const action = task.actif ? 'Désactiver' : 'Réactiver';
+      if (!confirm(`${action} "${task.nom}" ?`)) return;
+      try {
+        const { error } = await sb.from('predefined_tasks').update({ actif: !task.actif }).eq('id', task.id);
+        if (error) throw error;
+        task.actif = !task.actif;
+        showToast(`✓ ${action}e`, 'success');
+        await loadAll();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    }
+
+    async function deleteTask(task) {
+      if (task.nb_uses > 0) {
+        showToast('Impossible de supprimer : tâche utilisée. Désactive plutôt.', 'error');
+        return;
+      }
+      if (!confirm(`Supprimer définitivement "${task.nom}" ?\n\nCette action est irréversible. (La tâche n'a jamais été utilisée donc rien ne va casser.)`)) return;
+      try {
+        const { error } = await sb.from('predefined_tasks').delete().eq('id', task.id);
+        if (error) throw error;
+        showToast(`✓ "${task.nom}" supprimée`, 'success');
+        await loadAll();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    }
+
+    document.querySelectorAll('[data-filter-actif]').forEach(chip => {
       chip.addEventListener('click', () => {
-        document.querySelectorAll('[data-filter]').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('[data-filter-actif]').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
-        State.filter = chip.dataset.filter;
+        State.filterActif = chip.dataset.filterActif;
+        renderList();
+      });
+    });
+    document.querySelectorAll('[data-filter-fiche]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-fiche]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterFiche = chip.dataset.filterFiche;
+        renderList();
+      });
+    });
+    document.querySelectorAll('[data-filter-uses]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-uses]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterUses = chip.dataset.filterUses;
         renderList();
       });
     });
