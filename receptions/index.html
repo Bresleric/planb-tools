@@ -2,2069 +2,981 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Receptions">
   <meta name="theme-color" content="#8b5cf6">
-  <title>Receptions - PlanB Tools</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚛</text></svg>">
+  <title>Réceptions — Pilotage rapprochement</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
   <style>
     :root {
-      --purple: #8b5cf6; --purple-light: #f5f3ff; --purple-dark: #7c3aed;
-      --orange: #f97316; --orange-light: #fff7ed;
-      --green: #22c55e; --green-bg: #f0fdf4; --green-dark: #16a34a;
-      --red: #ef4444; --red-bg: #fef2f2;
-      --blue: #3b82f6; --blue-bg: #eff6ff;
-      --amber: #f59e0b; --amber-bg: #fffbeb;
-      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
-      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
-      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
-      --radius: 8px; --radius-sm: 6px; --radius-lg: 12px;
-      --shadow: 0 1px 3px rgba(0,0,0,.1);
-      --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+      --purple:#8b5cf6; --purple-light:#f5f3ff; --purple-dark:#7c3aed;
+      --orange:#f97316; --orange-bg:#fff7ed;
+      --green:#22c55e; --green-bg:#f0fdf4; --green-dark:#16a34a;
+      --red:#ef4444; --red-bg:#fef2f2; --red-dark:#dc2626;
+      --blue:#3b82f6; --blue-bg:#eff6ff;
+      --amber:#f59e0b; --amber-bg:#fffbeb;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937;
+      --radius:8px; --radius-sm:6px; --radius-lg:12px;
+      --shadow:0 1px 3px rgba(0,0,0,.08);
+      --shadow-md:0 4px 6px rgba(0,0,0,.08);
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--gray-50); color: var(--gray-800);
-      min-height: 100vh; min-height: 100dvh;
-      display: flex; flex-direction: column;
-      -webkit-tap-highlight-color: transparent;
-      padding-top: env(safe-area-inset-top);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:var(--gray-50); color:var(--gray-800);
+      min-height:100vh; min-height:100dvh;
+      padding-top:env(safe-area-inset-top);
+      -webkit-tap-highlight-color:transparent;
     }
-
-    /* HEADER */
     .header {
-      background: white; border-bottom: 2px solid var(--purple);
-      padding: 10px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 100;
+      background:white; border-bottom:2px solid var(--purple);
+      padding:10px 16px; display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:100;
     }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .header h1 { font-size: 1.2rem; color: var(--purple); font-weight: 700; }
-    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gray-500); }
+    .header-left { display:flex; align-items:center; gap:10px; }
+    .header h1 { font-size:1.15rem; color:var(--purple); font-weight:700; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--gray-500); }
     .btn-back {
-      padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
-      background: white; color: var(--gray-600); font-size: 0.8rem; cursor: pointer;
-      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+      padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--gray-200);
+      background:white; color:var(--gray-600); font-size:.8rem; cursor:pointer;
+      text-decoration:none; display:inline-flex; align-items:center; gap:4px;
     }
-    .btn-back:active { background: var(--gray-100); }
+    .btn-back:hover { background:var(--gray-100); }
 
-    /* TABS */
-    .tabs-bar {
-      background: white; border-bottom: 1px solid var(--gray-200);
-      display: flex; padding: 0 8px; overflow-x: auto;
+    .filters {
+      background:white; border-bottom:1px solid var(--gray-200);
+      padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
     }
-    .tab-btn {
-      flex: 1; padding: 10px 8px; border: none; background: none;
-      font-size: 0.85rem; font-weight: 500; color: var(--gray-400);
-      cursor: pointer; border-bottom: 2px solid transparent;
-      white-space: nowrap; transition: all .2s;
+    .chip {
+      padding:6px 12px; border-radius:18px; border:1px solid var(--gray-200);
+      background:white; font-size:.8rem; color:var(--gray-600); cursor:pointer;
+      white-space:nowrap;
     }
-    .tab-btn.active { color: var(--purple); border-bottom-color: var(--purple); font-weight: 600; }
-    .tab-btn:active { background: var(--purple-light); }
+    .chip.active { background:var(--purple); color:white; border-color:var(--purple); }
+    .chip:hover:not(.active) { background:var(--gray-100); }
+    .filter-sep { width:1px; height:24px; background:var(--gray-200); margin:0 4px; }
+    .filter-input {
+      padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+      font-size:.85rem; background:white;
+    }
 
-    /* SUB-TABS for factures/etiquettes sections */
-    .sub-tabs {
-      display: flex; gap: 6px; padding: 10px 16px;
-      background: white; border-bottom: 1px solid var(--gray-200);
-    }
-    .sub-tab {
-      padding: 6px 14px; border-radius: 20px;
-      border: 1px solid var(--gray-200); background: white;
-      font-size: 0.8rem; color: var(--gray-500); cursor: pointer;
-    }
-    .sub-tab.active {
-      background: var(--purple); color: white; border-color: var(--purple);
-    }
-    .sub-tab:active { opacity: .8; }
+    .content { padding:16px; padding-bottom:100px; max-width:1400px; margin:0 auto; }
+    .screen { display:none; }
+    .screen.active { display:block; }
 
-    /* DATE BAR */
-    .date-bar {
-      background: white; border-bottom: 1px solid var(--gray-200);
-      padding: 8px 16px;
-      display: flex; align-items: center; justify-content: center; gap: 12px;
+    .stats-row {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+      gap:10px; margin-bottom:16px;
     }
-    .date-nav-btn {
-      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-200);
-      background: white; color: var(--purple); font-size: 1rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
+    .stat-card {
+      background:white; border-radius:var(--radius); padding:14px; text-align:center;
+      box-shadow:var(--shadow); border:1px solid var(--gray-200);
     }
-    .date-nav-btn:active { background: var(--purple-light); }
-    .date-display {
-      font-size: 1rem; font-weight: 600; color: var(--gray-800);
-      min-width: 200px; text-align: center;
-    }
-    .date-display .day-name { color: var(--purple); text-transform: capitalize; }
-    .btn-today {
-      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
-      background: white; font-size: 0.75rem; color: var(--gray-500); cursor: pointer;
-    }
-    .btn-today:active { background: var(--purple-light); }
+    .stat-card .number { font-size:1.6rem; font-weight:700; color:var(--purple); }
+    .stat-card .label { font-size:.75rem; color:var(--gray-500); margin-top:2px; }
+    .stat-card.green .number { color:var(--green-dark); }
+    .stat-card.amber .number { color:var(--amber); }
+    .stat-card.red .number { color:var(--red); }
+    .stat-card.gray .number { color:var(--gray-500); }
 
-    /* CONTENT */
-    .content { flex: 1; padding: 12px 12px 100px; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* CARD */
-    .card {
-      background: white; border-radius: var(--radius-lg); padding: 14px;
-      margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid var(--gray-200);
+    .table-wrap {
+      background:white; border-radius:var(--radius-lg); overflow:hidden;
+      box-shadow:var(--shadow); border:1px solid var(--gray-200);
     }
-    .card-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 8px;
+    table { width:100%; border-collapse:collapse; font-size:.88rem; }
+    th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--gray-100); }
+    th {
+      background:var(--gray-50); font-weight:600; color:var(--gray-600);
+      font-size:.78rem; text-transform:uppercase; letter-spacing:.03em;
+      position:sticky; top:0;
     }
-    .card-title { font-weight: 600; font-size: 0.95rem; }
-    .card-meta { font-size: 0.75rem; color: var(--gray-400); }
-    .card-body { font-size: 0.85rem; color: var(--gray-600); }
-
-    /* BADGES */
+    tr.session-row { cursor:pointer; transition:background .1s; }
+    tr.session-row:hover { background:var(--purple-light); }
     .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 0.7rem; font-weight: 600;
+      display:inline-block; padding:2px 9px; border-radius:11px;
+      font-size:.7rem; font-weight:600; white-space:nowrap;
     }
-    .badge-waiting { background: var(--amber-bg); color: var(--amber); }
-    .badge-valid { background: var(--green-bg); color: var(--green-dark); }
-    .badge-rejected { background: var(--red-bg); color: var(--red); }
-    .badge-facture { background: var(--blue-bg); color: var(--blue); }
-    .badge-etiquette { background: var(--purple-light); color: var(--purple); }
+    .badge-ok { background:var(--green-bg); color:var(--green-dark); }
+    .badge-warn { background:var(--amber-bg); color:var(--amber); }
+    .badge-critical { background:var(--red-bg); color:var(--red-dark); }
+    .badge-gray { background:var(--gray-100); color:var(--gray-500); }
+    .badge-purple { background:var(--purple-light); color:var(--purple-dark); }
+    .badge-blue { background:var(--blue-bg); color:var(--blue); }
 
-    /* PHOTO THUMBNAILS */
-    .photo-thumbs {
-      display: flex; gap: 6px; margin-top: 8px; overflow-x: auto;
-      padding-bottom: 4px;
-    }
-    .photo-thumb {
-      width: 60px; height: 60px; border-radius: var(--radius-sm);
-      object-fit: cover; border: 1px solid var(--gray-200); cursor: pointer;
-      flex-shrink: 0;
-    }
-    .photo-thumb:active { opacity: .7; }
-    .photo-count {
-      font-size: 0.75rem; color: var(--gray-400); margin-top: 4px;
-    }
+    .empty { text-align:center; padding:60px 20px; color:var(--gray-400); }
+    .empty .icon { font-size:3rem; margin-bottom:10px; }
+    .empty .text { font-size:.95rem; }
 
-    /* FORM */
-    .form-section { margin-bottom: 16px; }
-    .form-label {
-      font-size: 0.8rem; font-weight: 600; color: var(--gray-600);
-      margin-bottom: 6px; display: block;
+    /* Détail session */
+    .session-header {
+      background:white; border-radius:var(--radius-lg); padding:16px;
+      margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200);
     }
-    .form-label.required::after { content: ' *'; color: var(--red); }
-    select, input[type="text"], textarea {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200);
-      border-radius: var(--radius); font-size: 0.9rem; background: white;
-      color: var(--gray-800); -webkit-appearance: none;
-    }
-    select:focus, input:focus, textarea:focus {
-      outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(139,92,246,.15);
-    }
-    textarea { resize: vertical; min-height: 60px; }
+    .session-header h2 { font-size:1.2rem; margin-bottom:8px; color:var(--gray-800); }
+    .session-meta { display:flex; flex-wrap:wrap; gap:14px; font-size:.85rem; color:var(--gray-600); }
+    .session-meta strong { color:var(--gray-800); font-weight:600; }
+    .session-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
 
-    /* PHOTO CAPTURE */
-    .photo-capture-area {
-      border: 2px dashed var(--gray-300); border-radius: var(--radius-lg);
-      padding: 20px; text-align: center; background: var(--gray-50);
-      cursor: pointer; transition: all .2s;
-    }
-    .photo-capture-area:active { background: var(--purple-light); border-color: var(--purple); }
-    .photo-capture-area .icon { font-size: 2rem; margin-bottom: 6px; }
-    .photo-capture-area .label { font-size: 0.85rem; color: var(--gray-500); }
-    .photo-capture-area .count { font-size: 0.75rem; color: var(--purple); font-weight: 600; margin-top: 4px; }
-
-    /* PHOTO PREVIEW GRID */
-    .photo-grid {
-      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
-    }
-    .photo-item {
-      position: relative; width: 80px; height: 80px;
-    }
-    .photo-item img {
-      width: 100%; height: 100%; border-radius: var(--radius-sm);
-      object-fit: cover; border: 1px solid var(--gray-200);
-    }
-    .photo-item .remove-btn {
-      position: absolute; top: -6px; right: -6px;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--red); color: white; border: 2px solid white;
-      font-size: 0.7rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .photo-item .page-num {
-      position: absolute; bottom: 2px; left: 2px;
-      background: rgba(0,0,0,.6); color: white;
-      font-size: 0.65rem; padding: 1px 5px; border-radius: 4px;
-    }
-
-    /* BUTTONS */
     .btn {
-      padding: 10px 18px; border-radius: var(--radius); border: none;
-      font-size: 0.9rem; font-weight: 600; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 6px;
-      transition: all .2s;
+      padding:9px 16px; border-radius:var(--radius); border:none;
+      font-size:.85rem; font-weight:600; cursor:pointer;
+      display:inline-flex; align-items:center; gap:6px;
+      transition:all .15s;
     }
-    .btn:active { transform: scale(.96); }
-    .btn:disabled { opacity: .5; pointer-events: none; }
-    .btn-primary { background: var(--purple); color: white; }
-    .btn-primary:active { background: var(--purple-dark); }
-    .btn-success { background: var(--green); color: white; }
-    .btn-success:active { background: var(--green-dark); }
-    .btn-danger { background: var(--red); color: white; }
+    .btn:active { transform:scale(.97); }
+    .btn:disabled { opacity:.5; pointer-events:none; }
+    .btn-primary { background:var(--purple); color:white; }
+    .btn-primary:hover { background:var(--purple-dark); }
+    .btn-success { background:var(--green); color:white; }
+    .btn-success:hover { background:var(--green-dark); }
+    .btn-danger { background:var(--red); color:white; }
     .btn-outline {
-      background: white; color: var(--purple);
-      border: 1px solid var(--purple);
+      background:white; color:var(--purple); border:1px solid var(--purple);
     }
-    .btn-full { width: 100%; justify-content: center; }
-    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+    .btn-outline:hover { background:var(--purple-light); }
+    .btn-ghost { background:transparent; color:var(--gray-600); }
+    .btn-ghost:hover { background:var(--gray-100); }
+    .btn-sm { padding:5px 10px; font-size:.78rem; }
 
-    /* FAB */
-    .fab {
-      position: fixed; bottom: 24px; right: 16px;
-      width: 56px; height: 56px; border-radius: 50%;
-      background: var(--purple); color: white;
-      border: none; font-size: 1.5rem; cursor: pointer;
-      box-shadow: 0 4px 12px rgba(139,92,246,.4);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 50;
+    .resume-box {
+      background:var(--purple-light); border-left:4px solid var(--purple);
+      padding:12px 14px; border-radius:var(--radius-sm); margin-bottom:16px;
+      font-size:.9rem; color:var(--gray-700);
     }
-    .fab:active { transform: scale(.9); background: var(--purple-dark); }
+    .resume-box .lbl { font-weight:600; color:var(--purple-dark); margin-right:6px; }
+
+    .section-title {
+      font-size:1rem; font-weight:600; margin:18px 0 8px; color:var(--gray-700);
+      display:flex; align-items:center; gap:8px;
+    }
+    .section-title .count {
+      background:var(--gray-100); color:var(--gray-600);
+      padding:1px 8px; border-radius:10px; font-size:.75rem;
+    }
+
+    .match-card {
+      background:white; border-radius:var(--radius-lg); padding:14px;
+      margin-bottom:10px; box-shadow:var(--shadow); border:1px solid var(--gray-200);
+      border-left:4px solid var(--gray-300);
+    }
+    .match-card.s-ok { border-left-color:var(--green); }
+    .match-card.s-mineur { border-left-color:var(--amber); }
+    .match-card.s-significatif { border-left-color:var(--red); }
+    .match-card.s-orphelin { border-left-color:var(--gray-400); }
+    .match-head {
+      display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+      flex-wrap:wrap;
+    }
+    .match-bl-info { flex:1; min-width:200px; }
+    .match-bl-info .desc { font-weight:600; font-size:.95rem; color:var(--gray-800); }
+    .match-bl-info .num { font-size:.75rem; color:var(--gray-500); margin-top:2px; }
+    .match-numbers { text-align:right; font-size:.85rem; }
+    .match-numbers .qty-bl { color:var(--gray-600); }
+    .match-numbers .qty-et { font-weight:600; }
+    .match-numbers .ecart { font-size:.85rem; font-weight:700; margin-top:2px; }
+    .match-numbers .ecart.ok { color:var(--green-dark); }
+    .match-numbers .ecart.mineur { color:var(--amber); }
+    .match-numbers .ecart.significatif { color:var(--red-dark); }
+
+    .etiquettes-list { margin-top:10px; padding-top:10px; border-top:1px dashed var(--gray-200); }
+    .etiquette-row {
+      display:flex; align-items:center; gap:10px; padding:6px 0;
+      border-bottom:1px solid var(--gray-50);
+    }
+    .etiquette-row:last-child { border-bottom:none; }
+    .etiq-thumb {
+      width:46px; height:46px; border-radius:var(--radius-sm); object-fit:cover;
+      border:1px solid var(--gray-200); cursor:pointer; flex-shrink:0; background:var(--gray-100);
+      display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:var(--gray-400);
+    }
+    .etiq-info { flex:1; font-size:.85rem; }
+    .etiq-info .nom { font-weight:500; color:var(--gray-800); }
+    .etiq-info .meta { font-size:.75rem; color:var(--gray-500); margin-top:1px; }
+    .etiq-poids { font-weight:600; color:var(--gray-700); font-size:.9rem; }
+    .etiq-actions { display:flex; gap:4px; }
+
+    .anomalie-card {
+      background:white; border-radius:var(--radius); padding:10px 14px;
+      margin-bottom:6px; box-shadow:var(--shadow); border:1px solid var(--gray-200);
+      border-left:4px solid var(--gray-300); font-size:.85rem;
+    }
+    .anomalie-card.sev-info { border-left-color:var(--blue); }
+    .anomalie-card.sev-warn { border-left-color:var(--amber); }
+    .anomalie-card.sev-critical { border-left-color:var(--red); }
+    .anomalie-card .type { font-weight:600; color:var(--gray-700); font-size:.78rem; text-transform:uppercase; }
+    .anomalie-card .desc { color:var(--gray-700); margin-top:2px; }
 
     /* MODAL */
     .modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.4); z-index: 200;
-      align-items: flex-end; justify-content: center;
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:200; align-items:center; justify-content:center; padding:20px;
     }
-    .modal-overlay.show { display: flex; }
+    .modal-overlay.show { display:flex; }
     .modal {
-      background: white; border-radius: 16px 16px 0 0;
-      width: 100%; max-width: 500px; max-height: 90vh;
-      overflow-y: auto; padding: 0;
-      animation: slideUp .25s ease;
+      background:white; border-radius:var(--radius-lg); width:100%;
+      max-width:560px; max-height:90vh; overflow-y:auto;
+      box-shadow:0 20px 50px rgba(0,0,0,.3);
     }
-    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
     .modal-header {
-      padding: 16px; border-bottom: 1px solid var(--gray-200);
-      display: flex; justify-content: space-between; align-items: center;
-      position: sticky; top: 0; background: white; z-index: 1;
+      padding:14px 18px; border-bottom:1px solid var(--gray-200);
+      display:flex; justify-content:space-between; align-items:center;
+      position:sticky; top:0; background:white; z-index:1;
     }
-    .modal-header h2 { font-size: 1.1rem; color: var(--gray-800); }
+    .modal-header h3 { font-size:1.05rem; color:var(--gray-800); }
     .modal-close {
-      width: 32px; height: 32px; border-radius: 50%; border: none;
-      background: var(--gray-100); font-size: 1.2rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
+      width:30px; height:30px; border-radius:50%; border:none;
+      background:var(--gray-100); font-size:1.1rem; cursor:pointer;
     }
-    .modal-body { padding: 16px; }
+    .modal-close:hover { background:var(--gray-200); }
+    .modal-body { padding:18px; }
     .modal-footer {
-      padding: 12px 16px; border-top: 1px solid var(--gray-200);
-      display: flex; gap: 8px;
+      padding:12px 18px; border-top:1px solid var(--gray-200);
+      display:flex; gap:8px; justify-content:flex-end;
     }
-
-    /* FULLSCREEN IMAGE VIEWER */
-    .viewer-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.9); z-index: 300;
-      flex-direction: column; align-items: center; justify-content: center;
+    .modal-img {
+      width:100%; max-height:60vh; object-fit:contain; border-radius:var(--radius);
+      background:var(--gray-100); margin-bottom:14px; cursor:zoom-in;
     }
-    .viewer-overlay.show { display: flex; }
-    .viewer-overlay img {
-      max-width: 95%; max-height: 80vh; object-fit: contain;
-      border-radius: var(--radius);
+    .img-placeholder {
+      width:100%; height:200px; background:var(--gray-100); border-radius:var(--radius);
+      display:flex; align-items:center; justify-content:center; color:var(--gray-400);
+      font-size:.9rem; margin-bottom:14px;
     }
-    .viewer-nav {
-      display: flex; gap: 16px; margin-top: 16px; align-items: center;
+    .field-row { margin-bottom:12px; }
+    .field-row label {
+      display:block; font-size:.78rem; font-weight:600; color:var(--gray-600);
+      margin-bottom:4px; text-transform:uppercase; letter-spacing:.02em;
     }
-    .viewer-nav button {
-      width: 44px; height: 44px; border-radius: 50%;
-      border: none; background: rgba(255,255,255,.2); color: white;
-      font-size: 1.2rem; cursor: pointer;
+    .field-row input, .field-row textarea, .field-row select {
+      width:100%; padding:8px 11px; border:1px solid var(--gray-200);
+      border-radius:var(--radius-sm); font-size:.9rem; background:white;
+      color:var(--gray-800); -webkit-appearance:none;
     }
-    .viewer-nav button:active { background: rgba(255,255,255,.4); }
-    .viewer-close {
-      position: absolute; top: 16px; right: 16px;
-      width: 40px; height: 40px; border-radius: 50%;
-      border: none; background: rgba(255,255,255,.2); color: white;
-      font-size: 1.3rem; cursor: pointer;
+    .field-row input:focus, .field-row textarea:focus {
+      outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(139,92,246,.15);
     }
-    .viewer-page-info {
-      color: white; font-size: 0.9rem; font-weight: 600;
+    .field-row .row { display:flex; gap:8px; }
+    .field-row .row > * { flex:1; }
+    .field-row .hint { font-size:.72rem; color:var(--gray-400); margin-top:3px; }
+    .pin-input {
+      letter-spacing:.5em; font-size:1.4rem !important; text-align:center;
+      font-family:'SF Mono',Menlo,monospace !important;
     }
-
-    /* EMPTY STATE */
-    .empty {
-      text-align: center; padding: 40px 20px; color: var(--gray-400);
-    }
-    .empty .icon { font-size: 3rem; margin-bottom: 10px; }
-    .empty .text { font-size: 0.9rem; }
 
     /* TOAST */
     .toast {
-      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-      background: var(--gray-800); color: white; padding: 10px 20px;
-      border-radius: 20px; font-size: 0.85rem; z-index: 400;
-      opacity: 0; transition: opacity .3s; pointer-events: none;
+      position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
+      background:var(--gray-800); color:white; padding:11px 22px;
+      border-radius:22px; font-size:.88rem; z-index:400;
+      opacity:0; transition:opacity .25s; pointer-events:none;
+      box-shadow:0 4px 12px rgba(0,0,0,.2);
     }
-    .toast.show { opacity: 1; }
-    .toast.success { background: var(--green); }
-    .toast.error { background: var(--red); }
+    .toast.show { opacity:1; }
+    .toast.success { background:var(--green-dark); }
+    .toast.error { background:var(--red-dark); }
 
-    /* STAT CARDS */
-    .stats-row {
-      display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto;
-      padding-bottom: 4px;
+    /* SPINNER */
+    .spinner {
+      display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.3);
+      border-top-color:white; border-radius:50%; animation:spin .7s linear infinite;
     }
-    .stat-card {
-      flex: 1; min-width: 90px; background: white; border-radius: var(--radius);
-      padding: 10px; text-align: center; box-shadow: var(--shadow);
-      border: 1px solid var(--gray-200);
-    }
-    .stat-card .number { font-size: 1.4rem; font-weight: 700; }
-    .stat-card .label { font-size: 0.7rem; color: var(--gray-500); }
-    .stat-card.purple .number { color: var(--purple); }
-    .stat-card.green .number { color: var(--green); }
-    .stat-card.amber .number { color: var(--amber); }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
-    /* OCR OVERLAY */
-    .ocr-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.7);
-      z-index: 500; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      color: white; gap: 16px;
+    .full-loader {
+      display:flex; align-items:center; justify-content:center; padding:40px;
+      color:var(--gray-500); font-size:.9rem; gap:10px;
     }
-    .ocr-overlay .spinner {
-      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,.3);
-      border-top-color: white; border-radius: 50%;
-      animation: spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .ocr-overlay .ocr-status { font-size: 1rem; font-weight: 600; }
-    .ocr-overlay .ocr-progress {
-      width: 200px; height: 6px; background: rgba(255,255,255,.2);
-      border-radius: 3px; overflow: hidden;
-    }
-    .ocr-overlay .ocr-progress-fill {
-      height: 100%; background: var(--purple); border-radius: 3px;
-      transition: width .3s;
-    }
+    .full-loader .spinner { border-color:rgba(139,92,246,.2); border-top-color:var(--purple); width:20px; height:20px; }
 
-    /* OCR TEXT DISPLAY */
-    .ocr-text-box {
-      background: var(--gray-50); border: 1px solid var(--gray-200);
-      border-radius: var(--radius); padding: 10px; margin-top: 8px;
-      font-size: 0.8rem; color: var(--gray-600);
-      max-height: 150px; overflow-y: auto;
-      white-space: pre-wrap; word-break: break-word;
-      font-family: 'SF Mono', 'Menlo', monospace;
+    @media (max-width:640px) {
+      .filters { gap:6px; }
+      .stat-card .number { font-size:1.3rem; }
+      th, td { padding:8px 6px; font-size:.8rem; }
+      .col-hide-mobile { display:none; }
     }
-    .ocr-badge {
-      display: inline-block; padding: 2px 6px; border-radius: 8px;
-      font-size: 0.65rem; font-weight: 600;
-      background: #ede9fe; color: var(--purple);
-      margin-left: 4px;
-    }
-
-    /* HIDDEN */
-    .hidden { display: none !important; }
-    .hidden-input { position: absolute; left: -9999px; opacity: 0; }
-
-    /* LOGIN (fallback) */
-    .login-screen {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; min-height: 100vh; padding: 20px;
-    }
-    .login-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; color: var(--purple); }
-    .pin-dots { display: flex; gap: 10px; margin-bottom: 20px; }
-    .pin-dot {
-      width: 14px; height: 14px; border-radius: 50%;
-      border: 2px solid var(--gray-300); background: white;
-    }
-    .pin-dot.filled { background: var(--purple); border-color: var(--purple); }
-    .pin-grid {
-      display: grid; grid-template-columns: repeat(3, 70px); gap: 10px;
-    }
-    .pin-btn {
-      height: 50px; border: 1px solid var(--gray-200); border-radius: var(--radius);
-      background: white; font-size: 1.2rem; font-weight: 600; cursor: pointer;
-    }
-    .pin-btn:active { background: var(--purple-light); }
-    .login-error {
-      color: var(--red); font-size: 0.85rem; margin-top: 12px;
-      display: none;
-    }
-
-    /* ============ ELIS ============ */
-    .elis-mouv-card {
-      background: white; border-radius: var(--radius-lg); padding: 14px;
-      margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid var(--gray-200);
-      cursor: pointer;
-    }
-    .elis-mouv-card:active { opacity: .85; }
-    .elis-mouv-card .type-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 0.7rem; font-weight: 600;
-    }
-    .elis-mouv-card .type-badge.inventaire { background: var(--amber-bg); color: var(--amber); }
-    .elis-mouv-card .type-badge.passage { background: var(--blue-bg); color: var(--blue); }
-
-    .elis-type-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
-    .elis-type-toggle .type-btn {
-      flex: 1; padding: 10px; border-radius: var(--radius);
-      border: 1px solid var(--gray-200); background: white;
-      font-size: 0.9rem; font-weight: 600; color: var(--gray-500); cursor: pointer;
-    }
-    .elis-type-toggle .type-btn.active {
-      border-color: var(--purple); background: var(--purple-light); color: var(--purple);
-    }
-
-    .elis-section {
-      margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--gray-200);
-    }
-    .elis-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-    .elis-section h3 {
-      font-size: 0.8rem; font-weight: 700; color: var(--purple);
-      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
-    }
-
-    .elis-article-row { padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
-    .elis-article-row:last-child { border-bottom: none; }
-    .elis-article-name {
-      font-size: 0.85rem; font-weight: 600; color: var(--gray-700);
-      margin-bottom: 2px;
-    }
-    .elis-article-meta {
-      font-size: 0.7rem; color: var(--gray-400); margin-bottom: 6px;
-    }
-    .elis-article-inputs {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-    }
-    .elis-article-inputs.two-cols { grid-template-columns: repeat(2, 1fr); }
-    .elis-input-group { display: flex; flex-direction: column; gap: 2px; }
-    .elis-input-label {
-      font-size: 0.65rem; color: var(--gray-400); font-weight: 600;
-      text-align: center; text-transform: uppercase;
-    }
-    .elis-input-label.retour { color: var(--amber); }
-    .elis-input-label.livre  { color: var(--green-dark); }
-    .elis-input-label.stock  { color: var(--purple); }
-    .elis-article-inputs input[type="number"] {
-      width: 100%; padding: 8px 6px; text-align: center; font-size: 0.95rem;
-      border: 1px solid var(--gray-200); border-radius: var(--radius);
-      background: white; -moz-appearance: textfield; -webkit-appearance: none;
-    }
-    .elis-article-inputs input[type="number"]::-webkit-outer-spin-button,
-    .elis-article-inputs input[type="number"]::-webkit-inner-spin-button {
-      -webkit-appearance: none; margin: 0;
-    }
-    .elis-article-inputs input:focus {
-      outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px rgba(139,92,246,.15);
-    }
-
-    .elis-summary {
-      display: flex; gap: 12px; flex-wrap: wrap;
-      margin-top: 6px; font-size: 0.75rem; color: var(--gray-500);
-    }
-    .elis-summary .kv { display: flex; gap: 4px; }
-    .elis-summary .kv b { color: var(--gray-700); }
-
-    .elis-view-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 8px; }
-    .elis-view-table th {
-      background: var(--gray-100); padding: 6px; text-align: left;
-      font-size: .7rem; text-transform: uppercase; color: var(--gray-500);
-    }
-    .elis-view-table th.num, .elis-view-table td.num { text-align: center; }
-    .elis-view-table td { padding: 6px; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
-    .elis-view-table tr:last-child td { border-bottom: none; }
-    .elis-view-table .art-name { font-weight: 600; color: var(--gray-700); }
-    .elis-view-table .art-meta { font-size: .7rem; color: var(--gray-400); }
   </style>
 </head>
 <body>
 
-<!-- ====== LOGIN SCREEN (fallback) ====== -->
-<div id="login-screen" class="login-screen hidden">
-  <div class="login-title">🚛 Receptions</div>
-  <div class="pin-dots" id="pin-dots"></div>
-  <div class="pin-grid">
-    <button class="pin-btn" onclick="pinAdd('1')">1</button>
-    <button class="pin-btn" onclick="pinAdd('2')">2</button>
-    <button class="pin-btn" onclick="pinAdd('3')">3</button>
-    <button class="pin-btn" onclick="pinAdd('4')">4</button>
-    <button class="pin-btn" onclick="pinAdd('5')">5</button>
-    <button class="pin-btn" onclick="pinAdd('6')">6</button>
-    <button class="pin-btn" onclick="pinAdd('7')">7</button>
-    <button class="pin-btn" onclick="pinAdd('8')">8</button>
-    <button class="pin-btn" onclick="pinAdd('9')">9</button>
-    <button class="pin-btn" onclick="pinClear()">C</button>
-    <button class="pin-btn" onclick="pinAdd('0')">0</button>
-    <button class="pin-btn" onclick="pinDelete()">←</button>
+<header class="header">
+  <div class="header-left">
+    <a href="../" class="btn-back">← Accueil</a>
+    <h1>📋 Réceptions — Pilotage</h1>
   </div>
-  <div class="login-error" id="login-error"></div>
-</div>
+  <div class="header-right">
+    <span id="header-etab">—</span> · <span id="header-user">—</span>
+  </div>
+</header>
 
-<!-- ====== MAIN APP ====== -->
-<div id="app-screen" class="hidden" style="display:flex;flex-direction:column;min-height:100vh;">
-
-  <!-- HEADER -->
-  <div class="header">
-    <div class="header-left">
-      <a class="btn-back" href="../">← Retour</a>
-      <h1>🚛 Receptions</h1>
-    </div>
-    <div class="header-right">
-      <span id="user-badge"></span>
-      <span id="etab-badge"></span>
-    </div>
+<!-- ========== SCREEN 1 : LISTE ========== -->
+<section id="screen-list" class="screen active">
+  <div class="filters">
+    <span style="font-size:.78rem; color:var(--gray-500); font-weight:600;">Établissement :</span>
+    <button class="chip" data-etab="all" onclick="setFilterEtab('all')">Tous</button>
+    <button class="chip active" data-etab="freddy" onclick="setFilterEtab('freddy')">Freddy</button>
+    <button class="chip" data-etab="liesel" onclick="setFilterEtab('liesel')">Liesel</button>
+    <span class="filter-sep"></span>
+    <span style="font-size:.78rem; color:var(--gray-500); font-weight:600;">Période :</span>
+    <input type="date" id="date-from" class="filter-input" onchange="reloadSessions()">
+    <span style="color:var(--gray-400);">→</span>
+    <input type="date" id="date-to" class="filter-input" onchange="reloadSessions()">
+    <span class="filter-sep"></span>
+    <span style="font-size:.78rem; color:var(--gray-500); font-weight:600;">Statut :</span>
+    <button class="chip active" data-statut="all" onclick="setFilterStatut('all')">Tous</button>
+    <button class="chip" data-statut="ecarts" onclick="setFilterStatut('ecarts')">⚠️ Avec écarts</button>
+    <button class="chip" data-statut="ok" onclick="setFilterStatut('ok')">✅ OK</button>
+    <button class="chip" data-statut="non_rapprochee" onclick="setFilterStatut('non_rapprochee')">⚪ Non rapprochée</button>
   </div>
 
-  <!-- MAIN TABS -->
-  <div class="tabs-bar">
-    <button class="tab-btn active" data-tab="factures" onclick="switchMainTab('factures')">📄 Factures/BL</button>
-    <button class="tab-btn" data-tab="etiquettes" onclick="switchMainTab('etiquettes')">🏷️ Etiquettes</button>
-    <button class="tab-btn" data-tab="elis" onclick="switchMainTab('elis')">🧺 ELIS</button>
-    <button class="tab-btn" data-tab="historique" onclick="switchMainTab('historique')">📊 Historique</button>
-  </div>
-
-  <!-- DATE BAR -->
-  <div class="date-bar">
-    <button class="date-nav-btn" onclick="changeDate(-1)">‹</button>
-    <div class="date-display" id="date-display"></div>
-    <button class="date-nav-btn" onclick="changeDate(1)">›</button>
-    <button class="btn-today" onclick="goToday()">Aujourd'hui</button>
-  </div>
-
-  <!-- CONTENT -->
   <div class="content">
-
-    <!-- TAB: FACTURES/BL -->
-    <div class="tab-content active" id="tab-factures">
-      <div class="sub-tabs">
-        <button class="sub-tab active" data-sub="all" onclick="filterDocs('factures','all')">Tous</button>
-        <button class="sub-tab" data-sub="en_attente" onclick="filterDocs('factures','en_attente')">En attente</button>
-        <button class="sub-tab" data-sub="valide" onclick="filterDocs('factures','valide')">Valides</button>
-      </div>
-      <div id="factures-list"></div>
+    <div class="stats-row" id="stats-row"></div>
+    <div id="list-container">
+      <div class="full-loader"><div class="spinner"></div> Chargement…</div>
     </div>
-
-    <!-- TAB: ETIQUETTES -->
-    <div class="tab-content" id="tab-etiquettes">
-      <div class="sub-tabs">
-        <button class="sub-tab active" data-sub="all" onclick="filterDocs('etiquettes','all')">Tous</button>
-        <button class="sub-tab" data-sub="en_attente" onclick="filterDocs('etiquettes','en_attente')">En attente</button>
-        <button class="sub-tab" data-sub="valide" onclick="filterDocs('etiquettes','valide')">Valides</button>
-      </div>
-      <div id="etiquettes-list"></div>
-    </div>
-
-    <!-- TAB: ELIS -->
-    <div class="tab-content" id="tab-elis">
-      <div class="sub-tabs">
-        <button class="sub-tab active" data-sub="all"         onclick="filterElis('all')">Tous</button>
-        <button class="sub-tab"        data-sub="inventaire"  onclick="filterElis('inventaire')">Inventaires</button>
-        <button class="sub-tab"        data-sub="passage"     onclick="filterElis('passage')">Passages</button>
-      </div>
-      <div id="elis-stats"></div>
-      <div id="elis-list"></div>
-    </div>
-
-    <!-- TAB: HISTORIQUE -->
-    <div class="tab-content" id="tab-historique">
-      <div id="stats-container"></div>
-      <div id="historique-list"></div>
-    </div>
-
   </div>
+</section>
 
-  <!-- FAB: New Document -->
-  <button class="fab" id="fab-add" onclick="openNewDocModal()">+</button>
+<!-- ========== SCREEN 2 : DÉTAIL ========== -->
+<section id="screen-detail" class="screen">
+  <div class="content">
+    <button class="btn btn-ghost" onclick="goBackToList()" style="margin-bottom:14px;">← Retour à la liste</button>
+    <div id="detail-container">
+      <div class="full-loader"><div class="spinner"></div> Chargement du rapprochement…</div>
+    </div>
+  </div>
+</section>
 
-</div>
-
-<!-- ====== MODAL: NEW DOCUMENT ====== -->
-<div class="modal-overlay" id="modal-new">
+<!-- ========== MODAL ÉDITION ÉTIQUETTE ========== -->
+<div class="modal-overlay" id="modal-edit">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="modal-new-title">Nouveau document</h2>
-      <button class="modal-close" onclick="closeModal('modal-new')">×</button>
+      <h3>🏷️ Édition étiquette</h3>
+      <button class="modal-close" onclick="closeEdit()">×</button>
     </div>
-    <div class="modal-body">
-
-      <!-- Type -->
-      <div class="form-section">
-        <label class="form-label required">Type de document</label>
-        <select id="form-type" onchange="onTypeChange()">
-          <option value="facture">📄 Facture / Bon de livraison</option>
-          <option value="etiquette">🏷️ Etiquette produit</option>
-        </select>
-      </div>
-
-      <!-- Fournisseur -->
-      <div class="form-section">
-        <label class="form-label required">Fournisseur</label>
-        <select id="form-fournisseur">
-          <option value="">-- Choisir un fournisseur --</option>
-        </select>
-      </div>
-
-      <!-- Référence (factures only) -->
-      <div class="form-section" id="form-ref-section">
-        <label class="form-label">Numero facture / BL</label>
-        <input type="text" id="form-reference" placeholder="Ex: FA-2026-0042">
-      </div>
-
-      <!-- Lien commande (factures only) -->
-      <div class="form-section" id="form-commande-section">
-        <label class="form-label">Rattacher a une commande</label>
-        <select id="form-commande">
-          <option value="">-- Aucune --</option>
-        </select>
-      </div>
-
-      <!-- Document import -->
-      <div class="form-section">
-        <label class="form-label required">Document scanne</label>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <button type="button" onclick="openScannerPro()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
-            <span style="font-size:1.1rem;">📷</span> Ouvrir Scanner Pro
-          </button>
-          <button type="button" onclick="triggerImport()" style="flex:1;padding:10px 12px;background:linear-gradient(135deg,#48bb78,#38a169);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
-            <span style="font-size:1.1rem;">📄</span> Importer PDF
-          </button>
-        </div>
-        <div class="photo-capture-area" onclick="triggerImport()" style="padding:12px;">
-          <div class="count" id="file-count">Aucun fichier</div>
-          <div id="file-hint" style="font-size:.7rem;color:var(--gray-400);margin-top:4px;line-height:1.4;">
-            Parcourir → iCloud Drive → <b style="color:var(--gray-600);">BALPlanB-Tools</b>
-          </div>
-        </div>
-        <div id="file-preview" style="margin-top:10px;"></div>
-      </div>
-
-      <!-- Observation -->
-      <div class="form-section">
-        <label class="form-label">Observation</label>
-        <textarea id="form-observation" placeholder="Notes, remarques..."></textarea>
-      </div>
-
+    <div class="modal-body" id="modal-edit-body">
+      <div class="full-loader"><div class="spinner"></div> Chargement de l'image…</div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-new')" style="flex:1;">Annuler</button>
-      <button class="btn btn-primary" onclick="submitDocument()" id="btn-submit" style="flex:2;">Enregistrer</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEdit()" id="btn-save-edit">Enregistrer</button>
     </div>
   </div>
 </div>
 
-<!-- ====== MODAL: VIEW DOCUMENT ====== -->
-<div class="modal-overlay" id="modal-view">
-  <div class="modal">
+<!-- ========== MODAL VALIDATION ADMIN ========== -->
+<div class="modal-overlay" id="modal-validate">
+  <div class="modal" style="max-width:380px;">
     <div class="modal-header">
-      <h2 id="modal-view-title">Document</h2>
-      <button class="modal-close" onclick="closeModal('modal-view')">×</button>
-    </div>
-    <div class="modal-body" id="modal-view-body"></div>
-    <div class="modal-footer" id="modal-view-footer"></div>
-  </div>
-</div>
-
-<!-- ====== MODAL: NEW ELIS MOUVEMENT ====== -->
-<div class="modal-overlay" id="modal-elis-new">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="modal-elis-new-title">Nouveau mouvement ELIS</h2>
-      <button class="modal-close" onclick="closeModal('modal-elis-new')">×</button>
+      <h3>🔒 Validation admin requise</h3>
+      <button class="modal-close" onclick="closeValidate()">×</button>
     </div>
     <div class="modal-body">
-
-      <!-- Type de mouvement -->
-      <div class="form-section">
-        <label class="form-label required">Type de mouvement</label>
-        <div class="elis-type-toggle">
-          <button type="button" class="type-btn active" data-elis-type="inventaire" onclick="setElisType('inventaire')">📋 Inventaire</button>
-          <button type="button" class="type-btn"        data-elis-type="passage"    onclick="setElisType('passage')">🚛 Passage ELIS</button>
-        </div>
-        <div id="elis-type-help" style="font-size:.75rem;color:var(--gray-500);line-height:1.4;">
-          <b>Inventaire</b> : comptage avant passage — <b>Sale</b> (à retourner) + <b>Stock propre</b> restant.
-        </div>
+      <p style="font-size:.88rem; color:var(--gray-600); margin-bottom:12px;">
+        Saisis ton code admin (6 chiffres) pour valider définitivement cette session de réception.
+      </p>
+      <div class="field-row">
+        <label>Code PIN</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+               id="pin-validate" class="pin-input" autocomplete="off" placeholder="••••••">
       </div>
-
-      <!-- Date -->
-      <div class="form-section">
-        <label class="form-label required">Date</label>
-        <input type="date" id="elis-form-date">
+      <div class="field-row">
+        <label>Observation (optionnel)</label>
+        <textarea id="obs-validate" rows="2" placeholder="Litige fournisseur ouvert, avoir attendu, etc."></textarea>
       </div>
-
-      <!-- BL number (passage only) -->
-      <div class="form-section hidden" id="elis-form-bl-section">
-        <label class="form-label">N° Bon de livraison</label>
-        <input type="text" id="elis-form-bl" placeholder="Ex: BL-20260424-001">
-      </div>
-
-      <!-- Articles groupés par service -->
-      <div id="elis-articles-form"></div>
-
-      <!-- Observation -->
-      <div class="form-section" style="margin-top:14px;">
-        <label class="form-label">Observation / anomalie</label>
-        <textarea id="elis-form-observation" placeholder="Article manquant, qualité insuffisante, report, etc."></textarea>
-      </div>
-
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-elis-new')" style="flex:1;">Annuler</button>
-      <button class="btn btn-primary" onclick="submitElisMouvement()" id="btn-elis-submit" style="flex:2;">Enregistrer</button>
+      <button class="btn btn-ghost" onclick="closeValidate()">Annuler</button>
+      <button class="btn btn-success" onclick="confirmValidate()" id="btn-confirm-validate">✓ Valider</button>
     </div>
   </div>
 </div>
 
-<!-- ====== MODAL: VIEW ELIS MOUVEMENT ====== -->
-<div class="modal-overlay" id="modal-elis-view">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="modal-elis-view-title">Mouvement ELIS</h2>
-      <button class="modal-close" onclick="closeModal('modal-elis-view')">×</button>
-    </div>
-    <div class="modal-body" id="modal-elis-view-body"></div>
-    <div class="modal-footer" id="modal-elis-view-footer"></div>
-  </div>
+<!-- ========== VIEWER PHOTO ========== -->
+<div class="modal-overlay" id="modal-viewer" style="background:rgba(0,0,0,.92); padding:0;" onclick="closeViewer()">
+  <img id="viewer-img" style="max-width:95%; max-height:95vh; object-fit:contain; border-radius:8px;">
+  <button class="modal-close" style="position:absolute; top:20px; right:20px; background:rgba(255,255,255,.2); color:white;" onclick="event.stopPropagation(); closeViewer()">×</button>
 </div>
 
-<!-- ====== FULLSCREEN IMAGE VIEWER ====== -->
-<div class="viewer-overlay" id="viewer">
-  <button class="viewer-close" onclick="closeViewer()">×</button>
-  <img id="viewer-img" src="" alt="Document">
-  <div class="viewer-nav">
-    <button onclick="viewerNav(-1)">‹</button>
-    <span class="viewer-page-info" id="viewer-info">1 / 1</span>
-    <button onclick="viewerNav(1)">›</button>
-  </div>
-</div>
-
-<!-- OCR OVERLAY -->
-<div class="ocr-overlay" id="ocr-overlay" style="display:none;">
-  <div class="spinner"></div>
-  <div class="ocr-status" id="ocr-status">Traitement en cours...</div>
-  <div class="ocr-progress"><div class="ocr-progress-fill" id="ocr-progress" style="width:0%"></div></div>
-</div>
-
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- Hidden file input for import (PDF + images) -->
-<input type="file" id="file-input" class="hidden-input" accept="application/pdf">
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
   // ====== CONFIG ======
   const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const RECONCILE_FN_URL = `${SUPABASE_URL}/functions/v1/reconcile-session`;
 
-  const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
-
-  // pdf.js worker
-  if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  // ====== AUTH ======
+  function getSession() {
+    const userJson = sessionStorage.getItem('planb_user');
+    const etab = sessionStorage.getItem('planb_etablissement');
+    if (!userJson || !etab) return null;
+    try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
   }
+  const userSession = getSession();
+  if (!userSession) window.location.href = '../';
+  const currentUser = userSession.user;
+  const currentEtab = userSession.etablissement;
+  document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+  document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
 
   // ====== STATE ======
-  let currentUser = null;
-  let currentEtablissement = null;
-  let supabaseClient = null;
-  let filterDate = new Date();
-  let currentMainTab = 'factures';
-  let currentSubFilter = { factures: 'all', etiquettes: 'all' };
-  let fournisseurs = [];
-  let commandes = [];
-  let documents = [];
-  let importedFile = null;    // { type:'pdf'|'image', dataUri: string, name: string, pageImages: [base64], textContent: string }
-  let viewerPages = [];
-  let viewerIndex = 0;
+  const State = {
+    filterEtab: currentEtab,           // par défaut : son resto
+    filterStatut: 'all',
+    dateFrom: null, dateTo: null,
+    sessions: [],
+    currentSession: null,
+    currentScans: {},                  // map scan_id => {scan, trac}
+    blScan: null,
+    blLignes: [],
+    editingScanId: null,
+    editingTrac: null,
+  };
+  // Chip établissement par défaut
+  document.querySelectorAll('.chip[data-etab]').forEach(c => c.classList.toggle('active', c.dataset.etab === currentEtab));
+  // Période par défaut : 30 derniers jours
+  (function initDates() {
+    const today = new Date();
+    const past = new Date(today.getTime() - 30 * 86400000);
+    document.getElementById('date-to').value = today.toISOString().slice(0, 10);
+    document.getElementById('date-from').value = past.toISOString().slice(0, 10);
+    State.dateFrom = past.toISOString().slice(0, 10);
+    State.dateTo = today.toISOString().slice(0, 10);
+  })();
 
-  // ELIS state
-  let elisArticles = [];
-  let elisMouvements = [];
-  let elisFilter = 'all';
-  let currentElisType = 'inventaire';
-
-  // ====== UTILITIES ======
-  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-  function dateStr(d) { return d.toISOString().split('T')[0]; }
-  function formatDateDisplay(d) {
-    const str = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    const parts = str.split(' ');
-    return `<span class="day-name">${parts[0]}</span> ${parts.slice(1).join(' ')}`;
+  // ====== UTILS ======
+  function $(id) { return document.getElementById(id); }
+  function showToast(msg, kind = '') {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'toast show ' + kind;
+    setTimeout(() => t.classList.remove('show'), 3500);
   }
-  function formatDateShort(d) {
-    return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    $('screen-' + name).classList.add('active');
+    window.scrollTo(0, 0);
   }
-  function formatTime(d) {
+  function fmtDate(d) {
+    if (!d) return '—';
+    const dt = typeof d === 'string' ? new Date(d) : d;
+    return dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+  function fmtTime(d) {
+    if (!d) return '—';
     return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }
-  function userRole() { return ROLE_HIERARCHY[currentUser?.role] || 0; }
-  function isManager() { return userRole() >= 3; }
-  function isToday(d) { return dateStr(d) === dateStr(new Date()); }
-
-  // ====== SUPABASE ======
-  function initSupabase() {
-    if (typeof supabase !== 'undefined' && supabase.createClient) {
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  function fmtKg(v) {
+    if (v == null || v === '') return '—';
+    const n = parseFloat(v);
+    return isNaN(n) ? '—' : n.toFixed(3) + ' kg';
+  }
+  function fmtPct(v) {
+    if (v == null || v === '') return '—';
+    const n = parseFloat(v);
+    if (isNaN(n)) return '—';
+    return (n > 0 ? '+' : '') + n.toFixed(1) + '%';
+  }
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+  function statutBadge(s) {
+    const r = s.rapprochement_jsonb;
+    if (s.statut === 'validee' && s.date_validation) {
+      return `<span class="badge badge-ok">✅ Validée</span>`;
     }
+    if (!r) return `<span class="badge badge-gray">⚪ Non rapprochée</span>`;
+    const totaux = r.totaux || {};
+    const crit = totaux.nb_anomalies_critical || 0;
+    const warn = totaux.nb_anomalies_warn || 0;
+    if (crit > 0) return `<span class="badge badge-critical">🔴 ${crit} critique${crit > 1 ? 's' : ''}</span>`;
+    if (warn > 0) return `<span class="badge badge-warn">🟠 ${warn} alerte${warn > 1 ? 's' : ''}</span>`;
+    return `<span class="badge badge-ok">🟢 OK</span>`;
   }
 
-  const DB = {
-    async getFournisseurs(etab) {
-      const { data } = await supabaseClient.from('appro_fournisseurs').select('id, nom')
-        .or(`etablissement.eq.${etab},etablissement.is.null`)
-        .eq('actif', true).order('nom');
-      return data || [];
-    },
-
-    async getCommandes(etab) {
-      const { data } = await supabaseClient.from('appro_commandes').select('id, fournisseur_nom, date_creation, statut')
-        .eq('etablissement', etab)
-        .in('statut', ['envoyee', 'validee'])
-        .order('date_creation', { ascending: false })
-        .limit(50);
-      return data || [];
-    },
-
-    async getDocuments(etab, date, type) {
-      let query = supabaseClient.from('receptions_documents').select('*')
-        .eq('etablissement', etab).eq('date', date);
-      if (type) query = query.eq('type', type);
-      const { data } = await query.order('created_at', { ascending: false });
-      return data || [];
-    },
-
-    async getDocumentsRange(etab, dateFrom, dateTo) {
-      const { data } = await supabaseClient.from('receptions_documents').select('*')
-        .eq('etablissement', etab)
-        .gte('date', dateFrom).lte('date', dateTo)
-        .order('date', { ascending: false });
-      return data || [];
-    },
-
-    async getPages(documentId) {
-      const { data } = await supabaseClient.from('receptions_pages').select('*')
-        .eq('document_id', documentId)
-        .order('page_num');
-      return data || [];
-    },
-
-    async insertDocument(doc) {
-      const { data, error } = await supabaseClient.from('receptions_documents')
-        .insert(doc).select();
-      if (error) throw error;
-      return data?.[0];
-    },
-
-    async insertPages(pages) {
-      const { error } = await supabaseClient.from('receptions_pages').insert(pages);
-      if (error) throw error;
-    },
-
-    async updateDocument(id, updates) {
-      const { error } = await supabaseClient.from('receptions_documents')
-        .update(updates).eq('id', id);
-      if (error) throw error;
-    },
-
-    async getStats(etab, dateFrom, dateTo) {
-      const { data } = await supabaseClient.from('receptions_documents')
-        .select('type, statut')
-        .eq('etablissement', etab)
-        .gte('date', dateFrom).lte('date', dateTo);
-      return data || [];
-    },
-
-    // ===== ELIS =====
-    async getElisArticles(etab) {
-      const { data, error } = await supabaseClient.from('elis_articles')
-        .select('*').eq('etablissement', etab).eq('actif', true)
-        .order('ordre');
-      if (error) console.error('getElisArticles:', error);
-      return data || [];
-    },
-    async getElisMouvements(etab, dateFrom, dateTo) {
-      const { data, error } = await supabaseClient.from('elis_mouvements').select(`
-        *,
-        lignes:elis_mouvements_lignes(
-          id, article_id, qty_retour, qty_livre, qty_stock,
-          article:elis_articles(id, nom, service, stock_theorique, pu_ht_hebdo, ordre)
-        )
-      `)
-        .eq('etablissement', etab)
-        .gte('date', dateFrom).lte('date', dateTo)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-      if (error) console.error('getElisMouvements:', error);
-      return data || [];
-    },
-    async insertElisMouvement(mv) {
-      const { data, error } = await supabaseClient.from('elis_mouvements')
-        .insert(mv).select();
-      if (error) throw error;
-      return data?.[0];
-    },
-    async insertElisLignes(lignes) {
-      if (!lignes.length) return;
-      const { error } = await supabaseClient.from('elis_mouvements_lignes')
-        .insert(lignes);
-      if (error) throw error;
-    }
-  };
-
-  // ====== SESSION ======
-  function checkPortalSession() {
-    const user = sessionStorage.getItem('planb_user');
-    const etablissement = sessionStorage.getItem('planb_etablissement');
-    return user && etablissement ? { user: JSON.parse(user), etablissement } : null;
+  // ====== FILTRES ======
+  function setFilterEtab(e) {
+    State.filterEtab = e;
+    document.querySelectorAll('.chip[data-etab]').forEach(c => c.classList.toggle('active', c.dataset.etab === e));
+    reloadSessions();
+  }
+  function setFilterStatut(s) {
+    State.filterStatut = s;
+    document.querySelectorAll('.chip[data-statut]').forEach(c => c.classList.toggle('active', c.dataset.statut === s));
+    renderList();
   }
 
-  function goBackToPortal() { window.location.href = '../'; }
-
-  // ====== LOGIN FALLBACK ======
-  let pinCode = '';
-  function renderPinDots() {
-    const c = document.getElementById('pin-dots');
-    if (!c) return;
-    c.innerHTML = Array.from({ length: 6 }, (_, i) =>
-      `<div class="pin-dot ${i < pinCode.length ? 'filled' : ''}"></div>`
-    ).join('');
-  }
-  function pinAdd(n) {
-    if (pinCode.length >= 6) return;
-    pinCode += n;
-    renderPinDots();
-    if (pinCode.length >= 4) attemptLogin();
-  }
-  function pinDelete() { pinCode = pinCode.slice(0, -1); renderPinDots(); }
-  function pinClear() { pinCode = ''; renderPinDots(); }
-
-  async function attemptLogin() {
-    try {
-      const { data } = await supabaseClient.from('users').select('*')
-        .eq('code', pinCode).eq('actif', true);
-      if (!data?.length) {
-        if (pinCode.length >= 6) {
-          document.getElementById('login-error').textContent = 'Code incorrect';
-          document.getElementById('login-error').style.display = 'block';
-          pinClear();
-        }
-        return;
-      }
-      const u = data[0];
-      currentUser = {
-        id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
-        equipe: u.equipe || 'cuisine',
-        etablissements: u.acces_etablissements?.length > 0
-          ? u.acces_etablissements : [u.etablissement]
-      };
-      if (currentUser.etablissements.length === 1) {
-        currentEtablissement = currentUser.etablissements[0];
-        showApp();
-      }
-    } catch (e) {
-      console.error('Login error:', e);
-    }
-  }
-
-  // ====== DATE NAVIGATION ======
-  function changeDate(delta) {
-    filterDate.setDate(filterDate.getDate() + delta);
-    updateDateDisplay();
-    loadDocuments();
-  }
-  function goToday() {
-    filterDate = new Date();
-    updateDateDisplay();
-    loadDocuments();
-  }
-  function updateDateDisplay() {
-    document.getElementById('date-display').innerHTML = formatDateDisplay(filterDate);
-  }
-
-  // ====== TAB NAVIGATION ======
-  function switchMainTab(tab) {
-    currentMainTab = tab;
-    document.querySelectorAll('.tab-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.tab === tab)
-    );
-    document.querySelectorAll('.tab-content').forEach(c =>
-      c.classList.toggle('active', c.id === `tab-${tab}`)
-    );
-    document.getElementById('fab-add').classList.toggle('hidden', tab === 'historique');
-    // Hide date bar on ELIS tab (mouvements are shown on a 90-day window, not per day)
-    const dateBar = document.querySelector('.date-bar');
-    if (dateBar) dateBar.classList.toggle('hidden', tab === 'elis');
-    if (tab === 'historique') loadHistorique();
-    else if (tab === 'elis') loadElisData();
-    else renderDocuments();
-  }
-
-  function filterDocs(tabType, filter) {
-    currentSubFilter[tabType] = filter;
-    const container = document.getElementById(`tab-${tabType}`);
-    container.querySelectorAll('.sub-tab').forEach(b =>
-      b.classList.toggle('active', b.dataset.sub === filter)
-    );
-    renderDocuments();
-  }
-
-  // ====== LOAD DATA ======
-  async function loadFournisseurs() {
-    try {
-      fournisseurs = await DB.getFournisseurs(currentEtablissement);
-      const sel = document.getElementById('form-fournisseur');
-      sel.innerHTML = '<option value="">-- Choisir un fournisseur --</option>';
-      fournisseurs.forEach(f => {
-        sel.innerHTML += `<option value="${f.id}">${esc(f.nom)}</option>`;
-      });
-    } catch (e) { console.error('Erreur fournisseurs:', e); }
-  }
-
-  async function loadCommandes() {
-    try {
-      commandes = await DB.getCommandes(currentEtablissement);
-      const sel = document.getElementById('form-commande');
-      sel.innerHTML = '<option value="">-- Aucune --</option>';
-      commandes.forEach(c => {
-        const dt = formatDateShort(c.date_creation);
-        sel.innerHTML += `<option value="${c.id}">${esc(c.fournisseur_nom)} - ${dt} (${c.statut})</option>`;
-      });
-    } catch (e) { console.error('Erreur commandes:', e); }
-  }
-
-  async function loadDocuments() {
-    try {
-      documents = await DB.getDocuments(currentEtablissement, dateStr(filterDate));
-      renderDocuments();
-    } catch (e) {
-      console.error('Erreur documents:', e);
-      showToast('Erreur de chargement', 'error');
-    }
-  }
-
-  // ====== RENDER DOCUMENTS ======
-  function renderDocuments() {
-    renderDocList('factures', 'facture');
-    renderDocList('etiquettes', 'etiquette');
-  }
-
-  function renderDocList(tabType, docType) {
-    const container = document.getElementById(`${tabType}-list`);
-    const filter = currentSubFilter[tabType];
-    let docs = documents.filter(d => d.type === docType);
-    if (filter !== 'all') docs = docs.filter(d => d.statut === filter);
-
-    if (!docs.length) {
-      const icon = docType === 'facture' ? '📄' : '🏷️';
-      const text = docType === 'facture' ? 'Aucune facture/BL ce jour' : 'Aucune etiquette ce jour';
-      container.innerHTML = `<div class="empty"><div class="icon">${icon}</div><div class="text">${text}</div></div>`;
+  // ====== LISTE SESSIONS ======
+  async function reloadSessions() {
+    const from = $('date-from').value;
+    const to = $('date-to').value;
+    State.dateFrom = from; State.dateTo = to;
+    $('list-container').innerHTML = '<div class="full-loader"><div class="spinner"></div> Chargement…</div>';
+    let q = sb.from('scan_sessions').select('*').gte('date_reception', from).lte('date_reception', to).order('date_reception', { ascending: false }).order('created_at', { ascending: false });
+    if (State.filterEtab !== 'all') q = q.eq('etablissement', State.filterEtab);
+    const { data, error } = await q;
+    if (error) {
+      $('list-container').innerHTML = `<div class="empty"><div class="icon">❌</div><div class="text">Erreur : ${escapeHtml(error.message)}</div></div>`;
       return;
     }
-    container.innerHTML = docs.map(d => renderDocCard(d)).join('');
-  }
-
-  function renderDocCard(doc) {
-    const statusBadge = {
-      en_attente: '<span class="badge badge-waiting">En attente</span>',
-      valide: '<span class="badge badge-valid">Valide</span>',
-      rejete: '<span class="badge badge-rejected">Rejete</span>'
-    }[doc.statut] || '';
-
-    const typeBadge = doc.type === 'facture'
-      ? '<span class="badge badge-facture">Facture/BL</span>'
-      : '<span class="badge badge-etiquette">Etiquette</span>';
-
-    const ref = doc.reference ? `<div style="font-size:.8rem;color:var(--gray-500);">Ref: ${esc(doc.reference)}</div>` : '';
-    const obs = doc.observation ? `<div style="font-size:.8rem;color:var(--gray-500);margin-top:4px;">${esc(doc.observation)}</div>` : '';
-    const pdfBadge = doc.pdf_data ? '<span class="ocr-badge">PDF</span>' : '';
-    const pages = doc.nb_pages > 0 ? `<span style="font-size:.75rem;color:var(--gray-400);">📋 ${doc.nb_pages} page(s) ${pdfBadge}</span>` : '';
-
-    return `
-      <div class="card" onclick="viewDocument('${doc.id}')">
-        <div class="card-header">
-          <div>
-            <div class="card-title">${esc(doc.fournisseur_nom)}</div>
-            ${ref}
-          </div>
-          <div style="text-align:right;">
-            ${typeBadge}
-            ${statusBadge}
-          </div>
-        </div>
-        <div class="card-body">
-          ${obs}
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-            ${pages}
-            <span class="card-meta">${esc(doc.user_initiales || doc.user_nom)} - ${formatTime(doc.created_at)}</span>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  // ====== NEW DOCUMENT ======
-  function openNewDocModal() {
-    // Dispatch to ELIS modal when on ELIS tab
-    if (currentMainTab === 'elis') return openNewElisModal();
-    const typeSelect = document.getElementById('form-type');
-    typeSelect.value = currentMainTab === 'etiquettes' ? 'etiquette' : 'facture';
-    onTypeChange();
-    document.getElementById('form-fournisseur').value = '';
-    document.getElementById('form-reference').value = '';
-    document.getElementById('form-commande').value = '';
-    document.getElementById('form-observation').value = '';
-    importedFile = null;
-    updateFilePreview();
-    loadCommandes();
-    document.getElementById('modal-new').classList.add('show');
-  }
-
-  function onTypeChange() {
-    const type = document.getElementById('form-type').value;
-    const isFacture = type === 'facture';
-    document.getElementById('form-ref-section').classList.toggle('hidden', !isFacture);
-    document.getElementById('form-commande-section').classList.toggle('hidden', !isFacture);
-    document.getElementById('modal-new-title').textContent =
-      isFacture ? 'Nouvelle facture / BL' : 'Nouvelle etiquette';
-  }
-
-  // ====== SCANNER PRO ======
-  function openScannerPro() {
-    // Show guidance before switching apps
-    const hint = document.getElementById('file-hint');
-    if (hint) {
-      hint.innerHTML = '⏳ <b style="color:var(--primary);">Scanner Pro ouvert</b> — Scannez, sauvegardez dans <b>BALPlanB-Tools</b>, puis revenez et tapez <b>Importer PDF</b>';
-      hint.style.color = 'var(--primary)';
-      hint.style.fontSize = '.8rem';
-    }
-
-    // Try known Readdle Scanner Pro URL scheme
-    window.location.href = 'scannerpro://';
-
-    // If we're still here after 2s, the app didn't open
-    const startTime = Date.now();
-    setTimeout(() => {
-      if (document.hidden) return; // App opened successfully
-      if (hint) {
-        hint.innerHTML = 'Parcourir → iCloud Drive → <b style="color:var(--gray-600);">BALPlanB-Tools</b>';
-        hint.style.color = 'var(--gray-400)';
-        hint.style.fontSize = '.7rem';
-      }
-      const useStore = confirm(
-        'Scanner Pro ne s\'est pas ouvert.\n\n' +
-        'Verifiez que l\'app est bien installee.\n\n' +
-        'Ouvrir l\'App Store ?'
-      );
-      if (useStore) {
-        window.location.href = 'https://apps.apple.com/app/scanner-pro-scan-documents/id333710667';
-      }
-    }, 2000);
-  }
-
-  // ====== FILE IMPORT ======
-  function triggerImport() {
-    const input = document.getElementById('file-input');
-    input.value = '';
-    input.click();
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('file-input')?.addEventListener('change', async function(e) {
-      if (!this.files?.length) return;
-      const file = this.files[0];
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-      showOcrOverlay(true, 'Chargement du fichier...', 10);
-
-      try {
-        if (isPdf) {
-          await processPdfFile(file);
-        } else {
-          await processImageFile(file);
-        }
-        showOcrOverlay(false);
-        updateFilePreview();
-        showToast(importedFile ? `${importedFile.name} importe` : 'Fichier importe', 'success');
-      } catch (err) {
-        console.error('Import error:', err);
-        showOcrOverlay(false);
-        showToast('Erreur d\'import', 'error');
-      }
-    });
-  });
-
-  // Process PDF file: extract pages as images + text
-  async function processPdfFile(file) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const numPages = pdf.numPages;
-
-    // Read file as data URI for storage
-    const dataUri = await fileToDataUri(file);
-
-    const pageImages = [];
-    let fullText = '';
-
-    for (let i = 1; i <= numPages; i++) {
-      showOcrOverlay(true, `Page ${i}/${numPages}...`, 10 + (70 * i / numPages));
-      const page = await pdf.getPage(i);
-
-      // Render page to canvas (for preview thumbnails — small size for DB)
-      const scale = 0.8;
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      pageImages.push(canvas.toDataURL('image/jpeg', 0.5));
-
-      // Extract text content (if PDF has text layer — iOS scanner usually does)
-      try {
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        if (pageText.trim()) fullText += (fullText ? '\n\n' : '') + pageText.trim();
-      } catch (e) { /* no text layer */ }
-    }
-
-    // If no text extracted, try OCR on the first page
-    if (!fullText.trim() && pageImages.length > 0) {
-      showOcrOverlay(true, 'OCR en cours (pas de texte dans le PDF)...', 80);
-      fullText = await runOcrOnImage(pageImages[0]);
-    }
-
-    importedFile = {
-      type: 'pdf',
-      dataUri,
-      name: file.name,
-      pageImages,
-      textContent: fullText,
-      nbPages: numPages
-    };
-  }
-
-  // Process image file
-  async function processImageFile(file) {
-    const rawUri = await fileToDataUri(file);
-
-    // Compress image (iPhone photos are 3-8 MB, too large for Supabase)
-    showOcrOverlay(true, 'Compression...', 20);
-    const compressed = await compressImage(rawUri, 1400, 0.65);
-    const thumbnail = await compressImage(rawUri, 800, 0.5);
-
-    // OCR on the compressed image
-    showOcrOverlay(true, 'OCR en cours...', 50);
-    const ocrText = await runOcrOnImage(compressed);
-
-    importedFile = {
-      type: 'image',
-      dataUri: compressed,
-      name: file.name,
-      pageImages: [thumbnail],
-      textContent: ocrText,
-      nbPages: 1
-    };
-  }
-
-  function fileToDataUri(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // Compress/resize image to fit Supabase payload limits
-  function compressImage(dataUri, maxWidth = 1200, quality = 0.6) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = () => resolve(dataUri); // fallback: return original
-      img.src = dataUri;
-    });
-  }
-
-  // OCR fallback with Tesseract.js
-  async function runOcrOnImage(base64Image) {
-    try {
-      const result = await Tesseract.recognize(base64Image, 'fra', {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            showOcrOverlay(true, 'Extraction du texte...', 80 + Math.round((m.progress || 0) * 20));
-          }
+    // Ajouter le nb_etiquettes calculé via une 2e query
+    const ids = (data || []).map(s => s.id);
+    let etqCounts = {};
+    if (ids.length > 0) {
+      const { data: scs } = await sb.from('scans')
+        .select('session_id, type_document')
+        .in('session_id', ids);
+      (scs || []).forEach(sc => {
+        if (sc.type_document === 'etiquette_produit') {
+          etqCounts[sc.session_id] = (etqCounts[sc.session_id] || 0) + 1;
         }
       });
-      return (result?.data?.text || '').trim();
-    } catch (e) {
-      console.error('OCR error:', e);
-      return '';
     }
+    State.sessions = (data || []).map(s => ({ ...s, nb_etq_calc: etqCounts[s.id] || 0 }));
+    renderList();
   }
 
-  // Update file preview
-  function updateFilePreview() {
-    const countEl = document.getElementById('file-count');
-    const previewEl = document.getElementById('file-preview');
-
-    if (!importedFile) {
-      countEl.textContent = 'Aucun fichier';
-      previewEl.innerHTML = '';
-      return;
+  function renderList() {
+    let sessions = State.sessions;
+    if (State.filterStatut !== 'all') {
+      sessions = sessions.filter(s => {
+        const r = s.rapprochement_jsonb;
+        if (State.filterStatut === 'non_rapprochee') return !r;
+        if (!r) return false;
+        const t = r.totaux || {};
+        if (State.filterStatut === 'ecarts') return (t.nb_anomalies_critical || 0) + (t.nb_anomalies_warn || 0) > 0;
+        if (State.filterStatut === 'ok') return (t.nb_anomalies_critical || 0) + (t.nb_anomalies_warn || 0) === 0;
+        return true;
+      });
     }
 
-    const icon = importedFile.type === 'pdf' ? '📄' : '🖼️';
-    countEl.textContent = `${icon} ${importedFile.name} (${importedFile.nbPages} page(s))`;
-
-    // Show page thumbnails
-    let html = '<div class="photo-grid">';
-    importedFile.pageImages.forEach((img, i) => {
-      html += `
-        <div class="photo-item">
-          <img src="${img}" alt="Page ${i+1}" onclick="previewPage(${i})">
-          <span class="page-num">p.${i+1}</span>
-        </div>`;
+    // Stats
+    const stats = {
+      total: State.sessions.length,
+      ok: 0, warn: 0, critical: 0, non_rapprochee: 0, validee: 0
+    };
+    State.sessions.forEach(s => {
+      if (s.statut === 'validee' && s.date_validation) { stats.validee++; return; }
+      const r = s.rapprochement_jsonb;
+      if (!r) { stats.non_rapprochee++; return; }
+      const t = r.totaux || {};
+      if ((t.nb_anomalies_critical || 0) > 0) stats.critical++;
+      else if ((t.nb_anomalies_warn || 0) > 0) stats.warn++;
+      else stats.ok++;
     });
-    html += '</div>';
-
-    // Show OCR text preview
-    if (importedFile.textContent) {
-      const preview = importedFile.textContent.substring(0, 200);
-      html += `<div style="margin-top:8px;font-size:.75rem;color:var(--gray-400);">Texte extrait: ${esc(preview)}${importedFile.textContent.length > 200 ? '...' : ''}</div>`;
-    }
-
-    previewEl.innerHTML = html;
-  }
-
-  function previewPage(index) {
-    if (!importedFile) return;
-    viewerPages = importedFile.pageImages;
-    viewerIndex = index;
-    showViewer();
-  }
-
-  // ====== SUBMIT DOCUMENT ======
-  async function submitDocument() {
-    const type = document.getElementById('form-type').value;
-    const fournisseurId = document.getElementById('form-fournisseur').value;
-    const reference = document.getElementById('form-reference').value.trim();
-    const commandeId = document.getElementById('form-commande').value;
-    const observation = document.getElementById('form-observation').value.trim();
-
-    if (!fournisseurId) { showToast('Selectionnez un fournisseur', 'error'); return; }
-    if (!importedFile) { showToast('Importez un document', 'error'); return; }
-
-    const fournisseur = fournisseurs.find(f => f.id === fournisseurId);
-    if (!fournisseur) { showToast('Fournisseur invalide', 'error'); return; }
-
-    const btn = document.getElementById('btn-submit');
-    btn.disabled = true;
-    btn.textContent = 'Enregistrement...';
-
-    try {
-      const doc = await DB.insertDocument({
-        type,
-        fournisseur_id: fournisseurId,
-        fournisseur_nom: fournisseur.nom,
-        date: dateStr(filterDate),
-        reference: type === 'facture' ? reference || null : null,
-        commande_id: type === 'facture' && commandeId ? commandeId : null,
-        statut: 'en_attente',
-        observation: observation || null,
-        nb_pages: importedFile.nbPages,
-        pdf_data: importedFile.type === 'pdf' ? importedFile.dataUri : null,
-        texte_ocr: importedFile.textContent || null,
-        user_id: currentUser.id,
-        user_nom: currentUser.nom,
-        user_initiales: currentUser.initiales,
-        etablissement: currentEtablissement
-      });
-
-      // Insert page thumbnails
-      if (doc && importedFile.pageImages.length) {
-        const pages = importedFile.pageImages.map((img, i) => ({
-          document_id: doc.id,
-          page_num: i + 1,
-          photo_data: img,
-          texte_ocr: null
-        }));
-        await DB.insertPages(pages);
-      }
-
-      showToast('Document enregistre !', 'success');
-      closeModal('modal-new');
-      loadDocuments();
-    } catch (e) {
-      console.error('Erreur enregistrement:', e);
-      const msg = e?.message || e?.details || e?.hint || JSON.stringify(e);
-      showToast('Erreur d\'enregistrement', 'error');
-      setTimeout(() => alert('Erreur Supabase:\n' + msg), 300);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Enregistrer';
-    }
-  }
-
-  // ====== VIEW DOCUMENT ======
-  async function viewDocument(docId) {
-    const doc = documents.find(d => d.id === docId);
-    if (!doc) return;
-
-    document.getElementById('modal-view-title').textContent =
-      doc.type === 'facture' ? `Facture/BL - ${esc(doc.fournisseur_nom)}` : `Etiquette - ${esc(doc.fournisseur_nom)}`;
-
-    let pages = [];
-    try { pages = await DB.getPages(docId); } catch (e) { console.error(e); }
-
-    const statusLabel = {
-      en_attente: '🟡 En attente de validation',
-      valide: '✅ Valide',
-      rejete: '❌ Rejete'
-    }[doc.statut] || doc.statut;
-
-    let body = `
-      <div style="margin-bottom:12px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Fournisseur</div>
-        <div style="font-weight:600;">${esc(doc.fournisseur_nom)}</div>
-      </div>
-      <div style="display:flex;gap:16px;margin-bottom:12px;">
-        <div style="flex:1;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Date</div>
-          <div>${new Date(doc.date).toLocaleDateString('fr-FR')}</div>
-        </div>
-        <div style="flex:1;">
-          <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Statut</div>
-          <div>${statusLabel}</div>
-        </div>
-      </div>`;
-
-    if (doc.reference) {
-      body += `<div style="margin-bottom:12px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Reference</div>
-        <div>${esc(doc.reference)}</div>
-      </div>`;
-    }
-
-    if (doc.commande_id) {
-      const cmd = commandes.find(c => c.id === doc.commande_id);
-      body += `<div style="margin-bottom:12px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Commande rattachee</div>
-        <div>${cmd ? esc(cmd.fournisseur_nom) + ' - ' + formatDateShort(cmd.date_creation) : doc.commande_id}</div>
-      </div>`;
-    }
-
-    if (doc.observation) {
-      body += `<div style="margin-bottom:12px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Observation</div>
-        <div>${esc(doc.observation)}</div>
-      </div>`;
-    }
-
-    body += `<div style="margin-bottom:8px;">
-      <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">Enregistre par</div>
-      <div>${esc(doc.user_nom)} (${esc(doc.user_initiales || '')}) - ${formatTime(doc.created_at)}</div>
-    </div>`;
-
-    if (doc.valide_par_nom) {
-      body += `<div style="margin-bottom:8px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:4px;">${doc.statut === 'valide' ? 'Valide' : 'Rejete'} par</div>
-        <div>${esc(doc.valide_par_nom)} - ${formatTime(doc.date_validation)}</div>
-      </div>`;
-    }
-
-    // PDF download button
-    if (doc.pdf_data) {
-      body += `<div style="margin-top:12px;">
-        <button class="btn btn-primary btn-full" onclick="downloadPdf('${doc.id}')">📥 Telecharger le PDF original</button>
-      </div>`;
-    }
-
-    // Page thumbnails
-    if (pages.length) {
-      body += `<div style="margin-top:12px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">Pages (${pages.length})</div>
-        <div class="photo-thumbs">
-          ${pages.map((p, i) => `
-            <img class="photo-thumb" src="${p.photo_data}" alt="Page ${i+1}"
-                 onclick="event.stopPropagation();openViewerFromDoc('${docId}', ${i})">
-          `).join('')}
-        </div>
-      </div>`;
-    }
-
-    // OCR text
-    const ocrText = doc.texte_ocr;
-    if (ocrText) {
-      body += `<div style="margin-top:12px;">
-        <div style="font-size:.85rem;color:var(--gray-500);margin-bottom:6px;">
-          Texte extrait <span class="ocr-badge">AUTO</span>
-        </div>
-        <div class="ocr-text-box">${esc(ocrText)}</div>
-      </div>`;
-    }
-
-    document.getElementById('modal-view-body').innerHTML = body;
-
-    let footer = '';
-    if (isManager() && doc.statut === 'en_attente') {
-      footer = `
-        <button class="btn btn-danger btn-sm" onclick="validateDocument('${doc.id}','rejete')" style="flex:1;">Rejeter</button>
-        <button class="btn btn-success btn-sm" onclick="validateDocument('${doc.id}','valide')" style="flex:2;">Valider</button>`;
-    } else if (doc.statut === 'en_attente') {
-      footer = `<div style="width:100%;text-align:center;font-size:.8rem;color:var(--gray-400);">En attente de validation par un manager</div>`;
-    }
-    document.getElementById('modal-view-footer').innerHTML = footer;
-    document.getElementById('modal-view').classList.add('show');
-  }
-
-  // Page cache for viewer
-  let docPagesCache = {};
-  async function openViewerFromDoc(docId, pageIndex) {
-    if (!docPagesCache[docId]) docPagesCache[docId] = await DB.getPages(docId);
-    viewerPages = docPagesCache[docId].map(p => p.photo_data);
-    viewerIndex = pageIndex;
-    showViewer();
-  }
-
-  // ====== PDF DOWNLOAD ======
-  function downloadPdf(docId) {
-    const doc = documents.find(d => d.id === docId);
-    if (!doc?.pdf_data) { showToast('PDF non disponible', 'error'); return; }
-    const link = document.createElement('a');
-    link.href = doc.pdf_data;
-    const dateLabel = doc.date.replace(/-/g, '');
-    const fournLabel = doc.fournisseur_nom.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
-    link.download = `${doc.type}_${fournLabel}_${dateLabel}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  // ====== VALIDATE DOCUMENT ======
-  async function validateDocument(docId, newStatut) {
-    try {
-      await DB.updateDocument(docId, {
-        statut: newStatut,
-        valide_par_id: currentUser.id,
-        valide_par_nom: currentUser.nom,
-        date_validation: new Date().toISOString()
-      });
-      showToast(newStatut === 'valide' ? 'Document valide !' : 'Document rejete', newStatut === 'valide' ? 'success' : 'error');
-      closeModal('modal-view');
-      loadDocuments();
-    } catch (e) {
-      console.error('Erreur validation:', e);
-      showToast('Erreur de validation', 'error');
-    }
-  }
-
-  // ====== HISTORIQUE ======
-  async function loadHistorique() {
-    const dateTo = dateStr(new Date());
-    const dateFrom = dateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-
-    try {
-      const stats = await DB.getStats(currentEtablissement, dateFrom, dateTo);
-      const allDocs = await DB.getDocumentsRange(currentEtablissement, dateFrom, dateTo);
-
-      const totalFactures = stats.filter(s => s.type === 'facture').length;
-      const totalEtiquettes = stats.filter(s => s.type === 'etiquette').length;
-      const enAttente = stats.filter(s => s.statut === 'en_attente').length;
-
-      document.getElementById('stats-container').innerHTML = `
-        <div class="stats-row">
-          <div class="stat-card purple"><div class="number">${totalFactures}</div><div class="label">Factures/BL</div></div>
-          <div class="stat-card purple"><div class="number">${totalEtiquettes}</div><div class="label">Etiquettes</div></div>
-          <div class="stat-card amber"><div class="number">${enAttente}</div><div class="label">En attente</div></div>
-        </div>
-        <div style="font-size:.8rem;color:var(--gray-400);margin-bottom:12px;text-align:center;">30 derniers jours</div>`;
-
-      const grouped = {};
-      allDocs.forEach(d => {
-        if (!grouped[d.date]) grouped[d.date] = [];
-        grouped[d.date].push(d);
-      });
-
-      let html = '';
-      Object.keys(grouped).sort().reverse().forEach(date => {
-        const dateLabel = new Date(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-        html += `<div style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin:12px 0 6px;text-transform:capitalize;">${dateLabel} (${grouped[date].length})</div>`;
-        grouped[date].forEach(d => html += renderDocCard(d));
-      });
-
-      document.getElementById('historique-list').innerHTML = html ||
-        '<div class="empty"><div class="icon">📊</div><div class="text">Aucun document sur les 30 derniers jours</div></div>';
-    } catch (e) { console.error('Erreur historique:', e); }
-  }
-
-  // ====== ELIS ======
-
-  const ELIS_SERVICE_ORDER = ['Linge-Service', 'Habillement-Porteur', 'Habillement-Groupe', 'Sanitaire', 'Sol-Service'];
-  const ELIS_SERVICE_META = {
-    'Linge-Service':       { label: '🍽️ Linge-Service',           help: 'Tabliers, torchons, nappes, serviettes…' },
-    'Habillement-Porteur': { label: '👨‍🍳 Habillement par porteur', help: 'Vestes / polos affectés aux personnes — compter le total du type.' },
-    'Habillement-Groupe':  { label: '🧥 Habillement groupé',       help: 'Tabliers communs, non nominatifs.' },
-    'Sanitaire':           { label: '🧻 Sanitaire',                help: 'Recharges et distributeurs — laisser vide pour les équipements fixes.' },
-    'Sol-Service':         { label: '🟫 Sol-Service',              help: 'Tapis entrée / poste.' }
-  };
-
-  async function loadElisData() {
-    try {
-      if (!elisArticles.length || elisArticles[0]?.etablissement !== currentEtablissement) {
-        elisArticles = await DB.getElisArticles(currentEtablissement);
-      }
-      const today = new Date();
-      const from = dateStr(new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000));
-      const to = dateStr(new Date(today.getTime() + 24 * 60 * 60 * 1000)); // +1j marge
-      elisMouvements = await DB.getElisMouvements(currentEtablissement, from, to);
-      renderElisList();
-    } catch (e) {
-      console.error('Erreur ELIS:', e);
-      showToast('Erreur de chargement ELIS', 'error');
-    }
-  }
-
-  function filterElis(filter) {
-    elisFilter = filter;
-    document.querySelectorAll('#tab-elis .sub-tab').forEach(b =>
-      b.classList.toggle('active', b.dataset.sub === filter)
-    );
-    renderElisList();
-  }
-
-  function renderElisList() {
-    const totalInv  = elisMouvements.filter(m => m.type === 'inventaire').length;
-    const totalPass = elisMouvements.filter(m => m.type === 'passage').length;
-    document.getElementById('elis-stats').innerHTML = `
-      <div class="stats-row">
-        <div class="stat-card amber"><div class="number">${totalInv}</div><div class="label">Inventaires</div></div>
-        <div class="stat-card purple"><div class="number">${totalPass}</div><div class="label">Passages</div></div>
-        <div class="stat-card green"><div class="number">${elisArticles.length}</div><div class="label">Articles suivis</div></div>
-      </div>
-      <div style="font-size:.75rem;color:var(--gray-400);margin-bottom:10px;text-align:center;">Mouvements des 90 derniers jours</div>
+    $('stats-row').innerHTML = `
+      <div class="stat-card"><div class="number">${stats.total}</div><div class="label">Sessions</div></div>
+      <div class="stat-card green"><div class="number">${stats.ok}</div><div class="label">🟢 OK</div></div>
+      <div class="stat-card amber"><div class="number">${stats.warn}</div><div class="label">🟠 Alertes</div></div>
+      <div class="stat-card red"><div class="number">${stats.critical}</div><div class="label">🔴 Critiques</div></div>
+      <div class="stat-card gray"><div class="number">${stats.non_rapprochee}</div><div class="label">⚪ Non rapproch.</div></div>
+      <div class="stat-card green"><div class="number">${stats.validee}</div><div class="label">✅ Validées</div></div>
     `;
 
-    let list = elisMouvements;
-    if (elisFilter !== 'all') list = list.filter(m => m.type === elisFilter);
-
-    const container = document.getElementById('elis-list');
-    if (!list.length) {
-      container.innerHTML = `<div class="empty"><div class="icon">🧺</div><div class="text">Aucun mouvement ELIS. Tapez + pour en saisir un.</div></div>`;
+    if (sessions.length === 0) {
+      $('list-container').innerHTML = `<div class="empty"><div class="icon">📭</div><div class="text">Aucune session pour ces filtres</div></div>`;
       return;
     }
-    container.innerHTML = list.map(renderElisMouvCard).join('');
-  }
 
-  function renderElisMouvCard(mv) {
-    const lignes = mv.lignes || [];
-    const tRetour = lignes.reduce((s,l) => s + (l.qty_retour || 0), 0);
-    const tLivre  = lignes.reduce((s,l) => s + (l.qty_livre  || 0), 0);
-    const tStock  = lignes.reduce((s,l) => s + (l.qty_stock  || 0), 0);
-    const dLabel  = new Date(mv.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-    const typeLabel = mv.type === 'inventaire' ? '📋 Inventaire' : '🚛 Passage';
-    const retourLabel = mv.type === 'inventaire' ? 'Sale' : 'Retour';
+    const rows = sessions.map(s => {
+      const r = s.rapprochement_jsonb;
+      const totaux = r?.totaux || {};
+      const nbBl = totaux.nb_lignes_bl ?? '—';
+      const nbEtq = s.nb_etq_calc;
+      const montant = totaux.montant_total_bl_ht;
+      return `
+        <tr class="session-row" onclick="openDetail('${s.id}')">
+          <td>${fmtDate(s.date_reception)}<br><span style="font-size:.7rem; color:var(--gray-400);">${fmtTime(s.created_at)}</span></td>
+          <td><span class="badge badge-purple">${s.etablissement === 'liesel' ? 'Liesel' : 'Freddy'}</span></td>
+          <td><strong>${escapeHtml(s.fournisseur_nom || '—')}</strong></td>
+          <td class="col-hide-mobile">${nbEtq} étiq. / ${nbBl} lignes</td>
+          <td class="col-hide-mobile">${montant != null ? Number(montant).toFixed(2) + ' €' : '—'}</td>
+          <td>${statutBadge(s)}</td>
+          <td style="text-align:right;">→</td>
+        </tr>
+      `;
+    }).join('');
 
-    return `
-      <div class="elis-mouv-card" onclick="viewElisMouvement('${mv.id}')">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <div style="font-weight:600;font-size:.95rem;text-transform:capitalize;">${dLabel}</div>
-            ${mv.bon_livraison ? `<div style="font-size:.75rem;color:var(--gray-500);">BL : ${esc(mv.bon_livraison)}</div>` : ''}
-          </div>
-          <span class="type-badge ${mv.type}">${typeLabel}</span>
-        </div>
-        <div class="elis-summary">
-          <div class="kv">🔙 ${retourLabel} <b>${tRetour}</b></div>
-          ${mv.type === 'passage' ? `<div class="kv">📦 Livré <b>${tLivre}</b></div>` : ''}
-          <div class="kv">📊 Stock <b>${tStock}</b></div>
-          <div class="kv">📋 Articles <b>${lignes.length}</b></div>
-        </div>
-        ${mv.observation ? `<div style="font-size:.75rem;color:var(--gray-500);margin-top:6px;">💬 ${esc(mv.observation)}</div>` : ''}
-        <div style="font-size:.7rem;color:var(--gray-400);margin-top:4px;">${esc(mv.user_initiales || mv.user_nom)} · ${formatTime(mv.created_at)}</div>
+    $('list-container').innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Resto</th><th>Fournisseur</th>
+            <th class="col-hide-mobile">Volumes</th>
+            <th class="col-hide-mobile">Montant HT</th>
+            <th>Statut</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
       </div>
     `;
   }
 
-  // ---- New mouvement modal ----
+  // ====== DÉTAIL ======
+  async function openDetail(sessionId) {
+    showScreen('detail');
+    $('detail-container').innerHTML = '<div class="full-loader"><div class="spinner"></div> Chargement du rapprochement…</div>';
+    State.currentSession = null; State.currentScans = {}; State.blScan = null; State.blLignes = [];
 
-  function openNewElisModal() {
-    if (!elisArticles.length) {
-      showToast('Chargement du référentiel...', 'error');
-      loadElisData().then(() => openNewElisModal());
+    // Session
+    const { data: session, error: sErr } = await sb.from('scan_sessions').select('*').eq('id', sessionId).single();
+    if (sErr || !session) {
+      $('detail-container').innerHTML = `<div class="empty"><div class="icon">❌</div><div class="text">Session introuvable</div></div>`;
       return;
     }
-    currentElisType = 'inventaire';
-    applyElisType();
-    document.getElementById('elis-form-date').value = dateStr(new Date());
-    document.getElementById('elis-form-bl').value = '';
-    document.getElementById('elis-form-observation').value = '';
-    renderElisArticlesForm();
-    document.getElementById('modal-elis-new').classList.add('show');
-  }
+    State.currentSession = session;
 
-  function setElisType(type) {
-    currentElisType = type;
-    applyElisType();
-    renderElisArticlesForm();
-  }
-
-  function applyElisType() {
-    document.querySelectorAll('.elis-type-toggle .type-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.elisType === currentElisType)
-    );
-    const isPassage = currentElisType === 'passage';
-    document.getElementById('elis-form-bl-section').classList.toggle('hidden', !isPassage);
-    document.getElementById('modal-elis-new-title').textContent =
-      isPassage ? 'Nouveau passage ELIS' : 'Nouvel inventaire ELIS';
-    document.getElementById('elis-type-help').innerHTML = isPassage
-      ? '<b>Passage</b> : lors de la livraison — <b>Retour</b> (sale remis), <b>Livré</b> (propre reçu) et <b>Stock</b> propre restant après passage.'
-      : '<b>Inventaire</b> : comptage avant passage — <b>Sale</b> (à retourner) et <b>Stock propre</b> restant.';
-  }
-
-  function renderElisArticlesForm() {
-    const isPassage = currentElisType === 'passage';
-    const grouped = {};
-    elisArticles.forEach(a => {
-      if (!grouped[a.service]) grouped[a.service] = [];
-      grouped[a.service].push(a);
+    // Scans (étiquettes + BL) + tracabilité
+    const { data: scans } = await sb.from('scans')
+      .select('id, type_document, statut, storage_path, mime_type, claude_extraction_jsonb, claude_erreur_message, confiance_globale, scan_tracabilite(*)')
+      .eq('session_id', sessionId);
+    (scans || []).forEach(sc => {
+      const trac = Array.isArray(sc.scan_tracabilite) ? sc.scan_tracabilite[0] : sc.scan_tracabilite;
+      State.currentScans[sc.id] = { scan: sc, trac };
+      if (sc.type_document === 'bl_facture') State.blScan = sc;
     });
 
-    let html = '';
-    ELIS_SERVICE_ORDER.forEach(svc => {
-      if (!grouped[svc]?.length) return;
-      const meta = ELIS_SERVICE_META[svc] || { label: svc, help: '' };
-      html += `<div class="elis-section"><h3>${meta.label}</h3>`;
-      if (meta.help) html += `<div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px;">${meta.help}</div>`;
-      grouped[svc].sort((a,b) => (a.ordre||0) - (b.ordre||0)).forEach(a => {
-        const meta2 = [];
-        if (a.stock_theorique)   meta2.push(`stock théo. ${a.stock_theorique}`);
-        if (a.pu_ht_hebdo > 0)   meta2.push(`${Number(a.pu_ht_hebdo).toFixed(3)} €`);
-        if (a.frequence)         meta2.push(a.frequence);
-        html += `<div class="elis-article-row" data-article-id="${a.id}">
-          <div class="elis-article-name">${esc(a.nom)}</div>
-          <div class="elis-article-meta">${meta2.join(' · ')}</div>
-          <div class="elis-article-inputs ${isPassage ? '' : 'two-cols'}">
-            <div class="elis-input-group">
-              <div class="elis-input-label retour">${isPassage ? 'Retour' : 'Sale'}</div>
-              <input type="number" inputmode="numeric" min="0" class="elis-qty-retour" placeholder="0">
-            </div>
-            ${isPassage ? `
-            <div class="elis-input-group">
-              <div class="elis-input-label livre">Livré</div>
-              <input type="number" inputmode="numeric" min="0" class="elis-qty-livre" placeholder="0">
-            </div>` : ''}
-            <div class="elis-input-group">
-              <div class="elis-input-label stock">Stock</div>
-              <input type="number" inputmode="numeric" min="0" class="elis-qty-stock" placeholder="0">
-            </div>
-          </div>
-        </div>`;
-      });
-      html += `</div>`;
-    });
-    const container = document.getElementById('elis-articles-form');
-    container.innerHTML = html || '<div class="empty"><div class="icon">⚠️</div><div class="text">Aucun article référencé pour cet établissement. Exécutez <code>elis-schema.sql</code> dans Supabase.</div></div>';
-  }
-
-  async function submitElisMouvement() {
-    const btn = document.getElementById('btn-elis-submit');
-    const date = document.getElementById('elis-form-date').value;
-    const bl   = document.getElementById('elis-form-bl').value.trim();
-    const obs  = document.getElementById('elis-form-observation').value.trim();
-
-    if (!date) { showToast('Date requise', 'error'); return; }
-
-    const rows = document.querySelectorAll('#elis-articles-form .elis-article-row');
-    const lignes = [];
-    rows.forEach(row => {
-      const id = row.dataset.articleId;
-      const r = row.querySelector('.elis-qty-retour')?.value;
-      const l = row.querySelector('.elis-qty-livre')?.value;
-      const s = row.querySelector('.elis-qty-stock')?.value;
-      const hasAny = (r !== '' && r != null) || (l !== '' && l != null) || (s !== '' && s != null);
-      if (!hasAny) return;
-      lignes.push({
-        article_id: id,
-        qty_retour: (r === '' || r == null) ? null : parseInt(r, 10),
-        qty_livre:  (l === '' || l == null) ? null : parseInt(l, 10),
-        qty_stock:  (s === '' || s == null) ? null : parseInt(s, 10)
-      });
-    });
-
-    if (!lignes.length) {
-      showToast('Saisissez au moins une quantité', 'error');
-      return;
+    // Lignes BL
+    if (session.bl_facture_scan_id) {
+      const { data: lignes } = await sb.from('scan_lignes')
+        .select('*').eq('scan_id', session.bl_facture_scan_id).order('ligne_num');
+      State.blLignes = lignes || [];
     }
 
-    btn.disabled = true;
-    const oldTxt = btn.textContent;
-    btn.textContent = 'Enregistrement...';
-    try {
-      const mv = await DB.insertElisMouvement({
-        type: currentElisType,
-        date,
-        etablissement: currentEtablissement,
-        bon_livraison: (currentElisType === 'passage' && bl) ? bl : null,
-        observation: obs || null,
-        user_id: currentUser.id,
-        user_nom: currentUser.nom,
-        user_initiales: currentUser.initiales
-      });
-      if (!mv) throw new Error('Échec insertion mouvement');
-      await DB.insertElisLignes(lignes.map(l => ({ ...l, mouvement_id: mv.id })));
-      showToast('Mouvement ELIS enregistré !', 'success');
-      closeModal('modal-elis-new');
-      loadElisData();
-    } catch (e) {
-      console.error('Erreur ELIS submit:', e);
-      const msg = e?.message || e?.details || e?.hint || JSON.stringify(e);
-      showToast("Erreur d'enregistrement", 'error');
-      setTimeout(() => alert('Erreur Supabase :\n' + msg), 300);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = oldTxt;
-    }
+    renderDetail();
   }
 
-  function viewElisMouvement(id) {
-    const mv = elisMouvements.find(m => m.id === id);
-    if (!mv) return;
-    const isPassage = mv.type === 'passage';
-    const typeLabel = isPassage ? '🚛 Passage ELIS' : '📋 Inventaire ELIS';
-    document.getElementById('modal-elis-view-title').textContent = typeLabel;
+  function goBackToList() {
+    showScreen('list');
+    State.currentSession = null;
+  }
 
-    const lignes = mv.lignes || [];
-    const byService = {};
-    lignes.forEach(l => {
-      const a = l.article || elisArticles.find(x => x.id === l.article_id) || {};
-      const svc = a.service || 'Autre';
-      if (!byService[svc]) byService[svc] = [];
-      byService[svc].push({ ligne: l, article: a });
-    });
+  function renderDetail() {
+    const s = State.currentSession;
+    const r = s.rapprochement_jsonb;
+    const blExtr = State.blScan?.claude_extraction_jsonb || {};
+    const isValidated = s.statut === 'validee' && s.date_validation;
+    // Détection : un re-rapprochement plus récent que la validation = à re-valider
+    const needsRevalidation = isValidated && s.rapprochement_at && new Date(s.rapprochement_at) > new Date(s.date_validation);
 
     let html = `
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
-        <div>
-          <div style="font-size:.75rem;color:var(--gray-500);">Date</div>
-          <div style="font-weight:600;text-transform:capitalize;">${new Date(mv.date).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+      <div class="session-header">
+        <h2>${escapeHtml(s.fournisseur_nom || 'Session sans fournisseur')}</h2>
+        <div class="session-meta">
+          <span><strong>📅</strong> ${fmtDate(s.date_reception)}</span>
+          <span><strong>🏠</strong> ${s.etablissement === 'liesel' ? 'Liesel' : 'Freddy'}</span>
+          ${blExtr.numero_document ? `<span><strong>📄 N°</strong> ${escapeHtml(blExtr.numero_document)}</span>` : ''}
+          ${blExtr.total_ht ? `<span><strong>HT</strong> ${Number(blExtr.total_ht).toFixed(2)} €</span>` : ''}
+          ${blExtr.total_ttc ? `<span><strong>TTC</strong> ${Number(blExtr.total_ttc).toFixed(2)} €</span>` : ''}
+          <span><strong>👤</strong> ${escapeHtml(s.created_by_nom || '—')}</span>
+          ${isValidated ? `<span><strong>✅ Validée</strong> ${fmtDate(s.date_validation)} par ${escapeHtml(s.validee_par_nom || '—')}${s.observation_validation ? ' — ' + escapeHtml(s.observation_validation) : ''}</span>` : ''}
         </div>
-        ${mv.bon_livraison ? `<div>
-          <div style="font-size:.75rem;color:var(--gray-500);">N° BL</div>
-          <div style="font-weight:600;">${esc(mv.bon_livraison)}</div>
-        </div>` : ''}
+        ${needsRevalidation ? `<div class="resume-box" style="background:var(--amber-bg); border-left-color:var(--amber); margin-top:10px;"><span class="lbl" style="color:var(--amber);">⚠️ Re-rapprochement après validation :</span>le rapprochement IA a été relancé après ta validation. Pense à re-valider en tant qu'admin si tu confirmes les nouveaux résultats.</div>` : ''}
+        <div class="session-actions">
+          <button class="btn btn-outline" onclick="rerunRapprochement()" id="btn-rerun" ${!s.bl_facture_scan_id ? 'disabled' : ''}>
+            🔄 Re-rapprocher avec l'IA
+          </button>
+          ${r ? `<button class="btn btn-success" onclick="openValidate()">${isValidated ? '🔒 Re-valider en tant qu&apos;admin' : '✓ Valider la session'}</button>` : ''}
+        </div>
       </div>
-      <div style="margin-bottom:12px;">
-        <div style="font-size:.75rem;color:var(--gray-500);">Saisi par</div>
-        <div>${esc(mv.user_nom)} ${mv.user_initiales ? `(${esc(mv.user_initiales)})` : ''} · ${formatTime(mv.created_at)}</div>
-      </div>`;
+    `;
 
-    ELIS_SERVICE_ORDER.forEach(svc => {
-      if (!byService[svc]?.length) return;
-      const meta = ELIS_SERVICE_META[svc] || { label: svc };
-      html += `<div class="elis-section"><h3>${meta.label}</h3>
-        <table class="elis-view-table"><thead><tr>
-          <th>Article</th>
-          <th class="num">${isPassage ? 'Retour' : 'Sale'}</th>
-          ${isPassage ? '<th class="num">Livré</th>' : ''}
-          <th class="num">Stock</th>
-        </tr></thead><tbody>`;
-      byService[svc].sort((a,b) => (a.article.ordre||0) - (b.article.ordre||0)).forEach(({ligne, article}) => {
-        html += `<tr>
-          <td><div class="art-name">${esc(article.nom || '–')}</div>
-              ${article.stock_theorique ? `<div class="art-meta">théo. ${article.stock_theorique}</div>` : ''}</td>
-          <td class="num">${ligne.qty_retour ?? '–'}</td>
-          ${isPassage ? `<td class="num">${ligne.qty_livre ?? '–'}</td>` : ''}
-          <td class="num">${ligne.qty_stock ?? '–'}</td>
-        </tr>`;
-      });
-      html += `</tbody></table></div>`;
-    });
-
-    if (mv.observation) {
-      html += `<div class="form-section" style="margin-top:14px;">
-        <label class="form-label">Observation</label>
-        <div style="font-size:.85rem;color:var(--gray-700);">${esc(mv.observation)}</div>
-      </div>`;
+    if (!s.bl_facture_scan_id) {
+      html += `<div class="empty"><div class="icon">📄</div><div class="text">Aucune facture/BL n'est rattachée à cette session.<br>Le rapprochement n'est pas possible.</div></div>`;
+      $('detail-container').innerHTML = html;
+      return;
     }
 
-    document.getElementById('modal-elis-view-body').innerHTML = html;
-    document.getElementById('modal-elis-view-footer').innerHTML = '';
-    document.getElementById('modal-elis-view').classList.add('show');
+    if (!r) {
+      html += `<div class="empty"><div class="icon">🤖</div><div class="text">Cette session n'a pas encore été rapprochée.<br>Clique sur "Re-rapprocher avec l'IA" pour lancer l'analyse.</div></div>`;
+      $('detail-container').innerHTML = html;
+      return;
+    }
+
+    // Résumé IA
+    if (r.resume_humain) {
+      html += `<div class="resume-box"><span class="lbl">🤖 Résumé IA :</span>${escapeHtml(r.resume_humain)} <span style="color:var(--gray-400); font-size:.78rem;">(confiance ${r.confiance_globale ?? '?'}%)</span></div>`;
+    }
+
+    // Stats rapprochement
+    const t = r.totaux || {};
+    html += `
+      <div class="stats-row">
+        <div class="stat-card"><div class="number">${t.nb_lignes_bl ?? '—'}</div><div class="label">Lignes facture</div></div>
+        <div class="stat-card"><div class="number">${t.nb_etiquettes ?? '—'}</div><div class="label">Étiquettes scannées</div></div>
+        <div class="stat-card green"><div class="number">${t.nb_matchs_complets ?? 0}</div><div class="label">Matchs complets</div></div>
+        <div class="stat-card amber"><div class="number">${t.nb_anomalies_warn ?? 0}</div><div class="label">Alertes</div></div>
+        <div class="stat-card red"><div class="number">${t.nb_anomalies_critical ?? 0}</div><div class="label">Critiques</div></div>
+      </div>
+    `;
+
+    // Matchs lignes BL
+    const matchs = r.matchs || [];
+    html += `<div class="section-title">📋 Rapprochement lignes facture <span class="count">${matchs.length}</span></div>`;
+    matchs.forEach(m => {
+      const sc = m.statut_match || 'orphelin';
+      const ecartCls = sc === 'ok' ? 'ok' : (sc === 'ecart_mineur' ? 'mineur' : 'significatif');
+      const ecartTxt = m.ecart_qte != null ? `${m.ecart_qte > 0 ? '+' : ''}${parseFloat(m.ecart_qte).toFixed(3)} ${m.unite_bl || 'kg'} (${fmtPct(m.ecart_pct)})` : '—';
+      const etiquettes = (m.etiquette_ids || []).map(eid => renderEtiquetteRow(eid)).join('');
+      html += `
+        <div class="match-card s-${sc.replace('ecart_','')}">
+          <div class="match-head">
+            <div class="match-bl-info">
+              <div class="desc">${escapeHtml(m.designation_bl || '—')}</div>
+              <div class="num">Ligne ${m.ligne_bl_num ?? '?'}</div>
+            </div>
+            <div class="match-numbers">
+              <div class="qty-bl">Facturé : <strong>${m.qte_bl ?? '?'} ${m.unite_bl || ''}</strong></div>
+              <div class="qty-et">Reçu : <strong>${m.qte_etiquettes_total != null ? parseFloat(m.qte_etiquettes_total).toFixed(3) + ' ' + (m.unite_bl || 'kg') : '—'}</strong></div>
+              <div class="ecart ${ecartCls}">${ecartTxt}</div>
+            </div>
+          </div>
+          ${etiquettes ? `<div class="etiquettes-list">${etiquettes}</div>` : ''}
+        </div>
+      `;
+    });
+
+    // Étiquettes orphelines (déduites des anomalies)
+    const orphelinIds = new Set();
+    (r.anomalies || []).forEach(a => {
+      if (a.type === 'etiquette_orpheline' && a.etiquette_id) orphelinIds.add(a.etiquette_id);
+    });
+    if (orphelinIds.size > 0) {
+      html += `<div class="section-title">🚫 Étiquettes orphelines <span class="count">${orphelinIds.size}</span></div>`;
+      html += '<div class="match-card s-orphelin"><div class="etiquettes-list" style="border:none; margin:0; padding:0;">';
+      orphelinIds.forEach(eid => { html += renderEtiquetteRow(eid); });
+      html += '</div></div>';
+    }
+
+    // Anomalies
+    const anomalies = r.anomalies || [];
+    if (anomalies.length > 0) {
+      html += `<div class="section-title">⚠️ Anomalies détaillées <span class="count">${anomalies.length}</span></div>`;
+      anomalies.forEach(a => {
+        html += `
+          <div class="anomalie-card sev-${a.severite || 'info'}">
+            <span class="type">${(a.severite || 'info').toUpperCase()} · ${escapeHtml(a.type || '')}</span>
+            <div class="desc">${escapeHtml(a.description || '')}</div>
+          </div>
+        `;
+      });
+    }
+
+    $('detail-container').innerHTML = html;
   }
 
-  // ====== IMAGE VIEWER ======
-  function showViewer() {
-    if (!viewerPages.length) return;
-    document.getElementById('viewer-img').src = viewerPages[viewerIndex];
-    document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
-    document.getElementById('viewer').classList.add('show');
-  }
-  function closeViewer() { document.getElementById('viewer').classList.remove('show'); }
-  function viewerNav(delta) {
-    viewerIndex = (viewerIndex + delta + viewerPages.length) % viewerPages.length;
-    document.getElementById('viewer-img').src = viewerPages[viewerIndex];
-    document.getElementById('viewer-info').textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
-  }
-
-  // ====== MODALS ======
-  function closeModal(id) {
-    document.getElementById(id).classList.remove('show');
-    if (id === 'modal-view') docPagesCache = {};
-  }
-  document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('show'))
-      e.target.classList.remove('show');
-  });
-
-  // ====== OVERLAY ======
-  function showOcrOverlay(show, status, progress) {
-    const overlay = document.getElementById('ocr-overlay');
-    overlay.style.display = show ? 'flex' : 'none';
-    if (status) document.getElementById('ocr-status').textContent = status;
-    if (progress !== undefined) document.getElementById('ocr-progress').style.width = progress + '%';
+  function renderEtiquetteRow(scanId) {
+    const item = State.currentScans[scanId];
+    if (!item) return `<div class="etiquette-row"><div class="etiq-info" style="color:var(--red);">⚠️ Étiquette ${scanId} introuvable</div></div>`;
+    const { scan, trac } = item;
+    const nom = trac?.produit || '<em style="color:var(--red);">(non extrait)</em>';
+    const meta = [
+      trac?.lot ? `Lot ${escapeHtml(trac.lot)}` : null,
+      trac?.dlc ? `DLC ${fmtDate(trac.dlc)}` : null,
+      trac?.fabricant ? escapeHtml(trac.fabricant) : null,
+      scan.statut === 'erreur' ? '🔴 Erreur DB' : null,
+    ].filter(Boolean).join(' · ');
+    const poids = trac?.poids_net_kg ? fmtKg(trac.poids_net_kg) : '<span style="color:var(--red);">poids ?</span>';
+    return `
+      <div class="etiquette-row">
+        <div class="etiq-thumb" onclick="viewPhoto('${scan.id}')" title="Voir la photo">📷</div>
+        <div class="etiq-info">
+          <div class="nom">${nom}</div>
+          <div class="meta">${meta || '<em style="color:var(--gray-400);">aucune métadonnée</em>'}</div>
+        </div>
+        <div class="etiq-poids">${poids}</div>
+        <div class="etiq-actions">
+          <button class="btn btn-outline btn-sm" onclick="openEdit('${scan.id}')">✏️ Corriger</button>
+        </div>
+      </div>
+    `;
   }
 
-  // ====== TOAST ======
-  let toastTimeout;
-  function showToast(msg, type = '') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast show' + (type ? ' ' + type : '');
-    clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => t.classList.remove('show'), 2500);
+  // ====== PHOTO VIEWER ======
+  async function viewPhoto(scanId) {
+    const item = State.currentScans[scanId];
+    if (!item || !item.scan.storage_path) { showToast('Pas de photo associée', 'error'); return; }
+    const { data, error } = await sb.storage.from('scans').createSignedUrl(item.scan.storage_path, 600);
+    if (error) { showToast('Erreur signed URL : ' + error.message, 'error'); return; }
+    $('viewer-img').src = data.signedUrl;
+    $('modal-viewer').classList.add('show');
+  }
+  function closeViewer() {
+    $('modal-viewer').classList.remove('show');
+    $('viewer-img').src = '';
   }
 
-  // ====== SHOW APP ======
-  function showApp() {
-    document.getElementById('login-screen').classList.add('hidden');
-    const app = document.getElementById('app-screen');
-    app.classList.remove('hidden');
-    app.style.display = 'flex';
-    document.getElementById('user-badge').textContent = currentUser.initiales || currentUser.nom;
-    const etabName = currentEtablissement === 'freddy' ? 'Freddy' :
-                     currentEtablissement === 'liesel' ? 'Liesel' : currentEtablissement;
-    document.getElementById('etab-badge').textContent = etabName;
-    updateDateDisplay();
-    loadFournisseurs();
-    loadCommandes();
-    loadDocuments();
+  // ====== EDIT ÉTIQUETTE ======
+  async function openEdit(scanId) {
+    const item = State.currentScans[scanId];
+    if (!item) return;
+    State.editingScanId = scanId;
+    State.editingTrac = item.trac || {};
+
+    let imgHtml = '';
+    if (item.scan.storage_path) {
+      const { data, error } = await sb.storage.from('scans').createSignedUrl(item.scan.storage_path, 600);
+      if (!error && data?.signedUrl) {
+        imgHtml = `<img src="${data.signedUrl}" class="modal-img" onclick="viewPhoto('${scanId}')" alt="Étiquette">`;
+      } else {
+        imgHtml = `<div class="img-placeholder">⚠️ Photo introuvable</div>`;
+      }
+    } else {
+      imgHtml = `<div class="img-placeholder">📷 Pas de photo enregistrée</div>`;
+    }
+
+    const t = item.trac || {};
+    const errMsg = item.scan.statut === 'erreur' ? `<div class="resume-box" style="background:var(--red-bg); border-left-color:var(--red);"><span class="lbl">🔴 Erreur DB :</span>${escapeHtml(item.scan.claude_erreur_message || '')}</div>` : '';
+
+    $('modal-edit-body').innerHTML = `
+      ${imgHtml}
+      ${errMsg}
+      <div class="field-row">
+        <label>Produit</label>
+        <input type="text" id="edit-produit" value="${escapeHtml(t.produit || '')}" placeholder="Ex : Escalopes de poulet sous vide">
+      </div>
+      <div class="field-row">
+        <label>Fabricant</label>
+        <input type="text" id="edit-fabricant" value="${escapeHtml(t.fabricant || '')}" placeholder="Ex : Distribution Iller">
+      </div>
+      <div class="field-row">
+        <div class="row">
+          <div>
+            <label>Lot</label>
+            <input type="text" id="edit-lot" value="${escapeHtml(t.lot || '')}" placeholder="Ex : 4180412026">
+          </div>
+          <div>
+            <label>Poids net (kg)</label>
+            <input type="number" step="0.001" id="edit-poids" value="${t.poids_net_kg || ''}" placeholder="2.500">
+          </div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="row">
+          <div>
+            <label>DLC</label>
+            <input type="date" id="edit-dlc" value="${t.dlc || ''}">
+          </div>
+          <div>
+            <label>DDM</label>
+            <input type="date" id="edit-ddm" value="${t.ddm || ''}">
+          </div>
+        </div>
+        <div class="hint">DLC = Date Limite de Consommation (frais) · DDM = Date de Durabilité Minimale (épicerie)</div>
+      </div>
+    `;
+    $('modal-edit').classList.add('show');
+  }
+  function closeEdit() {
+    $('modal-edit').classList.remove('show');
+    State.editingScanId = null;
+  }
+  async function saveEdit() {
+    const scanId = State.editingScanId;
+    if (!scanId) return;
+    const btn = $('btn-save-edit');
+    btn.innerHTML = '<span class="spinner"></span> Enregistrement…'; btn.disabled = true;
+
+    const updates = {
+      produit: $('edit-produit').value.trim() || null,
+      fabricant: $('edit-fabricant').value.trim() || null,
+      lot: $('edit-lot').value.trim() || null,
+      poids_net_kg: $('edit-poids').value ? parseFloat($('edit-poids').value) : null,
+      dlc: $('edit-dlc').value || null,
+      ddm: $('edit-ddm').value || null,
+    };
+
+    // Si pas encore d'enregistrement scan_tracabilite, INSERT, sinon UPDATE
+    const existing = State.editingTrac && State.editingTrac.id;
+    let res;
+    if (existing) {
+      res = await sb.from('scan_tracabilite').update(updates).eq('id', State.editingTrac.id);
+    } else {
+      res = await sb.from('scan_tracabilite').insert({ scan_id: scanId, ...updates, confiance: 100 });
+    }
+
+    btn.innerHTML = 'Enregistrer'; btn.disabled = false;
+    if (res.error) { showToast('Erreur : ' + res.error.message, 'error'); return; }
+
+    // Si le scan était en erreur DB, on remet "valide"
+    if (State.currentScans[scanId].scan.statut === 'erreur') {
+      await sb.from('scans').update({ statut: 'valide', claude_erreur_message: null }).eq('id', scanId);
+    }
+
+    showToast('Étiquette enregistrée. Pense à relancer le rapprochement.', 'success');
+    closeEdit();
+    // Refresh détail
+    openDetail(State.currentSession.id);
+  }
+
+  // ====== RE-RAPPROCHEMENT ======
+  async function rerunRapprochement() {
+    const sessionId = State.currentSession?.id;
+    if (!sessionId) return;
+    const btn = $('btn-rerun');
+    btn.innerHTML = '<span class="spinner"></span> Rapprochement IA en cours… (~10-20s)'; btn.disabled = true;
+    try {
+      const resp = await fetch(RECONCILE_FN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      showToast(`Rapprochement OK · ${data.anomalies_count} anomalie(s) · ${(data.cost_usd * 100).toFixed(2)} cents`, 'success');
+      openDetail(sessionId);
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+      btn.innerHTML = '🔄 Re-rapprocher avec l\'IA'; btn.disabled = false;
+    }
+  }
+
+  // ====== VALIDATION ADMIN ======
+  function openValidate() {
+    $('pin-validate').value = '';
+    $('obs-validate').value = '';
+    $('modal-validate').classList.add('show');
+    setTimeout(() => $('pin-validate').focus(), 100);
+  }
+  function closeValidate() {
+    $('modal-validate').classList.remove('show');
+  }
+  async function confirmValidate() {
+    const pin = $('pin-validate').value.trim();
+    if (!/^\d{6}$/.test(pin)) { showToast('Code admin = 6 chiffres', 'error'); return; }
+    const btn = $('btn-confirm-validate');
+    btn.innerHTML = '<span class="spinner"></span> Vérification…'; btn.disabled = true;
+
+    const { data: users, error } = await sb.from('users')
+      .select('id, nom, role, actif').eq('code', pin).eq('actif', true);
+    if (error) { showToast('Erreur : ' + error.message, 'error'); btn.innerHTML = '✓ Valider'; btn.disabled = false; return; }
+    if (!users || users.length === 0 || users[0].role !== 'admin') {
+      showToast('Code refusé (admin uniquement)', 'error');
+      btn.innerHTML = '✓ Valider'; btn.disabled = false; return;
+    }
+    const adm = users[0];
+
+    const { error: upErr } = await sb.from('scan_sessions').update({
+      statut: 'validee',
+      validee_par_id: adm.id,
+      validee_par_nom: adm.nom,
+      date_validation: new Date().toISOString(),
+      observation_validation: $('obs-validate').value.trim() || null,
+    }).eq('id', State.currentSession.id);
+
+    btn.innerHTML = '✓ Valider'; btn.disabled = false;
+    if (upErr) { showToast('Erreur : ' + upErr.message, 'error'); return; }
+    showToast(`Session validée par ${adm.nom}`, 'success');
+    closeValidate();
+    openDetail(State.currentSession.id);
   }
 
   // ====== INIT ======
-  document.addEventListener('DOMContentLoaded', () => {
-    initSupabase();
-    const session = checkPortalSession();
-    if (session) {
-      currentUser = session.user;
-      currentEtablissement = session.etablissement;
-      showApp();
-    } else if (supabaseClient) {
-      document.getElementById('login-screen').classList.remove('hidden');
-      renderPinDots();
-    }
-  });
-</script>
-</content>
-</invoke>
-<!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
-<style id="taf-header-style">
-.header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
-.header .header-left { display: flex !important; align-items: center !important; gap: 10px !important; flex: 0 1 auto !important; }
-.header .header-left h1, .header .header-left .header-title, .header .title { font-size: 1.2rem !important; color: #f97316 !important; font-weight: 700 !important; margin: 0 !important; }
-.header .header-right { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 0.85rem !important; color: #6b7280 !important; flex-wrap: wrap !important; justify-content: flex-end !important; }
-.header .btn-back, .header .btn-logout { padding: 6px 12px !important; border-radius: 6px !important; border: 1px solid #e5e7eb !important; background: white !important; color: #4b5563 !important; font-size: 0.8rem !important; cursor: pointer !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; }
-.header .btn-back:hover, .header .btn-logout:hover { background: #f3f4f6 !important; }
-.header .btn-logout { border-color: #fecaca !important; color: #dc2626 !important; }
-.header .btn-logout:hover { background: #fef2f2 !important; }
-</style>
-<script id="taf-header-script">
-(function() {
-  // Global logout helpers
-  window.__tafGoBackToPortal = function() { window.location.href = '../'; };
-  window.__tafLogout = function() { try { sessionStorage.clear(); } catch(e){} window.location.href = '../'; };
-  if (typeof window.goBackToPortal !== 'function') window.goBackToPortal = window.__tafGoBackToPortal;
-  if (typeof window.logout !== 'function') window.logout = window.__tafLogout;
-
-  // 2-minute inactivity auto-logout
-  var inactivityTimer = null;
-  var INACTIVITY_MS = 2 * 60 * 1000;
-  function resetInactivity() {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    inactivityTimer = setTimeout(function() {
-      try { sessionStorage.clear(); } catch(e){}
-      window.location.href = '../';
-    }, INACTIVITY_MS);
-  }
-  ['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(function(evt){
-    document.addEventListener(evt, resetInactivity, { passive: true, capture: true });
-  });
-
-  // Patch header on DOM ready: ensure header-right has Portail + Déconnexion
-  function patchHeader() {
-    var header = document.querySelector('.header, header.header, header');
-    if (!header) { resetInactivity(); return; }
-    header.classList.add('header');
-
-    // Ensure header-right exists
-    var right = header.querySelector('.header-right');
-    if (!right) {
-      right = document.createElement('div');
-      right.className = 'header-right';
-      header.appendChild(right);
-    }
-
-    // Add Portail button if missing
-    if (!right.querySelector('.btn-back')) {
-      var btnBack = document.createElement('a');
-      btnBack.className = 'btn-back';
-      btnBack.href = 'javascript:void(0)';
-      btnBack.textContent = '← Portail';
-      btnBack.onclick = window.__tafGoBackToPortal;
-      right.appendChild(btnBack);
-    } else {
-      // Normalise existing back button text
-      var existingBack = right.querySelector('.btn-back');
-      if (existingBack && /retour|accueil|portail/i.test(existingBack.textContent)) {
-        existingBack.textContent = '← Portail';
-      }
-    }
-
-    // Add Déconnexion button if missing
-    if (!right.querySelector('.btn-logout')) {
-      var btnLogout = document.createElement('button');
-      btnLogout.className = 'btn-logout';
-      btnLogout.type = 'button';
-      btnLogout.textContent = 'Déconnexion';
-      btnLogout.onclick = window.__tafLogout;
-      right.appendChild(btnLogout);
-    }
-
-    // Remove duplicate back buttons from header-left
-    var leftBacks = header.querySelectorAll('.header-left .btn-back, .header-left .back-btn, .header > .back-btn');
-    leftBacks.forEach(function(b){ b.remove(); });
-
-    resetInactivity();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', patchHeader);
-  } else {
-    patchHeader();
-  }
-})();
+  reloadSessions();
 </script>
 
 </body>
