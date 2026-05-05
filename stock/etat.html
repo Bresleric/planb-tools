@@ -388,61 +388,71 @@
           etablissement: t.scans?.etablissement || null,
         }));
 
-        // Agréger par article_id
-        const byArticle = {};
-        (data || []).forEach(t => {
-          const a = t.appro_ingredients;
-          const s = t.scans;
-          if (!byArticle[a.id]) {
-            byArticle[a.id] = {
-              article_id: a.id,
-              nom: a.nom,
-              categorie: a.categorie,
-              unite: a.unite,
-              total_kg: 0,
-              nb_scans: 0,
-              dlc_min: null,
-              dlc_max: null,
-              last_scan_at: null,
-              etablissements: new Set(),
-              scans: [],
-            };
-          }
-          const agg = byArticle[a.id];
-          agg.nb_scans += 1;
-          if (t.poids_net_kg) agg.total_kg += Number(t.poids_net_kg);
-          if (t.dlc) {
-            if (!agg.dlc_min || t.dlc < agg.dlc_min) agg.dlc_min = t.dlc;
-            if (!agg.dlc_max || t.dlc > agg.dlc_max) agg.dlc_max = t.dlc;
-          }
-          if (s.created_at && (!agg.last_scan_at || s.created_at > agg.last_scan_at)) agg.last_scan_at = s.created_at;
-          if (s.etablissement) agg.etablissements.add(s.etablissement);
-          agg.scans.push({ ...t, scan: s });
-        });
-        State.articles = Object.values(byArticle);
-
-        // Compter les catégories pour le filtre
-        const cats = [...new Set(State.articles.map(a => a.categorie).filter(Boolean))].sort();
-        renderCategoryChips(cats);
-
-        // Stats globales
-        const totalKg = State.articles.reduce((s, a) => s + a.total_kg, 0);
-        const totalScans = State.articles.reduce((s, a) => s + a.nb_scans, 0);
-        const alertes = State.articles.filter(a => {
-          const d = daysToDlc(a.dlc_min);
-          return d !== null && d <= 7;
-        }).length;
-        $('stat-articles').textContent = State.articles.length;
-        $('stat-scans').textContent = totalScans;
-        $('stat-poids').textContent = totalKg.toFixed(1);
-        $('stat-dlc').textContent = alertes;
-        $('stat-dlc-box').className = 'stat-box' + (alertes > 0 ? ' warn' : '');
-
-        renderList();
+        // Agrégation initiale (le filtre établissement est appliqué au niveau des scans)
+        rebuildArticles();
       } catch (err) {
         console.error(err);
         $('articles-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
       }
+    }
+
+    // Reconstruit State.articles à partir de State.allScans en appliquant le filtre établissement
+    // Doit être appelé après chaque changement de State.filterEtab.
+    function rebuildArticles() {
+      const filteredScans = State.filterEtab === 'all'
+        ? State.allScans
+        : State.allScans.filter(s => s.etablissement === State.filterEtab);
+
+      const byArticle = {};
+      filteredScans.forEach(t => {
+        const a = t.appro_ingredients;
+        const s = t.scans;
+        if (!byArticle[a.id]) {
+          byArticle[a.id] = {
+            article_id: a.id,
+            nom: a.nom,
+            categorie: a.categorie,
+            unite: a.unite,
+            total_kg: 0,
+            nb_scans: 0,
+            dlc_min: null,
+            dlc_max: null,
+            last_scan_at: null,
+            etablissements: new Set(),
+            scans: [],
+          };
+        }
+        const agg = byArticle[a.id];
+        agg.nb_scans += 1;
+        if (t.poids_net_kg) agg.total_kg += Number(t.poids_net_kg);
+        if (t.dlc) {
+          if (!agg.dlc_min || t.dlc < agg.dlc_min) agg.dlc_min = t.dlc;
+          if (!agg.dlc_max || t.dlc > agg.dlc_max) agg.dlc_max = t.dlc;
+        }
+        if (s.created_at && (!agg.last_scan_at || s.created_at > agg.last_scan_at)) agg.last_scan_at = s.created_at;
+        if (s.etablissement) agg.etablissements.add(s.etablissement);
+        agg.scans.push({ ...t, scan: s });
+      });
+      State.articles = Object.values(byArticle);
+
+      // Catégories
+      const cats = [...new Set(State.articles.map(a => a.categorie).filter(Boolean))].sort();
+      renderCategoryChips(cats);
+
+      // Stats globales (sur articles filtrés)
+      const totalKg = State.articles.reduce((s, a) => s + a.total_kg, 0);
+      const totalScans = State.articles.reduce((s, a) => s + a.nb_scans, 0);
+      const alertes = State.articles.filter(a => {
+        const d = daysToDlc(a.dlc_min);
+        return d !== null && d <= 7;
+      }).length;
+      $('stat-articles').textContent = State.articles.length;
+      $('stat-scans').textContent = totalScans;
+      $('stat-poids').textContent = totalKg.toFixed(1);
+      $('stat-dlc').textContent = alertes;
+      $('stat-dlc-box').className = 'stat-box' + (alertes > 0 ? ' warn' : '');
+
+      renderList();
     }
 
     function renderCategoryChips(cats) {
@@ -796,7 +806,7 @@
         document.querySelectorAll('[data-filter-etab]').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         State.filterEtab = chip.dataset.filterEtab;
-        renderList();
+        rebuildArticles();   // Reconstruit l'agrégation avec le nouveau filtre
       });
     });
     document.querySelectorAll('[data-filter-dlc]').forEach(chip => {
