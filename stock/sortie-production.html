@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sortie pour production — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669; --primary-dark: #047857; --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --yellow-100:#fef9c3; --yellow-700:#a16207;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:900px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+
+    /* Production card (sélection) */
+    .prod-card { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; cursor:pointer; }
+    .prod-card:hover { background:var(--gray-50); border-color:var(--gray-300); }
+    .prod-card.has-sorties { background:var(--gray-50); opacity:.7; }
+    .prod-card.has-sorties:hover { opacity:1; background:white; }
+    .prod-card.no-fiche { opacity:.5; }
+    .pc-info { flex:1; min-width:0; }
+    .pc-nom { font-size:15px; font-weight:600; color:var(--gray-900); }
+    .pc-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .pc-status { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+    .status-badge { padding:2px 8px; font-size:11px; font-weight:600; border-radius:999px; white-space:nowrap; }
+    .status-no-sortie { background:var(--orange-100); color:var(--orange-700); }
+    .status-has-sortie { background:var(--green-100); color:var(--green-700); }
+    .status-partial { background:var(--yellow-100); color:var(--yellow-700); }
+    .status-no-fiche { background:var(--gray-100); color:var(--gray-500); }
+
+    /* Détail prod sélectionnée */
+    .selected-prod { padding:14px; background:var(--primary-light); border:1px solid var(--primary); border-radius:var(--radius-sm); margin-bottom:14px; }
+    .sp-title { font-size:16px; font-weight:700; color:var(--gray-900); }
+    .sp-meta { font-size:12px; color:var(--primary-dark); margin-top:4px; }
+
+    /* Matière (1 par ingrédient) */
+    .matiere-block { padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:8px; }
+    .mb-header { display:flex; justify-content:space-between; gap:8px; margin-bottom:8px; }
+    .mb-info .mb-nom { font-size:14px; font-weight:600; color:var(--gray-900); }
+    .mb-info .mb-art { font-size:11px; color:var(--gray-500); }
+    .mb-theo { text-align:right; }
+    .mb-theo-lbl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; }
+    .mb-theo-val { font-size:15px; font-weight:700; }
+    .lot-line { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:13px; }
+    .lot-line input[type=checkbox] { width:18px; height:18px; cursor:pointer; }
+    .lot-line .ll-info { flex:1; min-width:0; }
+    .lot-line .ll-qty { width:80px; padding:5px 8px; text-align:right; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-size:13px; font-family:inherit; }
+    .lot-line .ll-unit { font-size:11px; color:var(--gray-500); width:30px; }
+    .dlc-pill { display:inline-block; padding:2px 6px; font-size:10px; border-radius:999px; font-weight:600; margin-left:4px; }
+    .dlc-vert { background:var(--green-100); color:var(--green-700); }
+    .dlc-jaune { background:var(--yellow-100); color:var(--yellow-700); }
+    .dlc-orange { background:var(--orange-100); color:var(--orange-700); }
+    .dlc-rouge { background:var(--red-100); color:var(--red-700); }
+    .dlc-gris { background:var(--gray-100); color:var(--gray-500); }
+
+    .btn { display:flex; align-items:center; justify-content:center; gap:8px; padding:14px; font-size:15px; font-weight:600; border-radius:var(--radius); cursor:pointer; border:none; font-family:inherit; width:100%; min-height:48px; }
+    .btn:active:not([disabled]) { transform:scale(.98); }
+    .btn[disabled] { opacity:.5; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+
+    .summary-box { padding:12px 14px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:24px 16px; color:var(--gray-500); font-size:13px; }
+    .field { margin-bottom:12px; }
+    .field label { display:block; font-size:11px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+    .field textarea { width:100%; padding:9px 11px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; resize:vertical; min-height:50px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Sortie pour production (rattrapage)</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- ÉTAPE 1 : Choix de la production -->
+    <div class="card" id="card-list">
+      <div class="card-title">1. Choisir une production récente</div>
+      <div style="font-size:13px; color:var(--gray-600); margin-bottom:10px;">
+        Productions des 14 derniers jours pour ton établissement. Les sorties déjà enregistrées sont marquées en vert pour éviter les doubles comptages.
+      </div>
+      <div class="filters">
+        <span class="filter-chip active" data-filter="without">Sans sortie</span>
+        <span class="filter-chip" data-filter="all">Toutes</span>
+        <span class="filter-chip" data-filter="with">Avec sortie</span>
+      </div>
+      <div id="prods-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 2 : Sélection des matières -->
+    <div class="card" id="card-matieres" style="display:none;">
+      <div class="selected-prod" id="selected-prod"></div>
+      <div class="card-title" style="margin-top:0;">2. Sélectionner les lots à sortir (FEFO)</div>
+      <div style="font-size:12px; color:var(--gray-500); margin-bottom:10px;">
+        Quantités calculées selon le ratio quantité produite / rendement de la fiche. Modifiables.
+      </div>
+      <div id="matieres-list"></div>
+      <div class="field" style="margin-top:14px;">
+        <label>Observation (optionnelle)</label>
+        <textarea id="observation" placeholder="Ex: Rattrapage sortie Baekeoffe service du 03/05 oublié hier soir"></textarea>
+      </div>
+      <button class="btn btn-primary" id="btn-validate" disabled>✓ Enregistrer les sorties</button>
+      <button class="btn btn-ghost" id="btn-back" style="margin-top:8px;">← Choisir une autre production</button>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    const State = {
+      prods: [],
+      filter: 'without',
+      selectedProd: null,
+      ficheData: null,
+      ingredients: [],
+      lotsByArticle: {},
+      selections: {}, // ingredient_id → { lot_id: qty }
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') { const t = $('toast'); t.textContent = msg; t.className = 'toast visible'+(kind?' '+kind:''); setTimeout(() => t.className = 'toast', 3500); }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+    function fmtDateOnly(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
+    function daysToDlc(dlc) { if (!dlc) return null; const td = new Date(); td.setHours(0,0,0,0); const d = new Date(dlc); d.setHours(0,0,0,0); return Math.round((d-td)/(1000*60*60*24)); }
+    function dlcCls(d) { if (d == null) return 'dlc-gris'; if (d < 0 || d <= 2) return 'dlc-rouge'; if (d <= 7) return 'dlc-orange'; if (d <= 14) return 'dlc-jaune'; return 'dlc-vert'; }
+    function dlcLbl(d) { if (d == null) return 'DLC ?'; if (d < 0) return `Dépassée ${-d}j`; if (d === 0) return "Auj."; if (d === 1) return 'Demain'; return `${d}j`; }
+
+    // ==== CHARGEMENT ====
+    async function loadProductions() {
+      try {
+        // Productions des 14 derniers jours pour l'établissement
+        const since = new Date(Date.now() - 14*24*60*60*1000).toISOString();
+        const { data: prods, error } = await sb.from('productions')
+          .select('id, nom_produit, categorie, quantite_produite, unite, date_production, fiche_id, statut, producteur_nom')
+          .eq('etablissement', currentEtab)
+          .gte('date_production', since)
+          .order('date_production', { ascending: false });
+        if (error) throw error;
+
+        // Sorties déjà enregistrées par production_id (source_table='production')
+        const prodIds = (prods || []).map(p => p.id);
+        const { data: movs } = await sb.from('stock_mouvements')
+          .select('source_id, quantite')
+          .eq('source_table', 'production')
+          .eq('type', 'SORTIE')
+          .in('source_id', prodIds);
+        const sortiesByProd = {};
+        (movs || []).forEach(m => {
+          if (!sortiesByProd[m.source_id]) sortiesByProd[m.source_id] = { count: 0, total_qty: 0 };
+          sortiesByProd[m.source_id].count++;
+          sortiesByProd[m.source_id].total_qty += Number(m.quantite || 0);
+        });
+
+        State.prods = (prods || []).map(p => ({
+          ...p,
+          sorties_count: sortiesByProd[p.id]?.count || 0,
+          sorties_qty: sortiesByProd[p.id]?.total_qty || 0,
+        }));
+        renderList();
+      } catch (err) {
+        console.error(err);
+        $('prods-list').innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      }
+    }
+
+    function renderList() {
+      const filtered = State.prods.filter(p => {
+        if (State.filter === 'without') return p.sorties_count === 0;
+        if (State.filter === 'with') return p.sorties_count > 0;
+        return true;
+      });
+      const c = $('prods-list');
+      if (!filtered.length) {
+        c.innerHTML = '<div class="empty-state">Aucune production ne correspond.</div>';
+        return;
+      }
+      c.innerHTML = '';
+      filtered.forEach(p => {
+        const card = document.createElement('div');
+        const hasFiche = !!p.fiche_id;
+        const hasSorties = p.sorties_count > 0;
+        card.className = 'prod-card' + (hasSorties ? ' has-sorties' : '') + (!hasFiche ? ' no-fiche' : '');
+        let badge = '';
+        if (!hasFiche) badge = '<span class="status-badge status-no-fiche">Sans fiche</span>';
+        else if (hasSorties) badge = `<span class="status-badge status-has-sortie">✓ ${p.sorties_count} sortie${p.sorties_count>1?'s':''}</span>`;
+        else badge = '<span class="status-badge status-no-sortie">⚠ Aucune sortie</span>';
+        card.innerHTML = `
+          <div class="pc-info">
+            <div class="pc-nom">${escapeHtml(p.nom_produit)}</div>
+            <div class="pc-meta">
+              ${escapeHtml(p.producteur_nom || '?')} ·
+              ${fmtDate(p.date_production)} ·
+              ${p.quantite_produite} ${escapeHtml(p.unite || '')}
+            </div>
+          </div>
+          <div class="pc-status">${badge}</div>
+        `;
+        if (hasFiche) {
+          card.addEventListener('click', () => selectProduction(p));
+        } else {
+          card.title = 'Cette production n\'a pas de fiche technique liée — impossible de proposer les ingrédients automatiquement.';
+        }
+        c.appendChild(card);
+      });
+    }
+
+    document.querySelectorAll('[data-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filter = chip.dataset.filter;
+        renderList();
+      });
+    });
+
+    // ==== SÉLECTION D'UNE PRODUCTION ====
+    async function selectProduction(prod) {
+      State.selectedProd = prod;
+      State.selections = {};
+      State.ingredients = [];
+      State.lotsByArticle = {};
+      // Confirmation si déjà des sorties
+      if (prod.sorties_count > 0) {
+        if (!confirm(`Cette production a déjà ${prod.sorties_count} sortie${prod.sorties_count>1?'s':''} enregistrée${prod.sorties_count>1?'s':''}. Continuer ajoutera des sorties supplémentaires (risque de double comptage). Confirmer ?`)) return;
+      }
+      try {
+        // Charger la fiche technique
+        const { data: fiche, error: fe } = await sb.from('fiches_techniques')
+          .select('id, nom, rendement_quantite, rendement_unite')
+          .eq('id', prod.fiche_id)
+          .single();
+        if (fe) throw fe;
+        State.ficheData = fiche;
+
+        // Charger les ingrédients de la fiche avec article_id
+        const { data: ings, error: ie } = await sb.from('fiche_ingredients')
+          .select('id, nom, quantite, unite, article_id, ordre')
+          .eq('fiche_id', prod.fiche_id)
+          .not('article_id', 'is', null)
+          .order('ordre');
+        if (ie) throw ie;
+        if (!ings || !ings.length) {
+          showToast('Aucun ingrédient rattaché dans la fiche', 'error');
+          return;
+        }
+
+        // Charger les lots disponibles via stock_par_lot
+        const articleIds = [...new Set(ings.map(i => i.article_id))];
+        const { data: lots, error: le } = await sb.from('stock_par_lot')
+          .select('scan_tracabilite_id, article_id, article_nom, lot, dlc, quantite_restante, fabricant')
+          .in('article_id', articleIds)
+          .eq('etablissement', currentEtab)
+          .gt('quantite_restante', 0)
+          .order('dlc', { ascending: true, nullsFirst: false });
+        if (le) throw le;
+        State.lotsByArticle = {};
+        (lots || []).forEach(l => {
+          if (!State.lotsByArticle[l.article_id]) State.lotsByArticle[l.article_id] = [];
+          State.lotsByArticle[l.article_id].push(l);
+        });
+
+        // Construire ingredients enrichis
+        const ratio = (prod.quantite_produite > 0 && fiche.rendement_quantite > 0)
+          ? prod.quantite_produite / fiche.rendement_quantite
+          : 1;
+        State.ingredients = ings.map(i => ({
+          ...i,
+          qty_theorique: (Number(i.quantite) || 0) * ratio,
+          lots: State.lotsByArticle[i.article_id] || [],
+          article_nom: (State.lotsByArticle[i.article_id] || [])[0]?.article_nom || '?',
+        }));
+
+        // Pré-remplir FEFO
+        State.ingredients.forEach(ing => {
+          State.selections[ing.id] = {};
+          let restant = ing.qty_theorique;
+          for (const lot of ing.lots) {
+            if (restant <= 0) break;
+            const dispo = Number(lot.quantite_restante);
+            const prendre = Math.min(restant, dispo);
+            State.selections[ing.id][lot.scan_tracabilite_id] = Number(prendre.toFixed(3));
+            restant -= prendre;
+          }
+          if (restant > 0.001 && ing.lots.length > 0) {
+            const first = ing.lots[0];
+            State.selections[ing.id][first.scan_tracabilite_id] = Number(((State.selections[ing.id][first.scan_tracabilite_id] || 0) + restant).toFixed(3));
+          }
+          ing.qty_manque = restant > 0.001 ? restant : 0;
+        });
+
+        // Render
+        $('selected-prod').innerHTML = `
+          <div class="sp-title">${escapeHtml(prod.nom_produit)}</div>
+          <div class="sp-meta">
+            Produit le ${fmtDate(prod.date_production)} par ${escapeHtml(prod.producteur_nom || '?')}<br>
+            Quantité : <strong>${prod.quantite_produite} ${escapeHtml(prod.unite || '')}</strong>
+            · Fiche : ${escapeHtml(fiche.nom)} (rendement ${fiche.rendement_quantite || '?'} ${escapeHtml(fiche.rendement_unite || '')})
+            · Ratio : <strong>×${ratio.toFixed(2)}</strong>
+          </div>
+        `;
+        $('observation').value = `Rattrapage : Production "${prod.nom_produit}" du ${fmtDateOnly(prod.date_production)} (étiquette éditée, sorties non enregistrées au moment)`;
+        renderMatieres();
+        $('card-list').style.display = 'none';
+        $('card-matieres').style.display = '';
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    function renderMatieres() {
+      const c = $('matieres-list');
+      c.innerHTML = '';
+      State.ingredients.forEach(ing => {
+        const block = document.createElement('div');
+        block.className = 'matiere-block';
+        let lotsHtml = '';
+        if (!ing.lots.length) {
+          lotsHtml = `<div style="font-size:12px; color:var(--red-700); padding:4px 0;">⚠ Aucun lot dispo en stock — l'enregistrement créera un dépassement (stock négatif).</div>`;
+        } else {
+          ing.lots.forEach(l => {
+            const days = daysToDlc(l.dlc);
+            const isSel = (State.selections[ing.id]?.[l.scan_tracabilite_id] || 0) > 0;
+            const qtyVal = State.selections[ing.id]?.[l.scan_tracabilite_id] || '';
+            lotsHtml += `
+              <div class="lot-line" style="${isSel ? '' : 'opacity:.7;'}">
+                <input type="checkbox" data-ing="${ing.id}" data-lot="${l.scan_tracabilite_id}" ${isSel ? 'checked' : ''}>
+                <div class="ll-info">
+                  Lot <strong>${escapeHtml(l.lot || '?')}</strong>
+                  <span class="dlc-pill ${dlcCls(days)}">${dlcLbl(days)}</span>
+                  <span style="color:var(--gray-500);">· ${Number(l.quantite_restante).toFixed(2)} restant</span>
+                </div>
+                <input type="number" step="0.001" min="0" data-ing-qty="${ing.id}" data-lot="${l.scan_tracabilite_id}" value="${qtyVal}" placeholder="0" class="ll-qty">
+                <span class="ll-unit">${escapeHtml(ing.unite || 'kg')}</span>
+              </div>
+            `;
+          });
+        }
+        block.innerHTML = `
+          <div class="mb-header">
+            <div class="mb-info">
+              <div class="mb-nom">${escapeHtml(ing.nom)}</div>
+              <div class="mb-art">→ ${escapeHtml(ing.article_nom)}</div>
+            </div>
+            <div class="mb-theo">
+              <div class="mb-theo-lbl">Théorique</div>
+              <div class="mb-theo-val">${ing.qty_theorique.toFixed(2)} ${escapeHtml(ing.unite || '')}</div>
+              ${ing.qty_manque > 0 ? `<div style="font-size:10px; color:var(--red-700);">⚠ Manque ${ing.qty_manque.toFixed(2)}</div>` : ''}
+            </div>
+          </div>
+          ${lotsHtml}
+        `;
+        // Wire
+        block.querySelectorAll('input[type=checkbox]').forEach(cb => {
+          cb.addEventListener('change', () => {
+            const ingId = cb.dataset.ing;
+            const lotId = cb.dataset.lot;
+            const lot = State.ingredients.find(x => x.id === ingId).lots.find(l => l.scan_tracabilite_id === lotId);
+            if (cb.checked) {
+              if (!State.selections[ingId]) State.selections[ingId] = {};
+              State.selections[ingId][lotId] = Number(lot.quantite_restante);
+            } else {
+              delete State.selections[ingId][lotId];
+            }
+            updateValidationButton();
+            renderMatieres();
+          });
+        });
+        block.querySelectorAll('input[type=number]').forEach(input => {
+          input.addEventListener('input', () => {
+            const ingId = input.dataset.ingQty;
+            const lotId = input.dataset.lot;
+            const v = parseFloat(input.value);
+            if (!State.selections[ingId]) State.selections[ingId] = {};
+            if (isNaN(v) || v <= 0) delete State.selections[ingId][lotId];
+            else State.selections[ingId][lotId] = v;
+            updateValidationButton();
+          });
+        });
+        c.appendChild(block);
+      });
+      updateValidationButton();
+    }
+
+    function updateValidationButton() {
+      const total = Object.values(State.selections).reduce((sum, sel) => sum + Object.values(sel).reduce((s, v) => s + (parseFloat(v) || 0), 0), 0);
+      $('btn-validate').disabled = total <= 0;
+    }
+
+    // ==== VALIDATION ====
+    $('btn-validate').addEventListener('click', async () => {
+      if (!State.selectedProd) return;
+      const obs = $('observation').value.trim() || null;
+      $('btn-validate').disabled = true;
+      try {
+        const rows = [];
+        State.ingredients.forEach(ing => {
+          const sel = State.selections[ing.id] || {};
+          Object.entries(sel).forEach(([lotId, qty]) => {
+            const q = parseFloat(qty);
+            if (!q || q <= 0) return;
+            rows.push({
+              type: 'SORTIE',
+              article_id: ing.article_id,
+              scan_tracabilite_id: lotId,
+              quantite: q,
+              unite: ing.unite || 'kg',
+              etablissement: currentEtab,
+              motif: obs || `Production : ${State.selectedProd.nom_produit}`,
+              source_table: 'production',
+              source_id: State.selectedProd.id,
+              created_by_id: currentUser.id,
+              created_by_nom: currentUser.nom,
+              created_by_initiales: currentUser.initiales || null,
+            });
+          });
+        });
+        if (!rows.length) { showToast('Aucune sortie à enregistrer', 'error'); $('btn-validate').disabled = false; return; }
+        const { error } = await sb.from('stock_mouvements').insert(rows);
+        if (error) throw error;
+        showToast(`✓ ${rows.length} sortie${rows.length>1?'s':''} enregistrée${rows.length>1?'s':''} pour cette production`, 'success');
+        // Reset et recharger la liste
+        State.selectedProd = null;
+        State.ingredients = [];
+        State.selections = {};
+        $('card-matieres').style.display = 'none';
+        $('card-list').style.display = '';
+        await loadProductions();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+        $('btn-validate').disabled = false;
+      }
+    });
+
+    $('btn-back').addEventListener('click', () => {
+      $('card-matieres').style.display = 'none';
+      $('card-list').style.display = '';
+      State.selectedProd = null;
+    });
+
+    // INIT
+    loadProductions();
+  </script>
+</body>
+</html>
