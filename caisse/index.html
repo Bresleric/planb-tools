@@ -191,19 +191,46 @@
         }
         .comptage-actions .btn:active { background: var(--orange-dark); }
 
-        /* Historique */
-        .history-card {
-            background: white; border-radius: 12px; padding: 16px;
-            margin-bottom: 10px; box-shadow: var(--shadow);
+        /* Historique - Tableau */
+        .history-table-wrap {
+            background: white; border-radius: 12px; box-shadow: var(--shadow);
+            overflow: auto; -webkit-overflow-scrolling: touch;
+            max-height: calc(100vh - 320px);
         }
-        .history-card .date { font-weight: 700; font-size: 15px; color: var(--gray-800); }
-        .history-card .meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
-        .history-card .stats {
-            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px;
+        .history-table {
+            border-collapse: separate; border-spacing: 0;
+            font-size: 12px; white-space: nowrap;
         }
-        .history-card .stat-item { text-align: center; }
-        .history-card .stat-label { font-size: 11px; color: var(--gray-500); }
-        .history-card .stat-value { font-size: 15px; font-weight: 800; margin-top: 2px; }
+        .history-table th, .history-table td {
+            padding: 8px 10px; border-bottom: 1px solid var(--gray-100);
+            text-align: right;
+        }
+        .history-table thead th {
+            background: var(--gray-50); color: var(--gray-600);
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.3px; position: sticky; top: 0; z-index: 2;
+            border-bottom: 2px solid var(--gray-200);
+        }
+        .history-table th.group-head {
+            background: var(--orange-light); color: var(--orange-dark);
+            text-align: center; border-bottom: 1px solid var(--orange);
+        }
+        .history-table tbody tr:hover { background: var(--gray-50); cursor: pointer; }
+        .history-table .col-date {
+            position: sticky; left: 0; background: white; z-index: 1;
+            text-align: left; font-weight: 700; color: var(--gray-800);
+            border-right: 1px solid var(--gray-200); min-width: 110px;
+        }
+        .history-table thead .col-date {
+            background: var(--gray-50); z-index: 3;
+        }
+        .history-table tbody tr:hover .col-date { background: var(--gray-50); }
+        .history-table .num { font-variant-numeric: tabular-nums; }
+        .history-table .calc { background: var(--gray-50); font-weight: 700; }
+        .history-table .ecart-ok { color: var(--green); font-weight: 700; }
+        .history-table .ecart-err { color: var(--red); font-weight: 700; }
+        .history-table .zero { color: var(--gray-300); }
+        .history-table .meta-cell { font-size: 11px; color: var(--gray-500); text-align: left; }
 
         /* Dashboard KPIs */
         .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -942,35 +969,117 @@ async function loadHistory() {
         </div>
     `;
 
-    // History list
+    // History table
     let histHtml = '';
     if (records.length === 0) {
         histHtml = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Aucune saisie ce mois-ci</div>';
     } else {
+        // Map date -> comptage for cashDebut lookup
+        const comptageByDate = {};
+        records.forEach(r => { comptageByDate[r.date] = n(r.comptage_caisse); });
+
+        // Build column groups
+        const allFields = [
+            ...fields.ca.map(f => ({ ...f, group: 'CA' })),
+            ...fields.paiements.map(f => ({ ...f, group: 'Paiements CB' })),
+            ...fields.autres.map(f => ({ ...f, group: 'Autres' })),
+            ...fields.mouvements.map(f => ({ ...f, group: 'Mouvements' })),
+        ];
+
+        // Group headers (colspan)
+        const groups = [];
+        allFields.forEach(f => {
+            const last = groups[groups.length - 1];
+            if (last && last.name === f.group) last.span++;
+            else groups.push({ name: f.group, span: 1 });
+        });
+
+        // Build header rows
+        let groupRow = '<tr><th class="col-date" rowspan="2">Date</th>';
+        groups.forEach(g => {
+            groupRow += `<th class="group-head" colspan="${g.span}">${g.name}</th>`;
+            if (g.name === 'Paiements CB') groupRow += `<th class="group-head" rowspan="2">Total CB</th>`;
+            if (g.name === 'Autres') groupRow += `<th class="group-head" rowspan="2">Contrôle CA</th>`;
+        });
+        groupRow += `<th class="group-head" colspan="3">Clôture</th>`;
+        groupRow += `<th class="group-head" rowspan="2">Saisi par</th>`;
+        groupRow += `</tr>`;
+
+        let fieldRow = '<tr>';
+        allFields.forEach(f => {
+            fieldRow += `<th>${f.label}</th>`;
+            // Insert calc column header after Paiements group last field
+            // (handled via group header rowspan above — leave space)
+        });
+        // Re-build properly: we need calc columns interleaved with headers
+        // Simpler approach: rebuild header rows from scratch
+        groupRow = '<tr><th class="col-date" rowspan="2">Date</th>';
+        fieldRow = '<tr>';
+        groups.forEach(g => {
+            groupRow += `<th class="group-head" colspan="${g.span}">${g.name}</th>`;
+            allFields.filter(f => f.group === g.name).forEach(f => {
+                fieldRow += `<th>${f.label}</th>`;
+            });
+            if (g.name === 'Paiements CB') {
+                groupRow += `<th class="group-head" rowspan="2">Total CB</th>`;
+            }
+            if (g.name === 'Autres') {
+                groupRow += `<th class="group-head" rowspan="2">Contrôle CA</th>`;
+            }
+        });
+        groupRow += `<th class="group-head" colspan="3">Clôture</th>`;
+        fieldRow += `<th>Comptage</th><th>Caisse théo.</th><th>Écart</th>`;
+        groupRow += `<th class="group-head" rowspan="2">Saisi par</th></tr>`;
+        fieldRow += `</tr>`;
+
+        // Body rows
+        let bodyHtml = '';
         records.forEach(r => {
             const d = new Date(r.date + 'T12:00:00');
-            const ecart = n(r.comptage_caisse) - fields.calcCaisseTheorique(r, 0);
-            const ecartClass = Math.abs(ecart) < 0.01 ? 'color:var(--green)' : 'color:var(--red)';
-            histHtml += `
-                <div class="history-card" onclick="goToDate('${r.date}')">
-                    <div class="date">${formatDate(d)}</div>
-                    <div class="meta">Saisi par ${r.saisi_par_nom || '—'}</div>
-                    <div class="stats">
-                        <div class="stat-item">
-                            <div class="stat-label">CA</div>
-                            <div class="stat-value">${n(r.ca).toFixed(0)} €</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Comptage</div>
-                            <div class="stat-value">${n(r.comptage_caisse).toFixed(2)} €</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Écart</div>
-                            <div class="stat-value" style="${ecartClass}">${ecart.toFixed(2)} €</div>
-                        </div>
-                    </div>
-                </div>`;
+            // Find previous day's comptage as cashDebut
+            const prev = new Date(d); prev.setDate(prev.getDate() - 1);
+            const prevISO = dateToISO(prev);
+            const cashDebut = comptageByDate[prevISO] || 0;
+
+            const totalCB = fields.calcTotalCB(r);
+            const controleCA = fields.calcControleCA(r);
+            const caisseTheo = fields.calcCaisseTheorique(r, cashDebut);
+            const ecart = fields.calcEcart(r, cashDebut);
+
+            const fmt = (v) => {
+                const num = n(v);
+                if (Math.abs(num) < 0.005) return '<span class="zero">—</span>';
+                return num.toFixed(2);
+            };
+
+            const dateLabel = d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' });
+
+            bodyHtml += `<tr onclick="goToDate('${r.date}')">`;
+            bodyHtml += `<td class="col-date">${dateLabel}</td>`;
+            groups.forEach(g => {
+                allFields.filter(f => f.group === g.name).forEach(f => {
+                    bodyHtml += `<td class="num">${fmt(r[f.key])}</td>`;
+                });
+                if (g.name === 'Paiements CB') {
+                    bodyHtml += `<td class="num calc">${totalCB.toFixed(2)}</td>`;
+                }
+                if (g.name === 'Autres') {
+                    const cls = Math.abs(controleCA) < 0.01 ? 'ecart-ok' : 'ecart-err';
+                    bodyHtml += `<td class="num calc ${cls}">${controleCA.toFixed(2)}</td>`;
+                }
+            });
+            bodyHtml += `<td class="num">${fmt(r.comptage_caisse)}</td>`;
+            bodyHtml += `<td class="num calc">${caisseTheo.toFixed(2)}</td>`;
+            const ecartCls = Math.abs(ecart) < 0.01 ? 'ecart-ok' : 'ecart-err';
+            bodyHtml += `<td class="num calc ${ecartCls}">${ecart.toFixed(2)}</td>`;
+            bodyHtml += `<td class="meta-cell">${r.saisi_par_nom || '—'}</td>`;
+            bodyHtml += `</tr>`;
         });
+
+        histHtml = `<div class="history-table-wrap"><table class="history-table">
+            <thead>${groupRow}${fieldRow}</thead>
+            <tbody>${bodyHtml}</tbody>
+        </table></div>`;
     }
     document.getElementById('history-list').innerHTML = histHtml;
 }
