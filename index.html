@@ -983,6 +983,14 @@
                 url: './howto/index.html?v=1'
             },
             {
+                id: 'information',
+                name: 'Information',
+                icon: '📰',
+                description: 'Journal d\'entreprise',
+                minRole: 'collaborateur',
+                url: './information/index.html?v=1'
+            },
+            {
                 id: 'admin',
                 name: 'Administration',
                 icon: '⚙️',
@@ -1266,6 +1274,17 @@
                     setBadge('briefings', nonLus);
                 }
             } catch (e) { console.warn('Badge Briefings error:', e); }
+
+            try {
+                // 5. Information : infos publiees ciblant le user et non lues
+                const { data: cnt, error: errInfo } = await supabaseClient.rpc('info_count_non_lues', {
+                    p_user_id: currentUser.id,
+                    p_etablissement: currentEstablishment,
+                    p_equipe: currentUser.equipe || null
+                });
+                if (errInfo) throw errInfo;
+                setBadge('information', cnt || 0);
+            } catch (e) { console.warn('Badge Information error:', e); }
         }
 
         function handleModuleClick(module) {
