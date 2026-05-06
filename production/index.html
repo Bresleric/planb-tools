@@ -3357,9 +3357,11 @@ function printEtiquette(productionId) {
     padding: 0; position: relative; overflow: hidden;
   }
   body.format-large-rotated .rotated-wrap {
+    /* Page papier 62×100 mais zone imprimable iOS ~90mm (marges AirPrint
+       ~5mm haut/bas non débrayables depuis Safari). Wrapper centré à 90×62. */
     position: absolute;
-    top: 100mm; left: 0;
-    width: 100mm; height: 62mm;
+    top: 95mm; left: 0;
+    width: 90mm; height: 62mm;
     transform: rotate(-90deg);
     transform-origin: top left;
     padding: 3mm 4mm;
@@ -3428,7 +3430,7 @@ function printEtiquette(productionId) {
       </div>
     </div>
     <div class="screen-actions">
-      <button id="btnPrintPdf" class="screen-btn print" onclick="window.print()">🖨 Imprimer l'étiquette</button>
+      <button id="btnPrintPdf" class="screen-btn print" onclick="genererEtImprimerPdf()">🖨 Imprimer l'étiquette</button>
       <button class="screen-btn back" onclick="history.back()">← Retour</button>
     </div>
   </div>
@@ -3448,67 +3450,99 @@ function printEtiquette(productionId) {
     }
 
     function genererPdfBlob(d) {
+      // Format paysage 89×62mm pour DK-22251 (rouleau continu 62mm, longueur de coupe 89mm).
+      // Destiné à être imprimé via Brother iPrint&Label (Partager → iPrint&Label).
       var jsPDF = window.jspdf.jsPDF;
-      var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [29, 62] });
-      var W = 62, PAD_X = 1.5, PAD_Y = 1;
-      var innerW = W - 2 * PAD_X;
-      var badgeW = 12, badgeH = 4.5, badgeY = PAD_Y;
-      var badgeTextY = badgeY + badgeH / 2 + 1;
+      var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [62, 89] });
+      var W = 89, H = 62, PAD = 3;
+
+      // Layout vertical (jsPDF top-down, y croissant vers le bas)
+      var ROW1_TOP = PAD;       // 3
+      var SEP1_Y   = 22;        // row1 occupe y=3..22
+      var ROW2_TOP = SEP1_Y;
+      var SEP2_Y   = 40;        // row2 occupe y=22..40
+      var ROW3_TOP = SEP2_Y;
+      var ROW3_BOT = H - PAD;   // 59
+
+      // === ROW 1 : badge MERCREDI + produit + LI ===
+      var badgeW = 30, badgeH = 11;
+      var badgeX = PAD;
+      var badgeY = ROW1_TOP + ((SEP1_Y - ROW1_TOP) - badgeH) / 2;
 
       if (d.dayClass === 'day-red') {
-        doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.3);
-        doc.roundedRect(PAD_X, badgeY, badgeW, badgeH, 0.4, 0.4, 'S');
+        doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.5);
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'S');
         doc.setTextColor(221, 0, 0);
       } else {
         doc.setFillColor(0, 0, 0);
-        doc.roundedRect(PAD_X, badgeY, badgeW, badgeH, 0.4, 0.4, 'F');
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
         doc.setTextColor(255, 255, 255);
       }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-      doc.text(d.dayName, PAD_X + badgeW / 2, badgeTextY, { align: 'center' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2, { align: 'center' });
 
+      // Étab à droite
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 1.8, { align: 'right' });
       var etabW = doc.getTextWidth(d.etabShort);
-      doc.text(d.etabShort, W - PAD_X, badgeTextY, { align: 'right' });
 
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+      // Produit (entre badge et étab, tronqué si trop long)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
       var productText = d.produit;
-      var productX = PAD_X + badgeW + 1;
-      var productMaxW = innerW - badgeW - 1 - etabW - 1;
+      var productX = badgeX + badgeW + 2;
+      var productMaxW = (W - PAD - etabW - 2) - productX;
       while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) {
         productText = productText.slice(0, -1);
       }
-      doc.text(productText, productX, badgeTextY);
+      doc.text(productText, productX, badgeY + badgeH / 2 + 2.5);
 
-      doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0);
-      var sepY = badgeY + badgeH + 1;
-      doc.line(PAD_X, sepY, W - PAD_X, sepY);
+      // Trait sous row1
+      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
+      doc.line(PAD, SEP1_Y, W - PAD, SEP1_Y);
 
-      var row2Y = sepY + 3.3;
-      doc.setFont('courier', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
-      doc.text('Lot:' + d.lotNum, PAD_X, row2Y);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-      doc.text('' + d.qte + d.unite, PAD_X + 24, row2Y);
-      doc.setFontSize(6.5);
-      doc.text(d.producteur, W - PAD_X, row2Y, { align: 'right' });
+      // === ROW 2 : Lot + qté + producteur ===
+      var row2BaseY = ROW2_TOP + (SEP2_Y - ROW2_TOP) / 2 + 2;
 
-      var row3Y = row2Y + 4;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0, 0, 0);
-      doc.text('P:' + d.prodDateStr, PAD_X, row3Y);
+      doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      var lotText = 'Lot:' + d.lotNum;
+      doc.text(lotText, PAD, row2BaseY);
+      var lotW = doc.getTextWidth(lotText);
 
-      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.text('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text(d.producteur, W - PAD, row2BaseY, { align: 'right' });
+
+      // Trait sous row2
+      doc.setLineWidth(0.5);
+      doc.line(PAD, SEP2_Y, W - PAD, SEP2_Y);
+
+      // === ROW 3 : P-date + DLC en gros (rouge) ===
+      var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 3;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      doc.text('P:' + d.prodDateStr, PAD, row3BaseY);
+
+      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
       var dlcW = doc.getTextWidth(d.dlcStr);
-      var dlcX = W - PAD_X - dlcW;
-      doc.text(d.dlcStr, dlcX, row3Y);
-      doc.setFontSize(5);
-      var lblW = doc.getTextWidth('DLC ');
-      doc.text('DLC ', dlcX - lblW, row3Y);
+      var dlcX = W - PAD - dlcW;
+      doc.text(d.dlcStr, dlcX, row3BaseY);
+
+      // Label "DLC" en petit, à gauche de la date
+      doc.setFontSize(8);
+      var dlcLabelW = doc.getTextWidth('DLC');
+      doc.text('DLC', dlcX - dlcLabelW - 1, row3BaseY - 2);
 
       return doc.output('blob');
     }
 
     async function genererEtImprimerPdf() {
+      // Génère un PDF 89×62mm et l'ouvre dans Safari pour que l'utilisateur
+      // puisse faire Partager → Brother iPrint&Label → Imprimer (4-5 taps).
+      // On NE passe PAS par window.print() ni iframe.print() car AirPrint
+      // ajoute des marges et un bandeau "Page 1 sur 1 / date" non débrayables.
       var btn = document.getElementById('btnPrintPdf');
       btn.disabled = true;
       btn.textContent = '⏳ Génération PDF...';
@@ -3516,45 +3550,9 @@ function printEtiquette(productionId) {
         await loadJsPDF();
         var blob = genererPdfBlob(pdfData);
         var url = URL.createObjectURL(blob);
-
-        // Iframe invisible qui charge le PDF puis déclenche window.print() automatiquement.
-        // Workflow utilisateur : 1 tap (bouton) puis dialog AirPrint apparaît directement.
-        var oldFrame = document.getElementById('pdfPrintFrame');
-        if (oldFrame) oldFrame.remove();
-        var iframe = document.createElement('iframe');
-        iframe.id = 'pdfPrintFrame';
-        iframe.style.cssText = 'position:fixed;bottom:-1px;right:-1px;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
-
-        var printTriggered = false;
-        function fallback() {
-          if (printTriggered) return;
-          printTriggered = true;
-          // Si l'auto-print iframe a échoué, on tombe sur le viewer plein écran.
-          window.location.href = url;
-        }
-
-        iframe.onload = function () {
-          if (printTriggered) return;
-          // Petit délai pour laisser le PDF se rendre dans l'iframe avant l'appel print()
-          setTimeout(function () {
-            try {
-              iframe.contentWindow.focus();
-              iframe.contentWindow.print();
-              printTriggered = true;
-              btn.disabled = false;
-              btn.textContent = '🖨 Imprimer l\\'étiquette';
-            } catch (err) {
-              fallback();
-            }
-          }, 250);
-        };
-
-        iframe.src = url;
-        document.body.appendChild(iframe);
-
-        // Garde-fou : si onload ne déclenche pas dans 4s (PDF lent à charger ou bloqué),
-        // on bascule sur l'affichage plein écran pour que l'utilisateur ne reste pas coincé.
-        setTimeout(fallback, 4000);
+        // Ouvre le PDF dans la vue Safari courante. La barre d'outils Safari
+        // permet ensuite Partager → Brother iPrint&Label.
+        window.location.href = url;
       } catch (e) {
         btn.disabled = false;
         btn.textContent = '🖨 Imprimer l\\'étiquette';
