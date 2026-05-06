@@ -1,0 +1,431 @@
+<!--
+  PlanB-Pilote — Récap productions par collaborateur
+  ====================================================
+  Fichier autonome à intégrer dans le repo PlanB-Pilote.
+  Nécessite : sessionStorage 'planb_user' + 'planb_etablissement' (même schéma que PlanB-Tools)
+  À adapter selon la structure de routing/auth de PlanB-Pilote.
+
+  Date création : 2026-05-06
+  Source données : tables productions + tasks + lots_production de Supabase PlanB
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productions par collaborateur — PlanB Pilote</title>
+  <style>
+    :root {
+      --purple:#8b5cf6; --purple-light:#f5f3ff; --purple-dark:#7c3aed;
+      --green:#22c55e; --green-bg:#f0fdf4; --green-dark:#16a34a;
+      --red:#ef4444; --red-bg:#fef2f2; --red-dark:#dc2626;
+      --blue:#3b82f6; --blue-bg:#eff6ff;
+      --amber:#f59e0b; --amber-bg:#fffbeb;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937;
+      --shadow:0 1px 3px rgba(0,0,0,.08);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:var(--gray-50); color:var(--gray-800); padding:0; min-height:100vh;
+    }
+    .header {
+      background:white; border-bottom:2px solid var(--purple); padding:12px 24px;
+      display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:100;
+    }
+    .header h1 { font-size:1.2rem; color:var(--purple); }
+    .header-right { font-size:.85rem; color:var(--gray-500); }
+
+    .filters {
+      background:white; padding:12px 24px; border-bottom:1px solid var(--gray-200);
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    }
+    .filters label { font-size:.78rem; font-weight:600; color:var(--gray-600); }
+    .filters input, .filters select {
+      padding:6px 10px; border:1px solid var(--gray-200); border-radius:6px;
+      font-size:.85rem; background:white;
+    }
+    .chip {
+      padding:6px 13px; border-radius:18px; border:1px solid var(--gray-200);
+      background:white; font-size:.8rem; color:var(--gray-600); cursor:pointer;
+    }
+    .chip.active { background:var(--purple); color:white; border-color:var(--purple); }
+    .btn-action {
+      padding:7px 14px; border:none; background:var(--purple); color:white;
+      border-radius:6px; font-size:.85rem; font-weight:600; cursor:pointer;
+    }
+    .btn-action:hover { background:var(--purple-dark); }
+
+    .content { padding:20px 24px; max-width:1400px; margin:0 auto; }
+
+    .stats-row {
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+      gap:10px; margin-bottom:18px;
+    }
+    .stat-card {
+      background:white; border-radius:10px; padding:14px; text-align:center;
+      box-shadow:var(--shadow); border:1px solid var(--gray-200);
+    }
+    .stat-card .num { font-size:1.7rem; font-weight:700; color:var(--purple); }
+    .stat-card .lbl { font-size:.72rem; color:var(--gray-500); margin-top:2px; text-transform:uppercase; letter-spacing:.03em; }
+    .stat-card.green .num { color:var(--green-dark); }
+    .stat-card.amber .num { color:var(--amber); }
+    .stat-card.blue .num { color:var(--blue); }
+    .stat-card.red .num { color:var(--red-dark); }
+
+    .chart-wrap {
+      background:white; border-radius:12px; padding:18px;
+      box-shadow:var(--shadow); border:1px solid var(--gray-200); margin-bottom:18px;
+    }
+    .chart-wrap h3 {
+      font-size:.95rem; color:var(--gray-700); margin-bottom:12px;
+      display:flex; align-items:center; gap:6px;
+    }
+    .bar-row {
+      display:flex; align-items:center; gap:10px; margin-bottom:7px;
+    }
+    .bar-label {
+      width:180px; font-size:.85rem; color:var(--gray-700); font-weight:500;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .bar-track {
+      flex:1; height:24px; background:var(--gray-100); border-radius:5px;
+      overflow:hidden; position:relative;
+    }
+    .bar-fill {
+      height:100%; background:linear-gradient(90deg, var(--purple), var(--purple-dark));
+      border-radius:5px; transition:width .4s ease;
+      display:flex; align-items:center; padding-left:10px; color:white; font-weight:600;
+      font-size:.8rem; white-space:nowrap;
+    }
+    .bar-pct { font-size:.78rem; color:var(--gray-500); width:50px; text-align:right; }
+
+    table {
+      width:100%; border-collapse:collapse; background:white;
+      border-radius:12px; overflow:hidden; box-shadow:var(--shadow);
+      border:1px solid var(--gray-200);
+    }
+    th, td { padding:10px 14px; text-align:left; border-bottom:1px solid var(--gray-100); font-size:.88rem; }
+    th { background:var(--gray-50); font-weight:600; color:var(--gray-600); font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover { background:var(--purple-light); }
+    .num-cell { text-align:right; font-variant-numeric:tabular-nums; }
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:10px;
+      font-size:.7rem; font-weight:600;
+    }
+    .badge-freddy { background:var(--blue-bg); color:var(--blue); }
+    .badge-liesel { background:var(--amber-bg); color:var(--amber); }
+    .avatar {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:30px; height:30px; border-radius:50%; background:var(--purple-light);
+      color:var(--purple-dark); font-weight:700; font-size:.78rem; margin-right:8px;
+    }
+
+    .top5-cell { display:flex; flex-direction:column; gap:2px; min-width:200px; }
+    .top5-item {
+      display:flex; justify-content:space-between; gap:8px;
+      font-size:.78rem; color:var(--gray-700);
+    }
+    .top5-item .nb { font-weight:600; color:var(--purple-dark); }
+
+    .empty { text-align:center; padding:60px 20px; color:var(--gray-400); font-size:.95rem; }
+
+    .section-title {
+      font-size:1rem; font-weight:600; color:var(--gray-700);
+      margin:16px 0 10px; display:flex; align-items:center; gap:8px;
+    }
+
+    .info-box {
+      background:var(--amber-bg); border-left:4px solid var(--amber);
+      padding:10px 14px; border-radius:6px; font-size:.85rem; color:#78350f;
+      margin-top:14px;
+    }
+
+    @media (max-width:740px) {
+      .filters { padding:10px 14px; }
+      .content { padding:14px; }
+      .col-hide-mobile { display:none; }
+      .bar-label { width:120px; font-size:.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <h1>👥 Productions par collaborateur</h1>
+  <div class="header-right" id="header-user">—</div>
+</header>
+
+<div class="filters">
+  <label>Du</label>
+  <input type="date" id="d-from">
+  <label>au</label>
+  <input type="date" id="d-to">
+  <span style="width:1px; height:20px; background:var(--gray-200); margin:0 4px;"></span>
+  <label>Établissement :</label>
+  <button class="chip active" data-etab="all" onclick="setEtab('all')">Les 2</button>
+  <button class="chip" data-etab="freddy" onclick="setEtab('freddy')">Freddy</button>
+  <button class="chip" data-etab="liesel" onclick="setEtab('liesel')">Liesel</button>
+  <span style="width:1px; height:20px; background:var(--gray-200); margin:0 4px;"></span>
+  <label>Trier par :</label>
+  <select id="sort-by" onchange="renderAll()">
+    <option value="nb_prods">Nb productions</option>
+    <option value="kg">Poids total (kg)</option>
+    <option value="litres">Volume total (L)</option>
+    <option value="nb_fiches">Variété (fiches diff.)</option>
+    <option value="duree_moy">Temps moyen TAF</option>
+  </select>
+  <button class="btn-action" onclick="reload()" style="margin-left:auto;">🔄 Actualiser</button>
+</div>
+
+<div class="content">
+  <div id="stats-row" class="stats-row"></div>
+  <div id="chart-section"></div>
+  <div class="section-title">📊 Détail par collaborateur</div>
+  <div id="table-wrap"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+  // ====== CONFIG (mêmes valeurs que PlanB-Tools) ======
+  const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const State = {
+    etab: 'all',
+    sortBy: 'nb_prods',
+    list: [],
+    dFrom: null, dTo: null,
+  };
+
+  // Auth (réutilise sessionStorage si présent)
+  try {
+    const u = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+    if (u && u.role === 'admin') {
+      document.getElementById('header-user').textContent = `${u.initiales || u.nom} (admin)`;
+    } else if (u) {
+      document.getElementById('header-user').textContent = `${u.initiales || u.nom} — accès lecture`;
+    } else {
+      document.getElementById('header-user').textContent = '⚠️ Non connecté';
+    }
+  } catch (e) { document.getElementById('header-user').textContent = '—'; }
+
+  // Init dates : 30 derniers jours
+  (function initDates() {
+    const today = new Date();
+    const past = new Date(today.getTime() - 30 * 86400000);
+    document.getElementById('d-to').value = today.toISOString().slice(0, 10);
+    document.getElementById('d-from').value = past.toISOString().slice(0, 10);
+    document.getElementById('d-from').addEventListener('change', reload);
+    document.getElementById('d-to').addEventListener('change', reload);
+  })();
+
+  function setEtab(e) {
+    State.etab = e;
+    document.querySelectorAll('.chip[data-etab]').forEach(c => c.classList.toggle('active', c.dataset.etab === e));
+    reload();
+  }
+
+  function fmtSec(sec) {
+    if (!sec) return '—';
+    const m = Math.floor(sec / 60);
+    if (m < 60) return m + ' min';
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    return h + 'h' + (r < 10 ? '0' + r : r);
+  }
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+
+  async function reload() {
+    State.dFrom = document.getElementById('d-from').value;
+    State.dTo = document.getElementById('d-to').value;
+    if (!State.dFrom || !State.dTo) return;
+    document.getElementById('table-wrap').innerHTML = '<div class="empty">⏳ Chargement…</div>';
+
+    let q = sb.from('productions').select(`
+      id, producteur_id, producteur_nom, producteur_initiales, etablissement,
+      nom_produit, fiche_id, quantite_produite, unite, tache_id, date_production, statut
+    `)
+      .gte('date_production', State.dFrom + 'T00:00:00')
+      .lte('date_production', State.dTo + 'T23:59:59')
+      .in('statut', ['termine', 'etiquete', 'consomme']);
+    if (State.etab !== 'all') q = q.eq('etablissement', State.etab);
+
+    const { data: prods, error } = await q;
+    if (error) { document.getElementById('table-wrap').innerHTML = `<div class="empty" style="color:var(--red-dark);">❌ ${escapeHtml(error.message)}</div>`; return; }
+    if (!prods || prods.length === 0) {
+      document.getElementById('table-wrap').innerHTML = '<div class="empty">📭 Aucune production sur cette période / établissement</div>';
+      document.getElementById('stats-row').innerHTML = '';
+      document.getElementById('chart-section').innerHTML = '';
+      return;
+    }
+
+    // Charger durées TAF
+    const tacheIds = prods.map(p => p.tache_id).filter(Boolean);
+    let dureeMap = {};
+    if (tacheIds.length > 0) {
+      const { data: tasks } = await sb.from('tasks')
+        .select('id, duree_accumulee_secondes')
+        .in('id', tacheIds);
+      (tasks || []).forEach(t => { if (t.duree_accumulee_secondes) dureeMap[t.id] = t.duree_accumulee_secondes; });
+    }
+
+    // Agrégation
+    const byPerson = {};
+    prods.forEach(p => {
+      if (!p.producteur_id) return;
+      const key = State.etab === 'all' ? `${p.producteur_id}__${p.etablissement}` : p.producteur_id;
+      if (!byPerson[key]) {
+        byPerson[key] = {
+          id: p.producteur_id, nom: p.producteur_nom, initiales: p.producteur_initiales,
+          etablissement: p.etablissement,
+          nb_prods: 0, kg: 0, litres: 0, pieces: 0, fiches: {}, durees: [],
+        };
+      }
+      const ag = byPerson[key];
+      ag.nb_prods++;
+      const u = (p.unite || '').toLowerCase();
+      const qty = parseFloat(p.quantite_produite) || 0;
+      if (u === 'kg') ag.kg += qty;
+      else if (u === 'g') ag.kg += qty / 1000;
+      else if (u === 'l' || u === 'litre') ag.litres += qty;
+      else if (u === 'cl') ag.litres += qty / 100;
+      else if (u === 'ml') ag.litres += qty / 1000;
+      else if (u === 'pièce' || u === 'piece') ag.pieces += qty;
+      const fk = p.nom_produit || '(sans nom)';
+      ag.fiches[fk] = (ag.fiches[fk] || 0) + 1;
+      if (p.tache_id && dureeMap[p.tache_id]) ag.durees.push(dureeMap[p.tache_id]);
+    });
+    State.list = Object.values(byPerson).map(p => ({
+      ...p,
+      nb_fiches: Object.keys(p.fiches).length,
+      duree_moy: p.durees.length > 0 ? p.durees.reduce((a, b) => a + b, 0) / p.durees.length : null,
+    }));
+    renderAll();
+  }
+
+  function renderAll() {
+    State.sortBy = document.getElementById('sort-by').value;
+    const list = [...State.list].sort((a, b) => {
+      if (State.sortBy === 'duree_moy') {
+        if (a.duree_moy == null && b.duree_moy == null) return 0;
+        if (a.duree_moy == null) return 1;
+        if (b.duree_moy == null) return -1;
+        return a.duree_moy - b.duree_moy;
+      }
+      return (b[State.sortBy] || 0) - (a[State.sortBy] || 0);
+    });
+    renderStats(list);
+    renderChart(list);
+    renderTable(list);
+  }
+
+  function renderStats(list) {
+    const tot = list.reduce((acc, p) => {
+      acc.prods += p.nb_prods; acc.kg += p.kg; acc.litres += p.litres;
+      acc.durees += p.durees.length;
+      return acc;
+    }, { prods: 0, kg: 0, litres: 0, durees: 0 });
+    const nbDays = Math.max(1, Math.round((new Date(State.dTo) - new Date(State.dFrom)) / 86400000) + 1);
+    const html = `
+      <div class="stat-card"><div class="num">${list.length}</div><div class="lbl">Collaborateurs actifs</div></div>
+      <div class="stat-card green"><div class="num">${tot.prods}</div><div class="lbl">Productions</div></div>
+      <div class="stat-card blue"><div class="num">${tot.kg.toFixed(0)} kg</div><div class="lbl">Poids total</div></div>
+      <div class="stat-card amber"><div class="num">${tot.litres.toFixed(0)} L</div><div class="lbl">Volume total</div></div>
+      <div class="stat-card"><div class="num">${(tot.prods / nbDays).toFixed(1)}</div><div class="lbl">Prods / jour</div></div>
+      <div class="stat-card red"><div class="num">${tot.durees}</div><div class="lbl">Avec chrono TAF</div></div>
+    `;
+    document.getElementById('stats-row').innerHTML = html;
+  }
+
+  function renderChart(list) {
+    const sortMetric = State.sortBy;
+    const labels = {
+      nb_prods: 'Nombre de productions', kg: 'Poids produit (kg)', litres: 'Volume produit (L)',
+      nb_fiches: 'Variété de fiches techniques', duree_moy: 'Temps moyen par production'
+    };
+    const max = Math.max(...list.map(p => sortMetric === 'duree_moy' ? (p.duree_moy || 0) : (p[sortMetric] || 0)), 1);
+    const bars = list.slice(0, 12).map(p => {
+      const v = sortMetric === 'duree_moy' ? (p.duree_moy || 0) : (p[sortMetric] || 0);
+      const pct = (v / max) * 100;
+      const display = sortMetric === 'duree_moy' ? fmtSec(v) :
+                      sortMetric === 'kg' ? v.toFixed(1) + ' kg' :
+                      sortMetric === 'litres' ? v.toFixed(1) + ' L' :
+                      v;
+      return `
+        <div class="bar-row">
+          <div class="bar-label">${escapeHtml(p.nom)} ${State.etab === 'all' ? '<span style="color:var(--gray-400); font-size:.72rem;">(' + (p.etablissement === 'liesel' ? 'L' : 'F') + ')</span>' : ''}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;">${display}</div></div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('chart-section').innerHTML = `
+      <div class="chart-wrap">
+        <h3>📈 ${labels[sortMetric]} (top 12)</h3>
+        ${bars}
+      </div>
+    `;
+  }
+
+  function renderTable(list) {
+    if (list.length === 0) {
+      document.getElementById('table-wrap').innerHTML = '<div class="empty">📭 Aucun résultat</div>';
+      return;
+    }
+    const totDurees = list.reduce((s, p) => s + p.durees.length, 0);
+
+    const rows = list.map(p => {
+      const top5 = Object.entries(p.fiches).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const top5Html = top5.map(([n, c]) => `<div class="top5-item"><span>${escapeHtml(n)}</span><span class="nb">×${c}</span></div>`).join('');
+      const initials = p.initiales || (p.nom || '?').split(' ').map(x => x[0] || '').join('').slice(0, 2).toUpperCase();
+      return `
+        <tr>
+          <td><span class="avatar">${escapeHtml(initials)}</span>${escapeHtml(p.nom || '—')}</td>
+          <td><span class="badge badge-${p.etablissement}">${p.etablissement === 'liesel' ? 'Liesel' : 'Freddy'}</span></td>
+          <td class="num-cell"><strong>${p.nb_prods}</strong></td>
+          <td class="num-cell">${p.nb_fiches}</td>
+          <td class="num-cell col-hide-mobile">${p.kg.toFixed(1)}</td>
+          <td class="num-cell col-hide-mobile">${p.litres.toFixed(1)}</td>
+          <td class="num-cell">${p.duree_moy != null ? fmtSec(p.duree_moy) + ` <span style="color:var(--gray-400); font-size:.7rem;">(${p.durees.length})</span>` : '<span style="color:var(--gray-400);">—</span>'}</td>
+          <td><div class="top5-cell">${top5Html}</div></td>
+        </tr>
+      `;
+    }).join('');
+
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Collaborateur</th>
+            <th>Resto</th>
+            <th class="num-cell">Prod.</th>
+            <th class="num-cell">Fiches diff.</th>
+            <th class="num-cell col-hide-mobile">Poids (kg)</th>
+            <th class="num-cell col-hide-mobile">Volume (L)</th>
+            <th class="num-cell">Tps moyen</th>
+            <th>Top 5 fiches</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+    if (totDurees === 0) {
+      html += `<div class="info-box">⏱️ <strong>Pas encore de chrono TAF :</strong> les temps moyens se rempliront au fur et à mesure que les équipes utiliseront le bouton Démarrer/Pause sur leurs tâches de production. Le module chrono a été ajouté le 04/05/2026.</div>`;
+    }
+    document.getElementById('table-wrap').innerHTML = html;
+  }
+
+  // INIT
+  reload();
+</script>
+
+</body>
+</html>
