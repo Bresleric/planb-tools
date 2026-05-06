@@ -3212,11 +3212,12 @@ function printEtiquette(productionId) {
   // Format d'étiquette par établissement.
   // Adapter ici quand on change physiquement de rouleau dans l'imprimante :
   //   - DK-11209 (pré-découpé 62×29mm) → 'compact'
-  //   - DK-22251 (continu 62mm noir/rouge) → 'large' (62×60mm pour exploiter le format
-  //     imposé par iOS AirPrint en l'absence de configuration "Cut Length" sur l'imprimante)
+  //   - DK-22251 (continu 62mm) avec contenu pivoté pour exploiter la longueur
+  //     imposée par iOS AirPrint (~100mm sur iPad) → 'large-rotated' (page 62×90mm,
+  //     contenu rendu sur 90×62mm tourné de -90°).
   const LABEL_FORMATS = {
-    freddy: { height: 60, mode: 'large' },   // DK-22251 actuellement
-    liesel: { height: 29, mode: 'compact' }, // DK-11209 actuellement
+    freddy: { height: 90, mode: 'large-rotated' }, // DK-22251 actuellement
+    liesel: { height: 29, mode: 'compact' },        // DK-11209 actuellement
   };
   const labelFormat = LABEL_FORMATS[currentEtablissement] || LABEL_FORMATS.liesel;
   const pageH = labelFormat.height;
@@ -3347,44 +3348,68 @@ function printEtiquette(productionId) {
   }
   .dlc small { font-size: 5pt; font-weight: 700; }
 
-  /* === Overrides GRAND FORMAT (Freddy DK-22251) ===
-     Active uniquement quand body.format-large. Polices ~2x, layout réorganisé en colonne. */
-  body.format-large .label {
-    padding: 2mm; display: flex; flex-direction: column; gap: 1.2mm;
+  /* === Overrides GRAND FORMAT PIVOTÉ (Freddy DK-22251) ===
+     Page imprimée 62×90mm (vertical). Le contenu est dans un wrapper de 90×62mm
+     pivoté de -90° pour s'inscrire dans la page : on lit l'étiquette dans le sens
+     de la longueur (= sens du défilement du rouleau). Polices très grosses pour
+     exploiter au maximum la surface. */
+  body.format-large-rotated .label {
+    padding: 0; position: relative; overflow: hidden;
   }
-  body.format-large .row1 {
-    gap: 2mm; padding-bottom: 1.5mm; margin-bottom: 1mm;
-    border-bottom: 0.4mm solid #000;
+  body.format-large-rotated .rotated-wrap {
+    position: absolute;
+    top: 90mm; left: 0;
+    width: 90mm; height: 62mm;
+    transform: rotate(-90deg);
+    transform-origin: top left;
+    padding: 3mm 4mm;
+    display: flex; flex-direction: column; gap: 2.5mm;
+    box-sizing: border-box;
   }
-  body.format-large .day {
-    font-size: 13pt; padding: 1mm 2mm; letter-spacing: 0.3px;
+  body.format-large-rotated .row1 {
+    gap: 3mm; padding-bottom: 2mm; margin-bottom: 0;
+    border-bottom: 0.5mm solid #000;
+    width: 100%; max-width: 100%;
   }
-  body.format-large .day-red { border-width: 0.5mm; border-radius: 1mm; }
-  body.format-large .day-black { border-radius: 1mm; }
-  body.format-large .product {
-    font-size: 16pt; line-height: 1.05;
+  body.format-large-rotated .day {
+    font-size: 16pt; padding: 1.5mm 3mm; letter-spacing: 0.4px;
   }
-  body.format-large .etab { font-size: 11pt; }
-  body.format-large .row2 {
-    font-size: 10pt; gap: 2.5mm; margin-bottom: 1mm;
+  body.format-large-rotated .day-red { border-width: 0.5mm; border-radius: 1mm; }
+  body.format-large-rotated .day-black { border-radius: 1mm; }
+  body.format-large-rotated .product {
+    font-size: 24pt; line-height: 1.05;
+    white-space: normal;
   }
-  body.format-large .row2 .lot { font-size: 9pt; }
-  body.format-large .row2 .qty { font-size: 12pt; }
-  body.format-large .row3 {
-    font-size: 9pt; gap: 3mm;
-    margin-top: auto; padding-top: 1.5mm;
-    border-top: 0.4mm solid #000;
+  body.format-large-rotated .etab { font-size: 14pt; }
+  body.format-large-rotated .row2 {
+    font-size: 14pt; gap: 4mm; margin-bottom: 0;
+    width: 100%; max-width: 100%;
   }
-  body.format-large .row3 .prod-date { font-size: 9pt; }
-  body.format-large .dlc { font-size: 14pt; }
-  body.format-large .dlc small { font-size: 7pt; }
+  body.format-large-rotated .row2 .lot { font-size: 13pt; }
+  body.format-large-rotated .row2 .qty { font-size: 18pt; }
+  body.format-large-rotated .row3 {
+    font-size: 13pt; gap: 4mm;
+    margin-top: auto; padding-top: 2mm;
+    border-top: 0.5mm solid #000;
+    width: 100%; max-width: 100%;
+  }
+  body.format-large-rotated .row3 .prod-date { font-size: 12pt; }
+  body.format-large-rotated .dlc { font-size: 22pt; }
+  body.format-large-rotated .dlc small { font-size: 9pt; }
+  /* Aperçu écran : afficher la zone "physique" de la page (62×90mm) */
+  @media screen {
+    body.format-large-rotated .preview-frame .label {
+      width: 62mm; height: 90mm;
+    }
+  }
 </style>
 </head>
 <body class="${formatClass}">
   <div class="screen-wrap">
-    <h1>Aperçu étiquette ${labelFormat.mode === 'large' ? '(grand format 62×60mm)' : '(62×29mm)'}</h1>
+    <h1>Aperçu étiquette ${labelFormat.mode === 'large-rotated' ? '(grand format pivoté 62×90mm)' : '(62×29mm)'}</h1>
     <div class="preview-frame">
       <div class="label">
+        ${labelFormat.mode === 'large-rotated' ? '<div class="rotated-wrap">' : ''}
         <div class="row1">
           <span class="day ${dayClass}">${dayName}</span>
           <span class="product">${produitEsc}</span>
@@ -3399,6 +3424,7 @@ function printEtiquette(productionId) {
           <span class="prod-date">P:${prodDateStr}</span>
           <span class="dlc"><small>DLC </small>${dlcStr}</span>
         </div>
+        ${labelFormat.mode === 'large-rotated' ? '</div>' : ''}
       </div>
     </div>
     <div class="screen-actions">
