@@ -3216,15 +3216,11 @@ function printEtiquette(productionId) {
   //     imposée par iOS AirPrint (~100mm sur iPad) → 'large-rotated' (page 62×90mm,
   //     contenu rendu sur 90×62mm tourné de -90°).
   const LABEL_FORMATS = {
-    freddy: { height: 90, mode: 'large-rotated' }, // DK-22251 actuellement
-    liesel: { height: 29, mode: 'compact' },        // DK-11209 actuellement
+    freddy: { height: 90, mode: 'large-rotated' }, // DK-22251
+    liesel: { height: 90, mode: 'large-rotated' }, // DK-22251 (alignée sur Freddy 06/05/2026)
   };
   const labelFormat = LABEL_FORMATS[currentEtablissement] || LABEL_FORMATS.liesel;
   const pageH = labelFormat.height;
-  // iOS AirPrint impose une "page papier" portrait (hauteur > largeur). Pour le mode
-  // compact (DK-11209 62×29), on déclare donc une page 29×62 et on fait pivoter le
-  // contenu de -90° dans un wrapper interne (même pattern que large-rotated).
-  const pageW = labelFormat.mode === 'compact' ? 29 : 62;
   const formatClass = 'format-' + labelFormat.mode;
 
   // Données pour la génération PDF (utilisée par le bouton "Imprimer")
@@ -3241,7 +3237,7 @@ function printEtiquette(productionId) {
 <meta name="viewport" content="width=235, initial-scale=1">
 <title> </title>
 <style>
-  @page { size: ${pageW}mm ${pageH}mm; margin: 0; }
+  @page { size: 62mm ${pageH}mm; margin: 0; }
   * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0 !important; padding: 0 !important;
@@ -3291,16 +3287,16 @@ function printEtiquette(productionId) {
       overflow: hidden !important;
     }
   }
-  /* Layout de base : compact (page 29×62 portrait) pour rouleaux pré-découpés type DK-11209,
-     contenu pivoté de -90° dans .rotated-wrap. Le mode large-rotated suit le même pattern en 62×90. */
+  /* Layout de base : compact 62×29mm pour rouleaux pré-découpés type DK-11209.
+     Les overrides .format-large étendent à 62×60mm pour DK-22251 + iOS. */
   @media print {
-    html, body { width: ${pageW}mm !important; height: ${pageH}mm !important; }
-    .preview-frame { width: ${pageW}mm; height: ${pageH}mm; }
-    .label { width: ${pageW}mm; height: ${pageH}mm; }
+    html, body { width: 62mm !important; height: ${pageH}mm !important; }
+    .preview-frame { width: 62mm; height: ${pageH}mm; }
+    .label { width: 62mm; height: ${pageH}mm; }
   }
   .label {
-    width: ${pageW}mm; height: ${pageH}mm;
-    max-width: ${pageW}mm; max-height: ${pageH}mm;
+    width: 62mm; height: ${pageH}mm;
+    max-width: 62mm; max-height: ${pageH}mm;
     padding: 1mm 1.5mm;
     position: relative;
     overflow: hidden;
@@ -3351,30 +3347,6 @@ function printEtiquette(productionId) {
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .dlc small { font-size: 5pt; font-weight: 700; }
-
-  /* === Overrides COMPACT PIVOTÉ (Liesel DK-11209) ===
-     Page imprimée 29×62mm (vertical, comme iOS l'impose). Le contenu est dans un
-     wrapper de 62×29mm pivoté de -90° pour s'inscrire dans la page : on lit
-     l'étiquette dans le sens de la longueur (= sens du défilement du rouleau).
-     Mêmes polices/structure qu'avant le passage en mode pivoté. */
-  body.format-compact .label {
-    padding: 0; position: relative; overflow: hidden;
-  }
-  body.format-compact .rotated-wrap {
-    position: absolute;
-    top: 62mm; left: 0;
-    width: 62mm; height: 29mm;
-    transform: rotate(-90deg);
-    transform-origin: top left;
-    padding: 1mm 1.5mm;
-    box-sizing: border-box;
-  }
-  /* Aperçu écran : afficher la zone "physique" de la page (29×62mm) */
-  @media screen {
-    body.format-compact .preview-frame .label {
-      width: 29mm; height: 62mm;
-    }
-  }
 
   /* === Overrides GRAND FORMAT PIVOTÉ (Freddy DK-22251) ===
      Page imprimée 62×90mm (vertical). Le contenu est dans un wrapper de 90×62mm
@@ -3437,7 +3409,7 @@ function printEtiquette(productionId) {
     <h1>Aperçu étiquette ${labelFormat.mode === 'large-rotated' ? '(grand format pivoté 62×90mm)' : '(62×29mm)'}</h1>
     <div class="preview-frame">
       <div class="label">
-        ${(labelFormat.mode === 'large-rotated' || labelFormat.mode === 'compact') ? '<div class="rotated-wrap">' : ''}
+        ${labelFormat.mode === 'large-rotated' ? '<div class="rotated-wrap">' : ''}
         <div class="row1">
           <span class="day ${dayClass}">${dayName}</span>
           <span class="product">${produitEsc}</span>
@@ -3452,7 +3424,7 @@ function printEtiquette(productionId) {
           <span class="prod-date">P:${prodDateStr}</span>
           <span class="dlc"><small>DLC </small>${dlcStr}</span>
         </div>
-        ${(labelFormat.mode === 'large-rotated' || labelFormat.mode === 'compact') ? '</div>' : ''}
+        ${labelFormat.mode === 'large-rotated' ? '</div>' : ''}
       </div>
     </div>
     <div class="screen-actions">
