@@ -3213,11 +3213,11 @@ function printEtiquette(productionId) {
   // Adapter ici quand on change physiquement de rouleau dans l'imprimante :
   //   - DK-11209 (pré-découpé 62×29mm) → 'compact'
   //   - DK-22251 (continu 62mm) avec contenu pivoté pour exploiter la longueur
-  //     imposée par iOS AirPrint (~100mm sur iPad) → 'large-rotated' (page 62×90mm,
-  //     contenu rendu sur 90×62mm tourné de -90°).
+  //     imposée par iOS AirPrint (62×100mm sur iPad QL-820NWB DK-22251) →
+  //     'large-rotated' (page 62×100mm, contenu rendu sur 100×62mm tourné de -90°).
   const LABEL_FORMATS = {
-    freddy: { height: 90, mode: 'large-rotated' }, // DK-22251
-    liesel: { height: 90, mode: 'large-rotated' }, // DK-22251 (alignée sur Freddy 06/05/2026)
+    freddy: { height: 100, mode: 'large-rotated' }, // DK-22251 — 62×100 (format papier réel imposé par iOS sur QL-820NWB)
+    liesel: { height: 100, mode: 'large-rotated' }, // DK-22251 — idem (alignée sur Freddy 06/05/2026)
   };
   const labelFormat = LABEL_FORMATS[currentEtablissement] || LABEL_FORMATS.liesel;
   const pageH = labelFormat.height;
@@ -3348,18 +3348,18 @@ function printEtiquette(productionId) {
   }
   .dlc small { font-size: 5pt; font-weight: 700; }
 
-  /* === Overrides GRAND FORMAT PIVOTÉ (Freddy DK-22251) ===
-     Page imprimée 62×90mm (vertical). Le contenu est dans un wrapper de 90×62mm
-     pivoté de -90° pour s'inscrire dans la page : on lit l'étiquette dans le sens
-     de la longueur (= sens du défilement du rouleau). Polices très grosses pour
-     exploiter au maximum la surface. */
+  /* === Overrides GRAND FORMAT PIVOTÉ (Freddy + Liesel DK-22251) ===
+     Page imprimée 62×100mm (vertical, format imposé par iOS sur QL-820NWB).
+     Le contenu est dans un wrapper de 100×62mm pivoté de -90° pour s'inscrire
+     dans la page : on lit l'étiquette dans le sens de la longueur (= sens du
+     défilement du rouleau). Polices très grosses pour exploiter au maximum la surface. */
   body.format-large-rotated .label {
     padding: 0; position: relative; overflow: hidden;
   }
   body.format-large-rotated .rotated-wrap {
     position: absolute;
-    top: 90mm; left: 0;
-    width: 90mm; height: 62mm;
+    top: 100mm; left: 0;
+    width: 100mm; height: 62mm;
     transform: rotate(-90deg);
     transform-origin: top left;
     padding: 3mm 4mm;
@@ -3396,17 +3396,17 @@ function printEtiquette(productionId) {
   body.format-large-rotated .row3 .prod-date { font-size: 12pt; }
   body.format-large-rotated .dlc { font-size: 22pt; }
   body.format-large-rotated .dlc small { font-size: 9pt; }
-  /* Aperçu écran : afficher la zone "physique" de la page (62×90mm) */
+  /* Aperçu écran : afficher la zone "physique" de la page (62×100mm) */
   @media screen {
     body.format-large-rotated .preview-frame .label {
-      width: 62mm; height: 90mm;
+      width: 62mm; height: 100mm;
     }
   }
 </style>
 </head>
 <body class="${formatClass}">
   <div class="screen-wrap">
-    <h1>Aperçu étiquette ${labelFormat.mode === 'large-rotated' ? '(grand format pivoté 62×90mm)' : '(62×29mm)'}</h1>
+    <h1>Aperçu étiquette ${labelFormat.mode === 'large-rotated' ? '(grand format pivoté 62×100mm)' : '(62×29mm)'}</h1>
     <div class="preview-frame">
       <div class="label">
         ${labelFormat.mode === 'large-rotated' ? '<div class="rotated-wrap">' : ''}
