@@ -221,7 +221,12 @@
         <span class="filter-chip" data-filter="ok">✅ OK</span>
         <span class="filter-chip" data-filter="notok">❌ Pas OK</span>
         <span class="filter-chip" data-filter="all">Tout</span>
-        <input type="text" class="search-input" id="search" placeholder="Rechercher…">
+      </div>
+      <div class="filters">
+        <select class="search-input" id="filter-article" style="flex:1; min-width:160px; max-width:340px;">
+          <option value="">📦 Tous les produits</option>
+        </select>
+        <input type="text" class="search-input" id="search" placeholder="🔎 Rechercher (lot, fabricant…)">
       </div>
 
       <div id="lots-list">
@@ -352,6 +357,7 @@
       session: null,            // session de contrôle en cours (DB row)
       lots: [],                 // [{ scan_tracabilite_id, article_nom, ..., url, statut?, motif?, sortieEffectuee?, ligne_id? }]
       filter: 'restant',        // restant | ok | notok | all
+      filterArticle: '',        // article_id sélectionné dans le menu (vide = tous)
       search: '',
       currentLot: null,         // lot en cours de "Pas OK"
       notokAction: 'sortir-tout', // sortir-tout | signaler
@@ -568,6 +574,7 @@
       $('screen-start').style.display = 'none';
       $('screen-controle').style.display = 'block';
       $('session-titre').textContent = `Contrôle ${fmtDateTime(State.session.date_debut)} — ${State.session.ouvert_par_nom}`;
+      populateArticleFilter();
       renderLots();
     }
 
@@ -578,12 +585,42 @@
         if (State.filter === 'restant' && l.statut != null) return false;
         if (State.filter === 'ok' && l.statut !== 'OK') return false;
         if (State.filter === 'notok' && l.statut !== 'PAS_OK') return false;
+        if (State.filterArticle && l.article_id !== State.filterArticle) return false;
         if (q) {
           const blob = `${l.article_nom||''} ${l.produit||''} ${l.lot||''} ${l.fabricant||''}`.toLowerCase();
           if (!blob.includes(q)) return false;
         }
         return true;
       });
+    }
+
+    // Remplit le <select> avec les articles distincts présents dans State.lots
+    function populateArticleFilter() {
+      const select = $('filter-article');
+      if (!select) return;
+      const previous = State.filterArticle;
+      // Compter les lots par article
+      const byArticle = {};
+      State.lots.forEach(l => {
+        if (!l.article_id) return;
+        if (!byArticle[l.article_id]) {
+          byArticle[l.article_id] = { id: l.article_id, nom: l.article_nom || '?', count: 0 };
+        }
+        byArticle[l.article_id].count++;
+      });
+      const sorted = Object.values(byArticle).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+      const total = State.lots.length;
+      let html = `<option value="">📦 Tous les produits (${total})</option>`;
+      sorted.forEach(a => {
+        html += `<option value="${escapeHtml(a.id)}">${escapeHtml(a.nom)} (${a.count})</option>`;
+      });
+      select.innerHTML = html;
+      // Restaurer la sélection précédente si l'article existe encore
+      if (previous && byArticle[previous]) {
+        select.value = previous;
+      } else {
+        State.filterArticle = '';
+      }
     }
 
     function renderLots() {
@@ -984,6 +1021,10 @@
     });
     $('search').addEventListener('input', (e) => {
       State.search = e.target.value;
+      renderLots();
+    });
+    $('filter-article').addEventListener('change', (e) => {
+      State.filterArticle = e.target.value;
       renderLots();
     });
 
