@@ -67,9 +67,9 @@
     /* Vignette photo article (remplace le bouton 'Voir photos') */
     .group-thumb {
       position:relative; flex-shrink:0;
-      width:25vw;
-      max-width:220px;
-      min-width:120px;
+      width:38vw;
+      max-width:340px;
+      min-width:160px;
       aspect-ratio:1 / 1;
       background:var(--gray-100); border:1px solid var(--gray-200);
       border-radius:var(--radius-sm); overflow:hidden;
@@ -79,14 +79,14 @@
     .group-thumb:active { transform:scale(.97); }
     .group-thumb:hover { box-shadow:var(--shadow-md); }
     .group-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-    .group-thumb .thumb-icon { font-size:48px; color:var(--gray-400); }
-    .group-thumb .thumb-loading { font-size:13px; color:var(--gray-400); }
+    .group-thumb .thumb-icon { font-size:64px; color:var(--gray-400); }
+    .group-thumb .thumb-loading { font-size:14px; color:var(--gray-400); }
     .group-thumb .thumb-count {
       position:absolute; bottom:0; right:0;
-      padding:4px 10px;
+      padding:5px 12px;
       background:rgba(0,0,0,0.65); color:white;
-      font-size:13px; font-weight:600;
-      border-radius:8px 0 0 0;
+      font-size:14px; font-weight:600;
+      border-radius:10px 0 0 0;
       letter-spacing:0.2px;
     }
 
