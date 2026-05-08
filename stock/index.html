@@ -55,6 +55,33 @@
     .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
     .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
 
+    /* Barre de navigation entre groupes */
+    .group-nav {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 12px; margin-bottom:12px;
+      background:white; border:1px solid var(--gray-200);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      position:sticky; top:54px; z-index:5;
+    }
+    .group-nav button {
+      padding:10px 16px; font-size:15px; font-weight:600;
+      background:var(--gray-100); color:var(--gray-700);
+      border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+      cursor:pointer; flex-shrink:0;
+    }
+    .group-nav button:active { background:var(--gray-200); }
+    .group-nav button[disabled] { opacity:.35; cursor:not-allowed; }
+    .group-nav .nav-pos {
+      flex:1; text-align:center; font-size:13px; font-weight:600;
+      color:var(--gray-700); line-height:1.3;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .group-nav .nav-pos .pos-num { color:var(--primary-dark); font-size:15px; }
+
+    /* Mode "une tuile par écran" : on cache toutes les cards sauf la courante */
+    #groups-container .group-card { display:none; }
+    #groups-container .group-card.visible { display:block; scroll-margin-top:120px; }
+
     /* Group card */
     .group-card { background:white; border:1px solid var(--gray-200); border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
     .group-header { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
@@ -79,6 +106,25 @@
     .group-thumb:active { transform:scale(.97); }
     .group-thumb:hover { box-shadow:var(--shadow-md); }
     .group-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+
+    /* En mode "une tuile par écran", on stacke verticalement et la photo prend
+       quasi toute la largeur disponible (pour pouvoir LIRE l'étiquette). */
+    .group-card.visible .group-header {
+      flex-direction:column; align-items:stretch; gap:14px;
+    }
+    .group-card.visible .group-thumb {
+      width: min(88vw, 70vh, 560px);
+      max-width: 100%;
+      min-width: 0;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+    .group-card.visible .group-thumb .thumb-icon { font-size:96px; }
+    .group-card.visible .group-thumb .thumb-count {
+      padding:8px 16px; font-size:18px; border-radius:14px 0 0 0;
+    }
+    .group-card.visible .group-title { font-size:22px; text-align:center; }
+    .group-card.visible .group-meta { font-size:14px; text-align:center; }
     .group-thumb .thumb-icon { font-size:64px; color:var(--gray-400); }
     .group-thumb .thumb-loading { font-size:14px; color:var(--gray-400); }
     .group-thumb .thumb-count {
@@ -253,6 +299,12 @@
       </div>
     </div>
 
+    <div id="group-nav" class="group-nav" style="display:none;">
+      <button id="nav-prev" type="button" aria-label="Étiquette précédente">←</button>
+      <div class="nav-pos" id="nav-pos">— / —</div>
+      <button id="nav-next" type="button" aria-label="Étiquette suivante">→</button>
+    </div>
+
     <div id="groups-container">
       <div style="color:var(--gray-500); font-size:14px; padding:20px; text-align:center;">Chargement…</div>
     </div>
@@ -350,6 +402,7 @@
       categories: [],       // catégories distinctes
       groups: [],           // groupes de scans à rattacher
       pendingGroup: null,   // groupe en cours d'édition (pour modal création)
+      currentIndex: 0,      // index du groupe actuellement affiché (1 tuile/écran)
     };
 
     function $(id) { return document.getElementById(id); }
@@ -505,7 +558,9 @@
     // ========= RENDU =========
     function renderGroups() {
       const container = $('groups-container');
+      const nav = $('group-nav');
       if (!State.groups.length) {
+        nav.style.display = 'none';
         container.innerHTML = `
           <div class="card empty-state">
             <div class="es-emoji">✓</div>
@@ -515,7 +570,50 @@
       }
       container.innerHTML = '';
       State.groups.forEach(g => container.appendChild(renderGroup(g)));
+      // Borner l'index courant aux nouvelles bornes
+      if (State.currentIndex >= State.groups.length) State.currentIndex = State.groups.length - 1;
+      if (State.currentIndex < 0) State.currentIndex = 0;
+      nav.style.display = 'flex';
+      showCurrent();
     }
+
+    function showCurrent() {
+      const cards = document.querySelectorAll('#groups-container .group-card');
+      cards.forEach((c, i) => c.classList.toggle('visible', i === State.currentIndex));
+      const total = State.groups.length;
+      const i = State.currentIndex;
+      const g = State.groups[i];
+      $('nav-pos').innerHTML = `<span class="pos-num">${i + 1}</span> / ${total}` +
+        (g ? ` · ${escapeHtml((g.produit || '').slice(0, 40))}` : '');
+      $('nav-prev').disabled = (i <= 0);
+      $('nav-next').disabled = (i >= total - 1);
+      // Faire remonter le scroll en haut de la card pour bien voir la photo
+      const visible = document.querySelector('#groups-container .group-card.visible');
+      if (visible) visible.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function navTo(delta) {
+      if (!State.groups.length) return;
+      const next = State.currentIndex + delta;
+      if (next < 0 || next >= State.groups.length) return;
+      State.currentIndex = next;
+      showCurrent();
+    }
+
+    // Wiring nav (le script est en fin de body, le DOM est déjà parsé)
+    $('nav-prev').addEventListener('click', () => navTo(-1));
+    $('nav-next').addEventListener('click', () => navTo(1));
+    document.addEventListener('keydown', (e) => {
+      // Ne pas intercepter si l'utilisateur tape dans un champ
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+      // Ignorer si une modal est ouverte
+      if ($('photos-modal-bg').classList.contains('visible')) return;
+      if ($('lightbox').classList.contains('visible')) return;
+      if ($('modal-create').classList.contains('visible')) return;
+      if (e.key === 'ArrowLeft') { navTo(-1); e.preventDefault(); }
+      else if (e.key === 'ArrowRight') { navTo(1); e.preventDefault(); }
+    });
 
     function renderGroup(g) {
       const div = document.createElement('div');
