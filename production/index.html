@@ -241,7 +241,25 @@
       padding: 6px 8px; border: 1px solid var(--gray-200);
       border-radius: var(--radius-sm); font-size: 0.8rem;
     }
-    .ingredient-row .ing-nom { flex: 2; min-width: 80px; }
+    .ingredient-row .ing-nom-wrap { flex: 2; min-width: 80px; position: relative; }
+    .ingredient-row .ing-nom { width: 100%; }
+    .ing-suggestions {
+      display: none; position: absolute; top: 100%; left: 0; right: 0;
+      max-height: 240px; overflow-y: auto;
+      background: white; border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      z-index: 50; margin-top: 2px;
+    }
+    .ing-suggestions.visible { display: block; }
+    .ing-suggestion {
+      padding: 8px 10px; font-size: 0.82rem; cursor: pointer;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .ing-suggestion:last-child { border-bottom: none; }
+    .ing-suggestion.active, .ing-suggestion:hover { background: #ecfdf5; }
+    .ing-suggestion .ing-sug-nom { font-weight: 600; color: var(--gray-800); }
+    .ing-suggestion .ing-sug-meta { font-size: 0.7rem; color: var(--gray-500); margin-top: 1px; }
+    .ing-suggestion-empty { padding: 10px; font-size: 0.78rem; color: var(--gray-500); text-align: center; }
     .ingredient-row .ing-qty { width: 60px; text-align: right; }
     .ingredient-row .ing-unite { width: 60px; }
     .ingredient-row .ing-prix { width: 70px; text-align: right; }
@@ -931,6 +949,7 @@ let allIngredients = {}; // ficheId → [ingredients]
 let allProductions = [];
 let allLots = [];
 let allArticlesAppro = []; // référentiel appro_ingredients pour rattachement
+let articleLastPrice = {}; // {article_id: dernier prix unitaire connu (€)}
 let currentFilter = 'all';
 let searchTerm = '';
 let editingFicheId = null;
@@ -1356,8 +1375,34 @@ async function loadArticlesAppro() {
     const sel = document.getElementById('ap-new-categorie');
     sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('') +
                     `<option value="__new__">+ Nouvelle catégorie…</option>`;
+    // Charger le dernier prix unitaire connu par article (alimente l'auto-remplissage P.U.
+    // dans la combobox des fiches techniques). Best-effort, échec silencieux.
+    loadArticleLastPrices();
   } catch (e) {
     console.error('loadArticlesAppro:', e);
+  }
+}
+
+// Récupère le dernier prix unitaire (>0) par article_id depuis fiche_ingredients.
+// Construit un map articleLastPrice = { uuid: prix } utilisé par la combobox.
+async function loadArticleLastPrices() {
+  try {
+    const { data, error } = await sb.from('fiche_ingredients')
+      .select('article_id, prix_unitaire, created_at')
+      .not('article_id', 'is', null)
+      .gt('prix_unitaire', 0)
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach(r => {
+      if (r.article_id && map[r.article_id] == null) {
+        map[r.article_id] = r.prix_unitaire;
+      }
+    });
+    articleLastPrice = map;
+  } catch (e) {
+    console.warn('loadArticleLastPrices:', e);
   }
 }
 
@@ -1674,7 +1719,10 @@ function addIngredientRow(data = {}) {
   row.dataset.id = id;
   row.dataset.articleId = data.article_id || '';
   row.innerHTML = `
-    <input type="text" class="ing-nom" placeholder="Ingrédient" value="${data.nom || ''}">
+    <div class="ing-nom-wrap">
+      <input type="text" class="ing-nom" placeholder="Ingrédient (tape pour rechercher)" value="${escapeHtmlProd(data.nom || '')}" autocomplete="off">
+      <div class="ing-suggestions"></div>
+    </div>
     <input type="number" class="ing-qty" placeholder="Qté" min="0" step="0.01" value="${data.quantite || ''}">
     <select class="ing-unite">
       ${UNITES.map(u => `<option value="${u}" ${u === (data.unite || 'kg') ? 'selected' : ''}>${u}</option>`).join('')}
@@ -1695,6 +1743,8 @@ function addIngredientRow(data = {}) {
   const qtyInput = row.querySelector('.ing-qty');
   const prixInput = row.querySelector('.ing-prix');
   const totalSpan = row.querySelector('.ing-total');
+  const nomInput = row.querySelector('.ing-nom');
+  const suggBox = row.querySelector('.ing-suggestions');
 
   const recalc = () => {
     const q = parseFloat(qtyInput.value) || 0;
@@ -1705,8 +1755,149 @@ function addIngredientRow(data = {}) {
   qtyInput.addEventListener('input', recalc);
   prixInput.addEventListener('input', recalc);
 
+  // ===== Combobox autocomplete sur le nom de l'ingrédient =====
+  let activeIdx = -1;
+  let currentSuggestions = [];
+
+  const renderSuggestions = (q) => {
+    const ql = (q || '').toLowerCase().trim();
+    let candidates;
+    if (ql.length === 0) {
+      // Pas de saisie → top 8 alphabétique
+      candidates = allArticlesAppro.slice(0, 8);
+    } else {
+      candidates = allArticlesAppro
+        .filter(a => (a.nom || '').toLowerCase().includes(ql) || (a.categorie || '').toLowerCase().includes(ql))
+        .slice(0, 12);
+    }
+    currentSuggestions = candidates;
+    activeIdx = -1;
+    if (!candidates.length) {
+      suggBox.innerHTML = `<div class="ing-suggestion-empty">Aucun ingrédient trouvé. Tape un nom libre puis utilise le bouton 🔗 pour créer.</div>`;
+    } else {
+      suggBox.innerHTML = candidates.map((a, idx) =>
+        `<div class="ing-suggestion" data-idx="${idx}">
+          <div class="ing-sug-nom">${escapeHtmlProd(a.nom)}</div>
+          <div class="ing-sug-meta">${escapeHtmlProd(a.categorie || '—')} · ${escapeHtmlProd(a.unite || '—')}</div>
+        </div>`
+      ).join('');
+      suggBox.querySelectorAll('.ing-suggestion').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          // mousedown (avant blur) pour empêcher la fermeture prématurée
+          e.preventDefault();
+          const a = currentSuggestions[parseInt(el.dataset.idx, 10)];
+          if (a) selectArticleForRow(row, a);
+          suggBox.classList.remove('visible');
+        });
+      });
+    }
+    suggBox.classList.add('visible');
+  };
+
+  nomInput.addEventListener('focus', () => renderSuggestions(nomInput.value));
+  nomInput.addEventListener('input', () => {
+    // L'utilisateur tape librement → on rouvre la liste mais on dé-rattache l'éventuel article
+    if (row.dataset.articleId) {
+      // Conserver le lien tant que le texte correspond toujours à l'article courant
+      const linked = allArticlesAppro.find(a => a.id === row.dataset.articleId);
+      if (!linked || linked.nom.toLowerCase() !== nomInput.value.trim().toLowerCase()) {
+        unlinkArticleFromRow(row);
+      }
+    }
+    renderSuggestions(nomInput.value);
+  });
+  nomInput.addEventListener('blur', () => {
+    // Léger délai pour laisser le mousedown tirer
+    setTimeout(() => suggBox.classList.remove('visible'), 150);
+  });
+  nomInput.addEventListener('keydown', (e) => {
+    if (!suggBox.classList.contains('visible')) return;
+    const items = suggBox.querySelectorAll('.ing-suggestion');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIdx = Math.min(activeIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+      const act = items[activeIdx]; if (act) act.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIdx = Math.max(activeIdx - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+      const act = items[activeIdx]; if (act) act.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      if (activeIdx >= 0 && currentSuggestions[activeIdx]) {
+        e.preventDefault();
+        selectArticleForRow(row, currentSuggestions[activeIdx]);
+        suggBox.classList.remove('visible');
+      }
+    } else if (e.key === 'Escape') {
+      suggBox.classList.remove('visible');
+    }
+  });
+
   container.appendChild(row);
   updateCostSummary();
+}
+
+// Sélection d'un article appro depuis la combobox d'une ligne ingrédient :
+// → renseigne le nom, lie l'article_id, pré-sélectionne l'unité,
+//   pré-remplit le dernier prix connu et passe la ligne en "has-article".
+function selectArticleForRow(row, article) {
+  const nomInput = row.querySelector('.ing-nom');
+  const uniteSel = row.querySelector('.ing-unite');
+  const prixInput = row.querySelector('.ing-prix');
+  const qtyInput = row.querySelector('.ing-qty');
+  const totalSpan = row.querySelector('.ing-total');
+
+  nomInput.value = article.nom;
+  row.dataset.articleId = article.id;
+  row.classList.remove('no-article');
+  row.classList.add('has-article');
+
+  // Bouton 🔗
+  const btn = row.querySelector('.btn-link-art');
+  if (btn) {
+    btn.textContent = '🔗';
+    btn.title = `Article : ${article.nom}`;
+  }
+  // Info ligne (sous la rangée)
+  const oldInfo = row.querySelector('.ing-article-info');
+  if (oldInfo) oldInfo.remove();
+  const info = document.createElement('div');
+  info.className = 'ing-article-info';
+  info.textContent = `→ ${article.nom}`;
+  row.appendChild(info);
+
+  // Pré-sélection de l'unité (mapée via mapUnit pour rester cohérent avec UNITES)
+  if (article.unite) {
+    const wantedUnit = mapUnit(article.unite);
+    const opt = Array.from(uniteSel.options).find(o => o.value === wantedUnit);
+    if (opt) uniteSel.value = wantedUnit;
+  }
+
+  // Pré-remplissage du dernier prix unitaire connu (s'il en existe un et que le champ est vide)
+  if ((!prixInput.value || parseFloat(prixInput.value) === 0) && articleLastPrice[article.id] != null) {
+    prixInput.value = articleLastPrice[article.id];
+  }
+
+  // Recalcul total ligne + récap
+  const q = parseFloat(qtyInput.value) || 0;
+  const p = parseFloat(prixInput.value) || 0;
+  totalSpan.textContent = (q * p).toFixed(2) + ' €';
+  updateCostSummary();
+}
+
+// Détache l'article de la ligne quand l'utilisateur modifie le nom librement
+function unlinkArticleFromRow(row) {
+  row.dataset.articleId = '';
+  row.classList.remove('has-article');
+  row.classList.add('no-article');
+  const btn = row.querySelector('.btn-link-art');
+  if (btn) {
+    btn.textContent = '🔗?';
+    btn.title = 'Pas d\'article rattaché — cliquer pour relier';
+  }
+  const info = row.querySelector('.ing-article-info');
+  if (info) info.remove();
 }
 
 function removeIngredientRow(id) {
