@@ -56,13 +56,36 @@
     .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
 
     /* Group card */
-    .group-card { background:white; border:1px solid var(--gray-200); border-radius:var(--radius); padding:12px; margin-bottom:10px; }
-    .group-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
-    .group-title { font-size:16px; font-weight:700; color:var(--gray-900); }
-    .group-meta { font-size:12px; color:var(--gray-500); margin-top:2px; }
-    .group-badge { padding:2px 8px; background:var(--orange-100); color:var(--orange-700); border-radius:999px; font-size:11px; font-weight:600; flex-shrink:0; }
-    .group-actions { display:flex; flex-direction:column; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--gray-100); }
+    .group-card { background:white; border:1px solid var(--gray-200); border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+    .group-header { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+    .group-title { font-size:18px; font-weight:700; color:var(--gray-900); line-height:1.25; }
+    .group-meta { font-size:13px; color:var(--gray-600); margin-top:4px; line-height:1.45; }
+    .group-badge { padding:3px 10px; background:var(--orange-100); color:var(--orange-700); border-radius:999px; font-size:12px; font-weight:600; flex-shrink:0; }
+    .group-actions { display:flex; flex-direction:column; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); }
     .group-actions.expanded { display:flex; }
+
+    /* Vignette photo article (remplace le bouton 'Voir photos') */
+    .group-thumb {
+      position:relative; flex-shrink:0;
+      width:96px; height:96px;
+      background:var(--gray-100); border:1px solid var(--gray-200);
+      border-radius:var(--radius-sm); overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+      cursor:zoom-in; transition:transform .12s, box-shadow .12s;
+    }
+    .group-thumb:active { transform:scale(.97); }
+    .group-thumb:hover { box-shadow:var(--shadow-md); }
+    .group-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .group-thumb .thumb-icon { font-size:34px; color:var(--gray-400); }
+    .group-thumb .thumb-loading { font-size:11px; color:var(--gray-400); }
+    .group-thumb .thumb-count {
+      position:absolute; bottom:0; right:0;
+      padding:2px 7px;
+      background:rgba(0,0,0,0.62); color:white;
+      font-size:11px; font-weight:600;
+      border-radius:6px 0 0 0;
+      letter-spacing:0.2px;
+    }
 
     /* Autocomplete */
     .autocomplete { position:relative; }
@@ -395,9 +418,84 @@
         $('stat-articles').textContent = State.articles.length;
 
         renderGroups();
+        // Charger les vignettes en arrière-plan (n'attend pas pour ne pas bloquer le rendu)
+        loadThumbs();
       } catch (err) {
         console.error(err);
         $('groups-container').innerHTML = `<div class="empty-state"><div class="es-emoji">⚠️</div><div class="es-msg">Erreur de chargement : ${err.message}</div></div>`;
+      }
+    }
+
+    // ========= VIGNETTES =========
+    // Pour chaque groupe, on récupère la 1re photo image/* parmi ses scans
+    // et on génère une URL signée à afficher dans la tuile.
+    async function loadThumbs() {
+      try {
+        // Map scan_id -> liste de groupes (premier scan en priorité)
+        // On récupère storage_path/mime_type pour TOUS les scans des groupes,
+        // puis on garde le 1er image/* par groupe.
+        const allScanIds = [];
+        State.groups.forEach(g => g.scans.forEach(s => allScanIds.push(s.scan_id)));
+        if (!allScanIds.length) return;
+
+        const { data: scansMeta, error } = await sb.from('scans')
+          .select('id, storage_path, mime_type')
+          .in('id', allScanIds);
+        if (error) throw error;
+        const metaById = {};
+        (scansMeta || []).forEach(s => { metaById[s.id] = s; });
+
+        await Promise.all(State.groups.map(async g => {
+          // Trouver le 1er scan dont la meta est une image
+          let firstImg = null;
+          for (const s of g.scans) {
+            const m = metaById[s.scan_id];
+            if (m && (m.mime_type || '').startsWith('image/') && m.storage_path) {
+              firstImg = m; break;
+            }
+          }
+          // Sinon, premier scan tout court (probablement PDF)
+          if (!firstImg) {
+            for (const s of g.scans) {
+              const m = metaById[s.scan_id];
+              if (m && m.storage_path) { firstImg = m; g.thumbIsPdf = true; break; }
+            }
+          }
+          if (firstImg && !g.thumbIsPdf) {
+            const { data, error: e } = await sb.storage.from('scans').createSignedUrl(firstImg.storage_path, 3600);
+            if (!e && data?.signedUrl) g.thumbUrl = data.signedUrl;
+          }
+          // Mettre à jour la tuile dans le DOM si elle est déjà rendue
+          updateThumbInDom(g);
+        }));
+      } catch (err) {
+        console.warn('loadThumbs:', err);
+      }
+    }
+
+    function updateThumbInDom(g) {
+      // Lookup safe (les keys peuvent contenir apostrophes/accents/espaces)
+      const all = document.querySelectorAll('.group-thumb[data-key]');
+      let thumb = null;
+      for (const el of all) {
+        if (el.getAttribute('data-key') === g.key) { thumb = el; break; }
+      }
+      if (!thumb) return;
+      if (g.thumbUrl) {
+        thumb.innerHTML = `
+          <img src="${g.thumbUrl}" alt="" loading="lazy">
+          <span class="thumb-count">${g.scans.length}</span>
+        `;
+      } else if (g.thumbIsPdf) {
+        thumb.innerHTML = `
+          <span class="thumb-icon">📄</span>
+          <span class="thumb-count">${g.scans.length}</span>
+        `;
+      } else {
+        thumb.innerHTML = `
+          <span class="thumb-icon">📷</span>
+          <span class="thumb-count">${g.scans.length}</span>
+        `;
       }
     }
 
@@ -421,8 +519,21 @@
       div.className = 'group-card';
       const lotsArr = [...g.lots];
       const etabArr = [...g.etablissements];
+      // Contenu initial de la tuile photo (mis à jour par loadThumbs)
+      let thumbInner;
+      if (g.thumbUrl) {
+        thumbInner = `<img src="${g.thumbUrl}" alt="" loading="lazy"><span class="thumb-count">${g.scans.length}</span>`;
+      } else if (g.thumbIsPdf) {
+        thumbInner = `<span class="thumb-icon">📄</span><span class="thumb-count">${g.scans.length}</span>`;
+      } else {
+        thumbInner = `<span class="thumb-loading">…</span><span class="thumb-count">${g.scans.length}</span>`;
+      }
+
       div.innerHTML = `
         <div class="group-header">
+          <div class="group-thumb" data-action="view-photos" data-key="${g.key}" title="Voir toutes les photos">
+            ${thumbInner}
+          </div>
           <div style="flex:1; min-width:0;">
             <div class="group-title">${escapeHtml(g.produit)}</div>
             <div class="group-meta">
@@ -432,10 +543,6 @@
               ${etabArr.join(', ')}
               ${g.categorie_haccp ? ' · cat: ' + g.categorie_haccp : ''}
             </div>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-            <span class="group-badge">${g.scans.length}</span>
-            <button class="btn-view" data-action="view-photos" data-key="${g.key}">👁 Photos</button>
           </div>
         </div>
         <div class="group-actions">
