@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Contrôle stock réel — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669;        /* emerald-600 */
+      --primary-dark: #047857;
+      --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --yellow-100:#fef9c3; --yellow-700:#a16207;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:900px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; transition:all .15s; }
+    .btn:active:not([disabled]) { transform:scale(.98); }
+    .btn[disabled] { opacity:.5; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-primary:active:not([disabled]) { background:var(--primary-dark); }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    .btn-danger { background:var(--red-700); color:white; }
+    .btn-warn { background:var(--orange-700); color:white; }
+    .btn-big { padding:14px; font-size:16px; min-height:52px; width:100%; }
+
+    /* Disclaimer */
+    .disclaimer { padding:10px 12px; background:var(--blue-100); color:var(--blue-700); border-radius:var(--radius-sm); font-size:12px; margin-bottom:14px; line-height:1.5; }
+    .disclaimer strong { display:block; margin-bottom:4px; }
+
+    /* Progress */
+    .progress-bar { width:100%; height:8px; background:var(--gray-200); border-radius:999px; overflow:hidden; margin:8px 0; }
+    .progress-fill { height:100%; background:var(--primary); transition:width .25s; }
+    .progress-stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:8px; }
+    .pstat { padding:8px; background:var(--gray-50); border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .pstat .pv { font-size:20px; font-weight:700; line-height:1; }
+    .pstat .pl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    .pstat.ok .pv { color:var(--green-700); }
+    .pstat.notok .pv { color:var(--red-700); }
+    .pstat.skip .pv { color:var(--gray-500); }
+
+    /* Filtres */
+    .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .search-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); flex:1; min-width:180px; }
+
+    /* Lot card */
+    .lot-card { display:grid; grid-template-columns:84px 1fr auto; gap:12px; padding:12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:8px; align-items:center; transition:background .15s, border-color .15s; }
+    .lot-card.controlled-ok { background:#f0fdf4; border-color:var(--green-700); }
+    .lot-card.controlled-notok { background:#fef2f2; border-color:var(--red-700); }
+    .lot-card.controlled-skip { background:var(--gray-50); border-color:var(--gray-300); opacity:.7; }
+
+    .lot-thumb { width:84px; height:84px; background:var(--gray-100); border-radius:var(--radius-sm); overflow:hidden; cursor:zoom-in; position:relative; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .lot-thumb img { width:100%; height:100%; object-fit:cover; }
+    .lot-thumb.placeholder { font-size:34px; color:var(--gray-400); }
+    .lot-thumb .zoom-hint { position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.6); color:white; font-size:10px; padding:1px 4px; border-radius:3px; }
+
+    .lot-info { min-width:0; }
+    .lot-nom { font-size:15px; font-weight:700; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lot-meta { font-size:12px; color:var(--gray-600); margin-top:3px; line-height:1.4; }
+    .lot-meta strong { color:var(--gray-900); font-weight:600; }
+    .lot-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:600; margin-right:4px; }
+    .dlc-vert    { background:var(--green-100); color:var(--green-700); }
+    .dlc-jaune   { background:var(--yellow-100); color:var(--yellow-700); }
+    .dlc-orange  { background:var(--orange-100); color:var(--orange-700); }
+    .dlc-rouge   { background:var(--red-100); color:var(--red-700); }
+    .dlc-gris    { background:var(--gray-100); color:var(--gray-500); }
+
+    .lot-actions { display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+    .btn-ok { padding:10px 14px; min-width:88px; background:white; color:var(--green-700); border:2px solid var(--green-700); border-radius:var(--radius-sm); font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; }
+    .btn-ok:active:not([disabled]) { background:var(--green-100); }
+    .btn-ok.done { background:var(--green-700); color:white; }
+    .btn-notok { padding:10px 14px; min-width:88px; background:white; color:var(--red-700); border:2px solid var(--red-700); border-radius:var(--radius-sm); font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; }
+    .btn-notok:active:not([disabled]) { background:var(--red-100); }
+    .btn-notok.done { background:var(--red-700); color:white; }
+
+    .control-status { font-size:11px; font-weight:700; padding:4px 8px; border-radius:var(--radius-sm); text-align:center; margin-top:4px; }
+    .control-status.ok { background:var(--green-100); color:var(--green-700); }
+    .control-status.notok { background:var(--red-100); color:var(--red-700); }
+    .control-status.skip { background:var(--gray-200); color:var(--gray-600); }
+
+    /* Mobile : actions en ligne */
+    @media (max-width:560px) {
+      .lot-card { grid-template-columns:64px 1fr; gap:10px; padding:10px; }
+      .lot-thumb { width:64px; height:64px; }
+      .lot-actions { grid-column:1 / -1; flex-direction:row; justify-content:stretch; margin-top:8px; padding-top:8px; border-top:1px solid var(--gray-100); }
+      .btn-ok, .btn-notok { flex:1; }
+    }
+
+    /* Modal */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; align-items:center; justify-content:center; padding:16px; overflow-y:auto; }
+    .modal-bg.visible { display:flex; }
+    .modal { background:white; border-radius:var(--radius); padding:20px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; }
+    .modal-title { font-size:18px; font-weight:700; margin-bottom:8px; }
+    .modal-subtitle { font-size:13px; color:var(--gray-600); margin-bottom:16px; }
+    .modal-field { margin-bottom:14px; }
+    .modal-field label { display:block; font-size:12px; font-weight:600; color:var(--gray-600); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px; }
+    .modal-field input, .modal-field select, .modal-field textarea { width:100%; padding:10px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; }
+    .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+    .modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; }
+
+    /* Choix Oui/Non sortir du stock */
+    .choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+    .choice-tile { padding:14px 10px; background:white; border:2px solid var(--gray-200); border-radius:var(--radius-sm); cursor:pointer; text-align:center; }
+    .choice-tile:hover, .choice-tile.selected { border-color:var(--primary); background:var(--primary-light); }
+    .choice-tile.danger:hover, .choice-tile.danger.selected { border-color:var(--red-700); background:var(--red-100); }
+    .choice-tile .ct-emoji { font-size:24px; line-height:1; margin-bottom:4px; }
+    .choice-tile .ct-label { font-size:13px; font-weight:700; color:var(--gray-900); }
+    .choice-tile .ct-sub { font-size:11px; color:var(--gray-500); margin-top:2px; }
+
+    /* Lightbox */
+    .lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:70; align-items:center; justify-content:center; cursor:zoom-out; }
+    .lightbox.visible { display:flex; }
+    .lightbox img { max-width:95vw; max-height:95vh; object-fit:contain; }
+    .lightbox-close { position:fixed; top:16px; right:16px; padding:8px 14px; background:white; border:none; border-radius:var(--radius); font-size:14px; cursor:pointer; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:32px 16px; color:var(--gray-500); }
+    .empty-state .es-emoji { font-size:48px; margin-bottom:12px; }
+
+    /* Historique sessions */
+    .session-row { display:grid; grid-template-columns:1fr auto; gap:8px; padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; cursor:pointer; }
+    .session-row:hover { background:var(--gray-50); }
+    .session-info .si-title { font-size:14px; font-weight:600; color:var(--gray-900); }
+    .session-info .si-meta { font-size:11px; color:var(--gray-500); margin-top:2px; }
+    .session-stats { display:flex; gap:6px; font-size:12px; }
+    .session-stats .sst { padding:3px 8px; border-radius:999px; font-weight:600; }
+    .session-stats .sst.ok { background:var(--green-100); color:var(--green-700); }
+    .session-stats .sst.notok { background:var(--red-100); color:var(--red-700); }
+    .session-stats .sst.skip { background:var(--gray-200); color:var(--gray-600); }
+    .session-stats .sst.encours { background:var(--orange-100); color:var(--orange-700); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Contrôle stock réel</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- ÉTAT 1 : Pas de session active -->
+    <div id="screen-start" style="display:none;">
+      <div class="disclaimer">
+        <strong>📋 Comment ça marche</strong>
+        Tu vas vérifier que chaque étiquette enregistrée dans le système est bien présente dans nos frigos. Pour chaque lot, marque <strong>OK</strong> si l'item est là et conforme, ou <strong>Pas OK</strong> si l'item manque, est consommé, perdu ou cassé. En cas de Pas OK, tu pourras sortir le lot du stock avec un motif.
+      </div>
+
+      <div class="card">
+        <div class="card-title">Démarrer un contrôle</div>
+        <p style="font-size:13px; color:var(--gray-600); margin-bottom:14px;">
+          Le contrôle portera sur <strong id="start-nb-lots">—</strong> lot<span id="start-pluriel">s</span> en stock pour <strong id="start-etab">—</strong>.
+        </p>
+        <button class="btn btn-primary btn-big" id="btn-start" disabled>▶️ Démarrer le contrôle</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Historique des contrôles</div>
+        <div id="sessions-list">
+          <div class="empty-state" style="padding:16px;">Chargement…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ÉTAT 2 : Session active -->
+    <div id="screen-controle" style="display:none;">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div>
+            <div style="font-size:11px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px;">Session en cours</div>
+            <div id="session-titre" style="font-size:15px; font-weight:700; color:var(--gray-900);">—</div>
+          </div>
+          <button class="btn btn-ghost" id="btn-abandon" title="Abandonner">✕ Abandonner</button>
+        </div>
+        <div class="progress-stats">
+          <div class="pstat"><div class="pv" id="pst-total">0</div><div class="pl">À voir</div></div>
+          <div class="pstat ok"><div class="pv" id="pst-ok">0</div><div class="pl">OK</div></div>
+          <div class="pstat notok"><div class="pv" id="pst-notok">0</div><div class="pl">Pas OK</div></div>
+          <div class="pstat skip"><div class="pv" id="pst-skip">0</div><div class="pl">Sautés</div></div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
+        <div style="font-size:12px; color:var(--gray-600); text-align:center;" id="progress-text">0 / 0 lots contrôlés</div>
+      </div>
+
+      <div class="filters">
+        <span class="filter-chip active" data-filter="restant">⏳ À voir</span>
+        <span class="filter-chip" data-filter="ok">✅ OK</span>
+        <span class="filter-chip" data-filter="notok">❌ Pas OK</span>
+        <span class="filter-chip" data-filter="all">Tout</span>
+        <input type="text" class="search-input" id="search" placeholder="Rechercher…">
+      </div>
+
+      <div id="lots-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+
+      <div style="position:sticky; bottom:8px; margin-top:16px; z-index:5;">
+        <button class="btn btn-primary btn-big" id="btn-finish" style="box-shadow:var(--shadow-md);">
+          ✅ Terminer le contrôle
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal "Pas OK" : sortir du stock ? -->
+  <div class="modal-bg" id="modal-notok">
+    <div class="modal">
+      <div class="modal-title">⚠️ Item non conforme</div>
+      <div class="modal-subtitle" id="notok-lot-name">—</div>
+
+      <div class="modal-field">
+        <label>Sortir du stock ?</label>
+        <div class="choice-grid">
+          <div class="choice-tile danger selected" data-action="sortir-tout">
+            <div class="ct-emoji">🗑</div>
+            <div class="ct-label">Oui, tout sortir</div>
+            <div class="ct-sub" id="ct-tout-qte">— kg</div>
+          </div>
+          <div class="choice-tile" data-action="signaler">
+            <div class="ct-emoji">⚠️</div>
+            <div class="ct-label">Non, juste signaler</div>
+            <div class="ct-sub">Pas de sortie de stock</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-field" id="field-qte-partielle" style="display:none;">
+        <label>Quantité à sortir</label>
+        <input type="number" step="0.001" min="0" id="notok-qte" placeholder="0">
+        <div style="font-size:11px; color:var(--gray-500); margin-top:4px;" id="notok-qte-info">—</div>
+      </div>
+
+      <div class="modal-field">
+        <label>Motif</label>
+        <select id="notok-motif">
+          <option value="">— Choisir un motif —</option>
+          <option value="Perte">Perte</option>
+          <option value="Casse">Casse</option>
+          <option value="Vol">Vol</option>
+          <option value="Erreur de saisie">Erreur de saisie</option>
+          <option value="Consommé sans étiquetage">Consommé sans étiquetage</option>
+          <option value="Périmé / DLC dépassée">Périmé / DLC dépassée</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label>Précisions (optionnel)</label>
+        <textarea id="notok-comment" rows="2" placeholder="Détail libre…"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="notok-confirm">Confirmer Pas OK</button>
+        <button class="btn btn-ghost" id="notok-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Terminer -->
+  <div class="modal-bg" id="modal-finish">
+    <div class="modal">
+      <div class="modal-title">✅ Terminer le contrôle</div>
+      <div class="modal-subtitle" id="finish-summary">—</div>
+      <div class="modal-field">
+        <label>Notes (optionnel)</label>
+        <textarea id="finish-notes" rows="3" placeholder="Observations générales sur ce contrôle…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="finish-confirm">Valider et clôturer</button>
+        <button class="btn btn-ghost" id="finish-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Détails session -->
+  <div class="modal-bg" id="modal-session-detail">
+    <div class="modal" style="max-width:780px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div>
+          <div class="modal-title" id="sd-title">—</div>
+          <div class="modal-subtitle" id="sd-subtitle">—</div>
+        </div>
+        <button class="btn btn-ghost" id="sd-close">✕ Fermer</button>
+      </div>
+      <div id="sd-lines"></div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightbox-close">✕</button>
+    <img id="lightbox-img" src="" alt="">
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    // ==== ÉTAT GLOBAL ====
+    const State = {
+      session: null,            // session de contrôle en cours (DB row)
+      lots: [],                 // [{ scan_tracabilite_id, article_nom, ..., url, statut?, motif?, sortieEffectuee?, ligne_id? }]
+      filter: 'restant',        // restant | ok | notok | all
+      search: '',
+      currentLot: null,         // lot en cours de "Pas OK"
+      notokAction: 'sortir-tout', // sortir-tout | signaler
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') {
+      const t = $('toast'); t.textContent = msg;
+      t.className = 'toast visible' + (kind ? ' ' + kind : '');
+      setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }); }
+    function fmtDateTime(iso) { if (!iso) return '—'; return new Date(iso).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+    function daysToDlc(dlc) {
+      if (!dlc) return null;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const d = new Date(dlc); d.setHours(0,0,0,0);
+      return Math.round((d - today) / (1000*60*60*24));
+    }
+    function dlcClass(days) {
+      if (days == null) return 'dlc-gris';
+      if (days < 0) return 'dlc-rouge';
+      if (days <= 2) return 'dlc-rouge';
+      if (days <= 7) return 'dlc-orange';
+      if (days <= 14) return 'dlc-jaune';
+      return 'dlc-vert';
+    }
+    function dlcLabel(days) {
+      if (days == null) return 'DLC ?';
+      if (days < 0) return `Dépassée ${-days} j`;
+      if (days === 0) return "Aujourd'hui";
+      if (days === 1) return 'Demain';
+      return `J+${days}`;
+    }
+
+    // ==== CHARGEMENT INITIAL ====
+    async function init() {
+      // Reprise éventuelle d'une session "en_cours" pour cet établissement
+      const { data: openSession } = await sb.from('stock_controle_sessions')
+        .select('*')
+        .eq('etablissement', currentEtab)
+        .eq('statut', 'en_cours')
+        .eq('ouvert_par_id', currentUser.id)
+        .order('date_debut', { ascending:false })
+        .limit(1);
+
+      if (openSession && openSession.length > 0) {
+        // Reprise auto
+        State.session = openSession[0];
+        await resumeSession();
+      } else {
+        await loadStartScreen();
+      }
+    }
+
+    async function loadStartScreen() {
+      $('screen-start').style.display = 'block';
+      $('screen-controle').style.display = 'none';
+
+      // Compter lots en stock
+      const { count } = await sb.from('stock_par_lot')
+        .select('scan_tracabilite_id', { count:'exact', head:true })
+        .eq('etablissement', currentEtab)
+        .gt('quantite_restante', 0);
+
+      const nb = count || 0;
+      $('start-nb-lots').textContent = nb;
+      $('start-pluriel').textContent = nb > 1 ? 's' : '';
+      $('start-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+      $('btn-start').disabled = nb === 0;
+      if (nb === 0) {
+        $('btn-start').textContent = 'Aucun lot en stock à contrôler';
+      }
+
+      await loadHistorique();
+    }
+
+    async function loadHistorique() {
+      const { data } = await sb.from('stock_controle_sessions')
+        .select('*')
+        .eq('etablissement', currentEtab)
+        .order('date_debut', { ascending:false })
+        .limit(20);
+
+      const list = $('sessions-list');
+      if (!data || data.length === 0) {
+        list.innerHTML = `<div class="empty-state" style="padding:16px;"><div style="font-size:13px;">Aucun contrôle effectué pour le moment.</div></div>`;
+        return;
+      }
+      list.innerHTML = '';
+      data.forEach(s => {
+        const row = document.createElement('div');
+        row.className = 'session-row';
+        const isEnCours = s.statut === 'en_cours';
+        const statsHtml = isEnCours
+          ? `<span class="sst encours">⏳ En cours</span>`
+          : `<span class="sst ok">✓ ${s.nb_ok}</span><span class="sst notok">✗ ${s.nb_pas_ok}</span>${s.nb_sautes>0?`<span class="sst skip">↷ ${s.nb_sautes}</span>`:''}`;
+        row.innerHTML = `
+          <div class="session-info">
+            <div class="si-title">${fmtDateTime(s.date_debut)} · ${escapeHtml(s.ouvert_par_nom)}</div>
+            <div class="si-meta">${s.nb_lots_total} lots · ${s.statut === 'termine' ? 'Terminé' : (s.statut === 'abandonne' ? 'Abandonné' : 'En cours')} ${s.nb_sorties > 0 ? `· ${s.nb_sorties} sortie${s.nb_sorties>1?'s':''} de stock` : ''}</div>
+          </div>
+          <div class="session-stats">${statsHtml}</div>
+        `;
+        row.addEventListener('click', () => openSessionDetail(s));
+        list.appendChild(row);
+      });
+    }
+
+    // ==== DÉMARRER UNE SESSION ====
+    $('btn-start').addEventListener('click', async () => {
+      $('btn-start').disabled = true;
+      try {
+        // 1. Créer la session
+        const { data: created, error: errSess } = await sb.from('stock_controle_sessions')
+          .insert({
+            etablissement: currentEtab,
+            statut: 'en_cours',
+            ouvert_par_id: currentUser.id,
+            ouvert_par_nom: currentUser.nom,
+            ouvert_par_initiales: currentUser.initiales,
+          })
+          .select()
+          .single();
+        if (errSess) throw errSess;
+        State.session = created;
+
+        // 2. Charger les lots
+        await loadLotsForControle();
+        switchToControleScreen();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+        $('btn-start').disabled = false;
+      }
+    });
+
+    async function resumeSession() {
+      try {
+        await loadLotsForControle();
+
+        // Charger les lignes déjà contrôlées dans cette session
+        const { data: lignes } = await sb.from('stock_controle_lignes')
+          .select('*')
+          .eq('session_id', State.session.id);
+
+        if (lignes && lignes.length > 0) {
+          const byScanId = {};
+          lignes.forEach(l => { byScanId[l.scan_tracabilite_id] = l; });
+          State.lots.forEach(lot => {
+            const l = byScanId[lot.scan_tracabilite_id];
+            if (l) {
+              lot.statut = l.statut;
+              lot.motif = l.motif;
+              lot.sortieEffectuee = l.sortie_effectuee;
+              lot.quantiteSortie = l.quantite_sortie;
+              lot.ligneId = l.id;
+            }
+          });
+        }
+        switchToControleScreen();
+        showToast(`Reprise de la session du ${fmtDateTime(State.session.date_debut)}`);
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur reprise session : ' + err.message, 'error');
+        await loadStartScreen();
+      }
+    }
+
+    async function loadLotsForControle() {
+      const { data, error } = await sb.from('stock_par_lot')
+        .select('*')
+        .eq('etablissement', currentEtab)
+        .gt('quantite_restante', 0)
+        .order('article_nom', { ascending:true });
+      if (error) throw error;
+
+      // Précharger signed URLs en parallèle (validité 1h)
+      const lots = await Promise.all((data || []).map(async (r) => {
+        let url = null;
+        const isImg = (r.mime_type || '').startsWith('image/');
+        if (isImg && r.storage_path) {
+          const { data:d } = await sb.storage.from('scans').createSignedUrl(r.storage_path, 3600);
+          url = d?.signedUrl || null;
+        }
+        return {
+          scan_tracabilite_id: r.scan_tracabilite_id,
+          article_id: r.article_id,
+          article_nom: r.article_nom,
+          article_categorie: r.article_categorie,
+          article_unite: r.article_unite,
+          produit: r.produit,
+          lot: r.lot,
+          dlc: r.dlc,
+          fabricant: r.fabricant,
+          quantite_restante: Number(r.quantite_restante || 0),
+          unite: r.article_unite || 'kg',
+          mime_type: r.mime_type,
+          storage_path: r.storage_path,
+          url,
+          isImg,
+          statut: null,         // null = pas encore contrôlé
+          motif: null,
+          sortieEffectuee: false,
+          quantiteSortie: null,
+          ligneId: null,
+        };
+      }));
+      State.lots = lots;
+    }
+
+    function switchToControleScreen() {
+      $('screen-start').style.display = 'none';
+      $('screen-controle').style.display = 'block';
+      $('session-titre').textContent = `Contrôle ${fmtDateTime(State.session.date_debut)} — ${State.session.ouvert_par_nom}`;
+      renderLots();
+    }
+
+    // ==== RENDU LISTE LOTS ====
+    function applyFilterSearch() {
+      const q = State.search.toLowerCase().trim();
+      return State.lots.filter(l => {
+        if (State.filter === 'restant' && l.statut != null) return false;
+        if (State.filter === 'ok' && l.statut !== 'OK') return false;
+        if (State.filter === 'notok' && l.statut !== 'PAS_OK') return false;
+        if (q) {
+          const blob = `${l.article_nom||''} ${l.produit||''} ${l.lot||''} ${l.fabricant||''}`.toLowerCase();
+          if (!blob.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderLots() {
+      // Stats
+      const total = State.lots.length;
+      const nbOk = State.lots.filter(l => l.statut === 'OK').length;
+      const nbNotOk = State.lots.filter(l => l.statut === 'PAS_OK').length;
+      const nbSkip = State.lots.filter(l => l.statut === 'SAUTE').length;
+      const nbDone = nbOk + nbNotOk + nbSkip;
+      const restant = total - nbDone;
+      $('pst-total').textContent = restant;
+      $('pst-ok').textContent = nbOk;
+      $('pst-notok').textContent = nbNotOk;
+      $('pst-skip').textContent = nbSkip;
+      const pct = total > 0 ? Math.round((nbDone / total) * 100) : 0;
+      $('progress-fill').style.width = pct + '%';
+      $('progress-text').textContent = `${nbDone} / ${total} lot${total>1?'s':''} contrôlé${nbDone>1?'s':''} (${pct}%)`;
+
+      const filtered = applyFilterSearch();
+      const list = $('lots-list');
+      if (!filtered.length) {
+        const msg = State.filter === 'restant' && nbDone === total
+          ? `<div class="es-emoji">🎉</div><div style="font-size:15px; font-weight:600; color:var(--green-700);">Tous les lots sont contrôlés !</div><div style="font-size:13px; margin-top:8px;">Tu peux clôturer le contrôle en bas de page.</div>`
+          : `<div class="es-emoji">📦</div><div>Aucun lot ne correspond au filtre.</div>`;
+        list.innerHTML = `<div class="empty-state">${msg}</div>`;
+        return;
+      }
+      list.innerHTML = '';
+      filtered.forEach(lot => {
+        const days = daysToDlc(lot.dlc);
+        const card = document.createElement('div');
+        card.className = 'lot-card' + (lot.statut === 'OK' ? ' controlled-ok' : lot.statut === 'PAS_OK' ? ' controlled-notok' : lot.statut === 'SAUTE' ? ' controlled-skip' : '');
+        const thumbHtml = lot.isImg && lot.url
+          ? `<div class="lot-thumb" data-zoom="${escapeHtml(lot.url)}"><img src="${lot.url}" loading="lazy" alt=""><span class="zoom-hint">🔍</span></div>`
+          : `<div class="lot-thumb placeholder">${(lot.mime_type || '').includes('pdf') ? '📄' : '?'}</div>`;
+        const statusHtml = lot.statut === 'OK'
+          ? `<div class="control-status ok">✓ OK</div>`
+          : lot.statut === 'PAS_OK'
+            ? `<div class="control-status notok">✗ ${lot.sortieEffectuee ? 'Sorti du stock' : 'Signalé'}</div>`
+            : lot.statut === 'SAUTE'
+              ? `<div class="control-status skip">↷ Sauté</div>`
+              : '';
+        card.innerHTML = `
+          ${thumbHtml}
+          <div class="lot-info">
+            <div class="lot-nom">${escapeHtml(lot.article_nom || '?')}</div>
+            <div class="lot-meta">
+              <strong>${lot.quantite_restante.toFixed(2)} ${escapeHtml(lot.unite)}</strong>
+              ${lot.lot ? ' · Lot ' + escapeHtml(lot.lot) : ''}
+              ${lot.dlc ? ` · <span class="lot-badge ${dlcClass(days)}">DLC ${fmtDate(lot.dlc)} · ${dlcLabel(days)}</span>` : ''}
+              ${lot.fabricant ? '<br>' + escapeHtml(lot.fabricant) : ''}
+              ${lot.motif ? `<br><strong style="color:var(--red-700);">Motif :</strong> ${escapeHtml(lot.motif)}` : ''}
+            </div>
+          </div>
+          <div class="lot-actions">
+            <button class="btn-ok ${lot.statut==='OK'?'done':''}" data-action="ok" data-id="${lot.scan_tracabilite_id}">✓ OK</button>
+            <button class="btn-notok ${lot.statut==='PAS_OK'?'done':''}" data-action="notok" data-id="${lot.scan_tracabilite_id}">✗ Pas OK</button>
+            ${statusHtml}
+          </div>
+        `;
+        // Listeners
+        const thumbEl = card.querySelector('.lot-thumb');
+        if (thumbEl?.dataset.zoom) thumbEl.addEventListener('click', () => openLightbox(thumbEl.dataset.zoom));
+        card.querySelector('[data-action="ok"]').addEventListener('click', () => markOk(lot));
+        card.querySelector('[data-action="notok"]').addEventListener('click', () => openNotokModal(lot));
+        list.appendChild(card);
+      });
+    }
+
+    // ==== ACTIONS OK / PAS OK ====
+    async function markOk(lot) {
+      try {
+        if (lot.ligneId) {
+          // Update ligne existante
+          const { error } = await sb.from('stock_controle_lignes')
+            .update({
+              statut: 'OK', motif: null,
+              sortie_effectuee: false, quantite_sortie: null, mouvement_id: null,
+            })
+            .eq('id', lot.ligneId);
+          if (error) throw error;
+          // Si une sortie avait été créée précédemment, on la laisse (pas de rollback auto pour l'instant — l'admin peut la corriger via Sortir des matières)
+          // TODO future : rollback automatique du mouvement de sortie associé
+        } else {
+          const { data, error } = await sb.from('stock_controle_lignes')
+            .insert({
+              session_id: State.session.id,
+              scan_tracabilite_id: lot.scan_tracabilite_id,
+              article_id: lot.article_id,
+              article_nom_snapshot: lot.article_nom,
+              produit_snapshot: lot.produit,
+              lot_snapshot: lot.lot,
+              dlc_snapshot: lot.dlc,
+              quantite_snapshot: lot.quantite_restante,
+              unite_snapshot: lot.unite,
+              statut: 'OK',
+              controle_par_id: currentUser.id,
+              controle_par_nom: currentUser.nom,
+              controle_par_initiales: currentUser.initiales,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          lot.ligneId = data.id;
+        }
+        lot.statut = 'OK';
+        lot.motif = null;
+        lot.sortieEffectuee = false;
+        lot.quantiteSortie = null;
+        renderLots();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    }
+
+    function openNotokModal(lot) {
+      State.currentLot = lot;
+      State.notokAction = 'sortir-tout';
+      $('notok-lot-name').textContent = `${lot.article_nom} · Lot ${lot.lot || '—'} · ${lot.quantite_restante.toFixed(2)} ${lot.unite}`;
+      $('ct-tout-qte').textContent = `${lot.quantite_restante.toFixed(2)} ${lot.unite}`;
+      // Reset modal
+      document.querySelectorAll('#modal-notok .choice-tile').forEach(t => t.classList.remove('selected'));
+      document.querySelector('#modal-notok [data-action="sortir-tout"]').classList.add('selected');
+      $('field-qte-partielle').style.display = 'none';
+      $('notok-qte').value = lot.quantite_restante.toFixed(2);
+      $('notok-qte-info').textContent = `Stock actuel : ${lot.quantite_restante.toFixed(2)} ${lot.unite}`;
+      $('notok-motif').value = lot.motif || '';
+      $('notok-comment').value = '';
+      $('modal-notok').classList.add('visible');
+    }
+
+    document.querySelectorAll('#modal-notok .choice-tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        document.querySelectorAll('#modal-notok .choice-tile').forEach(t => t.classList.remove('selected'));
+        tile.classList.add('selected');
+        State.notokAction = tile.dataset.action;
+        // Pas de quantité partielle dans cette V1 (simplification : tout ou signalement)
+        $('field-qte-partielle').style.display = 'none';
+      });
+    });
+
+    $('notok-cancel').addEventListener('click', () => $('modal-notok').classList.remove('visible'));
+
+    $('notok-confirm').addEventListener('click', async () => {
+      const lot = State.currentLot;
+      if (!lot) return;
+      const motif = $('notok-motif').value;
+      const comment = $('notok-comment').value.trim();
+      if (!motif) {
+        showToast('Choisis un motif', 'error');
+        return;
+      }
+      const motifFinal = comment ? `${motif} — ${comment}` : motif;
+      const sortir = State.notokAction === 'sortir-tout';
+      const qte = sortir ? lot.quantite_restante : null;
+
+      $('notok-confirm').disabled = true;
+      try {
+        let mouvementId = null;
+        // 1. Créer la sortie de stock si demandé
+        if (sortir && qte > 0) {
+          const { data: mouv, error: errMouv } = await sb.from('stock_mouvements')
+            .insert({
+              type: 'SORTIE',
+              article_id: lot.article_id,
+              scan_tracabilite_id: lot.scan_tracabilite_id,
+              quantite: qte,
+              unite: lot.unite,
+              etablissement: currentEtab,
+              motif: `Contrôle stock — ${motifFinal}`,
+              source_table: 'stock_controle',
+              source_id: State.session.id,
+              created_by_id: currentUser.id,
+              created_by_nom: currentUser.nom,
+              created_by_initiales: currentUser.initiales,
+            })
+            .select()
+            .single();
+          if (errMouv) throw errMouv;
+          mouvementId = mouv.id;
+        }
+
+        // 2. Upsert ligne contrôle
+        if (lot.ligneId) {
+          const { error } = await sb.from('stock_controle_lignes')
+            .update({
+              statut: 'PAS_OK',
+              motif: motifFinal,
+              sortie_effectuee: !!sortir,
+              quantite_sortie: qte,
+              mouvement_id: mouvementId,
+            })
+            .eq('id', lot.ligneId);
+          if (error) throw error;
+        } else {
+          const { data, error } = await sb.from('stock_controle_lignes')
+            .insert({
+              session_id: State.session.id,
+              scan_tracabilite_id: lot.scan_tracabilite_id,
+              article_id: lot.article_id,
+              article_nom_snapshot: lot.article_nom,
+              produit_snapshot: lot.produit,
+              lot_snapshot: lot.lot,
+              dlc_snapshot: lot.dlc,
+              quantite_snapshot: lot.quantite_restante,
+              unite_snapshot: lot.unite,
+              statut: 'PAS_OK',
+              motif: motifFinal,
+              sortie_effectuee: !!sortir,
+              quantite_sortie: qte,
+              mouvement_id: mouvementId,
+              controle_par_id: currentUser.id,
+              controle_par_nom: currentUser.nom,
+              controle_par_initiales: currentUser.initiales,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          lot.ligneId = data.id;
+        }
+        lot.statut = 'PAS_OK';
+        lot.motif = motifFinal;
+        lot.sortieEffectuee = !!sortir;
+        lot.quantiteSortie = qte;
+        if (sortir) {
+          lot.quantite_restante = 0;  // refléter en mémoire
+          showToast(`✓ Sortie de stock enregistrée (${qte.toFixed(2)} ${lot.unite})`, 'success');
+        } else {
+          showToast(`✓ Lot signalé (sans sortie de stock)`, 'success');
+        }
+        $('modal-notok').classList.remove('visible');
+        renderLots();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      } finally {
+        $('notok-confirm').disabled = false;
+      }
+    });
+
+    // ==== ABANDONNER ====
+    $('btn-abandon').addEventListener('click', async () => {
+      if (!confirm('Abandonner cette session de contrôle ?\n\nLes contrôles déjà enregistrés seront conservés mais la session sera marquée "abandonnée".')) return;
+      try {
+        await sb.from('stock_controle_sessions').update({
+          statut: 'abandonne',
+          date_fin: new Date().toISOString(),
+        }).eq('id', State.session.id);
+        State.session = null;
+        State.lots = [];
+        await loadStartScreen();
+        showToast('Session abandonnée');
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      }
+    });
+
+    // ==== TERMINER ====
+    $('btn-finish').addEventListener('click', () => {
+      const total = State.lots.length;
+      const nbOk = State.lots.filter(l => l.statut === 'OK').length;
+      const nbNotOk = State.lots.filter(l => l.statut === 'PAS_OK').length;
+      const nbSkip = total - nbOk - nbNotOk;
+      const nbSorties = State.lots.filter(l => l.sortieEffectuee).length;
+      let summary = `${nbOk}/${total} OK · ${nbNotOk} pas OK`;
+      if (nbSkip > 0) summary += ` · ${nbSkip} non contrôlé${nbSkip>1?'s':''}`;
+      if (nbSorties > 0) summary += ` · ${nbSorties} sortie${nbSorties>1?'s':''} de stock`;
+      $('finish-summary').textContent = summary;
+      $('finish-notes').value = '';
+      $('modal-finish').classList.add('visible');
+    });
+
+    $('finish-cancel').addEventListener('click', () => $('modal-finish').classList.remove('visible'));
+
+    $('finish-confirm').addEventListener('click', async () => {
+      $('finish-confirm').disabled = true;
+      try {
+        const total = State.lots.length;
+        const nbOk = State.lots.filter(l => l.statut === 'OK').length;
+        const nbNotOk = State.lots.filter(l => l.statut === 'PAS_OK').length;
+        const nbSorties = State.lots.filter(l => l.sortieEffectuee).length;
+
+        // Marquer comme SAUTE les lots non contrôlés (insérer ligne)
+        const sautes = State.lots.filter(l => l.statut == null);
+        if (sautes.length > 0) {
+          const rows = sautes.map(lot => ({
+            session_id: State.session.id,
+            scan_tracabilite_id: lot.scan_tracabilite_id,
+            article_id: lot.article_id,
+            article_nom_snapshot: lot.article_nom,
+            produit_snapshot: lot.produit,
+            lot_snapshot: lot.lot,
+            dlc_snapshot: lot.dlc,
+            quantite_snapshot: lot.quantite_restante,
+            unite_snapshot: lot.unite,
+            statut: 'SAUTE',
+            controle_par_id: currentUser.id,
+            controle_par_nom: currentUser.nom,
+            controle_par_initiales: currentUser.initiales,
+          }));
+          await sb.from('stock_controle_lignes').insert(rows);
+        }
+        const nbSkip = sautes.length;
+
+        // Update session
+        await sb.from('stock_controle_sessions').update({
+          statut: 'termine',
+          date_fin: new Date().toISOString(),
+          nb_lots_total: total,
+          nb_ok: nbOk,
+          nb_pas_ok: nbNotOk,
+          nb_sautes: nbSkip,
+          nb_sorties: nbSorties,
+          notes: $('finish-notes').value.trim() || null,
+        }).eq('id', State.session.id);
+
+        showToast(`✓ Contrôle terminé : ${nbOk}/${total} OK`, 'success');
+        State.session = null;
+        State.lots = [];
+        $('modal-finish').classList.remove('visible');
+        await loadStartScreen();
+      } catch (err) {
+        console.error(err);
+        showToast('Erreur : ' + err.message, 'error');
+      } finally {
+        $('finish-confirm').disabled = false;
+      }
+    });
+
+    // ==== HISTORIQUE : DÉTAIL D'UNE SESSION ====
+    async function openSessionDetail(s) {
+      $('sd-title').textContent = `Contrôle du ${fmtDateTime(s.date_debut)}`;
+      const dureeMs = s.date_fin ? new Date(s.date_fin) - new Date(s.date_debut) : null;
+      const dureeStr = dureeMs ? Math.round(dureeMs / 60000) + ' min' : 'en cours';
+      $('sd-subtitle').textContent = `${s.ouvert_par_nom} · ${dureeStr} · ${s.nb_lots_total} lots · ${s.statut}`;
+      $('sd-lines').innerHTML = '<div class="empty-state">Chargement…</div>';
+      $('modal-session-detail').classList.add('visible');
+
+      const { data: lignes } = await sb.from('stock_controle_lignes')
+        .select('*')
+        .eq('session_id', s.id)
+        .order('created_at', { ascending:true });
+
+      if (!lignes || lignes.length === 0) {
+        $('sd-lines').innerHTML = '<div class="empty-state">Aucune ligne enregistrée.</div>';
+        return;
+      }
+      const groupes = { OK: [], PAS_OK: [], SAUTE: [] };
+      lignes.forEach(l => groupes[l.statut]?.push(l));
+
+      let html = '';
+      if (groupes.PAS_OK.length > 0) {
+        html += `<div style="font-size:13px; font-weight:700; color:var(--red-700); margin:8px 0 6px;">❌ Pas OK (${groupes.PAS_OK.length})</div>`;
+        groupes.PAS_OK.forEach(l => {
+          html += `<div style="padding:8px 10px; background:var(--red-100); border-radius:var(--radius-sm); margin-bottom:4px; font-size:13px;">
+            <div style="font-weight:600;">${escapeHtml(l.article_nom_snapshot || '?')} ${l.lot_snapshot ? '· Lot ' + escapeHtml(l.lot_snapshot) : ''}</div>
+            <div style="font-size:12px; color:var(--gray-600); margin-top:2px;">
+              ${l.quantite_snapshot ? Number(l.quantite_snapshot).toFixed(2) + ' ' + (l.unite_snapshot || 'kg') : '?'} ·
+              ${l.sortie_effectuee ? `<strong>Sorti du stock</strong>` : 'Signalé seulement'} ·
+              <em>${escapeHtml(l.motif || '')}</em>
+            </div>
+          </div>`;
+        });
+      }
+      if (groupes.OK.length > 0) {
+        html += `<div style="font-size:13px; font-weight:700; color:var(--green-700); margin:12px 0 6px;">✅ OK (${groupes.OK.length})</div>`;
+        html += '<div style="font-size:12px; color:var(--gray-600); padding:6px 10px;">' +
+          groupes.OK.map(l => `${escapeHtml(l.article_nom_snapshot)} ${l.lot_snapshot?'('+escapeHtml(l.lot_snapshot)+')':''}`).join(' · ') +
+          '</div>';
+      }
+      if (groupes.SAUTE.length > 0) {
+        html += `<div style="font-size:13px; font-weight:700; color:var(--gray-600); margin:12px 0 6px;">↷ Sautés (${groupes.SAUTE.length})</div>`;
+        html += '<div style="font-size:12px; color:var(--gray-500); padding:6px 10px;">' +
+          groupes.SAUTE.map(l => `${escapeHtml(l.article_nom_snapshot)} ${l.lot_snapshot?'('+escapeHtml(l.lot_snapshot)+')':''}`).join(' · ') +
+          '</div>';
+      }
+      if (s.notes) {
+        html += `<div style="margin-top:14px; padding:10px; background:var(--blue-100); border-radius:var(--radius-sm); font-size:13px;"><strong>Notes :</strong> ${escapeHtml(s.notes)}</div>`;
+      }
+      $('sd-lines').innerHTML = html;
+    }
+
+    $('sd-close').addEventListener('click', () => $('modal-session-detail').classList.remove('visible'));
+    $('modal-session-detail').addEventListener('click', (e) => {
+      if (e.target === $('modal-session-detail')) $('modal-session-detail').classList.remove('visible');
+    });
+
+    // ==== FILTRES UI ====
+    document.querySelectorAll('[data-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filter = chip.dataset.filter;
+        renderLots();
+      });
+    });
+    $('search').addEventListener('input', (e) => {
+      State.search = e.target.value;
+      renderLots();
+    });
+
+    // ==== LIGHTBOX ====
+    function openLightbox(url) {
+      $('lightbox-img').src = url;
+      $('lightbox').classList.add('visible');
+    }
+    $('lightbox-close').addEventListener('click', closeLightbox);
+    $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox') || e.target === $('lightbox-img')) closeLightbox(); });
+    function closeLightbox() { $('lightbox').classList.remove('visible'); $('lightbox-img').src = ''; }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeLightbox();
+        document.querySelectorAll('.modal-bg.visible').forEach(m => m.classList.remove('visible'));
+      }
+    });
+
+    // INIT
+    init();
+  </script>
+</body>
+</html>
