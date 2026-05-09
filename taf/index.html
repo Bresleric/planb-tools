@@ -2365,12 +2365,32 @@
   // Store users list for edit modal to avoid inline JS with special chars
   let editUsersList = [];
 
+  // État local de la modale d'édition pour le rattachement production
+  let editIsProduction = false;
+  let editFicheId = null;
+  let editFicheNom = null;
+  let editCategorieProd = null;
+
   function showEditTaskModal(taskId) {
     if (userRole() < 3) return;
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     editingTaskId = taskId;
     editAssignee = task.attribue_a_id ? { id: task.attribue_a_id, nom: task.attribue_a_nom, initiales: task.attribue_a_initiales } : null;
+
+    // Initialiser l'état production à partir de la tâche
+    editIsProduction = !!task.is_production;
+    editFicheId = task.fiche_id || null;
+    editCategorieProd = task.categorie_production || null;
+    editFicheNom = null;
+    // Pré-charger les fiches si on en a besoin
+    if (productionFiches.length === 0) {
+      DB.getFiches(currentEtablissement).then(d => { productionFiches = d || []; renderEditFicheLine(); }).catch(()=>{});
+    }
+    if (editFicheId) {
+      const f = productionFiches.find(x => x.id === editFicheId);
+      if (f) editFicheNom = f.nom;
+    }
 
     const pLabels = [
       { val: 1, label: '! Basse' },
@@ -2437,6 +2457,37 @@
             ${CATEGORIES.map(c => `<button class="chip ${c === task.categorie ? 'active' : ''}" data-val="${c}" onclick="selectChip(this, 'edit-categorie')">${c}</button>`).join('')}
           </div>
         </div>
+
+        <!-- RATTACHEMENT PRODUCTION (admin/manager) -->
+        <div class="form-group" style="margin:0; padding:10px 12px; background:#f3e8ff; border:1px solid #ddd6fe; border-radius:8px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:600; color:#6b21a8; margin:0;">
+            <input type="checkbox" id="edit-is-production" ${editIsProduction ? 'checked' : ''}
+                   onchange="toggleEditProduction(this.checked)"
+                   style="width:18px; height:18px; accent-color:#7c3aed; cursor:pointer;">
+            🏭 Tâche de production (lier à une fiche technique)
+          </label>
+          <div id="edit-production-details" style="${editIsProduction ? '' : 'display:none;'} margin-top:10px;">
+            <!-- Catégorie production -->
+            <label style="font-size:0.75rem; font-weight:600; color:#6b21a8; margin-bottom:4px; display:block;">Type de production</label>
+            <div class="chip-group" id="edit-cat-prod" style="margin-bottom:10px;">
+              <button type="button" class="chip ${editCategorieProd === 'mise_en_place' ? 'active' : ''}" data-val="mise_en_place" onclick="selectChip(this, 'edit-cat-prod'); editCategorieProd='mise_en_place';">🔪 Mise en place</button>
+              <button type="button" class="chip ${editCategorieProd === 'produit_intermediaire' ? 'active' : ''}" data-val="produit_intermediaire" onclick="selectChip(this, 'edit-cat-prod'); editCategorieProd='produit_intermediaire';">🥘 Intermédiaire</button>
+              <button type="button" class="chip ${editCategorieProd === 'produit_fini' ? 'active' : ''}" data-val="produit_fini" onclick="selectChip(this, 'edit-cat-prod'); editCategorieProd='produit_fini';">✨ Produit fini</button>
+            </div>
+
+            <!-- Sélecteur fiche -->
+            <label style="font-size:0.75rem; font-weight:600; color:#6b21a8; margin-bottom:4px; display:block;">Fiche technique liée</label>
+            <div id="edit-fiche-line" style="margin-bottom:6px;"></div>
+            <div style="position:relative;">
+              <input type="text" id="edit-fiche-search" autocomplete="off" autocorrect="off" spellcheck="false"
+                     placeholder="Tape le nom d'une fiche…"
+                     oninput="filterEditFiches(this.value)"
+                     style="width:100%; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+              <div id="edit-fiche-results" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:white; border:1px solid #d1d5db; border-radius:6px; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:10; margin-top:2px;"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="form-group" style="margin:0">
           <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Attribuer à</label>
           <div id="edit-assignee-display" style="margin-bottom:4px">
@@ -2459,6 +2510,77 @@
       { label: 'Annuler', action: 'closeModal()', cls: '' },
       { label: 'Enregistrer', action: 'submitEditTask()', cls: 'primary' }
     ]);
+
+    // Une fois le DOM rendu : afficher la ligne fiche choisie (si elle existe)
+    setTimeout(renderEditFicheLine, 0);
+  }
+
+  // ====== Rattachement production dans la modale d'édition ======
+  function toggleEditProduction(checked) {
+    editIsProduction = !!checked;
+    document.getElementById('edit-production-details').style.display = checked ? '' : 'none';
+    if (!checked) {
+      // Décocher = on conserve fiche_id mais on désactive la production
+      // (l'utilisateur peut toujours la réactiver). On vide pas.
+    }
+  }
+
+  function renderEditFicheLine() {
+    const line = document.getElementById('edit-fiche-line');
+    if (!line) return; // modale fermée
+    if (editFicheId && editFicheNom) {
+      line.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:white; border:1px solid #c4b5fd; border-radius:6px;">
+        <span style="font-weight:600; color:#1e293b; flex:1;">📖 ${esc(editFicheNom)}</span>
+        <button type="button" onclick="unpickEditFiche()" style="border:none; background:none; cursor:pointer; color:#dc2626; font-size:1rem;">✕</button>
+      </div>`;
+    } else {
+      line.innerHTML = `<div style="font-size:0.78rem; color:#6b21a8; font-style:italic;">— Aucune fiche choisie —</div>`;
+    }
+  }
+
+  function filterEditFiches(q) {
+    const results = document.getElementById('edit-fiche-results');
+    if (!results) return;
+    const s = (q || '').toLowerCase().trim();
+    if (!s) { results.style.display = 'none'; return; }
+    const matches = productionFiches
+      .filter(f => f.actif !== false && (f.nom.toLowerCase().includes(s) || (f.code_court || '').toLowerCase().includes(s)))
+      .slice(0, 8);
+    if (matches.length === 0) {
+      results.innerHTML = `<div style="padding:8px 12px; color:#6b7280; font-size:0.85rem;">Aucune fiche trouvée</div>`;
+    } else {
+      results.innerHTML = matches.map(f => `
+        <div onclick="pickEditFiche('${f.id}')" style="padding:8px 12px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f1f5f9;">
+          ${f.code_court ? `<span style="color:#7c3aed; font-weight:700; font-size:0.7rem; padding:1px 5px; background:#f3e8ff; border-radius:4px; margin-right:6px;">${esc(f.code_court)}</span>` : ''}
+          ${esc(f.nom)}
+          <span style="color:#94a3b8; font-size:0.72rem; margin-left:6px;">${esc(f.categorie || '')}</span>
+        </div>`).join('');
+    }
+    results.style.display = '';
+  }
+
+  function pickEditFiche(ficheId) {
+    const f = productionFiches.find(x => x.id === ficheId);
+    if (!f) return;
+    editFicheId = f.id;
+    editFicheNom = f.nom;
+    // Pré-remplir la catégorie production depuis la fiche si vide
+    if (!editCategorieProd && f.categorie) {
+      editCategorieProd = f.categorie;
+      // Activer le chip correspondant
+      document.querySelectorAll('#edit-cat-prod .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.val === editCategorieProd);
+      });
+    }
+    renderEditFicheLine();
+    document.getElementById('edit-fiche-search').value = '';
+    document.getElementById('edit-fiche-results').style.display = 'none';
+  }
+
+  function unpickEditFiche() {
+    editFicheId = null;
+    editFicheNom = null;
+    renderEditFicheLine();
   }
 
   function pickEditAssignee(idx) {
@@ -2493,6 +2615,8 @@
       const obs = document.getElementById('edit-task-obs')?.value?.trim();
       const echeance = document.getElementById('edit-task-date')?.value;
 
+      // Récupérer l'état production depuis l'UI
+      const isProductionChecked = !!document.getElementById('edit-is-production')?.checked;
       const updates = {
         tache: tache,
         creneau: creneau,
@@ -2503,7 +2627,11 @@
         echeance: echeance || dateStr(filterDate),
         attribue_a_id: editAssignee ? editAssignee.id : null,
         attribue_a_nom: editAssignee ? editAssignee.nom : null,
-        attribue_a_initiales: editAssignee ? editAssignee.initiales : null
+        attribue_a_initiales: editAssignee ? editAssignee.initiales : null,
+        // Rattachement production
+        is_production: isProductionChecked,
+        fiche_id: isProductionChecked ? (editFicheId || null) : null,
+        categorie_production: isProductionChecked ? (editCategorieProd || null) : null
       };
 
       console.log('Updating task', editingTaskId, updates);
