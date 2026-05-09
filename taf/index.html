@@ -992,6 +992,7 @@
   let currentUser = null;
   let currentEtablissement = null;
   let supabaseClient = null;
+  let sb = null; // alias court de supabaseClient (utilisé dans plusieurs fonctions)
   let filterDate = new Date();
   let filterCreneau = 'all';
   let filterEquipe = null; // null = user's team
@@ -1113,6 +1114,7 @@
   function initSupabase() {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      sb = supabaseClient; // alias pour les fonctions qui l'utilisent
     }
   }
 
