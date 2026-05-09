@@ -553,6 +553,90 @@
       background: #f3e8ff; color: #7c3aed; border: 1px solid #ddd6fe;
       font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 600;
     }
+
+    /* ====== FICHE TECHNIQUE — modale consultation au démarrage TAF ====== */
+    .fiche-overlay {
+      display: none; position: fixed; inset: 0; z-index: 240;
+      background: rgba(15, 23, 42, .55); align-items: flex-start;
+      justify-content: center; padding: 24px 12px; overflow-y: auto;
+    }
+    .fiche-overlay.show { display: flex; }
+    .fiche-overlay.minimized { display: none; }
+    .fiche-box {
+      background: white; border-radius: 14px; width: 100%; max-width: 640px;
+      max-height: calc(100vh - 48px); overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25); display: flex; flex-direction: column;
+    }
+    .fiche-header {
+      padding: 14px 16px; border-bottom: 2px solid #2563eb;
+      background: linear-gradient(135deg, #dbeafe, white);
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      border-radius: 14px 14px 0 0;
+    }
+    .fiche-header h2 { font-size: 1rem; color: #1d4ed8; font-weight: 700; flex: 1; }
+    .fiche-header-actions { display: flex; gap: 6px; }
+    .fiche-btn-icon {
+      width: 32px; height: 32px; border-radius: 8px; border: 1px solid #cbd5e1;
+      background: white; cursor: pointer; font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fiche-btn-icon:active { background: #e2e8f0; }
+    .fiche-body { padding: 16px; overflow-y: auto; flex: 1; }
+    .fiche-body h3 {
+      font-size: 0.85rem; color: #475569; text-transform: uppercase;
+      margin: 14px 0 8px; letter-spacing: .5px; font-weight: 700;
+    }
+    .fiche-body h3:first-child { margin-top: 0; }
+    .fiche-meta {
+      display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem;
+      padding: 8px 10px; background: #f8fafc; border-radius: 8px;
+      border: 1px solid #e2e8f0; margin-bottom: 12px;
+    }
+    .fiche-meta-item { display: flex; flex-direction: column; min-width: 70px; }
+    .fiche-meta-item .lbl { color: #64748b; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; }
+    .fiche-meta-item .val { color: #0f172a; font-weight: 600; }
+    .fiche-ing-table {
+      width: 100%; border-collapse: collapse; font-size: 0.85rem;
+    }
+    .fiche-ing-table th, .fiche-ing-table td {
+      padding: 6px 10px; border-bottom: 1px solid #e2e8f0; text-align: left;
+    }
+    .fiche-ing-table th {
+      background: #f1f5f9; color: #475569; font-weight: 600;
+      font-size: 0.75rem; text-transform: uppercase;
+    }
+    .fiche-ing-table td:nth-child(2), .fiche-ing-table td:nth-child(3) {
+      text-align: right; font-variant-numeric: tabular-nums;
+    }
+    .fiche-instructions {
+      white-space: pre-wrap; line-height: 1.55; font-size: 0.9rem;
+      padding: 12px 14px; background: #fefce8; border-left: 3px solid #ca8a04;
+      border-radius: 6px; color: #422006;
+    }
+    .fiche-empty {
+      padding: 14px; text-align: center; color: #64748b; font-size: 0.85rem;
+      background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;
+    }
+    /* Bandeau persistant en pied d'écran (quand modale réduite) */
+    .fiche-bandeau {
+      display: none; position: fixed; left: 12px; right: 12px; bottom: 12px;
+      z-index: 230; padding: 10px 14px; border-radius: 12px;
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: white; box-shadow: 0 6px 20px rgba(37,99,235,.4);
+      align-items: center; justify-content: space-between; gap: 10px;
+      cursor: pointer; font-weight: 600;
+    }
+    .fiche-bandeau.show { display: flex; }
+    .fiche-bandeau-text { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .fiche-bandeau-name {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 0.95rem;
+    }
+    .fiche-bandeau-close {
+      width: 28px; height: 28px; border-radius: 8px; border: none;
+      background: rgba(255,255,255,.2); color: white; cursor: pointer; font-size: 1rem;
+    }
+
     .etiquette-overlay {
       position: fixed; inset: 0; z-index: 300;
       background: rgba(0,0,0,.5); display: flex;
@@ -779,6 +863,16 @@
         </div>
       </div>
 
+      <!-- RAPPEL FICHE TECHNIQUE (Phase 2) — affichée si fiche liée -->
+      <details id="prod-fiche-resume" class="form-group" style="display:none; padding:10px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;">
+        <summary style="cursor:pointer; font-weight:600; color:#1d4ed8; font-size:0.9rem; user-select:none;">
+          📖 Rappel fiche technique
+        </summary>
+        <div id="prod-fiche-resume-body" style="margin-top:10px; font-size:0.85rem; color:#1e293b;">
+          <!-- Injecté dynamiquement -->
+        </div>
+      </details>
+
       <div class="form-group">
         <label>Nom du produit *</label>
         <input type="text" class="form-input" id="prod-nom" placeholder="Nom du produit">
@@ -831,6 +925,32 @@
       <button class="btn-production save" onclick="saveProductionFromTaf()">Enregistrer</button>
     </div>
   </div>
+</div>
+
+<!-- FICHE TECHNIQUE — modale consultation au démarrage TAF -->
+<div class="fiche-overlay" id="fiche-overlay" onclick="event.target===this&&minimizeFiche()">
+  <div class="fiche-box">
+    <div class="fiche-header">
+      <h2 id="fiche-title">📖 Fiche technique</h2>
+      <div class="fiche-header-actions">
+        <button class="fiche-btn-icon" onclick="minimizeFiche()" title="Réduire">▾</button>
+        <button class="fiche-btn-icon" onclick="closeFiche()" title="Fermer">✕</button>
+      </div>
+    </div>
+    <div class="fiche-body" id="fiche-body">
+      <!-- Contenu injecté dynamiquement par renderFiche() -->
+    </div>
+  </div>
+</div>
+
+<!-- BANDEAU PERSISTANT — fiche réduite -->
+<div class="fiche-bandeau" id="fiche-bandeau" onclick="restoreFiche()">
+  <div class="fiche-bandeau-text">
+    <span>📖</span>
+    <span class="fiche-bandeau-name" id="fiche-bandeau-name">—</span>
+    <span style="opacity:.85; font-weight:400; font-size:0.8rem;">touch pour rouvrir</span>
+  </div>
+  <button class="fiche-bandeau-close" onclick="event.stopPropagation(); closeFiche()" title="Fermer">✕</button>
 </div>
 
 <!-- TOAST -->
@@ -1748,6 +1868,7 @@
   }
 
   // Démarre le chrono d'une tâche (sauvegarde côté DB pour persistance)
+  // Si la tâche est de production : ouvre la fiche technique en modale minimisable.
   async function startTask(id) {
     try {
       const task = tasks.find(t => t.id === id);
@@ -1766,12 +1887,143 @@
         duree_accumulee_secondes: task.duree_accumulee_secondes
       });
       showToast('Chrono démarré ⏱', 'success');
+
+      // === Affichage fiche technique pour les TAF de production ===
+      if (task.is_production) {
+        if (task.fiche_id) {
+          openFicheConsultModal(task.fiche_id, task.tache);
+        } else {
+          showToast('⚠ Fiche à créer pour cette tâche', 'error');
+        }
+      }
     } catch (e) {
       console.error(e);
       showToast('Erreur démarrage chrono', 'error');
       tasks = await DB.getTasks(filterDate);
       renderFiltered();
     }
+  }
+
+  // ====== FICHE TECHNIQUE — modale consultation (au démarrage TAF) ======
+  // Charge la fiche depuis le cache productionFiches (ou Supabase si absent),
+  // récupère ses ingrédients, puis affiche la modale plein écran.
+  // L'utilisateur peut la réduire (bouton ▾) → la fiche reste accessible
+  // via un bandeau au pied d'écran tant que la session de cuisine dure.
+  async function openFicheConsultModal(ficheId, taskName) {
+    if (!ficheId) return;
+    try {
+      // Cache fiches
+      if (productionFiches.length === 0) {
+        productionFiches = await DB.getFiches(currentEtablissement);
+      }
+      const fiche = productionFiches.find(f => f.id === ficheId);
+      if (!fiche) {
+        showToast('Fiche introuvable', 'error');
+        return;
+      }
+      // Charger les ingrédients (TOUS, pas filtrés par article_id)
+      const { data: ings, error } = await sb.from('fiche_ingredients')
+        .select('id, nom, quantite, unite, ordre')
+        .eq('fiche_id', ficheId)
+        .order('ordre');
+      if (error) throw error;
+
+      renderFiche(fiche, ings || [], taskName);
+      // Affichage plein écran
+      document.getElementById('fiche-overlay').classList.remove('minimized');
+      document.getElementById('fiche-overlay').classList.add('show');
+      document.getElementById('fiche-bandeau').classList.remove('show');
+      // Mémoriser pour le bandeau
+      document.getElementById('fiche-bandeau-name').textContent = fiche.nom;
+    } catch (e) {
+      console.error('openFicheConsultModal:', e);
+      showToast('Erreur chargement fiche', 'error');
+    }
+  }
+
+  // Construit le HTML de la fiche : meta + ingrédients + instructions
+  function renderFiche(fiche, ings, taskName) {
+    const title = `📖 ${esc(fiche.nom)}`;
+    document.getElementById('fiche-title').textContent = title;
+
+    // Meta : rendement, temps prépa/cuisson/repos, DLC, température
+    const metaItems = [];
+    if (fiche.rendement_quantite) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Rendement</div><div class="val">${esc(String(fiche.rendement_quantite))} ${esc(fiche.rendement_unite || 'portions')}</div></div>`);
+    }
+    if (fiche.temps_preparation) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Prépa</div><div class="val">${fiche.temps_preparation} min</div></div>`);
+    }
+    if (fiche.temps_cuisson) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Cuisson</div><div class="val">${fiche.temps_cuisson} min</div></div>`);
+    }
+    if (fiche.temps_repos) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Repos</div><div class="val">${fiche.temps_repos} min</div></div>`);
+    }
+    if (fiche.dlc_jours) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">DLC</div><div class="val">${fiche.dlc_jours} j</div></div>`);
+    } else if (fiche.dlc_heures) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">DLC</div><div class="val">${fiche.dlc_heures} h</div></div>`);
+    }
+    if (fiche.temperature_stockage) {
+      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Stockage</div><div class="val">${esc(fiche.temperature_stockage)}</div></div>`);
+    }
+    const metaHTML = metaItems.length ? `<div class="fiche-meta">${metaItems.join('')}</div>` : '';
+
+    // Ingrédients
+    let ingHTML = '';
+    if (ings.length === 0) {
+      ingHTML = `<h3>🥗 Ingrédients</h3><div class="fiche-empty">Aucun ingrédient renseigné dans cette fiche.</div>`;
+    } else {
+      const rows = ings.map(i => `
+        <tr>
+          <td>${esc(i.nom)}</td>
+          <td>${esc(String(i.quantite))}</td>
+          <td>${esc(i.unite || '')}</td>
+        </tr>`).join('');
+      ingHTML = `
+        <h3>🥗 Ingrédients (${ings.length})</h3>
+        <table class="fiche-ing-table">
+          <thead><tr><th>Ingrédient</th><th>Qté</th><th>Unité</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    // Instructions
+    let instrHTML = '';
+    if (fiche.instructions && fiche.instructions.trim().length > 0) {
+      instrHTML = `<h3>📝 Instructions</h3><div class="fiche-instructions">${esc(fiche.instructions)}</div>`;
+    } else {
+      instrHTML = `<h3>📝 Instructions</h3><div class="fiche-empty">Aucune instruction renseignée pour cette fiche.</div>`;
+    }
+
+    // Notes (optionnel)
+    let notesHTML = '';
+    if (fiche.notes && fiche.notes.trim().length > 0) {
+      notesHTML = `<h3>💡 Notes</h3><div class="fiche-instructions" style="background:#fef3c7; border-left-color:#d97706;">${esc(fiche.notes)}</div>`;
+    }
+
+    document.getElementById('fiche-body').innerHTML = metaHTML + ingHTML + instrHTML + notesHTML;
+  }
+
+  // Réduit la modale au bandeau de pied d'écran (chrono continue)
+  function minimizeFiche() {
+    document.getElementById('fiche-overlay').classList.remove('show');
+    document.getElementById('fiche-overlay').classList.add('minimized');
+    document.getElementById('fiche-bandeau').classList.add('show');
+  }
+
+  // Restaure la modale plein écran depuis le bandeau
+  function restoreFiche() {
+    document.getElementById('fiche-overlay').classList.remove('minimized');
+    document.getElementById('fiche-overlay').classList.add('show');
+    document.getElementById('fiche-bandeau').classList.remove('show');
+  }
+
+  // Ferme la modale ET le bandeau (n'arrête pas le chrono)
+  function closeFiche() {
+    document.getElementById('fiche-overlay').classList.remove('show', 'minimized');
+    document.getElementById('fiche-bandeau').classList.remove('show');
   }
 
   // Met en pause le chrono : on accumule le delta dans duree_accumulee_secondes
@@ -2623,6 +2875,10 @@
       c.classList.toggle('active', c.dataset.val === task.categorie_production);
     });
 
+    // Reset du rappel fiche technique (Phase 2)
+    document.getElementById('prod-fiche-resume').style.display = 'none';
+    document.getElementById('prod-fiche-resume-body').innerHTML = '';
+
     // Charger la fiche technique pour pré-remplir rendement/unité
     if (task.fiche_id) {
       // Cas standard : fiche déjà liée → on cache la zone choix
@@ -2636,6 +2892,8 @@
           if (fiche.rendement_quantite) document.getElementById('prod-quantite').value = fiche.rendement_quantite;
           if (fiche.rendement_unite) document.getElementById('prod-unite').value = fiche.rendement_unite;
           prodFicheRendement = fiche.rendement_quantite || null;
+          // Phase 2 : rappel instructions + temps
+          renderProdFicheResume(fiche);
         }
         // Charger les ingrédients de la fiche + lots disponibles
         await loadProductionMatieres(task.fiche_id);
@@ -2747,6 +3005,39 @@
     let common = 0;
     aw.forEach(w => { if (bw.has(w)) common++; });
     return aw.size > 0 ? common / aw.size : 0;
+  }
+
+  // Phase 2 — Affiche un rappel instructions + temps dans la modale de validation production.
+  // Utile pour vérifier que la prod a été conduite conformément à la fiche.
+  function renderProdFicheResume(fiche) {
+    const wrap = document.getElementById('prod-fiche-resume');
+    const body = document.getElementById('prod-fiche-resume-body');
+    if (!fiche) { wrap.style.display = 'none'; return; }
+
+    const temps = [];
+    if (fiche.temps_preparation) temps.push(`Prépa ${fiche.temps_preparation}min`);
+    if (fiche.temps_cuisson) temps.push(`Cuisson ${fiche.temps_cuisson}min`);
+    if (fiche.temps_repos) temps.push(`Repos ${fiche.temps_repos}min`);
+
+    let metaLine = '';
+    if (temps.length > 0) {
+      metaLine += `<div style="margin-bottom:8px;"><strong>⏱ Temps :</strong> ${temps.join(' · ')}</div>`;
+    }
+    if (fiche.dlc_jours || fiche.dlc_heures || fiche.temperature_stockage) {
+      const parts = [];
+      if (fiche.dlc_jours) parts.push(`DLC ${fiche.dlc_jours}j`);
+      else if (fiche.dlc_heures) parts.push(`DLC ${fiche.dlc_heures}h`);
+      if (fiche.temperature_stockage) parts.push(`Stockage ${esc(fiche.temperature_stockage)}`);
+      metaLine += `<div style="margin-bottom:8px;"><strong>📦 Conservation :</strong> ${parts.join(' · ')}</div>`;
+    }
+
+    let instrHTML = '';
+    if (fiche.instructions && fiche.instructions.trim().length > 0) {
+      instrHTML = `<div style="white-space:pre-wrap; line-height:1.5; padding:8px 10px; background:white; border:1px solid #bfdbfe; border-radius:6px; font-size:0.85rem;">${esc(fiche.instructions)}</div>`;
+    }
+
+    body.innerHTML = metaLine + instrHTML || '<div style="color:#64748b;">Aucune information complémentaire dans la fiche.</div>';
+    wrap.style.display = (metaLine || instrHTML) ? '' : 'none';
   }
 
   async function loadProductionMatieres(ficheId) {
