@@ -1081,12 +1081,18 @@ function init() {
 
   // Tab create is now accessed via FAB button on fiches tab (manager+ only)
 
-  setupTabs();
-  setupFilters();
-  setupProductionsFilters();
-  setupAllergens();
-  setupIngredientForm();
-  setupRattachement();
+  // Chaque setup est isolé : une erreur dans l'un ne doit pas empêcher les autres
+  // ni les chargements de données. Diagnostic = console (logs préfixés [init]).
+  const tryRun = (label, fn) => {
+    try { fn(); }
+    catch (e) { console.error('[init] ' + label + ' KO :', e); }
+  };
+  tryRun('setupTabs', setupTabs);
+  tryRun('setupFilters', setupFilters);
+  tryRun('setupProductionsFilters', setupProductionsFilters);
+  tryRun('setupAllergens', setupAllergens);
+  tryRun('setupIngredientForm', setupIngredientForm);
+  tryRun('setupRattachement', setupRattachement);
   loadArticlesAppro();
   loadFiches();
   loadProductions();
@@ -1173,6 +1179,15 @@ function switchTab(tab) {
     loadRecapPersonnes();
   } else if (tab === 'rattachement') {
     loadRattachement();
+  } else if (tab === 'fiches') {
+    // Filet de sécurité : si la liste n'a pas été chargée à l'init (erreur silencieuse,
+    // promesse interrompue, etc.), on relance la query maintenant pour ne pas laisser
+    // l'utilisateur devant un onglet vide.
+    if (!allFiches || allFiches.length === 0) {
+      loadFiches();
+    } else {
+      renderFiches();
+    }
   } else if (tab === 'create' && !editingFicheId) {
     resetForm();
   }
