@@ -272,6 +272,59 @@
     .ingredient-row.has-article .btn-link-art { background: #d1fae5; border-color: #10b981; }
     .ingredient-row.no-article .btn-link-art { background: #fef3c7; border-color: #f59e0b; }
 
+    /* ====== TAB RATTACHEMENT (audit + matching ingrédients <-> articles) ====== */
+    #tab-rattachement { padding: 12px; }
+    .rt-stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px; }
+    .rt-stat-box { padding:12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .rt-stat-box .rt-sv { font-size:22px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .rt-stat-box .rt-sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    .rt-stat-box.warn { background:#ffedd5; border-color:#ffedd5; }
+    .rt-stat-box.warn .rt-sv { color:#c2410c; }
+    .rt-stat-box.ok { background:#dcfce7; border-color:#dcfce7; }
+    .rt-stat-box.ok .rt-sv { color:#15803d; }
+    @media (max-width:600px) { .rt-stats-grid { grid-template-columns:repeat(2, 1fr); } }
+
+    .rt-fiche-card { background:white; border:1px solid var(--gray-200); border-radius:var(--radius); margin-bottom:10px; overflow:hidden; }
+    .rt-fiche-card.complete { border-color:#15803d; background:#dcfce7; }
+    .rt-fiche-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer; gap:12px; }
+    .rt-fiche-header:hover { background:var(--gray-50); }
+    .rt-fh-info { flex:1; min-width:0; }
+    .rt-fh-nom { font-size:15px; font-weight:700; color:var(--gray-900); }
+    .rt-fh-meta { font-size:11px; color:var(--gray-500); margin-top:2px; }
+    .rt-fh-progress { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--gray-700); white-space:nowrap; }
+    .rt-progress-bar { width:80px; height:8px; background:var(--gray-200); border-radius:999px; overflow:hidden; }
+    .rt-pb-fill { height:100%; background:#7c3aed; transition:width .3s; }
+    .rt-pb-fill.complete { background:#15803d; }
+    .rt-fiche-toggle { font-size:18px; color:var(--gray-400); transition:transform .2s; flex-shrink:0; }
+    .rt-fiche-card.expanded .rt-fiche-toggle { transform:rotate(90deg); }
+    .rt-fiche-body { display:none; border-top:1px solid var(--gray-200); padding:12px; background:var(--gray-50); }
+    .rt-fiche-card.expanded .rt-fiche-body { display:block; }
+
+    .rt-ing-row { display:grid; grid-template-columns:minmax(0,1.2fr) 90px minmax(0,1.5fr) 90px; gap:8px; padding:8px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; align-items:center; }
+    .rt-ing-row.matched { background:#dcfce7; border-color:#dcfce7; }
+    .rt-ing-row.unmatched { background:#ffedd5; border-color:#ffedd5; }
+    .rt-ir-nom { font-size:13px; font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rt-ir-qty { font-size:11px; color:var(--gray-600); text-align:right; }
+    .rt-ir-search { position:relative; }
+    .rt-ir-search input { width:100%; padding:6px 10px; font-size:13px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); }
+    .rt-ir-search input.matched { background:#dcfce7; border-color:#15803d; color:#15803d; font-weight:600; }
+    .rt-ir-results { display:none; position:absolute; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:5; margin-top:2px; }
+    .rt-ir-results.visible { display:block; }
+    .rt-ir-result { padding:8px 10px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--gray-100); }
+    .rt-ir-result:hover, .rt-ir-result.active { background:#d1fae5; }
+    .rt-ir-result.suggestion { background:#dbeafe; }
+    .rt-ir-cat { font-size:10px; color:var(--gray-500); margin-top:1px; }
+    .rt-ir-actions { display:flex; gap:4px; justify-content:flex-end; }
+    .rt-btn { display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:6px 10px; font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    .rt-btn:active { transform:scale(.97); }
+    .rt-btn-primary { background:#059669; color:white; }
+    .rt-btn-secondary { background:white; color:#047857; border:1px solid #059669; }
+    .rt-btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+    @media (max-width:680px) {
+      .rt-ing-row { grid-template-columns:1fr; gap:4px; padding:10px; }
+      .rt-ir-actions { justify-content:flex-start; }
+    }
+
     /* Modal article picker */
     .ap-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; padding:16px; overflow-y:auto; }
     .ap-modal-bg.visible { display:flex; align-items:flex-start; justify-content:center; }
@@ -571,6 +624,7 @@
     <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
     <button class="tab-btn" data-tab="recap">👥 Par personne</button>
     <button class="tab-btn" data-tab="fiches" style="margin-left:auto">📖 Fiches</button>
+    <button class="tab-btn" data-tab="rattachement" id="tab-btn-rattachement" style="display:none;">📌 Rattachement</button>
   </div>
 
   <!-- FILTERS (fiches list) -->
@@ -609,6 +663,16 @@
     </div>
   </div>
 
+  <!-- FILTERS (rattachement) -->
+  <div class="filters-section" id="filters-rattachement" style="display:none;">
+    <div class="filter-row" style="flex-wrap:wrap; gap:8px; align-items:center;">
+      <input type="text" class="search-input" id="rt-search" placeholder="Rechercher une fiche ou un ingrédient…" style="flex:1; min-width:180px; padding:6px 10px; margin-top:0;">
+      <button class="filter-chip active" data-rt-filter="all">Toutes</button>
+      <button class="filter-chip" data-rt-filter="incomplete">À compléter</button>
+      <button class="filter-chip" data-rt-filter="complete">Complètes</button>
+    </div>
+  </div>
+
   <!-- CONTENT -->
   <div class="content">
     <!-- TAB: Liste des fiches -->
@@ -622,6 +686,19 @@
 
     <!-- TAB: Récap par personne -->
     <div class="tab-content" id="tab-recap"></div>
+
+    <!-- TAB: Rattachement (audit + matching ingrédients <-> articles appro) -->
+    <div class="tab-content" id="tab-rattachement">
+      <div class="rt-stats-grid">
+        <div class="rt-stat-box"><div class="rt-sv" id="rt-stat-fiches">—</div><div class="rt-sl">Fiches</div></div>
+        <div class="rt-stat-box"><div class="rt-sv" id="rt-stat-ingredients">—</div><div class="rt-sl">Ingrédients</div></div>
+        <div class="rt-stat-box ok"><div class="rt-sv" id="rt-stat-rattaches">—</div><div class="rt-sl">Rattachés</div></div>
+        <div class="rt-stat-box warn"><div class="rt-sv" id="rt-stat-restants">—</div><div class="rt-sl">À rattacher</div></div>
+      </div>
+      <div id="rt-fiches-list">
+        <div class="empty-state" style="padding:24px; text-align:center; color:var(--gray-500);">Chargement…</div>
+      </div>
+    </div>
 
     <!-- TAB: Créer / Éditer -->
     <div class="tab-content" id="tab-create">
@@ -1009,13 +1086,34 @@ function init() {
   setupProductionsFilters();
   setupAllergens();
   setupIngredientForm();
+  setupRattachement();
   loadArticlesAppro();
   loadFiches();
   loadProductions();
 
+  // Affiche l'onglet "Rattachement" pour les rôles autorisés (responsable+)
+  const tabBtnRattachement = document.getElementById('tab-btn-rattachement');
+  if (tabBtnRattachement) tabBtnRattachement.style.display = canRattacher() ? '' : 'none';
+
   // Initialise l'onglet actif (affiche notamment le bouton FAB +)
-  const activeTabBtn = document.querySelector('.tab-btn.active');
-  const initialTab = activeTabBtn?.dataset.tab || 'productions';
+  // Priorité : (1) clé sessionStorage planb_initial_tab (consommée), (2) hash URL #xxx, (3) tab actif HTML, (4) défaut "productions"
+  let initialTab = null;
+  const sessionTab = sessionStorage.getItem('planb_initial_tab');
+  if (sessionTab) {
+    initialTab = sessionTab;
+    sessionStorage.removeItem('planb_initial_tab');
+  } else if (window.location.hash) {
+    initialTab = window.location.hash.replace(/^#/, '');
+  }
+  if (!initialTab) {
+    const activeTabBtn = document.querySelector('.tab-btn.active');
+    initialTab = activeTabBtn?.dataset.tab || 'productions';
+  }
+  // Sécurité : si le tab demandé n'existe pas (ou pas accessible), retomber sur productions
+  const tabBtn = document.querySelector(`.tab-btn[data-tab="${initialTab}"]`);
+  if (!tabBtn || (initialTab === 'rattachement' && !canRattacher())) {
+    initialTab = 'productions';
+  }
   switchTab(initialTab);
 }
 
@@ -1027,6 +1125,11 @@ function logout() {
 function canEdit() {
   // Création/édition de fiches techniques : admin only (référentiel structurant)
   return currentUser.role === 'admin';
+}
+
+function canRattacher() {
+  // Onglet Rattachement : responsable + (mêmes rôles que stock/fiches.html avant fusion)
+  return ['responsable', 'manager', 'admin'].includes(currentUser.role);
 }
 
 // ============= TABS =============
@@ -1049,9 +1152,11 @@ function switchTab(tab) {
   const filtersSection = document.getElementById('filters-section');
   const filtersProductions = document.getElementById('filters-productions');
   const filtersRecap = document.getElementById('filters-recap');
+  const filtersRattachement = document.getElementById('filters-rattachement');
   filtersSection.style.display = (tab === 'fiches') ? '' : 'none';
   filtersProductions.style.display = (tab === 'productions') ? '' : 'none';
   if (filtersRecap) filtersRecap.style.display = (tab === 'recap') ? '' : 'none';
+  if (filtersRattachement) filtersRattachement.style.display = (tab === 'rattachement') ? '' : 'none';
 
   // Show/hide FAB buttons
   const fabFiches = document.getElementById('fab-fiches');
@@ -1066,6 +1171,8 @@ function switchTab(tab) {
   } else if (tab === 'recap') {
     initRecapDates();
     loadRecapPersonnes();
+  } else if (tab === 'rattachement') {
+    loadRattachement();
   } else if (tab === 'create' && !editingFicheId) {
     resetForm();
   }
@@ -1453,6 +1560,8 @@ function renderArticlePickerResults() {
   if (ctx.kind === 'INGREDIENT') {
     const row = document.querySelector(`.ingredient-row[data-id="${ctx.rowId}"]`);
     refNom = row?.querySelector('.ing-nom')?.value || '';
+  } else if (ctx.kind === 'RT_INGREDIENT') {
+    refNom = RT.pendingCreate?.ing?.nom || '';
   } else {
     refNom = document.getElementById('f-nom').value || '';
   }
@@ -1505,6 +1614,16 @@ function escapeHtmlProd(s) {
 function applyArticleSelection(article) {
   const ctx = articlePickerContext;
   if (!ctx) return;
+  if (ctx.kind === 'RT_INGREDIENT') {
+    // Sélection depuis l'onglet Rattachement → écrit en base + met à jour la ligne
+    const pc = RT.pendingCreate;
+    if (pc && pc.kind === 'ingredient' && article) {
+      rtLinkIngredient(pc.fiche, pc.ing, article, pc.rowEl);
+    }
+    RT.pendingCreate = null;
+    closeArticlePicker();
+    return;
+  }
   if (ctx.kind === 'INGREDIENT') {
     const row = document.querySelector(`.ingredient-row[data-id="${ctx.rowId}"]`);
     if (!row) { closeArticlePicker(); return; }
@@ -3825,8 +3944,323 @@ function closeModal() {
 // Listen for rendement changes to recalculate cost per portion
 document.getElementById('f-rendement-qty')?.addEventListener('input', updateCostSummary);
 
-// ============= INIT =============
-init();
+// ============= ONGLET RATTACHEMENT =============
+// Vue d'audit + matching ingrédients <-> articles appro_ingredients.
+// Anciennement dans stock/fiches.html, fusionné ici le 09/05/2026.
+const RT = {
+  fiches: [],          // [{ ...fiche, ingredients: [...] }]
+  filter: 'all',       // 'all' | 'incomplete' | 'complete'
+  search: '',
+  loaded: false,
+  pendingCreate: null, // { kind: 'ingredient', fiche, ing, rowEl } | { kind: 'fiche', fiche, container }
+};
+
+function setupRattachement() {
+  // Filtres
+  document.querySelectorAll('[data-rt-filter]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('[data-rt-filter]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      RT.filter = chip.dataset.rtFilter;
+      rtRenderList();
+    });
+  });
+  // Recherche
+  const searchInput = document.getElementById('rt-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', e => {
+      RT.search = e.target.value;
+      rtRenderList();
+    });
+  }
+}
+
+async function loadRattachement() {
+  if (!canRattacher()) return;
+  const list = document.getElementById('rt-fiches-list');
+  list.innerHTML = '<div class="empty-state" style="padding:24px; text-align:center; color:var(--gray-500);">Chargement…</div>';
+  try {
+    // Fiches actives de l'établissement courant
+    const { data: fiches, error: e1 } = await sb.from('fiches_techniques')
+      .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite, actif, article_id')
+      .eq('etablissement', currentEtablissement)
+      .eq('actif', true)
+      .order('nom');
+    if (e1) throw e1;
+    const ficheIds = (fiches || []).map(f => f.id);
+
+    // Tous les ingrédients en une fois
+    let ingredients = [];
+    if (ficheIds.length) {
+      const { data: ings, error: e2 } = await sb.from('fiche_ingredients')
+        .select('id, fiche_id, nom, quantite, unite, article_id, ordre')
+        .in('fiche_id', ficheIds)
+        .order('ordre');
+      if (e2) throw e2;
+      ingredients = ings || [];
+    }
+    // Grouper
+    const byFiche = {};
+    ingredients.forEach(i => {
+      if (!byFiche[i.fiche_id]) byFiche[i.fiche_id] = [];
+      byFiche[i.fiche_id].push(i);
+    });
+    RT.fiches = (fiches || []).map(f => ({ ...f, ingredients: byFiche[f.id] || [] }));
+    RT.loaded = true;
+
+    rtUpdateGlobalStats();
+    rtRenderList();
+  } catch (err) {
+    console.error('loadRattachement:', err);
+    list.innerHTML = `<div class="empty-state" style="padding:24px; text-align:center; color:var(--red,#b91c1c);">Erreur : ${escapeHtmlProd(err.message)}</div>`;
+  }
+}
+
+function rtUpdateGlobalStats() {
+  let totalIngs = 0, ratIngs = 0;
+  RT.fiches.forEach(f => {
+    totalIngs += f.ingredients.length;
+    ratIngs += f.ingredients.filter(i => i.article_id).length;
+  });
+  document.getElementById('rt-stat-fiches').textContent = RT.fiches.length;
+  document.getElementById('rt-stat-ingredients').textContent = totalIngs;
+  document.getElementById('rt-stat-rattaches').textContent = ratIngs;
+  document.getElementById('rt-stat-restants').textContent = totalIngs - ratIngs;
+}
+
+function rtApplyFilter() {
+  const q = (RT.search || '').toLowerCase().trim();
+  return RT.fiches.filter(f => {
+    const total = f.ingredients.length;
+    const matched = f.ingredients.filter(i => i.article_id).length;
+    const isComplete = total > 0 && matched === total;
+    if (RT.filter === 'complete' && !isComplete) return false;
+    if (RT.filter === 'incomplete' && isComplete) return false;
+    if (q) {
+      const inFiche = (f.nom || '').toLowerCase().includes(q) || (f.categorie || '').toLowerCase().includes(q);
+      const inIng = f.ingredients.some(i => (i.nom || '').toLowerCase().includes(q));
+      if (!inFiche && !inIng) return false;
+    }
+    return true;
+  });
+}
+
+function rtRenderList() {
+  const list = rtApplyFilter();
+  const c = document.getElementById('rt-fiches-list');
+  if (!list.length) {
+    c.innerHTML = '<div class="empty-state" style="padding:24px; text-align:center; color:var(--gray-500);">Aucune fiche ne correspond.</div>';
+    return;
+  }
+  // Tri : incomplètes en haut puis alphabétique
+  list.sort((a, b) => {
+    const aDone = a.ingredients.length > 0 && a.ingredients.every(i => i.article_id);
+    const bDone = b.ingredients.length > 0 && b.ingredients.every(i => i.article_id);
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    return (a.nom || '').localeCompare(b.nom || '', 'fr');
+  });
+  c.innerHTML = '';
+  list.forEach(f => c.appendChild(rtRenderFiche(f)));
+}
+
+function rtRenderFiche(f) {
+  const total = f.ingredients.length;
+  const matched = f.ingredients.filter(i => i.article_id).length;
+  const isComplete = total > 0 && matched === total;
+  const pct = total > 0 ? Math.round(matched / total * 100) : 0;
+  const card = document.createElement('div');
+  card.className = 'rt-fiche-card' + (isComplete ? ' complete' : '');
+  card.dataset.fiche = f.id;
+  card.innerHTML = `
+    <div class="rt-fiche-header">
+      <div class="rt-fh-info">
+        <div class="rt-fh-nom">${isComplete ? '✓ ' : ''}${escapeHtmlProd(f.nom)}</div>
+        <div class="rt-fh-meta">
+          ${escapeHtmlProd(f.categorie || 'sans cat.')}${f.sous_categorie ? ' · ' + escapeHtmlProd(f.sous_categorie) : ''} ·
+          ${f.rendement_quantite || '?'} ${escapeHtmlProd(f.rendement_unite || '')} ·
+          ${total} ingrédient${total > 1 ? 's' : ''}
+        </div>
+      </div>
+      <div class="rt-fh-progress">
+        <span>${matched}/${total}</span>
+        <div class="rt-progress-bar"><div class="rt-pb-fill ${isComplete ? 'complete' : ''}" style="width:${pct}%"></div></div>
+        <span class="rt-fiche-toggle">›</span>
+      </div>
+    </div>
+    <div class="rt-fiche-body">
+      <div class="rt-ing-list" data-fiche="${f.id}">
+        ${total ? '' : '<div class="empty-state" style="padding:12px; text-align:center; color:var(--gray-500); font-size:12px;">Aucun ingrédient saisi pour cette fiche.</div>'}
+      </div>
+    </div>
+  `;
+  card.querySelector('.rt-fiche-header').addEventListener('click', () => {
+    card.classList.toggle('expanded');
+    if (card.classList.contains('expanded') && total > 0) {
+      rtRenderIngredients(f, card.querySelector('.rt-ing-list'));
+    }
+  });
+  return card;
+}
+
+function rtRenderIngredients(f, container) {
+  container.innerHTML = '';
+  f.ingredients.forEach(i => container.appendChild(rtRenderIngredient(f, i)));
+}
+
+function rtRenderIngredient(f, ing) {
+  const matched = !!ing.article_id;
+  const article = matched ? allArticlesAppro.find(a => a.id === ing.article_id) : null;
+  const div = document.createElement('div');
+  div.className = 'rt-ing-row ' + (matched ? 'matched' : 'unmatched');
+  div.dataset.ingId = ing.id;
+  const qtyTxt = (ing.quantite != null ? ing.quantite : '?') + ' ' + (ing.unite || '');
+  div.innerHTML = `
+    <div class="rt-ir-nom" title="${escapeHtmlProd(ing.nom)}">${escapeHtmlProd(ing.nom)}</div>
+    <div class="rt-ir-qty">${escapeHtmlProd(qtyTxt)}</div>
+    <div class="rt-ir-search">
+      <input type="text" placeholder="Rechercher un article…" value="${escapeHtmlProd(article ? article.nom : '')}" class="${matched ? 'matched' : ''}" autocomplete="off">
+      <div class="rt-ir-results"></div>
+    </div>
+    <div class="rt-ir-actions">
+      ${matched
+        ? `<button class="rt-btn rt-btn-ghost" data-action="unlink">✕</button>`
+        : `<button class="rt-btn rt-btn-secondary" data-action="create">+ Nouveau</button>`}
+    </div>
+  `;
+  const input = div.querySelector('input');
+  const results = div.querySelector('.rt-ir-results');
+  input.addEventListener('input', () => rtRenderAcResults(ing, f, input.value.toLowerCase().trim(), results, input));
+  input.addEventListener('focus', () => rtRenderAcResults(ing, f, input.value.toLowerCase().trim(), results, input));
+  input.addEventListener('blur', () => setTimeout(() => results.classList.remove('visible'), 200));
+  const actionBtn = div.querySelector('[data-action]');
+  if (actionBtn) {
+    actionBtn.addEventListener('click', () => {
+      const action = actionBtn.dataset.action;
+      if (action === 'unlink') rtUnlinkIngredient(f, ing, div);
+      else if (action === 'create') rtOpenCreateModal(f, ing, div);
+    });
+  }
+  return div;
+}
+
+function rtRenderAcResults(ing, fiche, q, container, input) {
+  let candidates;
+  if (q) {
+    candidates = allArticlesAppro
+      .filter(a => (a.nom || '').toLowerCase().includes(q) || (a.categorie || '').toLowerCase().includes(q))
+      .slice(0, 12);
+  } else {
+    // Suggestions : fuzzy match sur le nom de l'ingrédient
+    candidates = allArticlesAppro
+      .map(a => ({ a, score: rtScoreMatch(ing.nom, a.nom, ing.unite, a.unite) }))
+      .sort((x, y) => y.score - x.score)
+      .slice(0, 5)
+      .map(x => x.a);
+  }
+  if (!candidates.length) {
+    container.innerHTML = '<div class="rt-ir-result" style="color:var(--gray-500); font-style:italic;">Aucun résultat. Crée un nouvel article →</div>';
+  } else {
+    container.innerHTML = candidates.map((a, idx) => {
+      const isSugg = !q && idx < 3;
+      return `<div class="rt-ir-result ${isSugg ? 'suggestion' : ''}" data-aid="${a.id}">
+        <div>${isSugg ? '✨ ' : ''}${escapeHtmlProd(a.nom)}</div>
+        <div class="rt-ir-cat">${escapeHtmlProd(a.categorie || '')} · ${escapeHtmlProd(a.unite || '')}</div>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('.rt-ir-result[data-aid]').forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const a = allArticlesAppro.find(x => x.id === el.dataset.aid);
+        if (a) rtLinkIngredient(fiche, ing, a, input.closest('.rt-ing-row'));
+      });
+    });
+  }
+  container.classList.add('visible');
+}
+
+function rtScoreMatch(ingNom, articleNom, ingUnite, articleUnite) {
+  const p = (ingNom || '').toLowerCase();
+  const a = (articleNom || '').toLowerCase();
+  if (!p || !a) return 0;
+  const pWords = new Set(p.split(/[\s,/-]+/).filter(w => w.length >= 3));
+  const aWords = new Set(a.split(/[\s,/-]+/).filter(w => w.length >= 3));
+  let common = 0;
+  pWords.forEach(w => { if (aWords.has(w)) common++; });
+  let score = pWords.size > 0 ? common / pWords.size : 0;
+  if (ingUnite && articleUnite && ingUnite.toLowerCase() === articleUnite.toLowerCase()) score += 0.15;
+  return score;
+}
+
+async function rtLinkIngredient(fiche, ing, article, rowEl) {
+  try {
+    const { error } = await sb.from('fiche_ingredients')
+      .update({ article_id: article.id })
+      .eq('id', ing.id);
+    if (error) throw error;
+    ing.article_id = article.id;
+    showToast(`✓ "${ing.nom}" → ${article.nom}`, 'success');
+    const newRow = rtRenderIngredient(fiche, ing);
+    rowEl.replaceWith(newRow);
+    rtRefreshFicheHeader(fiche);
+    rtUpdateGlobalStats();
+  } catch (err) {
+    console.error(err);
+    showToast('Erreur : ' + err.message, 'error');
+  }
+}
+
+async function rtUnlinkIngredient(fiche, ing, rowEl) {
+  try {
+    const { error } = await sb.from('fiche_ingredients')
+      .update({ article_id: null })
+      .eq('id', ing.id);
+    if (error) throw error;
+    ing.article_id = null;
+    showToast(`Lien retiré : "${ing.nom}"`);
+    const newRow = rtRenderIngredient(fiche, ing);
+    rowEl.replaceWith(newRow);
+    rtRefreshFicheHeader(fiche);
+    rtUpdateGlobalStats();
+  } catch (err) {
+    console.error(err);
+    showToast('Erreur : ' + err.message, 'error');
+  }
+}
+
+function rtRefreshFicheHeader(fiche) {
+  const total = fiche.ingredients.length;
+  const matched = fiche.ingredients.filter(i => i.article_id).length;
+  const isComplete = total > 0 && matched === total;
+  const pct = total > 0 ? Math.round(matched / total * 100) : 0;
+  const card = document.querySelector(`.rt-fiche-card[data-fiche="${fiche.id}"]`);
+  if (!card) return;
+  card.classList.toggle('complete', isComplete);
+  card.querySelector('.rt-fh-nom').textContent = (isComplete ? '✓ ' : '') + fiche.nom;
+  card.querySelector('.rt-fh-progress span:first-child').textContent = `${matched}/${total}`;
+  const fillEl = card.querySelector('.rt-pb-fill');
+  fillEl.style.width = pct + '%';
+  fillEl.classList.toggle('complete', isComplete);
+}
+
+// Réutilise le modal article-picker existant (déjà câblé pour création + suggestions)
+// Au lieu de recréer un modal, on ouvre le picker en mode "INGREDIENT" avec un contexte spécifique.
+function rtOpenCreateModal(fiche, ing, rowEl) {
+  // On stocke la cible de l'éventuelle création + sélection
+  RT.pendingCreate = { kind: 'ingredient', fiche, ing, rowEl };
+  // Pré-remplit la zone "création article" du picker existant
+  document.getElementById('ap-title').textContent = `Rattacher : ${ing.nom || '(ingrédient)'}`;
+  document.getElementById('ap-sub').textContent = "Quel article du référentiel correspond à cet ingrédient ?";
+  document.getElementById('ap-new-nom').value = ing.nom || '';
+  document.getElementById('ap-new-unite').value = mapUnit(ing.unite || 'kg');
+  document.getElementById('ap-search').value = '';
+  // Active un mode spécial pour intercepter les sélections
+  articlePickerContext = { kind: 'RT_INGREDIENT' };
+  renderArticlePickerResults();
+  document.getElementById('article-picker').classList.add('visible');
+  setTimeout(() => document.getElementById('ap-search').focus(), 50);
+}
+
+// (extension de applyArticleSelection / createArticle existants gérée plus bas)
 </script>
 <!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
 <style id="taf-header-style">
