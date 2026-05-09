@@ -2627,6 +2627,25 @@
     const s = (search || '').toLowerCase();
     const selectedEquipe = getSelectedCreateEquipe();
 
+    // SAFETY NET — si predefinedTasks n'est pas (encore) chargé,
+    // on tente un fetch direct (utile si l'utilisateur arrive sur 'Créer'
+    // avant que loadAll() n'ait fini, ou si la promise initiale a échoué).
+    if (!predefinedTasks || predefinedTasks.length === 0) {
+      list.innerHTML = '<div class="predef-item" style="color:var(--gray-400);font-style:italic;cursor:default;border:none">Chargement des tâches…</div>';
+      DB.getPredefined(currentEtablissement).then(data => {
+        predefinedTasks = data || [];
+        if (predefinedTasks.length === 0) {
+          list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Aucune tâche prédéfinie en base. Tape un nom pour en créer une.</div>';
+        } else {
+          renderPredefinedList(search);
+        }
+      }).catch(e => {
+        console.error('renderPredefinedList — fetch fallback failed:', e);
+        list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Erreur de chargement. Tape un nom pour saisir manuellement.</div>';
+      });
+      return;
+    }
+
     // Filtrer par équipe : cuisine et plonge partagent la même base
     const equipeMatch = (taskEquipe) => {
       if (!taskEquipe) return true; // pas d'équipe = disponible pour tous
@@ -2646,6 +2665,11 @@
         ${p.is_production ? '<span class="badge-production" style="margin-right:4px">🏭</span>' : ''}${esc(p.nom)} ${p.categorie ? `<span style="color:var(--gray-400);font-size:0.75rem">(${esc(p.categorie)})</span>` : ''}
       </div>`
     ).join('');
+
+    // Si filtre vide (équipe sans tâches), on l'indique au lieu d'afficher rien
+    if (filtered.length === 0 && !s) {
+      list.innerHTML = `<div class="predef-item" style="color:var(--gray-500);font-style:italic;cursor:default;border:none">Aucune tâche prédéfinie pour l'équipe ${esc(selectedEquipe)}. Tape un nom pour en créer.</div>`;
+    }
 
     // Show "create custom" option if search has text
     if (s && !filtered.some(p => p.nom.toLowerCase() === s)) {
