@@ -2535,6 +2535,7 @@
           <div id="selected-task-area"></div>
           <input class="search-input" type="text" id="search-predef"
                  placeholder="Rechercher ou saisir une tâche..."
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                  oninput="filterPredefined(this.value)">
           <div class="predef-list" id="predef-list"></div>
         </div>
@@ -2646,9 +2647,13 @@
       return;
     }
 
-    // Filtrer par équipe : cuisine et plonge partagent la même base
+    // Filtrer par équipe :
+    // - 'cuisine' et 'plonge' partagent la même base de tâches
+    // - 'autre' est un super-rôle (admin/manager créant pour un autre) → on montre TOUTES les tâches
+    //   (la table predefined_tasks ne contient actuellement aucune entrée equipe='autre')
     const equipeMatch = (taskEquipe) => {
       if (!taskEquipe) return true; // pas d'équipe = disponible pour tous
+      if (selectedEquipe === 'autre') return true; // super-rôle : voit tout
       if (selectedEquipe === 'cuisine' || selectedEquipe === 'plonge') {
         return taskEquipe === 'cuisine' || taskEquipe === 'plonge';
       }
@@ -2666,9 +2671,13 @@
       </div>`
     ).join('');
 
-    // Si filtre vide (équipe sans tâches), on l'indique au lieu d'afficher rien
-    if (filtered.length === 0 && !s) {
-      list.innerHTML = `<div class="predef-item" style="color:var(--gray-500);font-style:italic;cursor:default;border:none">Aucune tâche prédéfinie pour l'équipe ${esc(selectedEquipe)}. Tape un nom pour en créer.</div>`;
+    // Si aucun résultat (filtre équipe ou recherche), on l'indique TOUJOURS
+    // (pas seulement quand la recherche est vide).
+    if (filtered.length === 0) {
+      const msg = s
+        ? `Aucun résultat pour « ${esc(s)} » dans l'équipe ${esc(selectedEquipe)}.`
+        : `Aucune tâche prédéfinie pour l'équipe ${esc(selectedEquipe)}.`;
+      list.innerHTML = `<div class="predef-item" style="color:var(--gray-500);font-style:italic;cursor:default;border:none">${msg} Tape un nom pour en créer une nouvelle.</div>`;
     }
 
     // Show "create custom" option if search has text
