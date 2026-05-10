@@ -553,110 +553,6 @@
       background: #f3e8ff; color: #7c3aed; border: 1px solid #ddd6fe;
       font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 600;
     }
-
-    /* ====== Ligne "+ Ajouter une tâche" en fin de liste ====== */
-    .task-row-add {
-      display: flex; align-items: center; justify-content: center;
-      padding: 14px 16px; margin-top: 8px;
-      background: #fff7ed; border: 2px dashed #fb923c;
-      border-radius: var(--radius);
-      color: #c2410c; font-weight: 600; font-size: 0.95rem;
-      cursor: pointer; transition: all .15s ease;
-      gap: 8px;
-    }
-    .task-row-add:hover, .task-row-add:active {
-      background: #ffedd5; border-color: #ea580c; color: #9a3412;
-    }
-    .task-row-add .add-icon {
-      width: 28px; height: 28px; border-radius: 50%;
-      background: var(--orange); color: white;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem; font-weight: 700; line-height: 1;
-    }
-
-    /* ====== FICHE TECHNIQUE — modale consultation au démarrage TAF ====== */
-    .fiche-overlay {
-      display: none; position: fixed; inset: 0; z-index: 240;
-      background: rgba(15, 23, 42, .55); align-items: flex-start;
-      justify-content: center; padding: 24px 12px; overflow-y: auto;
-    }
-    .fiche-overlay.show { display: flex; }
-    .fiche-overlay.minimized { display: none; }
-    .fiche-box {
-      background: white; border-radius: 14px; width: 100%; max-width: 640px;
-      max-height: calc(100vh - 48px); overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,.25); display: flex; flex-direction: column;
-    }
-    .fiche-header {
-      padding: 14px 16px; border-bottom: 2px solid #2563eb;
-      background: linear-gradient(135deg, #dbeafe, white);
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      border-radius: 14px 14px 0 0;
-    }
-    .fiche-header h2 { font-size: 1rem; color: #1d4ed8; font-weight: 700; flex: 1; }
-    .fiche-header-actions { display: flex; gap: 6px; }
-    .fiche-btn-icon {
-      width: 32px; height: 32px; border-radius: 8px; border: 1px solid #cbd5e1;
-      background: white; cursor: pointer; font-size: 1.1rem;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .fiche-btn-icon:active { background: #e2e8f0; }
-    .fiche-body { padding: 16px; overflow-y: auto; flex: 1; }
-    .fiche-body h3 {
-      font-size: 0.85rem; color: #475569; text-transform: uppercase;
-      margin: 14px 0 8px; letter-spacing: .5px; font-weight: 700;
-    }
-    .fiche-body h3:first-child { margin-top: 0; }
-    .fiche-meta {
-      display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem;
-      padding: 8px 10px; background: #f8fafc; border-radius: 8px;
-      border: 1px solid #e2e8f0; margin-bottom: 12px;
-    }
-    .fiche-meta-item { display: flex; flex-direction: column; min-width: 70px; }
-    .fiche-meta-item .lbl { color: #64748b; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; }
-    .fiche-meta-item .val { color: #0f172a; font-weight: 600; }
-    .fiche-ing-table {
-      width: 100%; border-collapse: collapse; font-size: 0.85rem;
-    }
-    .fiche-ing-table th, .fiche-ing-table td {
-      padding: 6px 10px; border-bottom: 1px solid #e2e8f0; text-align: left;
-    }
-    .fiche-ing-table th {
-      background: #f1f5f9; color: #475569; font-weight: 600;
-      font-size: 0.75rem; text-transform: uppercase;
-    }
-    .fiche-ing-table td:nth-child(2), .fiche-ing-table td:nth-child(3) {
-      text-align: right; font-variant-numeric: tabular-nums;
-    }
-    .fiche-instructions {
-      white-space: pre-wrap; line-height: 1.55; font-size: 0.9rem;
-      padding: 12px 14px; background: #fefce8; border-left: 3px solid #ca8a04;
-      border-radius: 6px; color: #422006;
-    }
-    .fiche-empty {
-      padding: 14px; text-align: center; color: #64748b; font-size: 0.85rem;
-      background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;
-    }
-    /* Bandeau persistant en pied d'écran (quand modale réduite) */
-    .fiche-bandeau {
-      display: none; position: fixed; left: 12px; right: 12px; bottom: 12px;
-      z-index: 230; padding: 10px 14px; border-radius: 12px;
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-      color: white; box-shadow: 0 6px 20px rgba(37,99,235,.4);
-      align-items: center; justify-content: space-between; gap: 10px;
-      cursor: pointer; font-weight: 600;
-    }
-    .fiche-bandeau.show { display: flex; }
-    .fiche-bandeau-text { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-    .fiche-bandeau-name {
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-size: 0.95rem;
-    }
-    .fiche-bandeau-close {
-      width: 28px; height: 28px; border-radius: 8px; border: none;
-      background: rgba(255,255,255,.2); color: white; cursor: pointer; font-size: 1rem;
-    }
-
     .etiquette-overlay {
       position: fixed; inset: 0; z-index: 300;
       background: rgba(0,0,0,.5); display: flex;
@@ -820,7 +716,7 @@
   <!-- TABS -->
   <div class="tabs-bar" id="tabs-bar">
     <button class="tab-btn active" data-tab="taches" onclick="switchTab('taches')">Tâches<span class="tab-badge" id="tab-badge-mine">0</span></button>
-    <button class="tab-btn" data-tab="creer" onclick="switchTab('creer')" style="display:none">+ Créer</button>
+    <button class="tab-btn" data-tab="creer" onclick="switchTab('creer')">+ Créer</button>
     <button class="tab-btn" data-tab="recurrences" onclick="switchTab('recurrences')" id="tab-recurrences" style="display:none">Récurrences</button>
     <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="tab-admin" style="display:none">Admin</button>
   </div>
@@ -883,16 +779,6 @@
         </div>
       </div>
 
-      <!-- RAPPEL FICHE TECHNIQUE (Phase 2) — affichée si fiche liée -->
-      <details id="prod-fiche-resume" class="form-group" style="display:none; padding:10px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;">
-        <summary style="cursor:pointer; font-weight:600; color:#1d4ed8; font-size:0.9rem; user-select:none;">
-          📖 Rappel fiche technique
-        </summary>
-        <div id="prod-fiche-resume-body" style="margin-top:10px; font-size:0.85rem; color:#1e293b;">
-          <!-- Injecté dynamiquement -->
-        </div>
-      </details>
-
       <div class="form-group">
         <label>Nom du produit *</label>
         <input type="text" class="form-input" id="prod-nom" placeholder="Nom du produit">
@@ -947,32 +833,6 @@
   </div>
 </div>
 
-<!-- FICHE TECHNIQUE — modale consultation au démarrage TAF -->
-<div class="fiche-overlay" id="fiche-overlay" onclick="event.target===this&&minimizeFiche()">
-  <div class="fiche-box">
-    <div class="fiche-header">
-      <h2 id="fiche-title">📖 Fiche technique</h2>
-      <div class="fiche-header-actions">
-        <button class="fiche-btn-icon" onclick="minimizeFiche()" title="Réduire">▾</button>
-        <button class="fiche-btn-icon" onclick="closeFiche()" title="Fermer">✕</button>
-      </div>
-    </div>
-    <div class="fiche-body" id="fiche-body">
-      <!-- Contenu injecté dynamiquement par renderFiche() -->
-    </div>
-  </div>
-</div>
-
-<!-- BANDEAU PERSISTANT — fiche réduite -->
-<div class="fiche-bandeau" id="fiche-bandeau" onclick="restoreFiche()">
-  <div class="fiche-bandeau-text">
-    <span>📖</span>
-    <span class="fiche-bandeau-name" id="fiche-bandeau-name">—</span>
-    <span style="opacity:.85; font-weight:400; font-size:0.8rem;">touch pour rouvrir</span>
-  </div>
-  <button class="fiche-bandeau-close" onclick="event.stopPropagation(); closeFiche()" title="Fermer">✕</button>
-</div>
-
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -992,7 +852,6 @@
   let currentUser = null;
   let currentEtablissement = null;
   let supabaseClient = null;
-  let sb = null; // alias court de supabaseClient (utilisé dans plusieurs fonctions)
   let filterDate = new Date();
   let filterCreneau = 'all';
   let filterEquipe = null; // null = user's team
@@ -1114,7 +973,6 @@
   function initSupabase() {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      sb = supabaseClient; // alias pour les fonctions qui l'utilisent
     }
   }
 
@@ -1680,6 +1538,9 @@
 
   // ====== TAB SWITCHING ======
   function switchTab(tab) {
+    // Garde-fou : empêcher l'accès aux onglets restreints même via URL/hash manuels
+    if (tab === 'admin' && !isAdmin()) tab = 'taches';
+    if (tab === 'recurrences' && !canManageRecurrences()) tab = 'taches';
     // Quitter le mode sélection multiple si on change d'onglet
     if (selectionMode && tab !== 'taches') exitSelectionMode();
     currentTab = tab;
@@ -1724,10 +1585,7 @@
     const eIcons = { cuisine: '🍴', salle: '🍽', plonge: '🫧', autre: '📦' };
 
     if (!filtered.length) {
-      mc.innerHTML = `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune tâche</h3><p>Pas de tâche pour cette date et ces filtres</p></div>
-        <div class="task-row-add" onclick="switchTab('creer')" title="Créer une nouvelle tâche">
-          <span class="add-icon">+</span> Ajouter une tâche
-        </div>`;
+      mc.innerHTML = `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune tâche</h3><p>Pas de tâche pour cette date et ces filtres</p></div>`;
       return;
     }
 
@@ -1821,11 +1679,6 @@
       </div>`;
     }).join('');
 
-    // Ligne "+ Ajouter une tâche" en fin de liste — ouvre l'écran Créer
-    html += `<div class="task-row-add" onclick="switchTab('creer')" title="Créer une nouvelle tâche">
-      <span class="add-icon">+</span> Ajouter une tâche
-    </div>`;
-
     mc.innerHTML = html;
     // Synchroniser la checkbox "tout sélectionner" (état mixte/coché)
     if (selectionMode) syncSelectAllCheckbox();
@@ -1898,7 +1751,6 @@
   }
 
   // Démarre le chrono d'une tâche (sauvegarde côté DB pour persistance)
-  // Si la tâche est de production : ouvre la fiche technique en modale minimisable.
   async function startTask(id) {
     try {
       const task = tasks.find(t => t.id === id);
@@ -1917,143 +1769,12 @@
         duree_accumulee_secondes: task.duree_accumulee_secondes
       });
       showToast('Chrono démarré ⏱', 'success');
-
-      // === Affichage fiche technique pour les TAF de production ===
-      if (task.is_production) {
-        if (task.fiche_id) {
-          openFicheConsultModal(task.fiche_id, task.tache);
-        } else {
-          showToast('⚠ Fiche à créer pour cette tâche', 'error');
-        }
-      }
     } catch (e) {
       console.error(e);
       showToast('Erreur démarrage chrono', 'error');
       tasks = await DB.getTasks(filterDate);
       renderFiltered();
     }
-  }
-
-  // ====== FICHE TECHNIQUE — modale consultation (au démarrage TAF) ======
-  // Charge la fiche depuis le cache productionFiches (ou Supabase si absent),
-  // récupère ses ingrédients, puis affiche la modale plein écran.
-  // L'utilisateur peut la réduire (bouton ▾) → la fiche reste accessible
-  // via un bandeau au pied d'écran tant que la session de cuisine dure.
-  async function openFicheConsultModal(ficheId, taskName) {
-    if (!ficheId) return;
-    try {
-      // Cache fiches
-      if (productionFiches.length === 0) {
-        productionFiches = await DB.getFiches(currentEtablissement);
-      }
-      const fiche = productionFiches.find(f => f.id === ficheId);
-      if (!fiche) {
-        showToast('Fiche introuvable', 'error');
-        return;
-      }
-      // Charger les ingrédients (TOUS, pas filtrés par article_id)
-      const { data: ings, error } = await sb.from('fiche_ingredients')
-        .select('id, nom, quantite, unite, ordre')
-        .eq('fiche_id', ficheId)
-        .order('ordre');
-      if (error) throw error;
-
-      renderFiche(fiche, ings || [], taskName);
-      // Affichage plein écran
-      document.getElementById('fiche-overlay').classList.remove('minimized');
-      document.getElementById('fiche-overlay').classList.add('show');
-      document.getElementById('fiche-bandeau').classList.remove('show');
-      // Mémoriser pour le bandeau
-      document.getElementById('fiche-bandeau-name').textContent = fiche.nom;
-    } catch (e) {
-      console.error('openFicheConsultModal:', e);
-      showToast('Erreur chargement fiche', 'error');
-    }
-  }
-
-  // Construit le HTML de la fiche : meta + ingrédients + instructions
-  function renderFiche(fiche, ings, taskName) {
-    const title = `📖 ${esc(fiche.nom)}`;
-    document.getElementById('fiche-title').textContent = title;
-
-    // Meta : rendement, temps prépa/cuisson/repos, DLC, température
-    const metaItems = [];
-    if (fiche.rendement_quantite) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Rendement</div><div class="val">${esc(String(fiche.rendement_quantite))} ${esc(fiche.rendement_unite || 'portions')}</div></div>`);
-    }
-    if (fiche.temps_preparation) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Prépa</div><div class="val">${fiche.temps_preparation} min</div></div>`);
-    }
-    if (fiche.temps_cuisson) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Cuisson</div><div class="val">${fiche.temps_cuisson} min</div></div>`);
-    }
-    if (fiche.temps_repos) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Repos</div><div class="val">${fiche.temps_repos} min</div></div>`);
-    }
-    if (fiche.dlc_jours) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">DLC</div><div class="val">${fiche.dlc_jours} j</div></div>`);
-    } else if (fiche.dlc_heures) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">DLC</div><div class="val">${fiche.dlc_heures} h</div></div>`);
-    }
-    if (fiche.temperature_stockage) {
-      metaItems.push(`<div class="fiche-meta-item"><div class="lbl">Stockage</div><div class="val">${esc(fiche.temperature_stockage)}</div></div>`);
-    }
-    const metaHTML = metaItems.length ? `<div class="fiche-meta">${metaItems.join('')}</div>` : '';
-
-    // Ingrédients
-    let ingHTML = '';
-    if (ings.length === 0) {
-      ingHTML = `<h3>🥗 Ingrédients</h3><div class="fiche-empty">Aucun ingrédient renseigné dans cette fiche.</div>`;
-    } else {
-      const rows = ings.map(i => `
-        <tr>
-          <td>${esc(i.nom)}</td>
-          <td>${esc(String(i.quantite))}</td>
-          <td>${esc(i.unite || '')}</td>
-        </tr>`).join('');
-      ingHTML = `
-        <h3>🥗 Ingrédients (${ings.length})</h3>
-        <table class="fiche-ing-table">
-          <thead><tr><th>Ingrédient</th><th>Qté</th><th>Unité</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-    }
-
-    // Instructions
-    let instrHTML = '';
-    if (fiche.instructions && fiche.instructions.trim().length > 0) {
-      instrHTML = `<h3>📝 Instructions</h3><div class="fiche-instructions">${esc(fiche.instructions)}</div>`;
-    } else {
-      instrHTML = `<h3>📝 Instructions</h3><div class="fiche-empty">Aucune instruction renseignée pour cette fiche.</div>`;
-    }
-
-    // Notes (optionnel)
-    let notesHTML = '';
-    if (fiche.notes && fiche.notes.trim().length > 0) {
-      notesHTML = `<h3>💡 Notes</h3><div class="fiche-instructions" style="background:#fef3c7; border-left-color:#d97706;">${esc(fiche.notes)}</div>`;
-    }
-
-    document.getElementById('fiche-body').innerHTML = metaHTML + ingHTML + instrHTML + notesHTML;
-  }
-
-  // Réduit la modale au bandeau de pied d'écran (chrono continue)
-  function minimizeFiche() {
-    document.getElementById('fiche-overlay').classList.remove('show');
-    document.getElementById('fiche-overlay').classList.add('minimized');
-    document.getElementById('fiche-bandeau').classList.add('show');
-  }
-
-  // Restaure la modale plein écran depuis le bandeau
-  function restoreFiche() {
-    document.getElementById('fiche-overlay').classList.remove('minimized');
-    document.getElementById('fiche-overlay').classList.add('show');
-    document.getElementById('fiche-bandeau').classList.remove('show');
-  }
-
-  // Ferme la modale ET le bandeau (n'arrête pas le chrono)
-  function closeFiche() {
-    document.getElementById('fiche-overlay').classList.remove('show', 'minimized');
-    document.getElementById('fiche-bandeau').classList.remove('show');
   }
 
   // Met en pause le chrono : on accumule le delta dans duree_accumulee_secondes
@@ -2395,32 +2116,12 @@
   // Store users list for edit modal to avoid inline JS with special chars
   let editUsersList = [];
 
-  // État local de la modale d'édition pour le rattachement production
-  let editIsProduction = false;
-  let editFicheId = null;
-  let editFicheNom = null;
-  let editCategorieProd = null;
-
   function showEditTaskModal(taskId) {
     if (userRole() < 3) return;
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     editingTaskId = taskId;
     editAssignee = task.attribue_a_id ? { id: task.attribue_a_id, nom: task.attribue_a_nom, initiales: task.attribue_a_initiales } : null;
-
-    // Initialiser l'état production à partir de la tâche
-    editIsProduction = !!task.is_production;
-    editFicheId = task.fiche_id || null;
-    editCategorieProd = task.categorie_production || null;
-    editFicheNom = null;
-    // Pré-charger les fiches si on en a besoin
-    if (productionFiches.length === 0) {
-      DB.getFiches(currentEtablissement).then(d => { productionFiches = d || []; renderEditFicheLine(); }).catch(()=>{});
-    }
-    if (editFicheId) {
-      const f = productionFiches.find(x => x.id === editFicheId);
-      if (f) editFicheNom = f.nom;
-    }
 
     const pLabels = [
       { val: 1, label: '! Basse' },
@@ -2487,37 +2188,6 @@
             ${CATEGORIES.map(c => `<button class="chip ${c === task.categorie ? 'active' : ''}" data-val="${c}" onclick="selectChip(this, 'edit-categorie')">${c}</button>`).join('')}
           </div>
         </div>
-
-        <!-- RATTACHEMENT PRODUCTION (admin/manager) -->
-        <div class="form-group" style="margin:0; padding:10px 12px; background:#f3e8ff; border:1px solid #ddd6fe; border-radius:8px;">
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:600; color:#6b21a8; margin:0;">
-            <input type="checkbox" id="edit-is-production" ${editIsProduction ? 'checked' : ''}
-                   onchange="toggleEditProduction(this.checked)"
-                   style="width:18px; height:18px; accent-color:#7c3aed; cursor:pointer;">
-            🏭 Tâche de production (lier à une fiche technique)
-          </label>
-          <div id="edit-production-details" style="${editIsProduction ? '' : 'display:none;'} margin-top:10px;">
-            <!-- Catégorie production -->
-            <label style="font-size:0.75rem; font-weight:600; color:#6b21a8; margin-bottom:4px; display:block;">Type de production</label>
-            <div class="chip-group" id="edit-cat-prod" style="margin-bottom:10px;">
-              <button type="button" class="chip ${editCategorieProd === 'mise_en_place' ? 'active' : ''}" data-val="mise_en_place" onclick="selectChip(this, 'edit-cat-prod'); editCategorieProd='mise_en_place';">🔪 Mise en place</button>
-              <button type="button" class="chip ${editCategorieProd === 'produit_intermediaire' ? 'active' : ''}" data-val="produit_intermediaire" onclick="selectChip(this, 'edit-cat-prod'); editCategorieProd='produit_intermediaire';">🥘 Intermédiaire</button>
-              <button type="button" class="chip ${editCategorieProd === 'produit_fini' ? 'active' : ''}" data-val="produit_fini" onclick="selectChip(this, 'edit-cat-prod'); editCategorieProd='produit_fini';">✨ Produit fini</button>
-            </div>
-
-            <!-- Sélecteur fiche -->
-            <label style="font-size:0.75rem; font-weight:600; color:#6b21a8; margin-bottom:4px; display:block;">Fiche technique liée</label>
-            <div id="edit-fiche-line" style="margin-bottom:6px;"></div>
-            <div style="position:relative;">
-              <input type="text" id="edit-fiche-search" autocomplete="off" autocorrect="off" spellcheck="false"
-                     placeholder="Tape le nom d'une fiche…"
-                     oninput="filterEditFiches(this.value)"
-                     style="width:100%; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
-              <div id="edit-fiche-results" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:white; border:1px solid #d1d5db; border-radius:6px; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:10; margin-top:2px;"></div>
-            </div>
-          </div>
-        </div>
-
         <div class="form-group" style="margin:0">
           <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Attribuer à</label>
           <div id="edit-assignee-display" style="margin-bottom:4px">
@@ -2540,77 +2210,6 @@
       { label: 'Annuler', action: 'closeModal()', cls: '' },
       { label: 'Enregistrer', action: 'submitEditTask()', cls: 'primary' }
     ]);
-
-    // Une fois le DOM rendu : afficher la ligne fiche choisie (si elle existe)
-    setTimeout(renderEditFicheLine, 0);
-  }
-
-  // ====== Rattachement production dans la modale d'édition ======
-  function toggleEditProduction(checked) {
-    editIsProduction = !!checked;
-    document.getElementById('edit-production-details').style.display = checked ? '' : 'none';
-    if (!checked) {
-      // Décocher = on conserve fiche_id mais on désactive la production
-      // (l'utilisateur peut toujours la réactiver). On vide pas.
-    }
-  }
-
-  function renderEditFicheLine() {
-    const line = document.getElementById('edit-fiche-line');
-    if (!line) return; // modale fermée
-    if (editFicheId && editFicheNom) {
-      line.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:white; border:1px solid #c4b5fd; border-radius:6px;">
-        <span style="font-weight:600; color:#1e293b; flex:1;">📖 ${esc(editFicheNom)}</span>
-        <button type="button" onclick="unpickEditFiche()" style="border:none; background:none; cursor:pointer; color:#dc2626; font-size:1rem;">✕</button>
-      </div>`;
-    } else {
-      line.innerHTML = `<div style="font-size:0.78rem; color:#6b21a8; font-style:italic;">— Aucune fiche choisie —</div>`;
-    }
-  }
-
-  function filterEditFiches(q) {
-    const results = document.getElementById('edit-fiche-results');
-    if (!results) return;
-    const s = (q || '').toLowerCase().trim();
-    if (!s) { results.style.display = 'none'; return; }
-    const matches = productionFiches
-      .filter(f => f.actif !== false && (f.nom.toLowerCase().includes(s) || (f.code_court || '').toLowerCase().includes(s)))
-      .slice(0, 8);
-    if (matches.length === 0) {
-      results.innerHTML = `<div style="padding:8px 12px; color:#6b7280; font-size:0.85rem;">Aucune fiche trouvée</div>`;
-    } else {
-      results.innerHTML = matches.map(f => `
-        <div onclick="pickEditFiche('${f.id}')" style="padding:8px 12px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f1f5f9;">
-          ${f.code_court ? `<span style="color:#7c3aed; font-weight:700; font-size:0.7rem; padding:1px 5px; background:#f3e8ff; border-radius:4px; margin-right:6px;">${esc(f.code_court)}</span>` : ''}
-          ${esc(f.nom)}
-          <span style="color:#94a3b8; font-size:0.72rem; margin-left:6px;">${esc(f.categorie || '')}</span>
-        </div>`).join('');
-    }
-    results.style.display = '';
-  }
-
-  function pickEditFiche(ficheId) {
-    const f = productionFiches.find(x => x.id === ficheId);
-    if (!f) return;
-    editFicheId = f.id;
-    editFicheNom = f.nom;
-    // Pré-remplir la catégorie production depuis la fiche si vide
-    if (!editCategorieProd && f.categorie) {
-      editCategorieProd = f.categorie;
-      // Activer le chip correspondant
-      document.querySelectorAll('#edit-cat-prod .chip').forEach(c => {
-        c.classList.toggle('active', c.dataset.val === editCategorieProd);
-      });
-    }
-    renderEditFicheLine();
-    document.getElementById('edit-fiche-search').value = '';
-    document.getElementById('edit-fiche-results').style.display = 'none';
-  }
-
-  function unpickEditFiche() {
-    editFicheId = null;
-    editFicheNom = null;
-    renderEditFicheLine();
   }
 
   function pickEditAssignee(idx) {
@@ -2645,8 +2244,6 @@
       const obs = document.getElementById('edit-task-obs')?.value?.trim();
       const echeance = document.getElementById('edit-task-date')?.value;
 
-      // Récupérer l'état production depuis l'UI
-      const isProductionChecked = !!document.getElementById('edit-is-production')?.checked;
       const updates = {
         tache: tache,
         creneau: creneau,
@@ -2657,11 +2254,7 @@
         echeance: echeance || dateStr(filterDate),
         attribue_a_id: editAssignee ? editAssignee.id : null,
         attribue_a_nom: editAssignee ? editAssignee.nom : null,
-        attribue_a_initiales: editAssignee ? editAssignee.initiales : null,
-        // Rattachement production
-        is_production: isProductionChecked,
-        fiche_id: isProductionChecked ? (editFicheId || null) : null,
-        categorie_production: isProductionChecked ? (editCategorieProd || null) : null
+        attribue_a_initiales: editAssignee ? editAssignee.initiales : null
       };
 
       console.log('Updating task', editingTaskId, updates);
@@ -2693,7 +2286,6 @@
           <div id="selected-task-area"></div>
           <input class="search-input" type="text" id="search-predef"
                  placeholder="Rechercher ou saisir une tâche..."
-                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                  oninput="filterPredefined(this.value)">
           <div class="predef-list" id="predef-list"></div>
         </div>
@@ -2786,32 +2378,9 @@
     const s = (search || '').toLowerCase();
     const selectedEquipe = getSelectedCreateEquipe();
 
-    // SAFETY NET — si predefinedTasks n'est pas (encore) chargé,
-    // on tente un fetch direct (utile si l'utilisateur arrive sur 'Créer'
-    // avant que loadAll() n'ait fini, ou si la promise initiale a échoué).
-    if (!predefinedTasks || predefinedTasks.length === 0) {
-      list.innerHTML = '<div class="predef-item" style="color:var(--gray-400);font-style:italic;cursor:default;border:none">Chargement des tâches…</div>';
-      DB.getPredefined(currentEtablissement).then(data => {
-        predefinedTasks = data || [];
-        if (predefinedTasks.length === 0) {
-          list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Aucune tâche prédéfinie en base. Tape un nom pour en créer une.</div>';
-        } else {
-          renderPredefinedList(search);
-        }
-      }).catch(e => {
-        console.error('renderPredefinedList — fetch fallback failed:', e);
-        list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Erreur de chargement. Tape un nom pour saisir manuellement.</div>';
-      });
-      return;
-    }
-
-    // Filtrer par équipe :
-    // - 'cuisine' et 'plonge' partagent la même base de tâches
-    // - 'autre' est un super-rôle (admin/manager créant pour un autre) → on montre TOUTES les tâches
-    //   (la table predefined_tasks ne contient actuellement aucune entrée equipe='autre')
+    // Filtrer par équipe : cuisine et plonge partagent la même base
     const equipeMatch = (taskEquipe) => {
       if (!taskEquipe) return true; // pas d'équipe = disponible pour tous
-      if (selectedEquipe === 'autre') return true; // super-rôle : voit tout
       if (selectedEquipe === 'cuisine' || selectedEquipe === 'plonge') {
         return taskEquipe === 'cuisine' || taskEquipe === 'plonge';
       }
@@ -2828,15 +2397,6 @@
         ${p.is_production ? '<span class="badge-production" style="margin-right:4px">🏭</span>' : ''}${esc(p.nom)} ${p.categorie ? `<span style="color:var(--gray-400);font-size:0.75rem">(${esc(p.categorie)})</span>` : ''}
       </div>`
     ).join('');
-
-    // Si aucun résultat (filtre équipe ou recherche), on l'indique TOUJOURS
-    // (pas seulement quand la recherche est vide).
-    if (filtered.length === 0) {
-      const msg = s
-        ? `Aucun résultat pour « ${esc(s)} » dans l'équipe ${esc(selectedEquipe)}.`
-        : `Aucune tâche prédéfinie pour l'équipe ${esc(selectedEquipe)}.`;
-      list.innerHTML = `<div class="predef-item" style="color:var(--gray-500);font-style:italic;cursor:default;border:none">${msg} Tape un nom pour en créer une nouvelle.</div>`;
-    }
 
     // Show "create custom" option if search has text
     if (s && !filtered.some(p => p.nom.toLowerCase() === s)) {
@@ -3066,10 +2626,6 @@
       c.classList.toggle('active', c.dataset.val === task.categorie_production);
     });
 
-    // Reset du rappel fiche technique (Phase 2)
-    document.getElementById('prod-fiche-resume').style.display = 'none';
-    document.getElementById('prod-fiche-resume-body').innerHTML = '';
-
     // Charger la fiche technique pour pré-remplir rendement/unité
     if (task.fiche_id) {
       // Cas standard : fiche déjà liée → on cache la zone choix
@@ -3083,8 +2639,6 @@
           if (fiche.rendement_quantite) document.getElementById('prod-quantite').value = fiche.rendement_quantite;
           if (fiche.rendement_unite) document.getElementById('prod-unite').value = fiche.rendement_unite;
           prodFicheRendement = fiche.rendement_quantite || null;
-          // Phase 2 : rappel instructions + temps
-          renderProdFicheResume(fiche);
         }
         // Charger les ingrédients de la fiche + lots disponibles
         await loadProductionMatieres(task.fiche_id);
@@ -3196,39 +2750,6 @@
     let common = 0;
     aw.forEach(w => { if (bw.has(w)) common++; });
     return aw.size > 0 ? common / aw.size : 0;
-  }
-
-  // Phase 2 — Affiche un rappel instructions + temps dans la modale de validation production.
-  // Utile pour vérifier que la prod a été conduite conformément à la fiche.
-  function renderProdFicheResume(fiche) {
-    const wrap = document.getElementById('prod-fiche-resume');
-    const body = document.getElementById('prod-fiche-resume-body');
-    if (!fiche) { wrap.style.display = 'none'; return; }
-
-    const temps = [];
-    if (fiche.temps_preparation) temps.push(`Prépa ${fiche.temps_preparation}min`);
-    if (fiche.temps_cuisson) temps.push(`Cuisson ${fiche.temps_cuisson}min`);
-    if (fiche.temps_repos) temps.push(`Repos ${fiche.temps_repos}min`);
-
-    let metaLine = '';
-    if (temps.length > 0) {
-      metaLine += `<div style="margin-bottom:8px;"><strong>⏱ Temps :</strong> ${temps.join(' · ')}</div>`;
-    }
-    if (fiche.dlc_jours || fiche.dlc_heures || fiche.temperature_stockage) {
-      const parts = [];
-      if (fiche.dlc_jours) parts.push(`DLC ${fiche.dlc_jours}j`);
-      else if (fiche.dlc_heures) parts.push(`DLC ${fiche.dlc_heures}h`);
-      if (fiche.temperature_stockage) parts.push(`Stockage ${esc(fiche.temperature_stockage)}`);
-      metaLine += `<div style="margin-bottom:8px;"><strong>📦 Conservation :</strong> ${parts.join(' · ')}</div>`;
-    }
-
-    let instrHTML = '';
-    if (fiche.instructions && fiche.instructions.trim().length > 0) {
-      instrHTML = `<div style="white-space:pre-wrap; line-height:1.5; padding:8px 10px; background:white; border:1px solid #bfdbfe; border-radius:6px; font-size:0.85rem;">${esc(fiche.instructions)}</div>`;
-    }
-
-    body.innerHTML = metaLine + instrHTML || '<div style="color:#64748b;">Aucune information complémentaire dans la fiche.</div>';
-    wrap.style.display = (metaLine || instrHTML) ? '' : 'none';
   }
 
   async function loadProductionMatieres(ficheId) {

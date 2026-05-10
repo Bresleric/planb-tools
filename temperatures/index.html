@@ -757,6 +757,8 @@
 
   // ====== TABS ======
   function switchTab(tab) {
+    // Garde-fou : empêcher l'accès à l'onglet Admin même via URL/hash manuels
+    if (tab === 'admin' && !isAdmin()) tab = 'releve';
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.getElementById('progress-section').style.display = tab === 'releve' ? '' : 'none';

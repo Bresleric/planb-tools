@@ -623,7 +623,7 @@
     <button class="tab-btn active" data-tab="productions">📦 Productions</button>
     <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
     <button class="tab-btn" data-tab="recap">👥 Par personne</button>
-    <button class="tab-btn" data-tab="fiches" style="margin-left:auto">📖 Fiches</button>
+    <button class="tab-btn" data-tab="fiches" id="tab-btn-fiches" style="margin-left:auto; display:none;">📖 Fiches</button>
     <button class="tab-btn" data-tab="rattachement" id="tab-btn-rattachement" style="display:none;">📌 Rattachement</button>
   </div>
 
@@ -1097,7 +1097,11 @@ function init() {
   loadFiches();
   loadProductions();
 
-  // Affiche l'onglet "Rattachement" pour les rôles autorisés (responsable+)
+  // Affiche l'onglet "Fiches" uniquement aux admins (référentiel structurant)
+  const tabBtnFiches = document.getElementById('tab-btn-fiches');
+  if (tabBtnFiches) tabBtnFiches.style.display = canSeeFiches() ? '' : 'none';
+
+  // Affiche l'onglet "Rattachement" uniquement aux admins (référentiel structurant)
   const tabBtnRattachement = document.getElementById('tab-btn-rattachement');
   if (tabBtnRattachement) tabBtnRattachement.style.display = canRattacher() ? '' : 'none';
 
@@ -1117,7 +1121,9 @@ function init() {
   }
   // Sécurité : si le tab demandé n'existe pas (ou pas accessible), retomber sur productions
   const tabBtn = document.querySelector(`.tab-btn[data-tab="${initialTab}"]`);
-  if (!tabBtn || (initialTab === 'rattachement' && !canRattacher())) {
+  if (!tabBtn
+      || (initialTab === 'rattachement' && !canRattacher())
+      || (initialTab === 'fiches' && !canSeeFiches())) {
     initialTab = 'productions';
   }
   switchTab(initialTab);
@@ -1133,9 +1139,14 @@ function canEdit() {
   return currentUser.role === 'admin';
 }
 
+function canSeeFiches() {
+  // Onglet Fiches : admin uniquement (référentiel structurant)
+  return currentUser.role === 'admin';
+}
+
 function canRattacher() {
-  // Onglet Rattachement : responsable + (mêmes rôles que stock/fiches.html avant fusion)
-  return ['responsable', 'manager', 'admin'].includes(currentUser.role);
+  // Onglet Rattachement : admin uniquement (référentiel structurant)
+  return currentUser.role === 'admin';
 }
 
 // ============= TABS =============
@@ -1149,6 +1160,10 @@ function setupTabs() {
 }
 
 function switchTab(tab) {
+  // Garde-fou : empêcher l'accès aux onglets restreints même via URL/hash manuels
+  if (tab === 'fiches' && !canSeeFiches()) tab = 'productions';
+  if (tab === 'rattachement' && !canRattacher()) tab = 'productions';
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${tab}"]`)?.classList.add('active');
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
