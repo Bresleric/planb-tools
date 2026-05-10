@@ -554,6 +554,59 @@
       font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 600;
     }
 
+    /* ====== Admin — table éditable predefined_tasks ====== */
+    .predef-admin-toolbar {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .predef-admin-toolbar input[type=text] {
+      flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm); font-size: 0.85rem;
+    }
+    .predef-admin-table {
+      width: 100%; border-collapse: collapse; font-size: 0.82rem;
+      background: white; border-radius: var(--radius-sm); overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .predef-admin-table th, .predef-admin-table td {
+      padding: 7px 10px; text-align: left;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .predef-admin-table th {
+      background: var(--gray-50); color: var(--gray-600);
+      font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .3px;
+      cursor: pointer; user-select: none; position: sticky; top: 0;
+    }
+    .predef-admin-table th:hover { background: var(--gray-100); }
+    .predef-admin-table th .sort-arrow { color: var(--orange); margin-left: 3px; font-size: 0.65rem; }
+    .predef-admin-table tr:hover { background: #fff8f0; }
+    .predef-admin-table .badge-cat-prod {
+      display: inline-block; padding: 1px 6px; border-radius: 10px;
+      font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-cat-prod.mep { background: #fef3c7; color: #92400e; }
+    .badge-cat-prod.inter { background: #fed7aa; color: #9a3412; }
+    .badge-cat-prod.fini { background: #dcfce7; color: #166534; }
+    .predef-admin-fiche {
+      font-size: 0.72rem; color: #1e40af;
+      max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .predef-admin-fiche .fiche-code {
+      background: #dbeafe; color: #1e40af; padding: 1px 5px; border-radius: 4px;
+      font-weight: 700; font-size: 0.65rem; margin-right: 4px;
+    }
+    .predef-admin-actions {
+      display: flex; gap: 4px; justify-content: flex-end;
+    }
+    .predef-admin-actions button {
+      width: 28px; height: 28px; border-radius: 6px; border: none;
+      cursor: pointer; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .predef-admin-actions .edit { background: #dbeafe; color: #1e40af; }
+    .predef-admin-actions .edit:hover { background: #bfdbfe; }
+    .predef-admin-actions .delete { background: #fee2e2; color: #b91c1c; }
+    .predef-admin-actions .delete:hover { background: #fecaca; }
+
     /* ====== Ligne "+ Ajouter une tâche" en fin de liste ====== */
     .task-row-add {
       display: flex; align-items: center; justify-content: center;
@@ -3846,23 +3899,307 @@
           `).join('')}
         </div>
 
-        <h3>Tâches prédéfinies</h3>
-        <div style="margin-bottom:8px">
-          <button class="btn-submit" style="width:auto;padding:6px 14px;font-size:0.8rem"
+        <h3>Tâches prédéfinies (base de données)</h3>
+        <div class="predef-admin-toolbar">
+          <input type="text" id="predef-admin-search" placeholder="🔎 Rechercher (nom, catégorie, fiche...)"
+                 oninput="onPredefAdminSearch(this.value)">
+          <button class="btn-submit" style="width:auto;padding:8px 14px;font-size:0.8rem"
                   onclick="showAddPredefinedModal()">+ Ajouter</button>
+          <span id="predef-admin-count" style="font-size:0.8rem;color:var(--gray-500)"></span>
         </div>
-        <div id="admin-predef-list">
-          ${predefinedTasks.map(p => `
-            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray-100)">
-              <span style="flex:1;font-size:0.85rem">${esc(p.nom)}</span>
-              <span style="font-size:0.7rem;color:var(--gray-400)">${esc(p.categorie || '')}</span>
-              <span style="font-size:0.7rem;color:var(--gray-400)">${esc(p.equipe || 'cuisine')}</span>
-              <button class="btn-action delete" onclick="deletePredefined('${p.id}')">✕</button>
+        <div id="admin-predef-list-wrap"></div>
+      </div>
+    `;
+    renderAdminPredefList();
+  }
+
+  // État local de la vue Admin/predef
+  let adminPredefSearch = '';
+  let adminPredefSort = { col: 'nom', dir: 'asc' };
+
+  function onPredefAdminSearch(v) {
+    adminPredefSearch = (v || '').toLowerCase();
+    renderAdminPredefList();
+  }
+
+  function togglePredefAdminSort(col) {
+    if (adminPredefSort.col === col) {
+      adminPredefSort.dir = adminPredefSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      adminPredefSort = { col, dir: 'asc' };
+    }
+    renderAdminPredefList();
+  }
+
+  function renderAdminPredefList() {
+    const wrap = document.getElementById('admin-predef-list-wrap');
+    if (!wrap) return;
+
+    // Filtre
+    let rows = predefinedTasks.slice();
+    if (adminPredefSearch) {
+      const s = adminPredefSearch;
+      rows = rows.filter(p => {
+        const fiche = productionFiches.find(f => f.id === p.fiche_id);
+        const haystack = [
+          p.nom, p.categorie, p.equipe, p.creneau,
+          p.categorie_production, fiche?.nom, fiche?.code_court
+        ].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(s);
+      });
+    }
+
+    // Tri
+    const { col, dir } = adminPredefSort;
+    const cmp = (a, b) => {
+      let va, vb;
+      if (col === 'fiche') {
+        va = (productionFiches.find(f => f.id === a.fiche_id)?.nom || '');
+        vb = (productionFiches.find(f => f.id === b.fiche_id)?.nom || '');
+      } else {
+        va = a[col] || ''; vb = b[col] || '';
+      }
+      const r = String(va).localeCompare(String(vb), 'fr', { sensitivity: 'base' });
+      return dir === 'asc' ? r : -r;
+    };
+    rows.sort(cmp);
+
+    // En-têtes triables
+    const arr = (c) => col === c ? `<span class="sort-arrow">${dir === 'asc' ? '▲' : '▼'}</span>` : '';
+
+    // Compte
+    document.getElementById('predef-admin-count').textContent =
+      `${rows.length} ligne${rows.length > 1 ? 's' : ''}` + (adminPredefSearch ? ` (filtré sur ${predefinedTasks.length})` : '');
+
+    // Mapping cat. prod → classe badge
+    const catProdLabel = { mise_en_place: '🔪 Mise en place', produit_intermediaire: '🥘 Intermédiaire', produit_fini: '✨ Produit fini' };
+    const catProdClass = { mise_en_place: 'mep', produit_intermediaire: 'inter', produit_fini: 'fini' };
+
+    wrap.innerHTML = rows.length === 0
+      ? `<div style="padding:14px;text-align:center;color:var(--gray-500);font-style:italic">Aucune tâche prédéfinie ne correspond.</div>`
+      : `
+        <div style="overflow-x:auto">
+          <table class="predef-admin-table">
+            <thead>
+              <tr>
+                <th onclick="togglePredefAdminSort('nom')">Nom${arr('nom')}</th>
+                <th onclick="togglePredefAdminSort('categorie')">Catégorie${arr('categorie')}</th>
+                <th onclick="togglePredefAdminSort('equipe')">Équipe${arr('equipe')}</th>
+                <th onclick="togglePredefAdminSort('creneau')">Créneau${arr('creneau')}</th>
+                <th onclick="togglePredefAdminSort('fiche')">🏭 Fiche liée${arr('fiche')}</th>
+                <th onclick="togglePredefAdminSort('categorie_production')">Type prod.${arr('categorie_production')}</th>
+                <th style="width:80px;text-align:right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(p => {
+                const fiche = productionFiches.find(f => f.id === p.fiche_id);
+                const ficheCell = p.is_production
+                  ? (fiche
+                      ? `<div class="predef-admin-fiche">${fiche.code_court ? `<span class="fiche-code">${esc(fiche.code_court)}</span>` : ''}${esc(fiche.nom)}</div>`
+                      : `<span style="color:#dc2626;font-size:0.72rem;font-weight:600">⚠ Fiche manquante</span>`)
+                  : `<span style="color:var(--gray-300)">—</span>`;
+                const cpClass = catProdClass[p.categorie_production] || '';
+                const cpLabel = catProdLabel[p.categorie_production] || (p.is_production ? '<span style="color:#dc2626">à définir</span>' : '—');
+                const cpHTML = p.is_production
+                  ? `<span class="badge-cat-prod ${cpClass}">${cpLabel}</span>`
+                  : `<span style="color:var(--gray-300)">—</span>`;
+                return `
+                  <tr>
+                    <td><strong>${p.is_production ? '🏭 ' : ''}${esc(p.nom)}</strong></td>
+                    <td>${esc(p.categorie || '')}</td>
+                    <td>${esc(p.equipe || 'cuisine')}</td>
+                    <td>${esc(p.creneau || 'Matin')}</td>
+                    <td>${ficheCell}</td>
+                    <td>${cpHTML}</td>
+                    <td>
+                      <div class="predef-admin-actions">
+                        <button class="edit" onclick="showEditPredefinedModal('${p.id}')" title="Modifier">✏️</button>
+                        <button class="delete" onclick="deletePredefined('${p.id}')" title="Désactiver">✕</button>
+                      </div>
+                    </td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
+  }
+
+  // ====== Édition d'une predefined_task (Admin) ======
+  let editingPredefId = null;
+  let editPredefIsProduction = false;
+  let editPredefFicheId = null;
+  let editPredefFicheNom = null;
+  let editPredefCatProd = null;
+
+  function showEditPredefinedModal(id) {
+    const p = predefinedTasks.find(x => x.id === id);
+    if (!p) return;
+    editingPredefId = id;
+    editPredefIsProduction = !!p.is_production;
+    editPredefFicheId = p.fiche_id || null;
+    editPredefCatProd = p.categorie_production || null;
+    const fiche = productionFiches.find(f => f.id === p.fiche_id);
+    editPredefFicheNom = fiche?.nom || null;
+
+    // Liste des catégories TAF disponibles
+    const cats = ['Production','Mise en Place','Nettoyage','Rangements','Cuissons','Pâtisserie',
+                  'Découpes & Épluchage','Garnitures & Accompagnements','Préparations'];
+
+    const body = `
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Nom *</label>
+          <input class="form-input" type="text" id="ep-nom" value="${esc(p.nom)}" style="font-size:0.9rem">
+        </div>
+
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Catégorie</label>
+          <select class="form-select" id="ep-cat">
+            <option value="">— Aucune —</option>
+            ${cats.map(c => `<option value="${esc(c)}" ${c === p.categorie ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Équipe</label>
+          <div class="chip-group" id="ep-equipe">
+            ${EQUIPES.map(eq => `<button type="button" class="chip ${eq === (p.equipe || 'cuisine') ? 'active' : ''}" data-val="${eq}" onclick="selectChip(this, 'ep-equipe')">${eq.charAt(0).toUpperCase() + eq.slice(1)}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Créneau</label>
+          <div class="chip-group" id="ep-creneau">
+            ${CRENEAUX.map(c => `<button type="button" class="chip ${c === (p.creneau || 'Matin') ? 'active' : ''}" data-val="${c}" onclick="selectChip(this, 'ep-creneau')">${c}</button>`).join('')}
+          </div>
+        </div>
+
+        <!-- Bloc production -->
+        <div class="form-group" style="margin:0; padding:10px 12px; background:#f3e8ff; border:1px solid #ddd6fe; border-radius:8px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:600; color:#6b21a8; margin:0;">
+            <input type="checkbox" id="ep-is-production" ${editPredefIsProduction ? 'checked' : ''}
+                   onchange="toggleEditPredefProduction(this.checked)"
+                   style="width:18px; height:18px; accent-color:#7c3aed; cursor:pointer;">
+            🏭 Tâche de production (lier à une fiche technique)
+          </label>
+          <div id="ep-production-details" style="${editPredefIsProduction ? '' : 'display:none;'} margin-top:10px;">
+            <label style="font-size:0.75rem; font-weight:600; color:#6b21a8; margin-bottom:4px; display:block;">Type de production</label>
+            <div class="chip-group" id="ep-cat-prod" style="margin-bottom:10px;">
+              <button type="button" class="chip ${editPredefCatProd === 'mise_en_place' ? 'active' : ''}" data-val="mise_en_place" onclick="selectChip(this, 'ep-cat-prod'); editPredefCatProd='mise_en_place';">🔪 Mise en place</button>
+              <button type="button" class="chip ${editPredefCatProd === 'produit_intermediaire' ? 'active' : ''}" data-val="produit_intermediaire" onclick="selectChip(this, 'ep-cat-prod'); editPredefCatProd='produit_intermediaire';">🥘 Intermédiaire</button>
+              <button type="button" class="chip ${editPredefCatProd === 'produit_fini' ? 'active' : ''}" data-val="produit_fini" onclick="selectChip(this, 'ep-cat-prod'); editPredefCatProd='produit_fini';">✨ Produit fini</button>
             </div>
-          `).join('')}
+            <label style="font-size:0.75rem; font-weight:600; color:#6b21a8; margin-bottom:4px; display:block;">Fiche technique liée</label>
+            <div id="ep-fiche-line" style="margin-bottom:6px;"></div>
+            <div style="position:relative;">
+              <input type="text" id="ep-fiche-search" autocomplete="off" autocorrect="off" spellcheck="false"
+                     placeholder="Tape le nom d'une fiche…"
+                     oninput="filterEditPredefFiches(this.value)"
+                     style="width:100%; padding:9px 11px; font-size:14px; border:1px solid #d1d5db; border-radius:6px;">
+              <div id="ep-fiche-results" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:white; border:1px solid #d1d5db; border-radius:6px; box-shadow:0 4px 6px -1px rgb(0 0 0/.1); z-index:10; margin-top:2px;"></div>
+            </div>
+          </div>
         </div>
       </div>
     `;
+
+    openModal('Modifier la tâche prédéfinie', body, [
+      { label: 'Annuler', action: 'closeModal()', cls: '' },
+      { label: 'Enregistrer', action: 'submitEditPredefined()', cls: 'primary' }
+    ]);
+    setTimeout(renderEditPredefFicheLine, 0);
+  }
+
+  function toggleEditPredefProduction(checked) {
+    editPredefIsProduction = !!checked;
+    document.getElementById('ep-production-details').style.display = checked ? '' : 'none';
+  }
+
+  function renderEditPredefFicheLine() {
+    const line = document.getElementById('ep-fiche-line');
+    if (!line) return;
+    if (editPredefFicheId && editPredefFicheNom) {
+      line.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:white; border:1px solid #c4b5fd; border-radius:6px;">
+        <span style="font-weight:600; color:#1e293b; flex:1;">📖 ${esc(editPredefFicheNom)}</span>
+        <button type="button" onclick="unpickEditPredefFiche()" style="border:none; background:none; cursor:pointer; color:#dc2626; font-size:1rem;">✕</button>
+      </div>`;
+    } else {
+      line.innerHTML = `<div style="font-size:0.78rem; color:#6b21a8; font-style:italic;">— Aucune fiche choisie —</div>`;
+    }
+  }
+
+  function filterEditPredefFiches(q) {
+    const results = document.getElementById('ep-fiche-results');
+    if (!results) return;
+    const s = (q || '').toLowerCase().trim();
+    if (!s) { results.style.display = 'none'; return; }
+    const matches = productionFiches
+      .filter(f => f.actif !== false && (f.nom.toLowerCase().includes(s) || (f.code_court || '').toLowerCase().includes(s)))
+      .slice(0, 10);
+    if (matches.length === 0) {
+      results.innerHTML = `<div style="padding:8px 12px; color:#6b7280; font-size:0.85rem;">Aucune fiche</div>`;
+    } else {
+      results.innerHTML = matches.map(f => `
+        <div onclick="pickEditPredefFiche('${f.id}')" style="padding:8px 12px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f1f5f9;">
+          ${f.code_court ? `<span style="color:#7c3aed; font-weight:700; font-size:0.7rem; padding:1px 5px; background:#f3e8ff; border-radius:4px; margin-right:6px;">${esc(f.code_court)}</span>` : ''}
+          ${esc(f.nom)}
+          <span style="color:#94a3b8; font-size:0.72rem; margin-left:6px;">${esc(f.categorie || '')}</span>
+        </div>`).join('');
+    }
+    results.style.display = '';
+  }
+
+  function pickEditPredefFiche(ficheId) {
+    const f = productionFiches.find(x => x.id === ficheId);
+    if (!f) return;
+    editPredefFicheId = f.id;
+    editPredefFicheNom = f.nom;
+    if (!editPredefCatProd && f.categorie) {
+      editPredefCatProd = f.categorie;
+      document.querySelectorAll('#ep-cat-prod .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.val === editPredefCatProd);
+      });
+    }
+    renderEditPredefFicheLine();
+    document.getElementById('ep-fiche-search').value = '';
+    document.getElementById('ep-fiche-results').style.display = 'none';
+  }
+
+  function unpickEditPredefFiche() {
+    editPredefFicheId = null;
+    editPredefFicheNom = null;
+    renderEditPredefFicheLine();
+  }
+
+  async function submitEditPredefined() {
+    if (!editingPredefId) return;
+    try {
+      const nom = document.getElementById('ep-nom')?.value?.trim();
+      if (!nom) { showToast('Le nom est obligatoire', 'error'); return; }
+      const categorie = document.getElementById('ep-cat')?.value || null;
+      const equipe = document.querySelector('#ep-equipe .chip.active')?.dataset?.val || 'cuisine';
+      const creneau = document.querySelector('#ep-creneau .chip.active')?.dataset?.val || 'Matin';
+      const isProd = !!document.getElementById('ep-is-production')?.checked;
+      const updates = {
+        nom: nom,
+        categorie: categorie || null,
+        equipe: equipe,
+        creneau: creneau,
+        is_production: isProd,
+        fiche_id: isProd ? (editPredefFicheId || null) : null,
+        categorie_production: isProd ? (editPredefCatProd || null) : null
+      };
+      const { error } = await supabaseClient.from('predefined_tasks').update(updates).eq('id', editingPredefId);
+      if (error) throw error;
+      predefinedTasks = await DB.getPredefined(currentEtablissement);
+      closeModal();
+      renderAdminTab();
+      showToast('Tâche prédéfinie modifiée ✓', 'success');
+    } catch (e) {
+      console.error('submitEditPredefined:', e);
+      showToast('Erreur: ' + (e.message || e), 'error');
+    }
   }
 
   function showAddPredefinedModal() {
