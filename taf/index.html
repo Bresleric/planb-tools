@@ -1680,6 +1680,9 @@
 
   // ====== TAB SWITCHING ======
   function switchTab(tab) {
+    // Garde-fou : empêcher l'accès aux onglets restreints même via URL/hash manuels
+    if (tab === 'admin' && !isAdmin()) tab = 'taches';
+    if (tab === 'recurrences' && !canManageRecurrences()) tab = 'taches';
     // Quitter le mode sélection multiple si on change d'onglet
     if (selectionMode && tab !== 'taches') exitSelectionMode();
     currentTab = tab;

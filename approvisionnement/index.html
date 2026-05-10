@@ -944,7 +944,7 @@
                 <div class="tab active" data-tab="besoins" onclick="switchTab('besoins')">📋 Besoins</div>
                 <div class="tab" data-tab="commandes" onclick="switchTab('commandes')">📦 Commandes</div>
                 <div class="tab" data-tab="inventaire" onclick="switchTab('inventaire')">🔍 Inventaire</div>
-                <div class="tab" data-tab="catalogue" onclick="switchTab('catalogue')">📚 Catalogue</div>
+                <div class="tab hidden" id="tab-btn-catalogue" data-tab="catalogue" onclick="switchTab('catalogue')">📚 Catalogue</div>
                 <div class="tab hidden" id="tab-btn-ingredients" data-tab="ingredients" onclick="switchTab('ingredients')">🥘 Ingrédients</div>
             </div>
         </header>
@@ -1402,12 +1402,18 @@
             const etabText = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽 Liesel';
             document.getElementById('etab-badge').textContent = etabText;
             document.getElementById('user-badge').textContent = currentUser.initiales;
-            // Onglet Ingrédients visible à partir de responsable
+            // Onglets Catalogue et Ingrédients : admin uniquement (référentiels structurants)
             const hierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
             const lvl = hierarchy[currentUser?.role] || 0;
-            if (lvl >= 2) {
+            if (lvl >= 4) {
+                document.getElementById('tab-btn-catalogue').classList.remove('hidden');
                 document.getElementById('tab-btn-ingredients').classList.remove('hidden');
             }
+        }
+
+        function isAdminAppro() {
+            const hierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
+            return (hierarchy[currentUser?.role] || 0) >= 4;
         }
 
         async function loadData() {
@@ -2318,6 +2324,10 @@
         }
 
         function switchTab(tabName) {
+            // Garde-fou : empêcher l'accès aux onglets Catalogue / Ingrédients aux non-admins (URL/hash manuels)
+            if ((tabName === 'catalogue' || tabName === 'ingredients') && !isAdminAppro()) {
+                tabName = 'besoins';
+            }
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
