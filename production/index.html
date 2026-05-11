@@ -623,6 +623,7 @@
     <button class="tab-btn active" data-tab="productions">📦 Productions</button>
     <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
     <button class="tab-btn" data-tab="recap">👥 Par personne</button>
+    <button class="tab-btn" data-tab="stock">🧊 Stock PF/PI</button>
     <button class="tab-btn" data-tab="fiches" id="tab-btn-fiches" style="margin-left:auto; display:none;">📖 Fiches</button>
     <button class="tab-btn" data-tab="rattachement" id="tab-btn-rattachement" style="display:none;">📌 Rattachement</button>
   </div>
@@ -663,6 +664,34 @@
     </div>
   </div>
 
+  <!-- FILTERS (stock PF/PI) -->
+  <div class="filters-section" id="filters-stock" style="display:none;">
+    <div class="filter-row" style="flex-wrap:wrap; gap:6px; align-items:center;">
+      <input type="text" class="search-input" id="stock-search" placeholder="Rechercher un produit…" style="flex:1; min-width:160px; padding:6px 10px 6px 32px; margin-top:0;">
+      <button class="filter-chip" id="stock-btn-new" style="background:var(--purple); color:white; border-color:var(--purple); font-weight:600;">+ Nouvelle ligne</button>
+    </div>
+    <div class="filter-row" style="flex-wrap:wrap; gap:6px; margin-top:6px;">
+      <span class="filter-label">Pièce</span>
+      <button class="filter-chip active" data-stock-piece="all">Toutes</button>
+      <button class="filter-chip" data-stock-piece="CUISINE">Cuisine</button>
+      <button class="filter-chip" data-stock-piece="LABO">Labo</button>
+      <button class="filter-chip" data-stock-piece="CAVE">Cave</button>
+      <button class="filter-chip" data-stock-piece="SALLE">Salle</button>
+      <button class="filter-chip" data-stock-piece="BAR">Bar</button>
+    </div>
+    <div class="filter-row" style="flex-wrap:wrap; gap:6px; margin-top:6px;">
+      <span class="filter-label">Catégorie</span>
+      <button class="filter-chip active" data-stock-cat="all">Toutes</button>
+      <button class="filter-chip" data-stock-cat="produit_fini">PF</button>
+      <button class="filter-chip" data-stock-cat="produit_intermediaire">PI</button>
+      <button class="filter-chip" data-stock-cat="mise_en_place">MEP</button>
+      <span class="filter-label" style="margin-left:8px;">Meuble</span>
+      <select id="stock-meuble-filter" class="form-select" style="padding:4px 8px; font-size:0.8rem; max-width:200px;">
+        <option value="all">Tous</option>
+      </select>
+    </div>
+  </div>
+
   <!-- FILTERS (rattachement) -->
   <div class="filters-section" id="filters-rattachement" style="display:none;">
     <div class="filter-row" style="flex-wrap:wrap; gap:8px; align-items:center;">
@@ -686,6 +715,9 @@
 
     <!-- TAB: Récap par personne -->
     <div class="tab-content" id="tab-recap"></div>
+
+    <!-- TAB: Stock PF/PI (markup injecté depuis stock-pf-pi.html) -->
+    <div class="tab-content" id="tab-stock"></div>
 
     <!-- TAB: Rattachement (audit + matching ingrédients <-> articles appro) -->
     <div class="tab-content" id="tab-rattachement">
@@ -860,6 +892,7 @@
   <!-- FAB BUTTONS -->
   <button class="fab-button" id="fab-fiches" onclick="switchTab('create')" title="Nouvelle fiche technique" style="display:none;">+</button>
   <button class="fab-button" id="fab-productions" onclick="openProductionModal()" style="display:none;">+</button>
+  <button class="fab-button" id="fab-stock" onclick="StockPFPI && StockPFPI.openModal()" title="Nouvelle ligne de stock" style="display:none;">+</button>
 
   <!-- PRODUCTION EDIT MODAL (correction nom / fiche / quantité) -->
   <div id="prodedit-bg" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:210; padding:16px; overflow-y:auto;">
@@ -1149,6 +1182,16 @@ function canRattacher() {
   return currentUser.role === 'admin';
 }
 
+function canCreateStock() {
+  // Stock PF/PI : création/édition à partir de collaborateur (PIN 4 chiffres)
+  return roleHierarchy[currentUser.role] >= roleHierarchy.collaborateur;
+}
+
+function canDeleteStock() {
+  // Stock PF/PI : suppression à partir de responsable (PIN 5 chiffres)
+  return roleHierarchy[currentUser.role] >= roleHierarchy.responsable;
+}
+
 // ============= TABS =============
 function setupTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1174,16 +1217,20 @@ function switchTab(tab) {
   const filtersProductions = document.getElementById('filters-productions');
   const filtersRecap = document.getElementById('filters-recap');
   const filtersRattachement = document.getElementById('filters-rattachement');
+  const filtersStock = document.getElementById('filters-stock');
   filtersSection.style.display = (tab === 'fiches') ? '' : 'none';
   filtersProductions.style.display = (tab === 'productions') ? '' : 'none';
   if (filtersRecap) filtersRecap.style.display = (tab === 'recap') ? '' : 'none';
   if (filtersRattachement) filtersRattachement.style.display = (tab === 'rattachement') ? '' : 'none';
+  if (filtersStock) filtersStock.style.display = (tab === 'stock') ? '' : 'none';
 
   // Show/hide FAB buttons
   const fabFiches = document.getElementById('fab-fiches');
   const fabProd = document.getElementById('fab-productions');
+  const fabStock = document.getElementById('fab-stock');
   if (fabFiches) fabFiches.style.display = (tab === 'fiches' && canEdit()) ? 'flex' : 'none';
   if (fabProd) fabProd.style.display = (tab === 'productions') ? 'flex' : 'none';
+  if (fabStock) fabStock.style.display = (tab === 'stock' && canCreateStock()) ? 'flex' : 'none';
 
   if (tab === 'productions') {
     loadProductions();
@@ -1192,6 +1239,8 @@ function switchTab(tab) {
   } else if (tab === 'recap') {
     initRecapDates();
     loadRecapPersonnes();
+  } else if (tab === 'stock') {
+    if (window.StockPFPI) StockPFPI.init();
   } else if (tab === 'rattachement') {
     loadRattachement();
   } else if (tab === 'fiches') {
@@ -4295,6 +4344,7 @@ function rtOpenCreateModal(fiche, ing, rowEl) {
 // ============= INIT =============
 init();
 </script>
+<script src="stock-pf-pi.js"></script>
 <!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
 <style id="taf-header-style">
 .header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
