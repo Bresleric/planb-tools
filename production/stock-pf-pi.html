@@ -1,0 +1,228 @@
+<!--
+  Stock PF/PI — markup de l'onglet (Module Production)
+  Fragment HTML chargé par stock-pf-pi.js puis injecté dans #tab-stock.
+  Le <style> est déplacé vers <head> et la modale vers <body>.
+-->
+<style>
+  /* ====== STOCK PF/PI ====== */
+  .stock-summary {
+    padding: 8px 12px; background: white; border-radius: var(--radius-sm);
+    box-shadow: var(--shadow); font-size: 0.82rem; color: var(--gray-600);
+    margin-bottom: 8px; display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .stock-summary strong { color: var(--gray-800); font-weight: 700; }
+  .stock-summary .sep { color: var(--gray-300); }
+
+  .stock-table-wrap {
+    background: white; border-radius: var(--radius); box-shadow: var(--shadow);
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  .stock-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 880px; }
+  .stock-table thead th {
+    text-align: left; padding: 8px 8px; background: var(--gray-100);
+    font-size: 0.66rem; text-transform: uppercase; color: var(--gray-500);
+    font-weight: 700; border-bottom: 1px solid var(--gray-200);
+    letter-spacing: 0.3px; white-space: nowrap; position: sticky; top: 0; z-index: 1;
+  }
+  .stock-table thead th.num { text-align: right; }
+  .stock-table tbody tr { border-bottom: 1px solid var(--gray-100); cursor: pointer; transition: background .1s; }
+  .stock-table tbody tr:hover { background: var(--gray-50); }
+  .stock-table tbody tr:last-child { border-bottom: none; }
+  .stock-table td { padding: 7px 8px; vertical-align: middle; }
+  .stock-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stock-table td.prod { font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stock-table td.obs { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-500); font-size: 0.76rem; }
+  .stock-table td.actions { text-align: right; white-space: nowrap; }
+  .stock-table td.dlc.warn { color: #b45309; font-weight: 600; }
+  .stock-table td.dlc.alert { color: #dc2626; font-weight: 700; }
+
+  .stock-table .badge {
+    padding: 2px 6px; border-radius: 8px; font-size: 0.62rem; font-weight: 700;
+    white-space: nowrap; display: inline-block;
+  }
+  .stock-table .badge.mise_en_place { background: var(--blue-bg); color: var(--blue); }
+  .stock-table .badge.produit_intermediaire { background: var(--orange-light); color: var(--orange-dark); }
+  .stock-table .badge.produit_fini { background: var(--green-bg); color: #15803d; }
+  .stock-table .badge.muted { background: var(--gray-100); color: var(--gray-500); }
+
+  .stock-icon-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--gray-200);
+    background: white; cursor: pointer; font-size: 0.85rem; margin-left: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .stock-icon-btn:active { background: var(--gray-100); }
+  .stock-icon-btn.danger { border-color: #fecaca; color: var(--red); }
+
+  @media (max-width: 600px) {
+    .stock-table { font-size: 0.76rem; min-width: 720px; }
+    .stock-table thead th, .stock-table td { padding: 6px 6px; }
+  }
+
+  /* ====== STOCK MODAL ====== */
+  .stock-modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    z-index: 210; padding: 16px; overflow-y: auto;
+  }
+  .stock-modal-bg.visible { display: flex; align-items: flex-start; justify-content: center; }
+  .stock-modal {
+    background: white; border-radius: 12px; max-width: 560px; width: 100%;
+    padding: 20px; margin-top: 20px;
+  }
+  .stock-modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+  .stock-modal .sm-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .stock-modal .sm-row > .sm-field { flex: 1; }
+  .stock-modal .sm-field { margin-bottom: 10px; position: relative; }
+  .stock-modal label {
+    display: block; font-size: 0.7rem; font-weight: 600; color: var(--gray-500);
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .stock-modal input[type="text"],
+  .stock-modal input[type="number"],
+  .stock-modal input[type="date"],
+  .stock-modal select,
+  .stock-modal textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm); font-size: 0.88rem; background: white;
+    color: var(--gray-800); font-family: inherit;
+  }
+  .stock-modal textarea { min-height: 60px; resize: vertical; }
+  .stock-modal input:focus, .stock-modal select:focus, .stock-modal textarea:focus {
+    outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-bg);
+  }
+
+  .sm-prod-results {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    max-height: 220px; overflow-y: auto; background: white;
+    border: 1px solid var(--gray-300); border-radius: var(--radius-sm);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 5; margin-top: 2px;
+  }
+  .sm-prod-results.visible { display: block; }
+  .sm-prod-result { padding: 8px 10px; cursor: pointer; font-size: 0.82rem; border-bottom: 1px solid var(--gray-100); }
+  .sm-prod-result:hover, .sm-prod-result.active { background: var(--purple-bg); }
+  .sm-prod-result:last-child { border-bottom: none; }
+  .sm-prod-result .sm-prod-cat { font-size: 0.66rem; color: var(--gray-500); margin-top: 1px; }
+  .sm-prod-free { padding: 8px 10px; font-size: 0.78rem; color: var(--gray-500); font-style: italic; }
+
+  .sm-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .sm-btn {
+    padding: 10px 12px; font-size: 0.88rem; font-weight: 600;
+    border-radius: var(--radius-sm); border: none; cursor: pointer; font-family: inherit;
+  }
+  .sm-btn-primary { background: var(--purple); color: white; }
+  .sm-btn-primary:active { background: #7c3aed; }
+  .sm-btn-ghost { background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); }
+  .sm-btn-danger { background: white; color: var(--red); border: 1px solid #fecaca; }
+  .sm-btn-danger:active { background: var(--red-bg); }
+  .sm-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+  .sm-meta {
+    font-size: 0.7rem; color: var(--gray-400); margin-top: 8px;
+    padding-top: 8px; border-top: 1px dashed var(--gray-200);
+  }
+</style>
+
+<!-- Contenu de l'onglet -->
+<div class="productions-container" id="stock-container">
+  <div class="stock-summary" id="stock-summary">
+    <span><strong id="stock-count-lignes">—</strong> lignes</span>
+    <span class="sep">·</span>
+    <span><strong id="stock-count-prods">—</strong> produits distincts</span>
+    <span class="sep">·</span>
+    <span id="stock-count-dlc">—</span>
+  </div>
+  <div class="stock-table-wrap">
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>Pièce</th>
+          <th>Meuble</th>
+          <th>Empl.</th>
+          <th>Niv.</th>
+          <th>Produit</th>
+          <th>Cat.</th>
+          <th class="num">Qté</th>
+          <th>Unité</th>
+          <th>Contenant</th>
+          <th>DLC</th>
+          <th>Obs.</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="stock-tbody">
+        <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--gray-400);">⏳ Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <datalist id="stock-emplacement-list"></datalist>
+</div>
+
+<!-- Modale Ajout / Édition -->
+<div class="stock-modal-bg" id="stock-modal-bg">
+  <div class="stock-modal">
+    <h3 id="stock-modal-title">Nouvelle ligne</h3>
+    <input type="hidden" id="sm-id">
+
+    <div class="sm-field">
+      <label>Produit *</label>
+      <input type="text" id="sm-produit" autocomplete="off" placeholder="Rechercher une fiche…">
+      <div class="sm-prod-results" id="sm-prod-results"></div>
+      <input type="hidden" id="sm-fiche-id">
+      <input type="hidden" id="sm-produit-cat">
+    </div>
+
+    <div class="sm-row">
+      <div class="sm-field" style="flex:1;">
+        <label>Pièce *</label>
+        <select id="sm-piece"><option value="">—</option></select>
+      </div>
+      <div class="sm-field" style="flex:2;">
+        <label>Meuble *</label>
+        <select id="sm-meuble"><option value="">—</option></select>
+      </div>
+    </div>
+
+    <div class="sm-row">
+      <div class="sm-field" style="flex:1;">
+        <label>Niveau</label>
+        <select id="sm-niveau"><option value="">—</option></select>
+      </div>
+      <div class="sm-field" style="flex:2;">
+        <label>Emplacement</label>
+        <input type="text" id="sm-emplacement" list="stock-emplacement-list" placeholder="Porte, Étagère, Tiroir…">
+      </div>
+    </div>
+
+    <div class="sm-field">
+      <label>Contenant</label>
+      <select id="sm-contenant"><option value="">—</option></select>
+    </div>
+
+    <div class="sm-row">
+      <div class="sm-field" style="flex:1;">
+        <label>Quantité *</label>
+        <input type="number" id="sm-quantite" step="0.01" min="0" placeholder="0">
+      </div>
+      <div class="sm-field" style="flex:1;">
+        <label>Unité *</label>
+        <select id="sm-unite"><option value="">—</option></select>
+      </div>
+      <div class="sm-field" style="flex:1;">
+        <label>DLC</label>
+        <input type="date" id="sm-dlc">
+      </div>
+    </div>
+
+    <div class="sm-field">
+      <label>Observations</label>
+      <textarea id="sm-observations" placeholder="Notes, qualité, lot…"></textarea>
+    </div>
+
+    <div class="sm-meta" id="sm-meta" style="display:none;"></div>
+
+    <div class="sm-actions">
+      <button class="sm-btn sm-btn-ghost" id="sm-cancel">Annuler</button>
+      <button class="sm-btn sm-btn-danger" id="sm-delete" style="display:none;">Supprimer</button>
+      <button class="sm-btn sm-btn-primary" id="sm-save">Enregistrer</button>
+    </div>
+  </div>
+</div>
