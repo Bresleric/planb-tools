@@ -153,13 +153,13 @@
 
     .taf-grid {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
+      grid-template-columns: 72px 48px 32px 32px 52px minmax(140px, 2fr) minmax(100px, 1fr) 90px 40px 30px 100px 140px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
+      grid-template-columns: 72px 48px 32px 32px 52px minmax(140px, 2fr) minmax(100px, 1fr) 90px 40px 30px 100px 140px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -178,7 +178,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
+      grid-template-columns: 72px 48px 32px 32px 52px minmax(140px, 2fr) minmax(100px, 1fr) 90px 40px 30px 100px 140px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -353,7 +353,7 @@
     .task-table-header.selection-mode,
     .task-row.selection-mode,
     .taf-grid.selection-mode {
-      grid-template-columns: 32px 72px 48px 32px 32px 52px 90px minmax(100px, 1fr) minmax(140px, 2fr) 40px 30px 100px 140px;
+      grid-template-columns: 32px 72px 48px 32px 32px 52px minmax(140px, 2fr) minmax(100px, 1fr) 90px 40px 30px 100px 140px;
     }
     .task-row.selected {
       background: #eff6ff;
@@ -1799,9 +1799,9 @@
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
       <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
-      <span class="th-sort ${sa('categorie')}" onclick="toggleSort('categorie')">Catégorie<span class="sort-arrow">${arrow('categorie')}</span></span>
-      <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
       <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
+      <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
+      <span class="th-sort ${sa('categorie')}" onclick="toggleSort('categorie')">Catégorie<span class="sort-arrow">${arrow('categorie')}</span></span>
       <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
       <span class="th-center">✓</span>
       <span class="th-sort th-center ${sa('statut')}" onclick="toggleSort('statut')">Statut<span class="sort-arrow">${arrow('statut')}</span></span>
@@ -1844,11 +1844,11 @@
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
-        <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
-        <div class="task-note-cell">${t.observation ? `<span class="task-note" title="${esc(t.observation)}">${esc(t.observation)}</span>` : ''}</div>
         <div class="task-main">
           <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
         </div>
+        <div class="task-note-cell">${t.observation ? `<span class="task-note" title="${esc(t.observation)}">${esc(t.observation)}</span>` : ''}</div>
+        <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
         ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
         <div class="task-cell">${(() => {
@@ -3943,7 +3943,8 @@
         const fiche = productionFiches.find(f => f.id === p.fiche_id);
         const haystack = [
           p.nom, p.categorie, p.equipe, p.creneau,
-          p.categorie_production, fiche?.nom, fiche?.code_court
+          p.categorie_production, p.produit, p.action,
+          fiche?.nom, fiche?.code_court
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(s);
       });
@@ -3983,6 +3984,8 @@
             <thead>
               <tr>
                 <th onclick="togglePredefAdminSort('nom')">Nom${arr('nom')}</th>
+                <th onclick="togglePredefAdminSort('produit')">Produit${arr('produit')}</th>
+                <th onclick="togglePredefAdminSort('action')">Action${arr('action')}</th>
                 <th onclick="togglePredefAdminSort('categorie')">Catégorie${arr('categorie')}</th>
                 <th onclick="togglePredefAdminSort('equipe')">Équipe${arr('equipe')}</th>
                 <th onclick="togglePredefAdminSort('creneau')">Créneau${arr('creneau')}</th>
@@ -4004,9 +4007,13 @@
                 const cpHTML = p.is_production
                   ? `<span class="badge-cat-prod ${cpClass}">${cpLabel}</span>`
                   : `<span style="color:var(--gray-300)">—</span>`;
+                const produitCell = p.produit ? `<span style="color:#0f766e;font-weight:600">${esc(p.produit)}</span>` : `<span style="color:var(--gray-300);font-size:0.72rem">—</span>`;
+                const actionCell = p.action ? `<span style="color:#7c2d12;font-weight:600">${esc(p.action)}</span>` : `<span style="color:var(--gray-300);font-size:0.72rem">—</span>`;
                 return `
                   <tr>
                     <td><strong>${p.is_production ? '🏭 ' : ''}${esc(p.nom)}</strong></td>
+                    <td>${produitCell}</td>
+                    <td>${actionCell}</td>
                     <td>${esc(p.categorie || '')}</td>
                     <td>${esc(p.equipe || 'cuisine')}</td>
                     <td>${esc(p.creneau || 'Matin')}</td>
@@ -4049,8 +4056,27 @@
     const body = `
       <div style="display:flex;flex-direction:column;gap:12px">
         <div class="form-group" style="margin:0">
-          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Nom *</label>
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Nom complet *</label>
           <input class="form-input" type="text" id="ep-nom" value="${esc(p.nom)}" style="font-size:0.9rem">
+          <div style="font-size:0.7rem;color:var(--gray-500);margin-top:3px;font-style:italic">Tel qu'affiché dans la liste TAF (source de vérité actuelle)</div>
+        </div>
+
+        <!-- Décomposition produit / action -->
+        <div style="display:flex; gap:10px; margin:0;">
+          <div class="form-group" style="margin:0;flex:1">
+            <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">🥕 Produit</label>
+            <input class="form-input" type="text" id="ep-produit" value="${esc(p.produit || '')}" placeholder="Ex: oignons, onglet, choucroute" style="font-size:0.9rem">
+          </div>
+          <div class="form-group" style="margin:0;flex:1">
+            <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">🛠 Action</label>
+            <input class="form-input" type="text" id="ep-action" value="${esc(p.action || '')}" placeholder="Ex: Couper, Cuire, Préparer" style="font-size:0.9rem" list="ep-action-suggestions">
+            <datalist id="ep-action-suggestions">
+              <option value="Préparer"><option value="Couper"><option value="Émincer"><option value="Éplucher">
+              <option value="Tailler"><option value="Détailler"><option value="Cuire"><option value="Sous-vide">
+              <option value="Poêler"><option value="Mariner"><option value="Préparer appareil">
+              <option value="Nettoyer"><option value="Filmer"><option value="Vérifier">
+            </datalist>
+          </div>
         </div>
 
         <div class="form-group" style="margin:0">
@@ -4181,11 +4207,15 @@
       const equipe = document.querySelector('#ep-equipe .chip.active')?.dataset?.val || 'cuisine';
       const creneau = document.querySelector('#ep-creneau .chip.active')?.dataset?.val || 'Matin';
       const isProd = !!document.getElementById('ep-is-production')?.checked;
+      const produit = document.getElementById('ep-produit')?.value?.trim() || null;
+      const action = document.getElementById('ep-action')?.value?.trim() || null;
       const updates = {
         nom: nom,
         categorie: categorie || null,
         equipe: equipe,
         creneau: creneau,
+        produit: produit,
+        action: action,
         is_production: isProd,
         fiche_id: isProd ? (editPredefFicheId || null) : null,
         categorie_production: isProd ? (editPredefCatProd || null) : null
