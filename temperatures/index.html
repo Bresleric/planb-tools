@@ -136,6 +136,7 @@
     .frigo-card.done { border-left-color: var(--green); }
     .frigo-card.hors-norme { border-left-color: var(--red); }
     .frigo-card.attente-controle { border-left-color: var(--amber); }
+    .frigo-card.na { border-left-color: var(--gray-400); background: #fafafa; }
 
     .frigo-header {
       padding: 6px 10px;
@@ -169,6 +170,7 @@
     .badge-temp.warning { background: var(--amber-bg); color: var(--amber); }
     .badge-temp.danger { background: var(--red-bg); color: var(--red); }
     .badge-temp.pending { background: var(--gray-100); color: var(--gray-400); }
+    .badge-temp.na { background: var(--gray-200); color: var(--gray-600); }
 
     .badge-photo {
       padding: 2px 6px; border-radius: 8px; font-size: 0.65rem; font-weight: 600;
@@ -245,6 +247,31 @@
     .btn-validate:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-validate:active:not(:disabled) { background: var(--cyan-dark); }
     .btn-validate.danger { background: var(--red); }
+
+    /* Row : Valider + N/A cote a cote */
+    .action-row {
+      display: flex; gap: 8px; margin-top: 10px;
+    }
+    .action-row .btn-validate { margin-top: 0; flex: 1; }
+    .btn-na {
+      padding: 10px 14px; border: 2px solid var(--gray-300); border-radius: var(--radius);
+      background: white; color: var(--gray-600); font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+    }
+    .btn-na:active { background: var(--gray-100); }
+    .btn-na:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Modale motifs N/A */
+    .motif-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .motif-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border: 2px solid var(--gray-200); border-radius: var(--radius);
+      cursor: pointer; font-size: 0.9rem; color: var(--gray-700);
+      transition: border-color .15s, background .15s;
+    }
+    .motif-item:active { background: var(--gray-50); }
+    .motif-item.selected { border-color: var(--cyan); background: var(--cyan-light); color: var(--cyan-dark); font-weight: 600; }
+    .motif-item input[type=radio] { accent-color: var(--cyan); }
 
     /* CATEGORY HEADER */
     .category-header {
@@ -475,6 +502,16 @@
   const ROLE_HIERARCHY = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
   const CATEGORIES = ['CAVE', 'CUISINE', 'LABO'];
   const CAT_ICONS = { CAVE: '🍷', CUISINE: '🍳', LABO: '🧪' };
+
+  // Motifs de "non applicable" (N/A) - cas d'appareil non relevable
+  const MOTIFS_NA = [
+    { code: 'PANNE',       label: 'En panne',          emoji: '🔧' },
+    { code: 'DEGIVRAGE',   label: 'En dégivrage',      emoji: '❄️' },
+    { code: 'DEBRANCHE',   label: 'Débranché',         emoji: '🔌' },
+    { code: 'VIDE',        label: 'Vide / non utilisé', emoji: '📭' },
+    { code: 'MAINTENANCE', label: 'En maintenance',    emoji: '🛠️' },
+    { code: 'AUTRE',       label: 'Autre (à préciser)', emoji: '✍️' }
+  ];
 
   // Probability of requiring a photo on any given fridge (20%)
   const PHOTO_RANDOM_CHANCE = 0.20;
@@ -825,13 +862,15 @@
       for (const frigo of byCategory[cat]) {
         const releve = releves.find(r => r.frigo_id === frigo.id && !r.est_controle_1h);
         const isDone = !!releve;
-        const isHorsNorme = releve?.hors_norme;
+        const isNA = releve?.statut === 'N_A';
+        const isHorsNorme = !isNA && releve?.hors_norme;
         const hasRecontrole = releves.some(r => r.est_controle_1h && r.releve_parent_id === releve?.id);
         const needsPhoto = shouldRequirePhoto(frigo.id);
         const isExpanded = expandedFrigoId === frigo.id;
 
         let cardClass = 'frigo-card';
-        if (isDone && isHorsNorme && !hasRecontrole) cardClass += ' attente-controle';
+        if (isNA) cardClass += ' na';
+        else if (isDone && isHorsNorme && !hasRecontrole) cardClass += ' attente-controle';
         else if (isDone && isHorsNorme) cardClass += ' hors-norme';
         else if (isDone) cardClass += ' done';
 
@@ -839,8 +878,12 @@
         let heureCol = '';
         let initCol = '';
         if (isDone) {
-          const status = checkTemp(releve.temperature, frigo);
-          tempBadge = `<span class="badge-temp ${status}">${releve.temperature}°</span>`;
+          if (isNA) {
+            tempBadge = `<span class="badge-temp na" title="${esc(motifNALabel(releve.motif_na))}">N/A</span>`;
+          } else {
+            const status = checkTemp(releve.temperature, frigo);
+            tempBadge = `<span class="badge-temp ${status}">${releve.temperature}°</span>`;
+          }
           const heureReleve = releve.created_at ? new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
           heureCol = `<div class="frigo-col-info">${heureReleve}</div>`;
           initCol = `<div class="frigo-col-info"><strong>${esc(releve.user_initiales || '')}</strong></div>`;
@@ -865,12 +908,22 @@
           </div>
 
           ${isExpanded && isDone ? `<div class="frigo-form show" style="padding:8px 12px 12px">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--green);font-size:0.85rem">
-              <span>✓</span> <span>Releve par <strong>${esc(releve.user_initiales || releve.user_nom)}</strong>
-              a ${new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-            ${releve.observation ? `<div style="font-size:0.8rem;color:var(--gray-500);margin-top:4px">${esc(releve.observation)}</div>` : ''}
-            ${releve.photo_data ? `<img src="${releve.photo_data}" class="photo-preview" style="margin-top:6px" alt="Photo">` : ''}
+            ${isNA ? `
+              <div style="display:flex;align-items:center;gap:8px;color:var(--gray-600);font-size:0.85rem">
+                <span>⚠️</span>
+                <span>N/A par <strong>${esc(releve.user_initiales || releve.user_nom)}</strong>
+                  à ${new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  — <strong>${esc(motifNALabel(releve.motif_na))}</strong></span>
+              </div>
+              ${releve.commentaire_na ? `<div style="font-size:0.8rem;color:var(--gray-500);margin-top:4px;font-style:italic">${esc(releve.commentaire_na)}</div>` : ''}
+            ` : `
+              <div style="display:flex;align-items:center;gap:8px;color:var(--green);font-size:0.85rem">
+                <span>✓</span> <span>Releve par <strong>${esc(releve.user_initiales || releve.user_nom)}</strong>
+                a ${new Date(releve.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              ${releve.observation ? `<div style="font-size:0.8rem;color:var(--gray-500);margin-top:4px">${esc(releve.observation)}</div>` : ''}
+              ${releve.photo_data ? `<img src="${releve.photo_data}" class="photo-preview" style="margin-top:6px" alt="Photo">` : ''}
+            `}
           </div>` : ''}
         </div>`;
       }
@@ -898,11 +951,19 @@
 
       <textarea class="obs-input" id="obs-${frigo.id}" placeholder="Observation (optionnelle)..."></textarea>
 
-      <button class="btn-validate" id="btn-validate-${frigo.id}"
-              onclick="submitReleve('${frigo.id}')"
-              ${!isToday(filterDate) ? 'disabled' : ''}>
-        Valider le releve
-      </button>
+      <div class="action-row">
+        <button class="btn-validate" id="btn-validate-${frigo.id}"
+                onclick="submitReleve('${frigo.id}')"
+                ${!isToday(filterDate) ? 'disabled' : ''}>
+          Valider le releve
+        </button>
+        <button class="btn-na" id="btn-na-${frigo.id}"
+                onclick="openNAModal('${frigo.id}')"
+                title="Appareil non relevable (panne, dégivrage, vide…)"
+                ${!isToday(filterDate) ? 'disabled' : ''}>
+          N/A !
+        </button>
+      </div>
     `;
   }
 
@@ -1068,6 +1129,110 @@
     }
   }
 
+  // ====== N/A (appareil non relevable) ======
+  function motifNALabel(code) {
+    const m = MOTIFS_NA.find(x => x.code === code);
+    return m ? `${m.emoji} ${m.label}` : (code || 'N/A');
+  }
+
+  let selectedMotifNA = null;
+
+  function openNAModal(frigoId) {
+    if (!isToday(filterDate)) return;
+    const frigo = frigos.find(f => f.id === frigoId);
+    if (!frigo) return;
+
+    // Si un releve N/A existe deja pour ce jour, refuser (un releve par jour)
+    const existing = releves.find(r => r.frigo_id === frigoId && !r.est_controle_1h);
+    if (existing) {
+      showToast('Cet appareil est deja releve aujourd\'hui', 'warning');
+      return;
+    }
+
+    selectedMotifNA = null;
+    openModal(`Indisponible : ${frigo.nom}`, `
+      <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:10px">
+        Saisissez le motif pour lequel cet appareil ne peut pas être relevé aujourd'hui.
+      </p>
+      <div class="motif-list" id="motif-list-${frigoId}">
+        ${MOTIFS_NA.map(m => `
+          <label class="motif-item" data-motif="${m.code}" onclick="selectMotifNA('${m.code}', '${frigoId}')">
+            <input type="radio" name="motif-na-${frigoId}" value="${m.code}">
+            <span>${m.emoji} ${esc(m.label)}</span>
+          </label>
+        `).join('')}
+      </div>
+      <textarea class="obs-input" id="commentaire-na-${frigoId}"
+                placeholder="Commentaire (obligatoire si Autre)..."
+                style="margin-top:10px;min-height:60px"></textarea>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Valider N/A', cls: 'primary', action: `submitNA('${frigoId}')` }
+    ]);
+  }
+
+  function selectMotifNA(code, frigoId) {
+    selectedMotifNA = code;
+    // Mise a jour visuelle des items
+    const list = document.getElementById(`motif-list-${frigoId}`);
+    if (!list) return;
+    list.querySelectorAll('.motif-item').forEach(el => {
+      const isSel = el.dataset.motif === code;
+      el.classList.toggle('selected', isSel);
+      const radio = el.querySelector('input[type=radio]');
+      if (radio) radio.checked = isSel;
+    });
+  }
+
+  async function submitNA(frigoId) {
+    const frigo = frigos.find(f => f.id === frigoId);
+    if (!frigo) return;
+
+    if (!selectedMotifNA) {
+      showToast('Choisissez un motif', 'error');
+      return;
+    }
+    const commentaire = document.getElementById(`commentaire-na-${frigoId}`)?.value?.trim() || null;
+    if (selectedMotifNA === 'AUTRE' && !commentaire) {
+      showToast('Précisez le motif dans le commentaire', 'error');
+      return;
+    }
+
+    try {
+      await DB.insertReleve({
+        frigo_id: frigoId,
+        frigo_nom: frigo.nom,
+        date: dateStr(filterDate),
+        temperature: null,
+        hors_norme: false,
+        photo_requise: false,
+        photo_data: null,
+        est_controle_1h: false,
+        releve_parent_id: null,
+        observation: null,
+        statut: 'N_A',
+        motif_na: selectedMotifNA,
+        commentaire_na: commentaire,
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        user_initiales: currentUser.initiales,
+        etablissement: currentEtablissement
+      });
+
+      closeModal();
+      showToast(`${frigo.nom} : N/A (${motifNALabel(selectedMotifNA)})`, 'success');
+
+      releves = await DB.getReleves(currentEtablissement, dateStr(filterDate));
+      expandedFrigoId = null;
+      selectedMotifNA = null;
+      updateProgress();
+      renderReleveTab();
+    } catch (e) {
+      console.error('Erreur N/A:', e);
+      showToast('Erreur enregistrement N/A', 'error');
+    }
+  }
+
   // ====== RE-CONTROLE 1H ======
   function startRecontrole(parentReleveId, frigoId) {
     const frigo = frigos.find(f => f.id === frigoId);
@@ -1208,25 +1373,34 @@
       let html = '';
       for (const date of Object.keys(byDate).sort().reverse()) {
         const dayReleves = byDate[date].filter(r => !r.est_controle_1h);
-        const horsNormeCount = dayReleves.filter(r => r.hors_norme).length;
+        const horsNormeCount = dayReleves.filter(r => r.hors_norme && r.statut !== 'N_A').length;
+        const naCount = dayReleves.filter(r => r.statut === 'N_A').length;
         const totalFrigos = frigos.length;
         const dateObj = new Date(date + 'T12:00:00');
         const dateLabel = dateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 
+        const summaryBits = [`${dayReleves.length}/${totalFrigos} releves`];
+        if (horsNormeCount > 0) summaryBits.push(`${horsNormeCount} hors norme`);
+        if (naCount > 0) summaryBits.push(`${naCount} N/A`);
+        if (horsNormeCount === 0 && naCount === 0 && dayReleves.length > 0) summaryBits.push('OK');
+
         html += `<div class="histo-card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <span style="font-weight:700;font-size:0.9rem">${dateLabel}</span>
-            <span style="font-size:0.8rem;color:${horsNormeCount > 0 ? 'var(--red)' : 'var(--green)'}">
-              ${dayReleves.length}/${totalFrigos} releves ${horsNormeCount > 0 ? `· ${horsNormeCount} hors norme` : '· OK'}
+            <span style="font-size:0.8rem;color:${horsNormeCount > 0 ? 'var(--red)' : (naCount > 0 ? 'var(--gray-500)' : 'var(--green)')}">
+              ${summaryBits.join(' · ')}
             </span>
           </div>
           ${dayReleves.map(r => {
             const frigo = frigos.find(f => f.id === r.frigo_id);
-            const status = frigo ? checkTemp(r.temperature, frigo) : 'pending';
+            const isNA = r.statut === 'N_A';
+            const status = isNA ? 'na' : (frigo ? checkTemp(r.temperature, frigo) : 'pending');
+            const badgeContent = isNA ? 'N/A' : `${r.temperature}°`;
             const heureReleve = r.created_at ? new Date(r.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+            const motifSuffix = isNA ? `<span style="font-size:0.7rem;color:var(--gray-500);font-style:italic">${esc(motifNALabel(r.motif_na))}${r.commentaire_na ? ' — ' + esc(r.commentaire_na) : ''}</span>` : '';
             return `<div class="histo-row">
-              <span style="flex:1;font-size:0.8rem">${esc(r.frigo_nom)}</span>
-              <span class="badge-temp ${status}" style="font-size:0.75rem;padding:2px 8px">${r.temperature}°</span>
+              <span style="flex:1;font-size:0.8rem">${esc(r.frigo_nom)}${isNA ? ' ' + motifSuffix : ''}</span>
+              <span class="badge-temp ${status}" style="font-size:0.75rem;padding:2px 8px">${badgeContent}</span>
               ${r.photo_data ? '<span style="font-size:0.7rem">📷</span>' : ''}
               <span style="font-size:0.7rem;color:var(--gray-400);font-weight:600">${esc(r.user_initiales || '')}</span>
               <span style="font-size:0.65rem;color:var(--gray-300)">${heureReleve}</span>
