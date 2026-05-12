@@ -63,7 +63,8 @@
   }
 
   function niveauLabel(niveau, nbNiveaux) {
-    if (!niveau) return '—';
+    if (niveau === 0) return 'Sol';
+    if (niveau === null || niveau === undefined || niveau === '') return '—';
     if (!nbNiveaux || nbNiveaux <= 1) return String(niveau);
     if (niveau === 1) return '1 (bas)';
     if (niveau === nbNiveaux) return `${niveau} (haut)`;
@@ -337,16 +338,17 @@
     const sel = document.getElementById('sm-niveau');
     const meuble = state.meubles.find(m => m.id === meubleId);
     const nb = meuble ? (meuble.nb_niveaux || 1) : 0;
-    if (!nb || nb <= 1) {
-      sel.innerHTML = '<option value="">—</option>';
-      return;
-    }
+    const selStr = (selected === null || selected === undefined) ? '' : String(selected);
     const opts = ['<option value="">—</option>'];
-    for (let i = 1; i <= nb; i++) {
-      let label = String(i);
-      if (i === 1) label = '1 (bas)';
-      else if (i === nb) label = `${i} (haut)`;
-      opts.push(`<option value="${i}" ${i == selected ? 'selected' : ''}>${label}</option>`);
+    // "Sol" toujours proposé en premier (niveau = 0)
+    opts.push(`<option value="0" ${selStr === '0' ? 'selected' : ''}>Sol</option>`);
+    if (nb >= 1) {
+      for (let i = 1; i <= nb; i++) {
+        let label = String(i);
+        if (i === 1 && nb > 1) label = '1 (bas)';
+        else if (i === nb && nb > 1) label = `${i} (haut)`;
+        opts.push(`<option value="${i}" ${selStr === String(i) ? 'selected' : ''}>${label}</option>`);
+      }
     }
     sel.innerHTML = opts.join('');
   }
@@ -459,7 +461,7 @@
       meuble_nom: meubleNom,
       piece: pieceSel,
       emplacement,
-      niveau: niveauVal ? Number(niveauVal) : null,
+      niveau: niveauVal === '' ? null : Number(niveauVal),
       contenant_id: contenantId,
       contenant_libelle: contenantId ? contenantLib : null,
       unite,
