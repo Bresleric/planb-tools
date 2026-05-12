@@ -35,9 +35,26 @@
     filterPiece: 'all',
     filterCat: 'all',
     filterMeuble: 'all',
+    viewMode: 'detail',  // 'detail' | 'groupe' (par produit)
     editingId: null,
     lastEtablissement: null
   };
+
+  // Définitions des en-têtes selon le mode d'affichage
+  const THEAD_DETAIL = `
+    <tr>
+      <th>Pièce</th><th>Meuble</th><th>Empl.</th><th>Niv.</th>
+      <th>Produit</th><th>Cat.</th>
+      <th class="num">Qté</th><th>Unité</th>
+      <th>Contenant</th><th>DLC</th><th>Obs.</th><th></th>
+    </tr>`;
+  const THEAD_GROUPE = `
+    <tr>
+      <th>Produit</th><th>Cat.</th>
+      <th class="num">Qté totale</th><th>Unité</th>
+      <th class="num">Empl.</th><th>Meubles</th>
+      <th>DLC + proche</th><th>Dernier relevé</th>
+    </tr>`;
 
   // ----- Helpers -----
   const $ = (sel, ctx) => (ctx || document).querySelector(sel);
@@ -196,6 +213,7 @@
   // ----- Render -----
   function render() {
     const tbody = document.getElementById('stock-tbody');
+    const thead = document.getElementById('stock-thead');
     if (!tbody) return;
     const rows = getFiltered();
 
@@ -212,8 +230,17 @@
       ? `<strong style="color:#dc2626;">${dlcAlert}</strong> DLC &lt; 48h`
       : '<span style="color:var(--gray-400);">aucune DLC critique</span>';
 
+    // Switch en-tête selon le mode
+    if (thead) thead.innerHTML = (state.viewMode === 'groupe') ? THEAD_GROUPE : THEAD_DETAIL;
+
     if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:40px; color:var(--gray-400);">📭 Aucune ligne de stock</td></tr>';
+      const colspan = (state.viewMode === 'groupe') ? 8 : 12;
+      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding:40px; color:var(--gray-400);">📭 Aucune ligne de stock</td></tr>`;
+      return;
+    }
+
+    if (state.viewMode === 'groupe') {
+      renderGroupe(rows, tbody);
       return;
     }
 
@@ -259,6 +286,71 @@
         openModal(id);
       });
     });
+  }
+
+  // ----- Render groupé par produit -----
+  function renderGroupe(rows, tbody) {
+    // Agrégation par (produit_nom, unite) — les lignes en différentes unités sont séparées
+    const groups = new Map();
+    rows.forEach(r => {
+      const key = `${r.produit_nom || ''}||${r.unite || ''}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          produit_nom: r.produit_nom || '',
+          produit_categorie: r.produit_categorie || '',
+          unite: r.unite || '',
+          quantite_totale: 0,
+          nb_emplacements: 0,
+          meubles: new Set(),
+          dlc_plus_proche: null,
+          dernier_releve: null,
+          dernier_releve_par: ''
+        };
+        groups.set(key, g);
+      }
+      g.quantite_totale += Number(r.quantite) || 0;
+      g.nb_emplacements += 1;
+      if (r.meuble_nom) g.meubles.add(r.meuble_nom);
+      if (r.dlc && (!g.dlc_plus_proche || r.dlc < g.dlc_plus_proche)) g.dlc_plus_proche = r.dlc;
+      if (r.date_releve && (!g.dernier_releve || r.date_releve > g.dernier_releve)) {
+        g.dernier_releve = r.date_releve;
+        g.dernier_releve_par = r.releve_par_initiales || r.releve_par_nom || '';
+      }
+    });
+
+    // Tri : par produit_nom puis unité
+    const arr = Array.from(groups.values()).sort((a, b) => {
+      const cmp = a.produit_nom.localeCompare(b.produit_nom, 'fr');
+      return cmp !== 0 ? cmp : a.unite.localeCompare(b.unite);
+    });
+
+    const html = arr.map(g => {
+      const cat = g.produit_categorie || '';
+      const catLabel = CAT_LABELS[cat] || '';
+      const uniteSymb = (state.unites.find(u => u.code === g.unite) || {}).symbole || g.unite || '';
+      const dlc = fmtDlc(g.dlc_plus_proche);
+      const releveDate = g.dernier_releve
+        ? new Date(g.dernier_releve).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+        : '—';
+      const releveStr = g.dernier_releve
+        ? `${releveDate}${g.dernier_releve_par ? ' ' + g.dernier_releve_par : ''}`
+        : '—';
+      const meublesStr = Array.from(g.meubles).join(', ');
+      return `
+        <tr>
+          <td class="prod">${escapeHtml(g.produit_nom)}</td>
+          <td>${catLabel ? `<span class="badge ${cat}">${catLabel}</span>` : '<span class="badge muted">—</span>'}</td>
+          <td class="num">${fmtQty(g.quantite_totale, null)}</td>
+          <td>${escapeHtml(uniteSymb)}</td>
+          <td class="num">${g.nb_emplacements}</td>
+          <td title="${escapeHtml(meublesStr)}" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(meublesStr)}</td>
+          <td class="dlc ${dlc.cls}">${dlc.txt}</td>
+          <td style="color:var(--gray-500); font-size:0.76rem;">${escapeHtml(releveStr)}</td>
+        </tr>
+      `;
+    }).join('');
+    tbody.innerHTML = html;
   }
 
   // ----- Modal : ouvrir / fermer -----
@@ -560,6 +652,16 @@
     if (meubleFilter) meubleFilter.addEventListener('change', () => {
       state.filterMeuble = meubleFilter.value;
       render();
+    });
+
+    // Chips Vue (Détail / Par produit)
+    document.querySelectorAll('[data-stock-view]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-stock-view]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.viewMode = chip.dataset.stockView;
+        render();
+      });
     });
 
     // Modale : boutons
