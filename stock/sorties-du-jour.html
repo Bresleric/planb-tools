@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sorties du jour — PlanB Tools</title>
+  <style>
+    :root {
+      --primary: #059669;
+      --primary-dark: #047857;
+      --primary-light: #d1fae5;
+      --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+      --gray-300:#d1d5db; --gray-400:#9ca3af; --gray-500:#6b7280;
+      --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937; --gray-900:#111827;
+      --green-100:#dcfce7; --green-700:#15803d;
+      --orange-100:#ffedd5; --orange-700:#c2410c;
+      --red-100:#fee2e2; --red-700:#b91c1c;
+      --yellow-100:#fef9c3; --yellow-700:#a16207;
+      --blue-100:#dbeafe; --blue-700:#1d4ed8;
+      --purple-100:#ede9fe; --purple-700:#6d28d9;
+      --radius:10px; --radius-sm:6px;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.5; color:var(--gray-900); background:var(--gray-100); -webkit-font-smoothing:antialiased; }
+    body { display:flex; flex-direction:column; min-height:100vh; }
+
+    .header { position:sticky; top:0; background:white; border-bottom:3px solid var(--primary); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; box-shadow:var(--shadow); }
+    .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+    .btn-back { display:inline-flex; align-items:center; padding:8px 12px; font-size:14px; font-weight:500; color:var(--gray-700); background:var(--gray-100); border:1px solid var(--gray-200); border-radius:var(--radius-sm); text-decoration:none; flex-shrink:0; }
+    .header-title { font-size:18px; font-weight:700; color:var(--gray-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-right { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-600); flex-shrink:0; }
+    .header-etab { padding:4px 10px; background:var(--primary-light); color:var(--primary-dark); border-radius:var(--radius-sm); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .content { flex:1; padding:16px; max-width:1000px; width:100%; margin:0 auto; }
+    .card { background:white; border-radius:var(--radius); padding:16px; margin-bottom:16px; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+    .card-title { font-size:14px; font-weight:600; color:var(--gray-700); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:8px 12px; font-size:13px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; border:none; font-family:inherit; }
+    .btn-secondary { background:white; color:var(--primary-dark); border:1px solid var(--primary); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+
+    /* Stats */
+    .stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:16px; }
+    .stat-box { padding:12px; background:white; border-radius:var(--radius-sm); border:1px solid var(--gray-200); text-align:center; }
+    .stat-box .sv { font-size:22px; font-weight:700; color:var(--gray-900); line-height:1.1; }
+    .stat-box .sl { font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; margin-top:4px; }
+    .stat-box.warn { background:var(--orange-100); border-color:var(--orange-100); }
+    .stat-box.warn .sv { color:var(--orange-700); }
+    @media (max-width:600px) { .stats-grid { grid-template-columns:repeat(2, 1fr); } }
+
+    /* Filtres */
+    .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+    .filter-chip { padding:6px 12px; background:white; border:1px solid var(--gray-200); border-radius:999px; font-size:13px; cursor:pointer; }
+    .filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .date-input, .select-input { padding:8px 12px; font-size:14px; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-family:inherit; }
+    .date-input { min-width:130px; }
+    .nav-day-btn { padding:6px 10px; background:white; border:1px solid var(--gray-300); border-radius:var(--radius-sm); font-size:16px; cursor:pointer; font-weight:600; }
+    .nav-day-btn:hover { background:var(--gray-100); }
+
+    /* Article aggrégé */
+    .article-row { display:grid; grid-template-columns:1fr auto auto auto; gap:10px; padding:12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; cursor:pointer; align-items:center; }
+    .article-row:hover { background:var(--gray-50); }
+    .ar-info { min-width:0; }
+    .ar-nom { font-size:15px; font-weight:700; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ar-meta { font-size:12px; color:var(--gray-500); margin-top:3px; }
+    .ar-sources { display:flex; gap:4px; flex-wrap:wrap; margin-top:4px; }
+    .src-badge { font-size:10px; padding:2px 6px; border-radius:999px; font-weight:600; }
+    .src-controle { background:#fef2f2; color:var(--red-700); }
+    .src-sortie { background:var(--orange-100); color:var(--orange-700); }
+    .src-prod { background:var(--purple-100); color:var(--purple-700); }
+    .src-other { background:var(--gray-100); color:var(--gray-600); }
+    .ar-qty { font-size:20px; font-weight:700; color:var(--gray-900); white-space:nowrap; text-align:right; }
+    .ar-qty .unit { font-size:11px; font-weight:500; color:var(--gray-500); }
+    .ar-nb { font-size:12px; color:var(--gray-500); white-space:nowrap; text-align:right; }
+    .ar-arrow { color:var(--gray-400); font-size:18px; }
+
+    /* Modal détail */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; padding:16px; overflow-y:auto; }
+    .modal-bg.visible { display:block; }
+    .modal { background:white; border-radius:var(--radius); max-width:800px; margin:0 auto; padding:20px; }
+    .modal-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--gray-200); }
+    .modal-title { font-size:18px; font-weight:700; }
+    .modal-close { padding:6px 12px; background:var(--gray-100); border:none; border-radius:var(--radius-sm); cursor:pointer; font-size:13px; }
+
+    .mvt-row { display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; padding:10px 12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:4px; font-size:13px; align-items:center; }
+    .mvt-row .mvt-src { font-size:10px; padding:2px 6px; border-radius:999px; font-weight:600; white-space:nowrap; text-align:center; }
+    .mvt-row .mvt-info { min-width:0; }
+    .mvt-row .mvt-motif { font-weight:600; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .mvt-row .mvt-meta { font-size:11px; color:var(--gray-500); margin-top:1px; }
+    .mvt-row .mvt-qty { font-weight:700; text-align:right; }
+    .mvt-row .mvt-when { font-size:11px; color:var(--gray-500); text-align:right; white-space:nowrap; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); padding:12px 20px; background:var(--gray-900); color:white; border-radius:var(--radius); font-size:14px; box-shadow:var(--shadow-md); z-index:100; transition:transform .25s; max-width:calc(100vw - 32px); }
+    .toast.visible { transform:translateX(-50%) translateY(0); }
+    .toast.error { background:var(--red-700); }
+    .toast.success { background:var(--green-700); }
+
+    .empty-state { text-align:center; padding:32px 16px; color:var(--gray-500); }
+    .empty-state .es-emoji { font-size:48px; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="./index.html" class="btn-back">← Stock</a>
+      <span class="header-title">Sorties du jour</span>
+    </div>
+    <div class="header-right">
+      <span class="header-etab" id="header-etab">—</span>
+      <span id="header-user">—</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="card">
+      <div class="filters">
+        <button class="nav-day-btn" id="btn-prev-day" title="Jour précédent">←</button>
+        <input type="date" class="date-input" id="filter-date">
+        <button class="nav-day-btn" id="btn-next-day" title="Jour suivant">→</button>
+        <button class="btn btn-ghost" id="btn-today">Aujourd'hui</button>
+        <span style="width:1px; height:22px; background:var(--gray-300);"></span>
+        <span class="filter-chip" data-filter-etab="all">Tous</span>
+        <span class="filter-chip" data-filter-etab="freddy">Freddy</span>
+        <span class="filter-chip" data-filter-etab="liesel">Liesel</span>
+        <span style="width:1px; height:22px; background:var(--gray-300);"></span>
+        <button class="btn btn-secondary" id="btn-export">📥 Export CSV</button>
+      </div>
+      <div class="filters" style="margin-bottom:0;">
+        <span class="filter-chip active" data-filter-src="all">Toutes les sources</span>
+        <span class="filter-chip" data-filter-src="stock_controle">🔍 Contrôle stock</span>
+        <span class="filter-chip" data-filter-src="sortie_manuelle">📤 Sortie manuelle</span>
+        <span class="filter-chip" data-filter-src="production">⚙️ Production</span>
+        <span class="filter-chip" data-filter-src="autres">Autres</span>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box"><div class="sv" id="stat-articles">—</div><div class="sl">Produits distincts</div></div>
+      <div class="stat-box"><div class="sv" id="stat-mvts">—</div><div class="sl">Mouvements</div></div>
+      <div class="stat-box"><div class="sv" id="stat-kg">—</div><div class="sl">Total (kg)</div></div>
+      <div class="stat-box" id="stat-ctrl-box"><div class="sv" id="stat-ctrl">—</div><div class="sl">Dont contrôle stock</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Récapitulatif par produit</div>
+      <div id="articles-list">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal détail article -->
+  <div class="modal-bg" id="modal-detail">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="detail-title">—</div>
+          <div style="font-size:12px; color:var(--gray-500);" id="detail-subtitle">—</div>
+        </div>
+        <button class="modal-close" id="detail-close">✕ Fermer</button>
+      </div>
+      <div id="detail-mvts"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function getSession() {
+      const userJson = sessionStorage.getItem('planb_user');
+      const etab = sessionStorage.getItem('planb_etablissement');
+      if (!userJson || !etab) return null;
+      try { return { user: JSON.parse(userJson), etablissement: etab }; } catch { return null; }
+    }
+    const userSession = getSession();
+    if (!userSession) window.location.href = '../';
+    const currentUser = userSession.user;
+    const currentEtab = userSession.etablissement;
+    document.getElementById('header-etab').textContent = currentEtab === 'liesel' ? 'Liesel' : 'Freddy';
+    document.getElementById('header-user').textContent = currentUser.initiales || currentUser.nom;
+
+    const State = {
+      date: new Date().toISOString().slice(0, 10),
+      filterEtab: currentEtab,
+      filterSrc: 'all',
+      mouvements: [],   // tous les mouvements SORTIE chargés
+      articles: [],     // agrégation
+    };
+
+    document.getElementById('filter-date').value = State.date;
+    document.querySelectorAll('[data-filter-etab]').forEach(c => {
+      c.classList.toggle('active', c.dataset.filterEtab === currentEtab);
+    });
+
+    function $(id) { return document.getElementById(id); }
+    function showToast(msg, kind='') {
+      const t = $('toast'); t.textContent = msg;
+      t.className = 'toast visible' + (kind ? ' ' + kind : '');
+      setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+    function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtTime(iso) { if (!iso) return '—'; return new Date(iso).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); }
+    function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' }); }
+    function srcLabel(s) {
+      if (s === 'stock_controle') return { txt:'Contrôle', cls:'src-controle' };
+      if (s === 'sortie_manuelle') return { txt:'Sortie manuelle', cls:'src-sortie' };
+      if (s === 'production') return { txt:'Production', cls:'src-prod' };
+      return { txt: s || 'Autre', cls:'src-other' };
+    }
+
+    // ==== CHARGEMENT ====
+    async function loadDay() {
+      const dateStart = State.date + 'T00:00:00Z';
+      const dateEnd = State.date + 'T23:59:59.999Z';
+      let q = sb.from('stock_mouvements')
+        .select('*, appro_ingredients(id, nom, categorie, unite)')
+        .eq('type', 'SORTIE')
+        .gte('created_at', dateStart)
+        .lte('created_at', dateEnd)
+        .order('created_at', { ascending:true });
+      if (State.filterEtab !== 'all') q = q.eq('etablissement', State.filterEtab);
+      const { data, error } = await q;
+      if (error) {
+        $('articles-list').innerHTML = `<div class="empty-state">Erreur : ${error.message}</div>`;
+        return;
+      }
+      State.mouvements = data || [];
+      rebuildArticles();
+    }
+
+    function rebuildArticles() {
+      // Filtrage source
+      const mvts = State.mouvements.filter(m => {
+        if (State.filterSrc === 'all') return true;
+        if (State.filterSrc === 'autres') return !['stock_controle', 'sortie_manuelle', 'production'].includes(m.source_table);
+        return m.source_table === State.filterSrc;
+      });
+
+      // Agrégation par article
+      const byArticle = {};
+      mvts.forEach(m => {
+        const aid = m.article_id;
+        const a = m.appro_ingredients || {};
+        if (!byArticle[aid]) {
+          byArticle[aid] = {
+            article_id: aid,
+            nom: a.nom || '?',
+            categorie: a.categorie || '',
+            unite: a.unite || m.unite || 'kg',
+            nb_mvts: 0,
+            total_qte: 0,
+            sources: {},
+            mvts: [],
+            etabs: new Set(),
+          };
+        }
+        const agg = byArticle[aid];
+        agg.nb_mvts++;
+        agg.total_qte += Number(m.quantite || 0);
+        const src = m.source_table || 'autre';
+        agg.sources[src] = (agg.sources[src] || 0) + Number(m.quantite || 0);
+        agg.mvts.push(m);
+        agg.etabs.add(m.etablissement);
+      });
+      State.articles = Object.values(byArticle).sort((a, b) => b.total_qte - a.total_qte);
+
+      // Stats globales
+      const totalKg = mvts.reduce((s, m) => s + Number(m.quantite || 0), 0);
+      const totalCtrl = mvts.filter(m => m.source_table === 'stock_controle').reduce((s, m) => s + Number(m.quantite || 0), 0);
+      $('stat-articles').textContent = State.articles.length;
+      $('stat-mvts').textContent = mvts.length;
+      $('stat-kg').textContent = totalKg.toFixed(2);
+      $('stat-ctrl').textContent = totalCtrl.toFixed(2) + ' kg';
+      $('stat-ctrl-box').className = 'stat-box' + (totalCtrl > 0 ? ' warn' : '');
+
+      renderList();
+    }
+
+    function renderList() {
+      const list = $('articles-list');
+      if (!State.articles.length) {
+        list.innerHTML = `<div class="empty-state"><div class="es-emoji">🍃</div>Aucune sortie pour cette période et ces filtres.</div>`;
+        return;
+      }
+      list.innerHTML = '';
+      State.articles.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'article-row';
+        const sourcesHtml = Object.entries(a.sources).map(([src, kg]) => {
+          const s = srcLabel(src);
+          return `<span class="src-badge ${s.cls}">${escapeHtml(s.txt)} · ${Number(kg).toFixed(2)} ${escapeHtml(a.unite)}</span>`;
+        }).join('');
+        row.innerHTML = `
+          <div class="ar-info">
+            <div class="ar-nom">${escapeHtml(a.nom)}</div>
+            <div class="ar-meta">${escapeHtml(a.categorie || 'sans cat.')} · ${[...a.etabs].join(', ')}</div>
+            <div class="ar-sources">${sourcesHtml}</div>
+          </div>
+          <div class="ar-qty">${a.total_qte.toFixed(2)}<span class="unit"> ${escapeHtml(a.unite)}</span></div>
+          <div class="ar-nb">${a.nb_mvts} mvt${a.nb_mvts>1?'s':''}</div>
+          <span class="ar-arrow">›</span>
+        `;
+        row.addEventListener('click', () => openDetail(a));
+        list.appendChild(row);
+      });
+    }
+
+    function openDetail(a) {
+      $('detail-title').textContent = a.nom;
+      $('detail-subtitle').textContent = `${a.nb_mvts} mouvement${a.nb_mvts>1?'s':''} · ${a.total_qte.toFixed(2)} ${a.unite} · ${fmtDate(State.date)}`;
+      const list = $('detail-mvts');
+      list.innerHTML = '';
+      const sorted = [...a.mvts].sort((x, y) => (y.created_at || '').localeCompare(x.created_at || ''));
+      sorted.forEach(m => {
+        const s = srcLabel(m.source_table);
+        const div = document.createElement('div');
+        div.className = 'mvt-row';
+        div.innerHTML = `
+          <div class="mvt-src ${s.cls}">${escapeHtml(s.txt)}</div>
+          <div class="mvt-info">
+            <div class="mvt-motif">${escapeHtml(m.motif || '—')}</div>
+            <div class="mvt-meta">${escapeHtml(m.etablissement || '?')} · ${escapeHtml(m.created_by_nom || '?')}</div>
+          </div>
+          <div class="mvt-qty">${Number(m.quantite || 0).toFixed(2)} ${escapeHtml(m.unite || a.unite)}</div>
+          <div class="mvt-when">${fmtTime(m.created_at)}</div>
+        `;
+        list.appendChild(div);
+      });
+      $('modal-detail').classList.add('visible');
+    }
+
+    $('detail-close').addEventListener('click', () => $('modal-detail').classList.remove('visible'));
+    $('modal-detail').addEventListener('click', (e) => {
+      if (e.target === $('modal-detail')) $('modal-detail').classList.remove('visible');
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') $('modal-detail').classList.remove('visible');
+    });
+
+    // ==== NAVIGATION DATE ====
+    function shiftDay(delta) {
+      const d = new Date(State.date + 'T12:00:00');
+      d.setDate(d.getDate() + delta);
+      State.date = d.toISOString().slice(0, 10);
+      $('filter-date').value = State.date;
+      loadDay();
+    }
+    $('btn-prev-day').addEventListener('click', () => shiftDay(-1));
+    $('btn-next-day').addEventListener('click', () => shiftDay(1));
+    $('btn-today').addEventListener('click', () => {
+      State.date = new Date().toISOString().slice(0, 10);
+      $('filter-date').value = State.date;
+      loadDay();
+    });
+    $('filter-date').addEventListener('change', (e) => {
+      State.date = e.target.value;
+      loadDay();
+    });
+
+    // ==== FILTRES ====
+    document.querySelectorAll('[data-filter-etab]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-etab]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterEtab = chip.dataset.filterEtab;
+        loadDay();
+      });
+    });
+    document.querySelectorAll('[data-filter-src]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter-src]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        State.filterSrc = chip.dataset.filterSrc;
+        rebuildArticles();
+      });
+    });
+
+    // ==== EXPORT CSV ====
+    $('btn-export').addEventListener('click', () => {
+      const esc = v => v == null ? '' : (/[";\n\r]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+      const headers = ['Produit', 'Catégorie', 'Nb mouvements', 'Total', 'Unité', 'Source contrôle (kg)', 'Source sortie manuelle (kg)', 'Source production (kg)', 'Autres (kg)', 'Établissements'];
+      const rows = State.articles.map(a => [
+        a.nom, a.categorie || '', a.nb_mvts, a.total_qte.toFixed(3), a.unite,
+        (a.sources['stock_controle'] || 0).toFixed(3),
+        (a.sources['sortie_manuelle'] || 0).toFixed(3),
+        (a.sources['production'] || 0).toFixed(3),
+        (Object.entries(a.sources).filter(([s]) => !['stock_controle','sortie_manuelle','production'].includes(s)).reduce((s, [,v]) => s + v, 0)).toFixed(3),
+        [...a.etabs].join(', '),
+      ].map(esc).join(';'));
+      const meta = [
+        `# Sorties du jour — PlanB Tools`,
+        `# Date;${State.date}`,
+        `# Établissement;${State.filterEtab}`,
+        `# Source;${State.filterSrc}`,
+        `# Export;${new Date().toLocaleString('fr-FR')}`,
+        ``,
+      ].join('\n');
+      const csv = '﻿' + meta + headers.join(';') + '\n' + rows.join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sorties_${State.date}_${State.filterEtab}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ ${rows.length} ligne${rows.length>1?'s':''} exportée${rows.length>1?'s':''}`, 'success');
+    });
+
+    // INIT
+    loadDay();
+  </script>
+</body>
+</html>
