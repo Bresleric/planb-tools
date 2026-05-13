@@ -2810,98 +2810,109 @@
     return document.querySelector('#create-equipe .chip.active')?.dataset.val || 'cuisine';
   }
 
+  // ====== Création de tâche : source = FICHES TECHNIQUES (Production) ======
+  // Toute nouvelle tâche cherche d'abord dans le catalogue des fiches techniques.
+  // Si rien ne correspond → option "À créer" : la tâche est marquée a_traiter=true
+  // pour être triée par un Admin (qui décidera : promouvoir en fiche, lier, ou ignorer).
   function renderPredefinedList(search) {
     const list = document.getElementById('predef-list');
     if (!list) return;
     const s = (search || '').toLowerCase();
-    const selectedEquipe = getSelectedCreateEquipe();
 
-    // SAFETY NET — si predefinedTasks n'est pas (encore) chargé,
-    // on tente un fetch direct (utile si l'utilisateur arrive sur 'Créer'
-    // avant que loadAll() n'ait fini, ou si la promise initiale a échoué).
-    if (!predefinedTasks || predefinedTasks.length === 0) {
-      list.innerHTML = '<div class="predef-item" style="color:var(--gray-400);font-style:italic;cursor:default;border:none">Chargement des tâches…</div>';
-      DB.getPredefined(currentEtablissement).then(data => {
-        predefinedTasks = data || [];
-        if (predefinedTasks.length === 0) {
-          list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Aucune tâche prédéfinie en base. Tape un nom pour en créer une.</div>';
-        } else {
-          renderPredefinedList(search);
-        }
+    // Charger les fiches si pas encore en cache
+    if (!productionFiches || productionFiches.length === 0) {
+      list.innerHTML = '<div class="predef-item" style="color:var(--gray-400);font-style:italic;cursor:default;border:none">Chargement des fiches techniques…</div>';
+      DB.getFiches(currentEtablissement).then(data => {
+        productionFiches = data || [];
+        renderPredefinedList(search);
       }).catch(e => {
-        console.error('renderPredefinedList — fetch fallback failed:', e);
-        list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Erreur de chargement. Tape un nom pour saisir manuellement.</div>';
+        console.error('renderPredefinedList — fetch fiches failed:', e);
+        list.innerHTML = '<div class="predef-item" style="color:var(--red);cursor:default;border:none">Erreur de chargement des fiches. Tape un nom pour la créer en « À créer ».</div>';
       });
       return;
     }
 
-    // Filtrer par équipe :
-    // - 'cuisine' et 'plonge' partagent la même base de tâches
-    // - 'autre' est un super-rôle (admin/manager créant pour un autre) → on montre TOUTES les tâches
-    //   (la table predefined_tasks ne contient actuellement aucune entrée equipe='autre')
-    const equipeMatch = (taskEquipe) => {
-      if (!taskEquipe) return true; // pas d'équipe = disponible pour tous
-      if (selectedEquipe === 'autre') return true; // super-rôle : voit tout
-      if (selectedEquipe === 'cuisine' || selectedEquipe === 'plonge') {
-        return taskEquipe === 'cuisine' || taskEquipe === 'plonge';
-      }
-      return taskEquipe === selectedEquipe;
-    };
+    // Filtre sur nom, code_court, catégorie de la fiche
+    const filtered = productionFiches
+      .filter(f => f.actif !== false)
+      .filter(f => !s
+        || f.nom.toLowerCase().includes(s)
+        || (f.code_court || '').toLowerCase().includes(s)
+        || (f.categorie || '').toLowerCase().includes(s));
 
-    const filtered = predefinedTasks.filter(p =>
-      equipeMatch(p.equipe) &&
-      (!s || p.nom.toLowerCase().includes(s) || (p.categorie || '').toLowerCase().includes(s))
-    );
-    list.innerHTML = filtered.slice(0, 20).map(p =>
-      `<div class="predef-item ${selectedPredefined?.id === p.id ? 'selected' : ''}"
-            onclick="selectPredefined('${p.id}')">
-        ${p.is_production ? '<span class="badge-production" style="margin-right:4px">🏭</span>' : ''}${esc(p.nom)} ${p.categorie ? `<span style="color:var(--gray-400);font-size:0.75rem">(${esc(p.categorie)})</span>` : ''}
-      </div>`
-    ).join('');
+    // Liste des fiches (15 max)
+    list.innerHTML = filtered.slice(0, 15).map(f => {
+      const sel = (selectedPredefined?.source_type === 'fiche' && selectedPredefined?.fiche_id === f.id);
+      const codeBadge = f.code_court
+        ? `<span style="color:#7c3aed;font-weight:700;font-size:0.7rem;padding:1px 5px;background:#f3e8ff;border-radius:4px;margin-right:6px;">${esc(f.code_court)}</span>`
+        : '';
+      return `<div class="predef-item ${sel ? 'selected' : ''}" onclick="selectPredefined('${f.id}')">
+        <span class="badge-production" style="margin-right:4px">🏭</span>${codeBadge}${esc(f.nom)}
+        <span style="color:var(--gray-400);font-size:0.75rem;margin-left:6px">${esc(f.categorie || '')}</span>
+      </div>`;
+    }).join('');
 
-    // Si aucun résultat (filtre équipe ou recherche), on l'indique TOUJOURS
-    // (pas seulement quand la recherche est vide).
     if (filtered.length === 0) {
       const msg = s
-        ? `Aucun résultat pour « ${esc(s)} » dans l'équipe ${esc(selectedEquipe)}.`
-        : `Aucune tâche prédéfinie pour l'équipe ${esc(selectedEquipe)}.`;
-      list.innerHTML = `<div class="predef-item" style="color:var(--gray-500);font-style:italic;cursor:default;border:none">${msg} Tape un nom pour en créer une nouvelle.</div>`;
+        ? `Aucune fiche ne correspond à « ${esc(s)} ».`
+        : `Aucune fiche technique disponible.`;
+      list.innerHTML = `<div class="predef-item" style="color:var(--gray-500);font-style:italic;cursor:default;border:none">${msg}</div>`;
     }
 
-    // Show "create custom" option if search has text
-    if (s && !filtered.some(p => p.nom.toLowerCase() === s)) {
-      list.innerHTML += `<div class="predef-item" onclick="selectCustomTask('${esc(search)}')"
-        style="color:var(--orange);font-weight:500">+ Créer « ${esc(search)} »</div>`;
-    }
+    // Option "À créer" — TOUJOURS visible
+    // Si l'utilisateur a tapé du texte, on pré-remplit avec ce texte
+    const customLabel = s
+      ? `+ À créer : « ${esc(search)} » <span style="font-size:0.72rem;font-weight:400;color:#92400e">(sera revue par Admin)</span>`
+      : `+ À créer (taper d'abord un libellé dans la recherche)`;
+    const customDisabled = s ? '' : 'opacity:.5;cursor:not-allowed;';
+    list.innerHTML += `<div class="predef-item" onclick="${s ? `selectCustomTask('${esc(search)}')` : ''}"
+      style="color:#c2410c;font-weight:600;border-top:2px dashed #fb923c;margin-top:6px;padding-top:8px;${customDisabled}">
+      ${customLabel}
+    </div>`;
   }
 
   function filterPredefined(val) { renderPredefinedList(val); }
 
   function selectPredefined(id) {
-    selectedPredefined = predefinedTasks.find(p => p.id === id);
-    if (!selectedPredefined) return;
+    // id = fiche_id
+    const fiche = productionFiches.find(f => f.id === id);
+    if (!fiche) return;
+    selectedPredefined = {
+      source_type: 'fiche',
+      id: null,            // pas de predefined_task derrière
+      fiche_id: fiche.id,
+      nom: fiche.nom,
+      is_production: true,
+      categorie_production: fiche.categorie || null
+    };
     const area = document.getElementById('selected-task-area');
     area.innerHTML = `<div class="selected-task-display">
-      <span class="name">${esc(selectedPredefined.nom)}</span>
+      <span class="name">🏭 ${esc(fiche.nom)}${fiche.code_court ? ` <span style="color:#7c3aed;font-size:0.75rem">(${esc(fiche.code_court)})</span>` : ''}</span>
       <button class="btn-clear" onclick="clearPredefined()">✕</button>
     </div>`;
     document.getElementById('search-predef').style.display = 'none';
     document.getElementById('predef-list').style.display = 'none';
 
-    // Auto-set equipe if predefined has one
-    if (selectedPredefined.equipe) {
-      document.querySelectorAll('#create-equipe .chip').forEach(c => {
-        c.classList.toggle('active', c.dataset.val === selectedPredefined.equipe);
-      });
-    }
+    // Pré-sélection auto de la catégorie 'Production'
+    document.querySelectorAll('#create-categorie .chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.val === 'Production');
+    });
   }
 
   function selectCustomTask(name) {
-    selectedPredefined = { id: null, nom: name };
+    selectedPredefined = {
+      source_type: 'a_creer',
+      id: null,
+      nom: name,
+      is_a_creer: true
+    };
     const area = document.getElementById('selected-task-area');
-    area.innerHTML = `<div class="selected-task-display">
-      <span class="name">${esc(name)}</span>
+    area.innerHTML = `<div class="selected-task-display" style="background:#fff7ed;border:1px solid #fb923c;">
+      <span class="name" style="color:#9a3412">⚠ À créer : ${esc(name)}</span>
       <button class="btn-clear" onclick="clearPredefined()">✕</button>
+    </div>
+    <div style="font-size:0.72rem;color:#9a3412;margin-top:4px;font-style:italic">
+      Cette tâche sera signalée à l'admin pour validation/création éventuelle d'une fiche.
     </div>`;
     document.getElementById('search-predef').style.display = 'none';
     document.getElementById('predef-list').style.display = 'none';
@@ -3025,11 +3036,16 @@
         createur_nom: currentUser.nom
       };
 
-      // Propager les champs production depuis predefined_task
-      if (selectedPredefined.is_production) {
+      // Source = fiche technique : propage is_production + fiche_id + cat. prod
+      if (selectedPredefined.source_type === 'fiche' || selectedPredefined.is_production) {
         baseData.is_production = true;
         baseData.fiche_id = selectedPredefined.fiche_id || null;
         baseData.categorie_production = selectedPredefined.categorie_production || null;
+      }
+
+      // Source = À créer : flag a_traiter pour l'admin
+      if (selectedPredefined.source_type === 'a_creer' || selectedPredefined.is_a_creer) {
+        baseData.a_traiter = true;
       }
 
       if (assignToAll) {
@@ -3967,6 +3983,9 @@
       byEquipe[eq] = { total: eqTasks.length, done: eqTasks.filter(t => t.fait_par_id).length };
     });
 
+    // Tâches à traiter (a_traiter = true, non finies)
+    const aTraiter = tasks.filter(t => t.a_traiter && !t.fait_par_id);
+
     mc.innerHTML = `
       <div class="admin-section">
         <div class="stat-row">
@@ -3974,7 +3993,32 @@
           <div class="stat-card stat-green"><div class="value">${done}</div><div class="label">Terminées</div></div>
           <div class="stat-card stat-orange"><div class="value">${unassigned}</div><div class="label">Non attribuées</div></div>
           <div class="stat-card stat-red"><div class="value">${overdue}</div><div class="label">En retard</div></div>
+          ${aTraiter.length > 0 ? `<div class="stat-card" style="background:#fef3c7;color:#92400e"><div class="value">${aTraiter.length}</div><div class="label">À traiter</div></div>` : ''}
         </div>
+
+        ${aTraiter.length > 0 ? `
+        <h3 style="color:#9a3412;display:flex;align-items:center;gap:8px">
+          ⚠ Tâches à traiter
+          <span style="font-size:0.75rem;font-weight:400;color:#6b7280;font-style:italic">— libellés saisis manuellement, à valider</span>
+        </h3>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:14px">
+          ${aTraiter.map(t => {
+            const createdDt = t.date_creation ? new Date(t.date_creation).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' }) : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:white;border:1px solid #fde68a;border-radius:6px;margin-bottom:6px;flex-wrap:wrap">
+              <span style="flex:1;min-width:200px;font-weight:600">${esc(t.tache)}</span>
+              <span style="font-size:0.72rem;color:#6b7280">par ${esc(t.createur_nom || '?')} le ${esc(createdDt)}</span>
+              <div style="display:flex;gap:4px">
+                <button class="btn-modal primary" style="font-size:0.75rem;padding:5px 10px"
+                        onclick="adminLinkFiche('${t.id}')" title="Lier à une fiche existante">🔗 Lier fiche</button>
+                <button class="btn-modal" style="font-size:0.75rem;padding:5px 10px;background:#dbeafe;color:#1e40af"
+                        onclick="adminPromoteToPredef('${t.id}')" title="Créer en tâche prédéfinie">+ Predef</button>
+                <button class="btn-modal" style="font-size:0.75rem;padding:5px 10px;background:#e5e7eb;color:#374151"
+                        onclick="adminIgnoreATraiter('${t.id}')" title="Garder la tâche, juste retirer le flag">Ignorer</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        ` : ''}
 
         <h3>Par équipe</h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px">
@@ -4003,6 +4047,103 @@
         </div>
       </div>
     `;
+  }
+
+  // ====== Actions admin sur tâches a_traiter ======
+
+  // Ignorer : retire juste le flag a_traiter sans rien créer
+  async function adminIgnoreATraiter(taskId) {
+    try {
+      const { error } = await supabaseClient.from('tasks')
+        .update({ a_traiter: false }).eq('id', taskId);
+      if (error) throw error;
+      tasks = await DB.getTasks(filterDate);
+      renderAdminTab();
+      showToast('Tâche dépilée ✓', 'success');
+    } catch (e) {
+      console.error(e); showToast('Erreur: ' + (e.message || e), 'error');
+    }
+  }
+
+  // Lier à une fiche existante : ouvre un mini-prompt de recherche
+  async function adminLinkFiche(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (productionFiches.length === 0) {
+      try { productionFiches = await DB.getFiches(currentEtablissement); } catch(e) {}
+    }
+    const fichesOpts = productionFiches
+      .filter(f => f.actif !== false)
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+      .map(f => `<option value="${f.id}">${esc(f.nom)}${f.code_court ? ' ('+esc(f.code_court)+')' : ''}</option>`)
+      .join('');
+    const body = `
+      <p style="font-size:0.85rem;color:#6b7280;margin-bottom:10px">
+        Tâche : <strong>${esc(task.tache)}</strong>
+      </p>
+      <div class="form-group">
+        <label>Fiche technique à lier</label>
+        <select class="form-select" id="admin-link-fiche-select" style="font-size:0.9rem">
+          <option value="">— Choisir une fiche —</option>
+          ${fichesOpts}
+        </select>
+      </div>
+      <p style="font-size:0.75rem;color:#6b7280;font-style:italic;margin-top:6px">
+        La tâche sera marquée is_production=true et liée à cette fiche. Le flag « à traiter » sera retiré.
+      </p>`;
+    openModal('Lier à une fiche', body, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Lier', cls: 'primary', action: `adminDoLinkFiche('${taskId}')` }
+    ]);
+  }
+
+  async function adminDoLinkFiche(taskId) {
+    const fid = document.getElementById('admin-link-fiche-select')?.value;
+    if (!fid) { showToast('Choisis une fiche', 'error'); return; }
+    const fiche = productionFiches.find(f => f.id === fid);
+    try {
+      const { error } = await supabaseClient.from('tasks').update({
+        is_production: true,
+        fiche_id: fid,
+        categorie_production: fiche?.categorie || null,
+        a_traiter: false
+      }).eq('id', taskId);
+      if (error) throw error;
+      tasks = await DB.getTasks(filterDate);
+      closeModal();
+      renderAdminTab();
+      showToast('Tâche liée à la fiche ✓', 'success');
+    } catch (e) {
+      console.error(e); showToast('Erreur: ' + (e.message || e), 'error');
+    }
+  }
+
+  // Promouvoir : crée une predefined_task à partir du libellé + lie la tâche
+  async function adminPromoteToPredef(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!confirm(`Créer une tâche prédéfinie « ${task.tache} » ?\n\nElle apparaîtra dans le catalogue pour les prochaines créations.`)) return;
+    try {
+      // Insert predef avec valeurs raisonnables
+      const { data: created, error } = await supabaseClient.from('predefined_tasks').insert({
+        nom: task.tache,
+        categorie: task.categorie || null,
+        equipe: task.equipe || 'cuisine',
+        creneau: task.creneau || 'Matin',
+        is_production: !!task.is_production,
+        actif: true,
+        etablissement: null
+      }).select().single();
+      if (error) throw error;
+      // Retirer le flag a_traiter
+      await supabaseClient.from('tasks').update({ a_traiter: false }).eq('id', taskId);
+      predefinedTasks = await DB.getPredefined(currentEtablissement);
+      tasks = await DB.getTasks(filterDate);
+      renderAdminTab();
+      showToast('Tâche prédéfinie créée ✓ — pense à enrichir produit/action et fiche', 'success');
+    } catch (e) {
+      console.error(e); showToast('Erreur: ' + (e.message || e), 'error');
+    }
   }
 
   function showAddPredefinedModal() {
