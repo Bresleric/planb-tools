@@ -56,6 +56,9 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans aucune balise markdown, sans
   "nutrition": {"energie_kj": "number|null", "energie_kcal": "number|null", "matieres_grasses_g": "number|null", "glucides_g": "number|null", "proteines_g": "number|null", "sel_g": "number|null"} | null,
   "origine": "string|null",
   "tracabilite_bovine": {"naissance": "string|null", "elevage": "string|null", "abattage": "string|null", "decoupe": "string|null", "n_traitement": "string|null"} | null,
+  "couleur_contenant": "bleu|blanc|transparent|vert|rouge|jaune|noir|marron|gris|orange|autre|null",
+  "type_contenant": "seau|sachet_sous_vide|sachet_opaque|barquette|carton|bidon|bocal|sachet_kraft|caisse_plastique|autre|null",
+  "taille_apparente": "petit|moyen|grand|null",
   "confiance_globale": "number entre 0 et 100",
   "champs_manquants": ["string"],
   "necessite_2eme_photo": "boolean",
@@ -77,6 +80,9 @@ Règles :
 - "champs_manquants" : liste des champs que tu as mis à null car illisibles ou absents.
 - "necessite_2eme_photo" : true UNIQUEMENT si l'étiquette renvoie explicitement à une autre face (ex : "voir au dos", "DLC : voir face arrière", "voir emballage")
 - "raison_2eme_photo" : explication courte si necessite_2eme_photo est true.
+- "couleur_contenant" : couleur dominante du CONTENANT (seau, sachet, barquette) visible dans la photo, PAS la couleur du produit lui-même. Ex : seau bleu de choucroute → "bleu". Si le contenant est transparent et qu'on voit le produit à travers → "transparent". Si pas visible → null.
+- "type_contenant" : type physique du contenant. Préfère "sachet_sous_vide" si on voit un sachet plastique sous tension/dépression, "sachet_opaque" pour un sachet qui ne laisse pas voir le produit, "seau" pour un récipient cylindrique avec couvercle, "barquette" pour une coque rigide ouverte ou filmée, "carton" pour une boîte en carton, "bidon" pour un récipient liquide à poignée. Si pas visible ou inclassable → null.
+- "taille_apparente" : "petit" < 1 L/kg, "moyen" 1-5 L/kg, "grand" > 5 L/kg. Estime depuis l'échelle visible (étiquette, mention de poids, etc.). Si rien à estimer → null.
 
 Impératifs :
 - Si un champ n'est pas lisible ou n'apparaît pas, mets null. NE JAMAIS inventer une valeur.
@@ -284,6 +290,9 @@ async function insertTracabilite(
     nutrition: e.nutrition ?? null,
     origine: e.origine ?? null,
     tracabilite_bovine_jsonb: e.tracabilite_bovine ?? null,
+    couleur_contenant: e.couleur_contenant ?? null,
+    type_contenant: e.type_contenant ?? null,
+    taille_apparente: e.taille_apparente ?? null,
     confiance: typeof e.confiance_globale === 'number' ? e.confiance_globale : null,
   }
   const { error } = await supabase.from('scan_tracabilite').insert(row)
