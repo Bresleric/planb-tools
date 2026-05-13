@@ -1,0 +1,40 @@
+# ====== PlanB Tools — .gitignore ======
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# LibreOffice / Office lock files
+.~lock.*#
+~$*.xlsx
+~$*.docx
+~$*.pptx
+
+# Éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# Claude Code (worktrees + config locale)
+.claude/
+
+# Logs
+*.log
+
+# Node / build (au cas où)
+node_modules/
+dist/
+.cache/
+
+# Variables d'environnement (ne JAMAIS commit de clés)
+.env
+.env.local
+.env.*.local
+
+# NB : scripts/commit-*.sh sont versionnés volontairement (historique des
+#      opérations + permet de relancer une commande). Ne pas les ignorer.
