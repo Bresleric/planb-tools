@@ -153,13 +153,13 @@
 
     .taf-grid {
       display: grid;
-      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
+      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 140px 30px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
+      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 140px 30px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -178,7 +178,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
+      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 140px 30px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -353,7 +353,7 @@
     .task-table-header.selection-mode,
     .task-row.selection-mode,
     .taf-grid.selection-mode {
-      grid-template-columns: 32px minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
+      grid-template-columns: 32px minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 140px 30px;
     }
     .task-row.selected {
       background: #eff6ff;
@@ -1832,8 +1832,8 @@
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
       <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
-      <span class="th-center">✓</span>
       <span></span>
+      <span class="th-center">✓</span>
     </div>`;
 
     html += filtered.map(t => {
@@ -1894,7 +1894,6 @@
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
         <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
         <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
-        ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
         <div class="task-actions">
           ${!done && canAct && !t.date_debut_execution && !(t.duree_accumulee_secondes > 0) ? `<button class="btn-action start" onclick="startTask('${t.id}')" title="Démarrer le chrono">▶</button>` : ''}
           ${!done && canAct && t.date_debut_execution ? `<button class="btn-action pause" onclick="pauseTask('${t.id}')" title="Mettre en pause">⏸</button>` : ''}
@@ -1903,6 +1902,7 @@
           ${!done && canAssign() ? `<button class="btn-action" onclick="showAssignModal('${t.id}')" title="Attribuer à quelqu'un">👤</button>` : ''}
           ${canAssign() ? `<button class="btn-action delete" onclick="confirmDelete('${t.id}')" title="Supprimer la tâche">✕</button>` : ''}
         </div>
+        ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="confirmToggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
       </div>`;
     }).join('');
 
@@ -2237,6 +2237,26 @@
   }
 
   // ====== TASK ACTIONS ======
+  // Confirmation avant toggle (sauf production : la modale de saisie sert déjà de confirmation)
+  function confirmToggleTask(id, isDone) {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    // Production en attente : passer directement (modale de saisie va s'ouvrir)
+    if (!isDone && task.is_production) {
+      return toggleTask(id, isDone);
+    }
+    const titre = isDone ? 'Réouvrir la tâche ?' : 'Valider la tâche ?';
+    const message = isDone
+      ? `<p style="font-size:0.9rem">Cette tâche est marquée comme terminée. La réouvrir va effacer la validation, la durée et le chrono.</p><p style="font-size:0.85rem;margin-top:8px"><strong>${esc(task.tache)}</strong></p>`
+      : `<p style="font-size:0.9rem">Confirmer que cette tâche est terminée ?</p><p style="font-size:0.85rem;margin-top:8px"><strong>${esc(task.tache)}</strong></p>`;
+    const action = isDone ? 'Réouvrir' : 'Valider';
+    const cls = isDone ? 'danger' : 'primary';
+    openModal(titre, message, [
+      { label: 'Annuler', action: 'closeModal()', cls: '' },
+      { label: action, action: `closeModal(); toggleTask('${id}', ${isDone})`, cls: cls }
+    ]);
+  }
+
   async function toggleTask(id, isDone) {
     try {
       if (isDone) {
