@@ -2006,6 +2006,7 @@
       // === Affichage fiche technique pour les TAF de production ===
       if (task.is_production) {
         if (task.fiche_id) {
+          window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: task.tache };
           openFicheConsultModal(task.fiche_id, task.tache);
         } else {
           showToast('⚠ Fiche à créer pour cette tâche', 'error');
@@ -2038,7 +2039,7 @@
       }
       // Charger les ingrédients (TOUS, pas filtrés par article_id)
       const { data: ings, error } = await sb.from('fiche_ingredients')
-        .select('id, nom, quantite, unite, ordre')
+        .select('id, nom, quantite, unite, ordre, est_principal, article_id')
         .eq('fiche_id', ficheId)
         .order('ordre');
       if (error) throw error;
@@ -2085,19 +2086,34 @@
     }
     const metaHTML = metaItems.length ? `<div class="fiche-meta">${metaItems.join('')}</div>` : '';
 
-    // Ingrédients
+    // Ingrédients principaux à scanner (Scan-FEFO Phase 3)
+    const principaux = ings.filter(i => i.est_principal);
+    let scanHTML = '';
+    if (principaux.length > 0) {
+      scanHTML = `
+        <h3 style="color:#92400e">🎯 Ingrédients à scanner</h3>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+          ${principaux.map(i => `
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
+              <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
+              <button class="btn-action" style="background:#7c3aed; color:white; padding:8px 14px; font-size:0.85rem;" onclick="openScannerForIngredient('${i.id}', ${i.article_id ? `'${i.article_id}'` : 'null'}, '${esc(i.nom).replace(/'/g, '\\\'')}')">📷 Scanner</button>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    // Ingrédients (liste complète)
     let ingHTML = '';
     if (ings.length === 0) {
       ingHTML = `<h3>🥗 Ingrédients</h3><div class="fiche-empty">Aucun ingrédient renseigné dans cette fiche.</div>`;
     } else {
       const rows = ings.map(i => `
-        <tr>
-          <td>${esc(i.nom)}</td>
+        <tr style="${i.est_principal ? 'background:#fffbeb' : ''}">
+          <td>${i.est_principal ? '🎯 ' : ''}${esc(i.nom)}</td>
           <td>${esc(String(i.quantite))}</td>
           <td>${esc(i.unite || '')}</td>
         </tr>`).join('');
       ingHTML = `
-        <h3>🥗 Ingrédients (${ings.length})</h3>
+        <h3>🥗 Ingrédients (${ings.length}${principaux.length > 0 ? `, dont ${principaux.length} principal${principaux.length > 1 ? 'aux' : ''}` : ''})</h3>
         <table class="fiche-ing-table">
           <thead><tr><th>Ingrédient</th><th>Qté</th><th>Unité</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -2134,6 +2150,46 @@
     document.getElementById('fiche-overlay').classList.add('show');
     document.getElementById('fiche-bandeau').classList.remove('show');
   }
+
+  // ====== SCAN-FEFO Phase 3 — Lancement scanner + retour ======
+  function openScannerForIngredient(ingredientId, articleId, nomIngredient) {
+    const ctx = window.__currentTafContext || {};
+    if (!ctx.task_id) {
+      showToast('Erreur : contexte TAF perdu', 'error');
+      return;
+    }
+    // Stocker le contexte pour le retour (TAF lira ça quand le scanner redirigera)
+    localStorage.setItem('scan_fefo_context', JSON.stringify({
+      task_id: ctx.task_id,
+      fiche_id: ctx.fiche_id,
+      tache: ctx.tache,
+      ingredient_id: ingredientId,
+      article_id_attendu: articleId,
+      nom_attendu: nomIngredient,
+      timestamp: Date.now()
+    }));
+    // Naviguer vers le scanner en mode unit avec return=taf
+    window.location.href = '/scanner/?mode=unit&return=taf';
+  }
+
+  // Au retour du scanner : si un résultat est en localStorage, le traiter
+  window.addEventListener('DOMContentLoaded', function checkScanReturn() {
+    try {
+      const raw = localStorage.getItem('scan_fefo_result');
+      if (!raw) return;
+      const result = JSON.parse(raw);
+      // Consommer le résultat (1 seul affichage)
+      localStorage.removeItem('scan_fefo_result');
+      // Afficher un toast pour signaler que le scan a bien été reçu
+      // (la logique FEFO + sortie stock viendra en Phase 4)
+      const dlcStr = result.dlc ? ` — DLC ${new Date(result.dlc).toLocaleDateString('fr-FR')}` : '';
+      showToast(`Scan reçu : ${result.produit || '?'}${dlcStr}`, 'success');
+      console.log('[Scan-FEFO] Résultat reçu :', result);
+      // TODO Phase 4 : vérif matching article + FEFO + INSERT stock_mouvements
+    } catch (e) {
+      console.error('[Scan-FEFO] checkScanReturn:', e);
+    }
+  });
 
   // Ferme la modale ET le bandeau (n'arrête pas le chrono)
   function closeFiche() {

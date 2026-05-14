@@ -548,6 +548,21 @@
       }
     }
 
+    // ====== Scan-FEFO : retour vers TAF après scan ======
+    const urlParams = new URLSearchParams(window.location.search);
+    const returnTo = urlParams.get('return'); // 'taf' si appelé depuis TAF
+    const forcedMode = urlParams.get('mode'); // 'unit' attendu pour Scan-FEFO
+
+    // Si on arrive avec ?return=taf&mode=unit, on passe direct à l'écran unit
+    if (returnTo === 'taf' && forcedMode === 'unit') {
+      State.mode = 'unit';
+      window.__scanFefoReturnMode = 'taf';
+      setTimeout(() => {
+        if (typeof resetUnitScreen === 'function') resetUnitScreen();
+        if (typeof showScreen === 'function') showScreen('unit');
+      }, 200);
+    }
+
     // ====== HOME : routing modes ======
     document.querySelectorAll('.mode-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -1328,6 +1343,29 @@
           }).eq('scan_id', State.unitScanId);
         }
         showToast('✓ Scan validé', 'success');
+        // ====== Scan-FEFO : retour vers TAF ======
+        if (window.__scanFefoReturnMode === 'taf' && State.unitType === 'etiquette_produit') {
+          try {
+            const { data: trac } = await sb.from('scan_tracabilite')
+              .select('id, produit, article_id, lot, dlc')
+              .eq('scan_id', State.unitScanId).single();
+            if (trac) {
+              localStorage.setItem('scan_fefo_result', JSON.stringify({
+                scan_tracabilite_id: trac.id,
+                article_id: trac.article_id,
+                produit: trac.produit,
+                lot: trac.lot,
+                dlc: trac.dlc,
+                scan_id: State.unitScanId,
+                timestamp: Date.now()
+              }));
+            }
+            window.location.href = '/taf/';
+            return;
+          } catch (e) {
+            console.error('[Scan-FEFO] retour TAF échec:', e);
+          }
+        }
         showScreen('home');
       } catch (err) {
         console.error(err); showToast(err.message, 'error');
