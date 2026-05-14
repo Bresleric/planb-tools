@@ -226,6 +226,82 @@
     }
     .disclaimer-btn:active { background: var(--accent-dark); transform: scale(0.98); }
 
+    /* ===== MODAL SESSION OUBLIÉE (confirmation heure réelle) ===== */
+    .forgotten-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 5500; padding: 20px;
+    }
+    .forgotten-overlay.active { display: flex; }
+    .forgotten-modal {
+      background: white; border-radius: 16px;
+      width: 100%; max-width: 480px;
+      padding: 26px 22px;
+      animation: modalIn 0.25s ease-out;
+      border-top: 6px solid var(--orange);
+    }
+    .forgotten-icon { font-size: 2.6rem; text-align: center; margin-bottom: 10px; }
+    .forgotten-title {
+      font-size: 1.2rem; font-weight: 700; color: var(--gray-900);
+      text-align: center; margin-bottom: 8px;
+    }
+    .forgotten-subtitle {
+      font-size: 0.88rem; color: var(--gray-600);
+      text-align: center; margin-bottom: 16px;
+    }
+    .forgotten-info {
+      background: var(--orange-bg); border-left: 4px solid var(--orange);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 0.92rem; color: var(--gray-800);
+      margin-bottom: 16px;
+    }
+    .forgotten-info strong { color: var(--orange-dark); }
+    .forgotten-info-row {
+      display: flex; justify-content: space-between;
+      padding: 4px 0;
+    }
+    .forgotten-question {
+      font-size: 1rem; font-weight: 600; color: var(--gray-900);
+      margin-bottom: 12px; text-align: center;
+    }
+    .forgotten-time-input {
+      width: 100%; padding: 14px;
+      border: 2px solid var(--gray-200); border-radius: 10px;
+      font-size: 1.6rem; font-weight: 700;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 16px;
+      color: var(--gray-900);
+    }
+    .forgotten-time-input:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
+    }
+    .forgotten-actions {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .forgotten-btn {
+      padding: 14px;
+      border: none; border-radius: 10px;
+      font-size: 0.95rem; font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .forgotten-btn:active { transform: scale(0.98); }
+    .forgotten-btn-confirm { background: var(--accent); color: white; }
+    .forgotten-btn-confirm:active { background: var(--accent-dark); }
+    .forgotten-btn-auto {
+      background: white; color: var(--gray-700);
+      border: 1px solid var(--gray-300);
+      font-weight: 600;
+    }
+    .forgotten-progress {
+      font-size: 0.75rem; color: var(--gray-500);
+      text-align: center; margin-top: 14px;
+    }
+
     /* ===== TOAST & LOADING ===== */
     .toast {
       position: fixed; top: 80px; left: 50%;
@@ -333,6 +409,29 @@
     </div>
   </main>
 
+  <!-- Modal de confirmation de session oubliée (heure réelle de fin) -->
+  <div class="forgotten-overlay" id="forgotten">
+    <div class="forgotten-modal">
+      <div class="forgotten-icon">⏰</div>
+      <div class="forgotten-title">Tu as oublié de pointer ta fin de service</div>
+      <div class="forgotten-subtitle" id="forgotten-subtitle">
+        Pour fiabiliser tes heures, confirme l'heure réelle de fin.
+      </div>
+      <div class="forgotten-info" id="forgotten-info"></div>
+      <div class="forgotten-question">À quelle heure as-tu réellement terminé ?</div>
+      <input type="time" class="forgotten-time-input" id="forgotten-time" value="22:00">
+      <div class="forgotten-actions">
+        <button class="forgotten-btn forgotten-btn-confirm" onclick="confirmForgottenWithTime()">
+          ✅ Confirmer cette heure
+        </button>
+        <button class="forgotten-btn forgotten-btn-auto" onclick="confirmForgottenWithAuto()">
+          Je ne sais plus — laisser 23:59 (auto)
+        </button>
+      </div>
+      <div class="forgotten-progress" id="forgotten-progress"></div>
+    </div>
+  </div>
+
   <!-- Modale d'avertissement au premier accès (1 fois par user) -->
   <div class="disclaimer-overlay" id="disclaimer">
     <div class="disclaimer-modal">
@@ -399,7 +498,152 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadEtatCourant();
   await loadEvenementsDuJour();
   render();
+
+  // Vérifier s'il y a des sessions à confirmer (oublis fin de service des jours passés)
+  // Soit elles sont encore ouvertes (le cron n'a pas encore tourné), soit elles ont
+  // été auto-fermées à 23:59 et l'utilisateur n'a pas encore confirmé l'heure réelle.
+  await checkForgottenSessions();
 });
+
+// ============= MODAL "SESSION OUBLIÉE" (confirmation heure réelle) =============
+let forgottenQueue = [];        // Liste des périodes à confirmer
+let forgottenIndex = 0;         // Position courante dans la file
+
+async function checkForgottenSessions() {
+  const today = new Date().toISOString().split('T')[0];
+  // Cherche les périodes du user, jours passés, soit ouvertes, soit auto-fermées non encore confirmées
+  const { data, error } = await sb
+    .from('pointage_periodes_travail')
+    .select('id, date_service, debut_service, fin_service, duree_pauses_minutes, notes')
+    .eq('user_id', currentUser.id)
+    .lt('date_service', today)
+    .order('date_service', { ascending: true });
+  if (error) { console.warn('checkForgottenSessions error:', error); return; }
+
+  forgottenQueue = (data || []).filter(p => {
+    const isOpen = p.fin_service === null;
+    const notes = p.notes || '';
+    const isAutoClosed = notes.includes('[Auto') && notes.includes('cron');
+    const isConfirmed = notes.includes('[Confirme par utilisateur');
+    return isOpen || (isAutoClosed && !isConfirmed);
+  });
+
+  if (forgottenQueue.length > 0) {
+    forgottenIndex = 0;
+    showNextForgottenSession();
+  }
+}
+
+function showNextForgottenSession() {
+  if (forgottenIndex >= forgottenQueue.length) {
+    // Plus rien à confirmer
+    document.getElementById('forgotten').classList.remove('active');
+    forgottenQueue = [];
+    forgottenIndex = 0;
+    // Recharger l'affichage pour tenir compte des confirmations
+    loadEvenementsDuJour().then(() => render());
+    return;
+  }
+  const session = forgottenQueue[forgottenIndex];
+  const dateFr = new Date(session.date_service).toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  });
+  const heureDebut = formatHeure(session.debut_service);
+
+  document.getElementById('forgotten-info').innerHTML = `
+    <div class="forgotten-info-row"><span>📅 Jour</span><strong>${dateFr}</strong></div>
+    <div class="forgotten-info-row"><span>▶️ Début de service</span><strong>${heureDebut}</strong></div>
+    ${session.duree_pauses_minutes ? `<div class="forgotten-info-row"><span>⏸️ Pauses</span><strong>${session.duree_pauses_minutes} min</strong></div>` : ''}
+  `;
+
+  // Préremplir avec une heure plausible : si auto-fermé, garder l'heure auto, sinon proposer 22h
+  if (session.fin_service) {
+    document.getElementById('forgotten-time').value = formatHeure(session.fin_service);
+  } else {
+    document.getElementById('forgotten-time').value = '22:00';
+  }
+
+  // Compteur de progression
+  if (forgottenQueue.length > 1) {
+    document.getElementById('forgotten-progress').textContent =
+      `Session ${forgottenIndex + 1} sur ${forgottenQueue.length}`;
+  } else {
+    document.getElementById('forgotten-progress').textContent = '';
+  }
+
+  document.getElementById('forgotten').classList.add('active');
+}
+
+async function confirmForgottenWithTime() {
+  const session = forgottenQueue[forgottenIndex];
+  const heureSaisie = document.getElementById('forgotten-time').value;  // "HH:MM"
+  if (!heureSaisie || !heureSaisie.match(/^\d{2}:\d{2}$/)) {
+    toast('⚠️ Heure invalide', 'error', 3000);
+    return;
+  }
+  await updateForgottenSession(session, heureSaisie);
+}
+
+async function confirmForgottenWithAuto() {
+  const session = forgottenQueue[forgottenIndex];
+  // Garder l'heure auto (23:59) si déjà fermée, sinon mettre 23:59
+  await updateForgottenSession(session, '23:59');
+}
+
+async function updateForgottenSession(session, heureStr) {
+  showLoading(true);
+  try {
+    const [hh, mm] = heureStr.split(':');
+    // Construit fin_service = date_service + heure saisie (heure de Paris)
+    // On envoie en ISO local avec +02:00 pour CEST (été) ou +01:00 pour CET (hiver) — en simplifié, on laisse Postgres gérer le tz côté DB
+    // Approche simple : envoyer en UTC en partant du principe que l'heure saisie est en heure FR.
+    // Plus robuste : utiliser un format ISO complet avec offset de Paris à cette date.
+    const dateBase = new Date(session.date_service + 'T' + heureStr + ':00');
+    const finIso = dateBase.toISOString();
+
+    // Recalcul de la durée de travail effective (heure fin - heure début - pauses)
+    const debut = new Date(session.debut_service);
+    const ms = dateBase - debut;
+    const dureeTotaleMin = Math.max(0, Math.round(ms / 60000));
+    const dureeTravailMin = Math.max(0, dureeTotaleMin - (session.duree_pauses_minutes || 0));
+
+    const noteAdd = `\n[Confirme par utilisateur ${new Date().toLocaleString('fr-FR')}] Heure de fin reelle saisie : ${heureStr}.`;
+
+    const { error } = await sb
+      .from('pointage_periodes_travail')
+      .update({
+        fin_service: finIso,
+        notes: (session.notes || '') + noteAdd,
+        statut: 'saisi'
+      })
+      .eq('id', session.id);
+    if (error) throw error;
+
+    // Insérer aussi un événement fin_service rétroactif si la période n'en avait pas
+    if (!session.fin_service) {
+      await sb.from('pointage_evenements').insert({
+        user_id: currentUser.id,
+        user_nom: currentUser.nom,
+        type_evenement: 'fin_service',
+        horodatage: finIso,
+        date_service: session.date_service,
+        etablissement: currentEtablissement,
+        source: 'saisie_manuelle',
+        periode_travail_id: session.id,
+        commentaire: 'Confirmation rétroactive via modal session oubliée'
+      });
+    }
+
+    toast('✅ Heure de fin enregistrée', 'success', 2000);
+    forgottenIndex++;
+    setTimeout(showNextForgottenSession, 600);
+  } catch (e) {
+    console.error(e);
+    toast('Erreur : ' + (e.message || 'inconnue'), 'error', 4000);
+  } finally {
+    showLoading(false);
+  }
+}
 
 // ============= DISCLAIMER (modale phase test) =============
 function maybeShowDisclaimer() {
