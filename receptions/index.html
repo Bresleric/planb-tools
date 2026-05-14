@@ -1686,10 +1686,12 @@
     const fromTs = from + 'T00:00:00';
     const toTs = to + 'T23:59:59';
 
+    // Stratégie en 2 requêtes : on évite l'embed imbriqué scans→scan_sessions
+    // qui plante avec 'more than one relationship' (FK ambigu : session_id vs bl_facture_scan_id)
     let q = sb.from('scan_tracabilite')
       .select(`
         *,
-        scans!inner(id, etablissement, statut, storage_path, mime_type, confiance_globale, claude_extraction_jsonb, created_at, created_by_nom, session_id, type_document, scan_sessions(id, fournisseur_nom, date_reception))
+        scans!inner(id, etablissement, statut, storage_path, mime_type, confiance_globale, claude_extraction_jsonb, created_at, created_by_nom, session_id, type_document)
       `)
       .gte('scans.created_at', fromTs)
       .lte('scans.created_at', toTs)
@@ -1707,6 +1709,16 @@
       return;
     }
 
+    // 2e requête : récupérer les sessions associées en une fois
+    const sessionIds = [...new Set((data || []).map(t => t.scans?.session_id).filter(Boolean))];
+    const sessionsById = {};
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await sb.from('scan_sessions')
+        .select('id, fournisseur_nom, date_reception')
+        .in('id', sessionIds);
+      (sessions || []).forEach(s => { sessionsById[s.id] = s; });
+    }
+
     // Rattacher les noms d'articles via cache (chargé en parallèle)
     await loadArticlesIfNeeded();
     const articleById = {};
@@ -1715,7 +1727,7 @@
     State.etqRows = (data || []).map(t => ({
       trac: t,
       scan: t.scans,
-      session: t.scans?.scan_sessions || null,
+      session: t.scans?.session_id ? sessionsById[t.scans.session_id] || null : null,
       article: t.article_id ? articleById[t.article_id] : null,
       thumbUrl: null, // chargée à la demande
     }));
