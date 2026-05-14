@@ -892,7 +892,15 @@
                 icon: '📊',
                 description: 'KPI, comparaisons N-1, analyses',
                 minRole: 'responsable',
-                url: './dashboard/index.html?v=1'
+                url: './dashboard/index.html?v=2'
+            },
+            {
+                id: 'objectifs',
+                name: 'Objectifs',
+                icon: '🎯',
+                description: 'Objectifs CA jour par jour (écrasable)',
+                minRole: 'manager',
+                url: './objectifs/index.html?v=1'
             },
             {
                 id: 'temperatures',
@@ -908,7 +916,7 @@
                 icon: '⏰',
                 description: 'Saisie des mouvements',
                 minRole: 'collaborateur',
-                url: './pointages/'
+                url: null
             },
             {
                 id: 'caisse',
@@ -959,36 +967,12 @@
                 url: './receptions/'
             },
             {
-                id: 'scanner',
-                name: 'Scanner',
-                icon: '📸',
-                description: 'Étiquettes, BL, factures',
-                minRole: 'collaborateur',
-                url: './scanner/'
-            },
-            {
-                id: 'stock',
-                name: 'Stock',
-                icon: '📦',
-                description: 'Rattachement & stock matières premières',
-                minRole: 'responsable',
-                url: './stock/'
-            },
-            {
                 id: 'howto',
                 name: 'HowTo',
                 icon: '💡',
                 description: 'Tutoriels d\'utilisation',
                 minRole: 'collaborateur',
                 url: './howto/index.html?v=1'
-            },
-            {
-                id: 'information',
-                name: 'Information',
-                icon: '📰',
-                description: 'Journal d\'entreprise',
-                minRole: 'collaborateur',
-                url: './information/index.html?v=1'
             },
             {
                 id: 'admin',
@@ -1027,22 +1011,19 @@
         }
 
         function canAccessModule(moduleId, minRole) {
-            // Admin a toujours accès à tout (peu importe acces_modules)
-            if (currentUser.role === 'admin') return true;
-
-            // Si acces_modules est explicitement défini → cette liste est la règle qui prime.
-            // L'admin peut donc accorder ponctuellement un module sensible à un user de niveau inférieur
-            // (ex: Stock à un collaborateur). Les protections internes des écrans sensibles
-            // (stock/articles.html admin only, etc.) continuent à filtrer les sous-fonctions.
-            if (currentUser.acces_modules && Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.length > 0) {
-                return currentUser.acces_modules.includes(moduleId);
-            }
-
-            // Pas de configuration explicite → fallback sur la règle minRole (plancher par défaut)
             const roleHierarchy = { collaborateur: 1, responsable: 2, manager: 3, admin: 4 };
             const userLevel = roleHierarchy[currentUser.role] || 0;
             const requiredLevel = roleHierarchy[minRole] || 0;
-            return userLevel >= requiredLevel;
+            // Check role first
+            if (userLevel < requiredLevel) return false;
+            // Admin always has access to everything
+            if (currentUser.role === 'admin') return true;
+            // If acces_modules is defined and non-empty, check module is in the list
+            if (currentUser.acces_modules && Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.length > 0) {
+                return currentUser.acces_modules.includes(moduleId);
+            }
+            // No acces_modules restriction → role-based access only
+            return true;
         }
 
         function getEstablishmentDisplayName(code) {
@@ -1274,17 +1255,6 @@
                     setBadge('briefings', nonLus);
                 }
             } catch (e) { console.warn('Badge Briefings error:', e); }
-
-            try {
-                // 5. Information : infos publiees ciblant le user et non lues
-                const { data: cnt, error: errInfo } = await supabaseClient.rpc('info_count_non_lues', {
-                    p_user_id: currentUser.id,
-                    p_etablissement: currentEstablishment,
-                    p_equipe: currentUser.equipe || null
-                });
-                if (errInfo) throw errInfo;
-                setBadge('information', cnt || 0);
-            } catch (e) { console.warn('Badge Information error:', e); }
         }
 
         function handleModuleClick(module) {
@@ -1448,18 +1418,14 @@
                     }
                 }
 
-                setTimeout(async () => {
+                setTimeout(() => {
                     if (user.etablissements.length === 1) {
                         // Auto-select single establishment
                         currentEstablishment = user.etablissements[0];
                         storeSession(user, currentEstablishment);
-                        // Check si premier login du jour → redirect Pointages
-                        const redirected = await checkAndRedirectIfFirstPointage(user, currentEstablishment);
-                        if (!redirected) {
-                            updateHeader();
-                            renderModules();
-                            showScreen(dashboardScreen);
-                        }
+                        updateHeader();
+                        renderModules();
+                        showScreen(dashboardScreen);
                     } else {
                         // Show establishment selector
                         establishmentSubtitle.textContent = `Bienvenue, ${user.nom}`;
@@ -1468,49 +1434,15 @@
                 }, 500);
         }
 
-        // ============= Helper: redirect vers Pointages si premier login du jour =============
-        // Logique : tout user (incl manager/admin) qui n'a pas encore pointé son début de
-        // service aujourd'hui sur cet établissement → redirect vers /pointages/.
-        // Cas d'usage manager/admin : ils sont sur le planning du jour et doivent pointer.
-        // Si un manager/admin n'est PAS planifié, il peut cliquer "← Portail" depuis l'écran
-        // de pointage pour passer outre (pas de validation forcée).
-        // 🔜 Phase 2 (plannings) : on conditionnera ce redirect à "présence sur planning du jour".
-        async function checkAndRedirectIfFirstPointage(user, establishment) {
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                const { data, error } = await supabaseClient
-                    .from('pointage_evenements')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .eq('etablissement', establishment)
-                    .eq('date_service', today)
-                    .eq('type_evenement', 'debut_service')
-                    .limit(1);
-                if (error) { console.warn('Pointage check error:', error); return false; }
-                if (!data || data.length === 0) {
-                    // Pas encore pointé → redirect vers Pointages
-                    window.location.href = './pointages/';
-                    return true;
-                }
-            } catch (e) {
-                console.warn('checkAndRedirectIfFirstPointage failed:', e);
-            }
-            return false;
-        }
-
         // ============= Event Listeners: Establishment =============
         document.querySelectorAll('.establishment-card').forEach(card => {
-            card.addEventListener('click', async () => {
+            card.addEventListener('click', () => {
                 const establishment = card.dataset.establishment;
                 currentEstablishment = establishment;
                 storeSession(currentUser, establishment);
-                // Check si premier login du jour → redirect Pointages
-                const redirected = await checkAndRedirectIfFirstPointage(currentUser, establishment);
-                if (!redirected) {
-                    updateHeader();
-                    renderModules();
-                    showScreen(dashboardScreen);
-                }
+                updateHeader();
+                renderModules();
+                showScreen(dashboardScreen);
             });
         });
 
