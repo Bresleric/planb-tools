@@ -153,13 +153,13 @@
 
     .taf-grid {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px minmax(140px, 2fr) 40px minmax(100px, 1fr) 90px 40px 30px 100px 140px;
+      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
       gap: 0;
     }
 
     .task-table-header {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px minmax(140px, 2fr) 40px minmax(100px, 1fr) 90px 40px 30px 100px 140px;
+      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
       gap: 0; padding: 6px 8px; align-items: center;
       font-size: 0.65rem; font-weight: 600; color: var(--gray-400);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -178,7 +178,7 @@
 
     .task-row {
       display: grid;
-      grid-template-columns: 72px 48px 32px 32px 52px minmax(140px, 2fr) 40px minmax(100px, 1fr) 90px 40px 30px 100px 140px;
+      grid-template-columns: minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
       gap: 0; padding: 5px 8px; align-items: center;
       background: white; border-radius: var(--radius-sm);
       box-shadow: var(--shadow); border-left: 3px solid transparent;
@@ -353,7 +353,7 @@
     .task-table-header.selection-mode,
     .task-row.selection-mode,
     .taf-grid.selection-mode {
-      grid-template-columns: 32px 72px 48px 32px 32px 52px minmax(140px, 2fr) 40px minmax(100px, 1fr) 90px 40px 30px 100px 140px;
+      grid-template-columns: 32px minmax(140px, 2fr) 40px 48px 72px 40px minmax(100px, 1fr) 90px 100px 32px 32px 52px 30px 140px;
     }
     .task-row.selected {
       background: #eff6ff;
@@ -1821,18 +1821,18 @@
     const selCls = selectionMode ? ' selection-mode' : '';
     let html = `<div class="task-table-header${selCls}">
       ${selectionMode ? `<span class="select-all-wrap"><input type="checkbox" id="select-all-cb" class="task-select-cb" onclick="toggleSelectAll()" title="Tout sélectionner / désélectionner"></span>` : ''}
-      <span class="th-sort ${sa('creneau')}" onclick="toggleSort('creneau')">Crén.<span class="sort-arrow">${arrow('creneau')}</span></span>
+      <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
+      <span class="th-center">FT</span>
       <span class="th-sort th-center ${sa('echeance')}" onclick="toggleSort('echeance')">Éch.<span class="sort-arrow">${arrow('echeance')}</span></span>
+      <span class="th-sort ${sa('creneau')}" onclick="toggleSort('creneau')">Crén.<span class="sort-arrow">${arrow('creneau')}</span></span>
+      <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
+      <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
+      <span class="th-sort ${sa('categorie')}" onclick="toggleSort('categorie')">Catégorie<span class="sort-arrow">${arrow('categorie')}</span></span>
+      <span class="th-sort th-center ${sa('statut')}" onclick="toggleSort('statut')">Statut<span class="sort-arrow">${arrow('statut')}</span></span>
       <span class="th-sort th-center ${sa('createur')}" onclick="toggleSort('createur')">De<span class="sort-arrow">${arrow('createur')}</span></span>
       <span class="th-sort th-center ${sa('attribue')}" onclick="toggleSort('attribue')">À<span class="sort-arrow">${arrow('attribue')}</span></span>
       <span class="th-sort th-center ${sa('retard')}" onclick="toggleSort('retard')">Retard<span class="sort-arrow">${arrow('retard')}</span></span>
-      <span class="th-sort ${sa('tache')}" onclick="toggleSort('tache')">Tâche<span class="sort-arrow">${arrow('tache')}</span></span>
-      <span class="th-center">FT</span>
-      <span class="th-sort ${sa('note')}" onclick="toggleSort('note')">Note<span class="sort-arrow">${arrow('note')}</span></span>
-      <span class="th-sort ${sa('categorie')}" onclick="toggleSort('categorie')">Catégorie<span class="sort-arrow">${arrow('categorie')}</span></span>
-      <span class="th-sort th-center ${sa('priorite')}" onclick="toggleSort('priorite')">Prio<span class="sort-arrow">${arrow('priorite')}</span></span>
       <span class="th-center">✓</span>
-      <span class="th-sort th-center ${sa('statut')}" onclick="toggleSort('statut')">Statut<span class="sort-arrow">${arrow('statut')}</span></span>
       <span></span>
     </div>`;
 
@@ -1867,19 +1867,15 @@
 
       return `<div class="task-row ${done ? 'done' : ''} priority-${t.priorite || 3}${mineClass}${lateClass}${selCls}${selectedClass}" data-id="${t.id}">
         ${selectionMode ? `<div class="select-all-wrap">${done ? '' : `<input type="checkbox" class="task-select-cb" data-id="${t.id}" ${isSelected ? 'checked' : ''} onclick="toggleTaskSelection('${t.id}')">`}</div>` : ''}
-        <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
-        <div class="task-cell"><span class="task-echeance" title="${echTitle}">${echShort}</span></div>
-        <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
-        <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
-        <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
         <div class="task-main">
           <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
         </div>
         <div class="task-cell" style="text-align:center">${t.fiche_id ? `<button class="btn-action" style="background:#dbeafe;color:#1d4ed8" onclick="openFicheConsultModal('${t.fiche_id}')" title="Afficher la fiche technique">📖</button>` : `<span style="color:var(--gray-300);font-size:0.72rem">—</span>`}</div>
+        <div class="task-cell"><span class="task-echeance" title="${echTitle}">${echShort}</span></div>
+        <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
+        <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
         <div class="task-note-cell">${t.observation ? `<span class="task-note" title="${esc(t.observation)}">${esc(t.observation)}</span>` : ''}</div>
         <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
-        <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
-        ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
         <div class="task-cell">${(() => {
           if (done) {
             return `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>${(t.duree_secondes != null) ? `<span class="task-duree-final">${formatDureeShort(t.duree_secondes)}</span>` : ''}`;
@@ -1895,6 +1891,10 @@
           }
           return '';
         })()}</div>
+        <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
+        <div class="task-cell">${assignee ? `<span class="task-initials assignee" title="Attribué à ${esc(t.attribue_a_nom || assignee)}">${esc(assignee)}</span>` : `<span class="task-initials unassigned">—</span>`}</div>
+        <div class="task-cell">${isLate ? `<span class="badge-late" title="Reportée depuis le ${new Date(t.echeance_initiale).toLocaleDateString('fr-FR')}">${daysLate}j</span>` : ''}</div>
+        ${canAct ? `<button class="task-check ${done ? 'checked' : ''}" onclick="toggleTask('${t.id}', ${done})">${done ? '✓' : ''}</button>` : `<div class="task-cell" style="width:36px"></div>`}
         <div class="task-actions">
           ${!done && canAct && !t.date_debut_execution && !(t.duree_accumulee_secondes > 0) ? `<button class="btn-action start" onclick="startTask('${t.id}')" title="Démarrer le chrono">▶</button>` : ''}
           ${!done && canAct && t.date_debut_execution ? `<button class="btn-action pause" onclick="pauseTask('${t.id}')" title="Mettre en pause">⏸</button>` : ''}
