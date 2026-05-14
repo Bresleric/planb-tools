@@ -1687,14 +1687,16 @@
     var sc = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
     if (!sc) { __planbInactShowError('Connexion indisponible'); return; }
     sc.from('users').select('id').eq('code', pin).eq('actif', true).then(function(res){
+      if (pin !== __planbInactPin) return; // réponse obsolète, l'utilisateur a continué à taper
       var data = res && res.data;
       if (data && data.length && data[0].id === expectedId) {
         __planbInactHide();
         resetInactivity();
-      } else {
+      } else if (pin.length >= 6) {
         __planbInactShowError('Code incorrect');
       }
-    }).catch(function(){ __planbInactShowError('Erreur de vérification'); });
+      // sinon : longueur intermédiaire, on attend silencieusement la suite
+    }).catch(function(){ if (pin === __planbInactPin && pin.length >= 6) __planbInactShowError('Erreur de vérification'); });
   }
 
   function __planbInactShow() {
