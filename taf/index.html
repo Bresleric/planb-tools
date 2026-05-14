@@ -1875,7 +1875,7 @@
         <div class="task-main">
           <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
         </div>
-        <div class="task-cell" style="text-align:center">${t.fiche_id ? `<button class="btn-action" style="background:#dbeafe;color:#1d4ed8" onclick="openFicheConsultModal('${t.fiche_id}', ${JSON.stringify(t.tache)})" title="Afficher la fiche technique">📖</button>` : `<span style="color:var(--gray-300);font-size:0.72rem">—</span>`}</div>
+        <div class="task-cell" style="text-align:center">${t.fiche_id ? `<button class="btn-action" style="background:#dbeafe;color:#1d4ed8" onclick="openFicheConsultModal('${t.fiche_id}')" title="Afficher la fiche technique">📖</button>` : `<span style="color:var(--gray-300);font-size:0.72rem">—</span>`}</div>
         <div class="task-note-cell">${t.observation ? `<span class="task-note" title="${esc(t.observation)}">${esc(t.observation)}</span>` : ''}</div>
         <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
