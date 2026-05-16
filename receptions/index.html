@@ -290,105 +290,11 @@
     }
     .full-loader .spinner { border-color:rgba(139,92,246,.2); border-top-color:var(--purple); width:20px; height:20px; }
 
-    /* ===== ONGLETS ===== */
-    .tabs {
-      background:white; border-bottom:1px solid var(--gray-200);
-      padding:0 16px; display:flex; gap:4px; overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-    }
-    .tab {
-      padding:10px 16px; border:none; background:none;
-      font-size:.88rem; font-weight:600; color:var(--gray-500);
-      cursor:pointer; white-space:nowrap; border-bottom:3px solid transparent;
-      transition:all .15s; display:inline-flex; align-items:center; gap:6px;
-    }
-    .tab:hover { color:var(--gray-700); }
-    .tab.active { color:var(--purple); border-bottom-color:var(--purple); }
-    .tab .count {
-      background:var(--gray-100); color:var(--gray-600);
-      padding:1px 7px; border-radius:9px; font-size:.7rem; font-weight:700;
-    }
-    .tab.active .count { background:var(--purple-light); color:var(--purple-dark); }
-
-    /* ===== VUE ÉTIQUETTES ===== */
-    .etq-table-wrap {
-      background:white; border-radius:var(--radius-lg); overflow:hidden;
-      box-shadow:var(--shadow); border:1px solid var(--gray-200);
-    }
-    .etq-row { cursor:pointer; transition:background .1s; }
-    .etq-row:hover { background:var(--purple-light); }
-    .etq-row td { padding:8px 10px; border-bottom:1px solid var(--gray-100); vertical-align:middle; }
-    .etq-thumb-cell {
-      width:50px; height:50px; border-radius:var(--radius-sm); object-fit:cover;
-      border:1px solid var(--gray-200); background:var(--gray-100);
-      display:block;
-    }
-    .etq-thumb-placeholder {
-      width:50px; height:50px; border-radius:var(--radius-sm); background:var(--gray-100);
-      display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:var(--gray-400);
-      border:1px solid var(--gray-200);
-    }
-    .etq-prod { font-weight:600; color:var(--gray-800); font-size:.88rem; }
-    .etq-prod .em { color:var(--red); font-style:italic; font-weight:500; }
-    .etq-sub { font-size:.72rem; color:var(--gray-500); margin-top:2px; }
-    .etq-article { font-size:.78rem; color:var(--purple-dark); font-weight:600; }
-    .etq-article.missing { color:var(--red-dark); font-weight:500; font-style:italic; }
-    .etq-poids-cell { font-weight:600; font-size:.9rem; text-align:right; white-space:nowrap; }
-    .etq-poids-cell.missing { color:var(--red-dark); font-style:italic; }
-    .etq-conf {
-      display:inline-block; padding:2px 8px; border-radius:10px;
-      font-size:.72rem; font-weight:700;
-    }
-    .etq-conf.high { background:var(--green-bg); color:var(--green-dark); }
-    .etq-conf.mid { background:var(--amber-bg); color:var(--amber); }
-    .etq-conf.low { background:var(--red-bg); color:var(--red-dark); }
-
-    .quickfilters {
-      display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;
-      align-items:center;
-    }
-    .quickfilters .chip {
-      padding:5px 11px; border-radius:18px; border:1px solid var(--gray-200);
-      background:white; font-size:.78rem; color:var(--gray-600); cursor:pointer;
-    }
-    .quickfilters .chip.active { background:var(--purple); color:white; border-color:var(--purple); }
-    .quickfilters .search-input {
-      flex:1; min-width:180px; padding:6px 11px; border:1px solid var(--gray-200);
-      border-radius:var(--radius-sm); font-size:.85rem; background:white;
-    }
-
-    /* Modal édition — ajouts pour rattachement article + suppression */
-    .article-search-block {
-      background:var(--purple-light); border-radius:var(--radius);
-      padding:10px 12px; margin:8px 0;
-    }
-    .article-current {
-      font-size:.82rem; color:var(--gray-700); margin-bottom:6px;
-    }
-    .article-current strong { color:var(--purple-dark); }
-    .article-search-input {
-      width:100%; padding:7px 10px; border:1px solid var(--gray-200);
-      border-radius:var(--radius-sm); font-size:.85rem; background:white;
-    }
-    .article-results {
-      margin-top:5px; max-height:180px; overflow-y:auto;
-      background:white; border:1px solid var(--gray-200); border-radius:var(--radius-sm);
-      display:none;
-    }
-    .article-result-row {
-      padding:7px 11px; cursor:pointer; font-size:.83rem; border-bottom:1px solid var(--gray-100);
-    }
-    .article-result-row:hover { background:var(--purple-light); }
-    .article-result-row:last-child { border-bottom:none; }
-    .article-result-row .sub { font-size:.7rem; color:var(--gray-500); }
-
     @media (max-width:640px) {
       .filters { gap:6px; }
       .stat-card .number { font-size:1.3rem; }
       th, td { padding:8px 6px; font-size:.8rem; }
       .col-hide-mobile { display:none; }
-      .tabs { padding:0 8px; }
-      .tab { padding:9px 12px; font-size:.82rem; }
     }
   </style>
 </head>
@@ -400,15 +306,10 @@
     <h1>📋 Réceptions — Pilotage</h1>
   </div>
   <div class="header-right">
+    <a href="./elis.html" class="btn-back" style="border-color:#c4b5fd; color:var(--purple-dark); font-weight:600;">🧺 ELIS</a>
     <span id="header-etab">—</span> · <span id="header-user">—</span>
   </div>
 </header>
-
-<!-- ========== ONGLETS ========== -->
-<nav class="tabs" id="main-tabs">
-  <button class="tab active" data-tab="sessions" onclick="switchTab('sessions')">📦 Sessions</button>
-  <button class="tab" data-tab="etiquettes" onclick="switchTab('etiquettes')">🏷️ Étiquettes <span class="count" id="tab-etq-count">—</span></button>
-</nav>
 
 <!-- ========== SCREEN 1 : LISTE ========== -->
 <section id="screen-list" class="screen active">
@@ -448,41 +349,6 @@
   </div>
 </section>
 
-<!-- ========== SCREEN 3 : ÉTIQUETTES ========== -->
-<section id="screen-etiquettes" class="screen">
-  <div class="filters">
-    <span style="font-size:.78rem; color:var(--gray-500); font-weight:600;">Établissement :</span>
-    <button class="chip" data-etq-etab="all" onclick="setEtqFilterEtab('all')">Tous</button>
-    <button class="chip active" data-etq-etab="freddy" onclick="setEtqFilterEtab('freddy')">Freddy</button>
-    <button class="chip" data-etq-etab="liesel" onclick="setEtqFilterEtab('liesel')">Liesel</button>
-    <span class="filter-sep"></span>
-    <span style="font-size:.78rem; color:var(--gray-500); font-weight:600;">Période :</span>
-    <input type="date" id="etq-date-from" class="filter-input" onchange="reloadEtiquettes()">
-    <span style="color:var(--gray-400);">→</span>
-    <input type="date" id="etq-date-to" class="filter-input" onchange="reloadEtiquettes()">
-    <button class="chip" onclick="setEtqDateToday()">Aujourd'hui</button>
-  </div>
-
-  <div class="content">
-    <div class="stats-row" id="etq-stats-row"></div>
-
-    <div class="quickfilters">
-      <span style="font-size:.78rem; color:var(--gray-500); font-weight:600;">Filtres :</span>
-      <button class="chip active" data-etq-pb="all" onclick="setEtqPb('all')">Toutes</button>
-      <button class="chip" data-etq-pb="probleme" onclick="setEtqPb('probleme')">⚠️ À problème</button>
-      <button class="chip" data-etq-pb="sans_poids" onclick="setEtqPb('sans_poids')">⚖️ Sans poids</button>
-      <button class="chip" data-etq-pb="sans_article" onclick="setEtqPb('sans_article')">🔗 Sans article</button>
-      <button class="chip" data-etq-pb="confiance_basse" onclick="setEtqPb('confiance_basse')">🤖 Confiance &lt; 70</button>
-      <button class="chip" data-etq-pb="dlc_dep" onclick="setEtqPb('dlc_dep')">📅 DLC dépassée</button>
-      <input type="text" id="etq-search" class="search-input" placeholder="🔍 Chercher produit, lot, fabricant…" oninput="renderEtiquettes()">
-    </div>
-
-    <div id="etq-list-container">
-      <div class="full-loader"><div class="spinner"></div> Chargement des étiquettes…</div>
-    </div>
-  </div>
-</section>
-
 <!-- ========== MODAL ÉDITION ÉTIQUETTE ========== -->
 <div class="modal-overlay" id="modal-edit">
   <div class="modal">
@@ -493,37 +359,9 @@
     <div class="modal-body" id="modal-edit-body">
       <div class="full-loader"><div class="spinner"></div> Chargement de l'image…</div>
     </div>
-    <div class="modal-footer" id="modal-edit-footer">
-      <button class="btn btn-danger" onclick="deleteEtiquette()" id="btn-delete-edit" style="margin-right:auto;">🗑 Supprimer</button>
+    <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeEdit()">Annuler</button>
       <button class="btn btn-primary" onclick="saveEdit()" id="btn-save-edit">Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========== MODAL CONFIRMATION SUPPRESSION ========== -->
-<div class="modal-overlay" id="modal-delete-confirm">
-  <div class="modal" style="max-width:420px;">
-    <div class="modal-header">
-      <h3>⚠️ Supprimer cette étiquette ?</h3>
-      <button class="modal-close" onclick="closeDeleteConfirm()">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:.9rem; color:var(--gray-700); margin-bottom:10px;">
-        Cette action supprime définitivement :
-      </p>
-      <ul style="font-size:.85rem; color:var(--gray-600); padding-left:18px; margin-bottom:14px;">
-        <li>La ligne de traçabilité (scan_tracabilite)</li>
-        <li>Le scan lui-même (scans) et la photo associée</li>
-        <li>Les mouvements de stock liés (entrée, etc.)</li>
-      </ul>
-      <p style="font-size:.85rem; color:var(--red-dark); font-weight:600;">
-        Ne le fais que pour les doublons et les étiquettes illisibles inutiles.
-      </p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeDeleteConfirm()">Annuler</button>
-      <button class="btn btn-danger" onclick="confirmDeleteEtiquette()" id="btn-confirm-delete">🗑 Confirmer la suppression</button>
     </div>
   </div>
 </div>
@@ -598,41 +436,17 @@
     blLignes: [],
     editingScanId: null,
     editingTrac: null,
-    editingFromScreen: 'detail',       // 'detail' ou 'etiquettes' (pour savoir où revenir au save/delete)
-    editingInitialPoids: 0,            // poids initial avant édition (sync stock_mouvements)
-    editingInitialArticleId: null,     // article rattaché avant édition (sync stock_mouvements)
-    editingNewArticleId: null,         // nouvel article choisi dans le modal
-    signatures: [],                    // signatures du fournisseur courant
-    signaturesAll: [],                 // toutes les signatures (cache)
-    creatingSigForScan: null,
-    // Étiquettes (onglet 2)
-    currentTab: 'sessions',
-    etqFilterEtab: currentEtab,
-    etqDateFrom: null, etqDateTo: null,
-    etqPb: 'all',                      // all | probleme | sans_poids | sans_article | confiance_basse | dlc_dep
-    etqSearch: '',
-    etqRows: [],                       // [{trac, scan, session, article, thumbUrl}]
-    allArticles: [],                   // cache global articles pour autocomplete rattachement
   };
-  // Chip établissement par défaut (vue Sessions + vue Étiquettes)
+  // Chip établissement par défaut
   document.querySelectorAll('.chip[data-etab]').forEach(c => c.classList.toggle('active', c.dataset.etab === currentEtab));
-  document.querySelectorAll('.chip[data-etq-etab]').forEach(c => c.classList.toggle('active', c.dataset.etqEtab === currentEtab));
-  // Période par défaut
+  // Période par défaut : 30 derniers jours
   (function initDates() {
     const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
     const past = new Date(today.getTime() - 30 * 86400000);
-    const pastStr = past.toISOString().slice(0, 10);
-    // Vue Sessions : 30 derniers jours
-    document.getElementById('date-to').value = todayStr;
-    document.getElementById('date-from').value = pastStr;
-    State.dateFrom = pastStr;
-    State.dateTo = todayStr;
-    // Vue Étiquettes : aujourd'hui par défaut (demande utilisateur)
-    document.getElementById('etq-date-from').value = todayStr;
-    document.getElementById('etq-date-to').value = todayStr;
-    State.etqDateFrom = todayStr;
-    State.etqDateTo = todayStr;
+    document.getElementById('date-to').value = today.toISOString().slice(0, 10);
+    document.getElementById('date-from').value = past.toISOString().slice(0, 10);
+    State.dateFrom = past.toISOString().slice(0, 10);
+    State.dateTo = today.toISOString().slice(0, 10);
   })();
 
   // ====== UTILS ======
@@ -803,114 +617,11 @@
     `;
   }
 
-  // ====== SIGNATURES PRODUITS (matching auto) ======
-  function normalizeStr(s) {
-    if (!s) return '';
-    return String(s).toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '') // accents
-      .replace(/[^a-z0-9]+/g, ' ').trim();
-  }
-  function scoreSignature(scanData, sig) {
-    let s = 0;
-    const fournisScan = normalizeStr(scanData.fournisseur_session || scanData.fabricant);
-    const fournisSig = normalizeStr(sig.fournisseur_nom);
-    if (!fournisScan || !fournisSig) return 0;
-    // Match fournisseur : exact ou contient
-    if (fournisScan === fournisSig) s += 25;
-    else if (fournisScan.includes(fournisSig.split(' ')[0]) || fournisSig.includes(fournisScan.split(' ')[0])) s += 15;
-    else return 0; // pas même fournisseur, on n'évalue pas
-
-    // Couleur contenant
-    if (scanData.couleur_contenant && sig.couleur_contenant && scanData.couleur_contenant === sig.couleur_contenant) s += 35;
-    // Type contenant
-    if (scanData.type_contenant && sig.type_contenant && scanData.type_contenant === sig.type_contenant) s += 20;
-    // Taille apparente
-    if (scanData.taille_apparente && sig.taille_apparente && scanData.taille_apparente === sig.taille_apparente) s += 5;
-
-    // Mots-clés (chacun trouvé +5, max 25)
-    const txt = normalizeStr(scanData.produit) + ' ' + normalizeStr(scanData.fabricant);
-    let kwHits = 0;
-    (sig.mots_cles || []).forEach(kw => {
-      const kwn = normalizeStr(kw);
-      if (kwn && txt.includes(kwn)) kwHits++;
-    });
-    s += Math.min(25, kwHits * 5);
-
-    // Alias (si match exact sur une variante connue, gros boost)
-    const produitNorm = normalizeStr(scanData.produit);
-    const aliasMatch = (sig.alias || []).some(a => normalizeStr(a) === produitNorm);
-    if (aliasMatch) s += 30;
-
-    // Code article
-    if (scanData.code_article && sig.code_article_attendu && scanData.code_article === sig.code_article_attendu) s += 25;
-
-    // Poids attendu (tolérance 5%)
-    if (scanData.poids_net_kg && sig.poids_attendu_kg) {
-      const ecart = Math.abs(scanData.poids_net_kg - sig.poids_attendu_kg) / sig.poids_attendu_kg;
-      if (ecart < 0.05) s += 10;
-    }
-
-    return Math.min(100, s);
-  }
-  async function loadSignaturesForFournisseur(fournisseurNom) {
-    const fnorm = normalizeStr(fournisseurNom);
-    if (!fnorm) { State.signatures = []; return; }
-    // Stratégie large : on charge toutes les signatures actives, on filtre côté client
-    const { data, error } = await sb.from('produits_signatures')
-      .select('*').eq('actif', true);
-    if (error) { console.warn('signatures load err:', error.message); State.signatures = []; return; }
-    State.signatures = (data || []).filter(sig => {
-      const sn = normalizeStr(sig.fournisseur_nom);
-      return sn === fnorm || sn.includes(fnorm.split(' ')[0]) || fnorm.includes(sn.split(' ')[0]);
-    });
-  }
-  async function autoMatchScan(scanId) {
-    const item = State.currentScans[scanId];
-    if (!item || !item.trac || !State.signatures.length) return;
-    if (item.trac.signature_id) return; // déjà matché manuellement ou auto précédemment
-    const scanData = {
-      fournisseur_session: State.currentSession.fournisseur_nom,
-      fabricant: item.trac.fabricant,
-      produit: item.trac.produit,
-      code_article: item.trac.code_article,
-      poids_net_kg: item.trac.poids_net_kg ? parseFloat(item.trac.poids_net_kg) : null,
-      couleur_contenant: item.trac.couleur_contenant,
-      type_contenant: item.trac.type_contenant,
-      taille_apparente: item.trac.taille_apparente,
-    };
-    let best = { sig: null, score: 0 };
-    State.signatures.forEach(sig => {
-      const sc = scoreSignature(scanData, sig);
-      if (sc > best.score) best = { sig, score: sc };
-    });
-    if (best.sig && best.score >= 70 && item.trac.id) {
-      const { error } = await sb.from('scan_tracabilite').update({
-        signature_id: best.sig.id,
-        signature_score: best.score,
-        signature_at: new Date().toISOString(),
-      }).eq('id', item.trac.id);
-      if (!error) {
-        item.trac.signature_id = best.sig.id;
-        item.trac.signature_score = best.score;
-        item.trac.signature_obj = best.sig;
-        // incrémenter le compteur d'observations
-        await sb.from('produits_signatures').update({
-          nb_match_observes: (best.sig.nb_match_observes || 0) + 1,
-          derniere_obs_at: new Date().toISOString(),
-        }).eq('id', best.sig.id);
-      }
-    } else if (best.sig) {
-      // suggestion mais pas appliquée : on stocke en mémoire pour l'UI
-      item.trac.signature_suggestion = { sig: best.sig, score: best.score };
-    }
-  }
-
   // ====== DÉTAIL ======
   async function openDetail(sessionId) {
     showScreen('detail');
     $('detail-container').innerHTML = '<div class="full-loader"><div class="spinner"></div> Chargement du rapprochement…</div>';
     State.currentSession = null; State.currentScans = {}; State.blScan = null; State.blLignes = [];
-    State.signatures = [];
 
     // Session
     const { data: session, error: sErr } = await sb.from('scan_sessions').select('*').eq('id', sessionId).single();
@@ -920,27 +631,15 @@
     }
     State.currentSession = session;
 
-    // Scans (étiquettes + BL) + tracabilité — on demande aussi les signatures liées
+    // Scans (étiquettes + BL) + tracabilité
     const { data: scans } = await sb.from('scans')
-      .select('id, type_document, statut, storage_path, mime_type, claude_extraction_jsonb, claude_erreur_message, confiance_globale, scan_tracabilite(*, produits_signatures:signature_id(id, produit_canonique, couleur_contenant, type_contenant))')
+      .select('id, type_document, statut, storage_path, mime_type, claude_extraction_jsonb, claude_erreur_message, confiance_globale, scan_tracabilite(*)')
       .eq('session_id', sessionId);
     (scans || []).forEach(sc => {
       const trac = Array.isArray(sc.scan_tracabilite) ? sc.scan_tracabilite[0] : sc.scan_tracabilite;
-      if (trac && trac.produits_signatures) {
-        trac.signature_obj = trac.produits_signatures;
-      }
       State.currentScans[sc.id] = { scan: sc, trac };
       if (sc.type_document === 'bl_facture') State.blScan = sc;
     });
-
-    // Charger signatures du fournisseur de cette session
-    await loadSignaturesForFournisseur(session.fournisseur_nom);
-
-    // Auto-matcher les scans étiquettes pas encore matchés
-    const matchPromises = Object.keys(State.currentScans)
-      .filter(id => State.currentScans[id].scan.type_document === 'etiquette_produit')
-      .map(id => autoMatchScan(id));
-    await Promise.all(matchPromises);
 
     // Lignes BL
     if (session.bl_facture_scan_id) {
@@ -1083,30 +782,12 @@
       scan.statut === 'erreur' ? '🔴 Erreur DB' : null,
     ].filter(Boolean).join(' · ');
     const poids = trac?.poids_net_kg ? fmtKg(trac.poids_net_kg) : '<span style="color:var(--red);">poids ?</span>';
-
-    // Signature : badge si matchée, suggestion si proche, bouton créer sinon
-    let sigBlock = '';
-    if (trac?.signature_obj) {
-      const sig = trac.signature_obj;
-      sigBlock = `<div style="margin-top:4px; display:inline-flex; align-items:center; gap:4px; background:var(--green-bg); color:var(--green-dark); padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:600;" title="Score ${trac.signature_score || '?'}%">
-        ✅ ${escapeHtml(sig.produit_canonique)}${trac.signature_score ? ` <span style="opacity:.7;">${trac.signature_score}%</span>` : ''}
-      </div>`;
-    } else if (trac?.signature_suggestion) {
-      const sug = trac.signature_suggestion;
-      sigBlock = `<div style="margin-top:4px; display:inline-flex; align-items:center; gap:4px; background:var(--amber-bg); color:var(--amber); padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:600; cursor:pointer;" onclick="confirmSuggestion('${scan.id}')" title="Cliquer pour confirmer ce matching">
-        💡 ${escapeHtml(sug.sig.produit_canonique)} ? <span style="opacity:.7;">${sug.score}%</span>
-      </div>`;
-    } else if (trac && trac.id) {
-      sigBlock = `<div style="margin-top:4px;"><button class="btn btn-ghost btn-sm" style="padding:2px 8px; font-size:.72rem; color:var(--purple);" onclick="openCreateSig('${scan.id}')">🔖 Créer signature</button></div>`;
-    }
-
     return `
       <div class="etiquette-row">
         <div class="etiq-thumb" onclick="viewPhoto('${scan.id}')" title="Voir la photo">📷</div>
         <div class="etiq-info">
           <div class="nom">${nom}</div>
           <div class="meta">${meta || '<em style="color:var(--gray-400);">aucune métadonnée</em>'}</div>
-          ${sigBlock}
         </div>
         <div class="etiq-poids">${poids}</div>
         <div class="etiq-actions">
@@ -1114,117 +795,6 @@
         </div>
       </div>
     `;
-  }
-
-  // ====== SIGNATURES — création / confirmation ======
-  async function confirmSuggestion(scanId) {
-    const item = State.currentScans[scanId];
-    if (!item || !item.trac?.signature_suggestion) return;
-    const { sig, score } = item.trac.signature_suggestion;
-    const { error } = await sb.from('scan_tracabilite').update({
-      signature_id: sig.id, signature_score: score, signature_at: new Date().toISOString(),
-    }).eq('id', item.trac.id);
-    if (error) { showToast('Erreur : ' + error.message, 'error'); return; }
-    showToast('Signature confirmée : ' + sig.produit_canonique, 'success');
-    openDetail(State.currentSession.id);
-  }
-  function openCreateSig(scanId) {
-    const item = State.currentScans[scanId];
-    if (!item || !item.trac) return;
-    State.creatingSigForScan = scanId;
-    const t = item.trac;
-    const html = `
-      <div class="field-row">
-        <label>Fournisseur</label>
-        <input type="text" id="sig-fournisseur" value="${escapeHtml(State.currentSession.fournisseur_nom || t.fabricant || '')}">
-      </div>
-      <div class="field-row">
-        <label>Nom canonique du produit</label>
-        <input type="text" id="sig-produit" value="${escapeHtml(t.produit || '')}" placeholder="Ex : Choucroute crue artisanale">
-      </div>
-      <div class="field-row">
-        <div class="row">
-          <div>
-            <label>Poids attendu (kg)</label>
-            <input type="number" step="0.01" id="sig-poids" value="${t.poids_net_kg || ''}">
-          </div>
-          <div>
-            <label>Couleur contenant</label>
-            <select id="sig-couleur">
-              <option value="">—</option>
-              ${['bleu','blanc','transparent','vert','rouge','jaune','noir','marron','gris','orange','autre'].map(c => `<option value="${c}" ${t.couleur_contenant===c?'selected':''}>${c}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="row">
-          <div>
-            <label>Type contenant</label>
-            <select id="sig-type">
-              <option value="">—</option>
-              ${['seau','sachet_sous_vide','sachet_opaque','barquette','carton','bidon','bocal','sachet_kraft','caisse_plastique','autre'].map(c => `<option value="${c}" ${t.type_contenant===c?'selected':''}>${c.replace(/_/g,' ')}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label>Taille apparente</label>
-            <select id="sig-taille">
-              <option value="">—</option>
-              <option value="petit" ${t.taille_apparente==='petit'?'selected':''}>petit</option>
-              <option value="moyen" ${t.taille_apparente==='moyen'?'selected':''}>moyen</option>
-              <option value="grand" ${t.taille_apparente==='grand'?'selected':''}>grand</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <div class="field-row">
-        <label>Mots-clés à reconnaître (séparés par virgule)</label>
-        <input type="text" id="sig-motscles" placeholder="Ex : choucroute, choux, kraut">
-        <div class="hint">Mots à chercher dans le libellé Vision pour reconnaître ce produit (sans accents).</div>
-      </div>
-    `;
-    $('modal-edit-body').innerHTML = html;
-    $('modal-edit').querySelector('.modal-header h3').textContent = '🔖 Créer une signature produit';
-    $('btn-save-edit').textContent = 'Créer signature';
-    $('btn-save-edit').onclick = saveCreateSig;
-    $('btn-delete-edit').style.display = 'none';  // pas de delete en mode "créer signature"
-    $('modal-edit').classList.add('show');
-  }
-  async function saveCreateSig() {
-    const scanId = State.creatingSigForScan;
-    if (!scanId) return;
-    const fournisseur_nom = $('sig-fournisseur').value.trim();
-    const produit_canonique = $('sig-produit').value.trim();
-    if (!fournisseur_nom || !produit_canonique) { showToast('Fournisseur et produit obligatoires', 'error'); return; }
-    const motsCles = $('sig-motscles').value.split(',').map(x => x.trim()).filter(Boolean);
-    const item = State.currentScans[scanId];
-    const aliasInit = item?.trac?.produit ? [item.trac.produit] : [];
-    const btn = $('btn-save-edit'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Création…';
-    const { data: sig, error } = await sb.from('produits_signatures').insert({
-      fournisseur_nom, produit_canonique,
-      poids_attendu_kg: $('sig-poids').value ? parseFloat($('sig-poids').value) : null,
-      unite_attendue: 'kg',
-      couleur_contenant: $('sig-couleur').value || null,
-      type_contenant: $('sig-type').value || null,
-      taille_apparente: $('sig-taille').value || null,
-      mots_cles: motsCles,
-      alias: aliasInit,
-      created_by_id: currentUser.id,
-      created_by_nom: currentUser.nom,
-    }).select().single();
-    btn.disabled = false; btn.innerHTML = 'Enregistrer'; btn.onclick = saveEdit;
-    if (error) { showToast('Erreur : ' + error.message, 'error'); return; }
-    // Lier le scan courant
-    if (item?.trac?.id) {
-      await sb.from('scan_tracabilite').update({
-        signature_id: sig.id, signature_score: 100, signature_at: new Date().toISOString(),
-      }).eq('id', item.trac.id);
-    }
-    showToast('Signature créée : ' + sig.produit_canonique, 'success');
-    State.creatingSigForScan = null;
-    closeEdit();
-    $('modal-edit').querySelector('.modal-header h3').textContent = '🏷️ Édition étiquette';
-    openDetail(State.currentSession.id);
   }
 
   // ====== PHOTO VIEWER ======
@@ -1242,43 +812,17 @@
   }
 
   // ====== EDIT ÉTIQUETTE ======
-  async function openEdit(scanId, fromScreen) {
+  async function openEdit(scanId) {
+    const item = State.currentScans[scanId];
+    if (!item) return;
     State.editingScanId = scanId;
-    State.editingFromScreen = fromScreen || 'detail';
+    State.editingTrac = item.trac || {};
 
-    // Récupération du scan + trac :
-    // - si on vient de l'écran détail, on a déjà tout dans State.currentScans
-    // - si on vient de l'onglet étiquettes, on charge depuis la BDD
-    let scan = null, trac = null;
-    if (State.editingFromScreen === 'detail' && State.currentScans[scanId]) {
-      scan = State.currentScans[scanId].scan;
-      trac = State.currentScans[scanId].trac;
-    } else {
-      const found = State.etqRows.find(r => r.scan?.id === scanId);
-      if (found) { scan = found.scan; trac = found.trac; }
-      else {
-        // fallback : fetch direct
-        const { data: s } = await sb.from('scans')
-          .select('id, storage_path, statut, claude_erreur_message, scan_tracabilite(*)')
-          .eq('id', scanId).single();
-        if (s) {
-          scan = s;
-          trac = Array.isArray(s.scan_tracabilite) ? s.scan_tracabilite[0] : s.scan_tracabilite;
-        }
-      }
-    }
-    if (!scan) { showToast('Scan introuvable', 'error'); return; }
-    State.editingTrac = trac || {};
-    State.editingInitialPoids = Number(trac?.poids_net_kg || 0);
-    State.editingInitialArticleId = trac?.article_id || null;
-    State.editingNewArticleId = trac?.article_id || null;
-
-    // Photo
     let imgHtml = '';
-    if (scan.storage_path) {
-      const { data, error } = await sb.storage.from('scans').createSignedUrl(scan.storage_path, 600);
+    if (item.scan.storage_path) {
+      const { data, error } = await sb.storage.from('scans').createSignedUrl(item.scan.storage_path, 600);
       if (!error && data?.signedUrl) {
-        imgHtml = `<img src="${data.signedUrl}" class="modal-img" onclick="viewPhotoUrl('${data.signedUrl}')" alt="Étiquette">`;
+        imgHtml = `<img src="${data.signedUrl}" class="modal-img" onclick="viewPhoto('${scanId}')" alt="Étiquette">`;
       } else {
         imgHtml = `<div class="img-placeholder">⚠️ Photo introuvable</div>`;
       }
@@ -1286,49 +830,19 @@
       imgHtml = `<div class="img-placeholder">📷 Pas de photo enregistrée</div>`;
     }
 
-    const t = trac || {};
-    const errMsg = scan.statut === 'erreur' ? `<div class="resume-box" style="background:var(--red-bg); border-left-color:var(--red);"><span class="lbl">🔴 Erreur DB :</span>${escapeHtml(scan.claude_erreur_message || '')}</div>` : '';
-
-    // Article actuel
-    await loadArticlesIfNeeded();
-    const currentArticle = t.article_id ? State.allArticles.find(a => a.id === t.article_id) : null;
-    const currentArticleHtml = currentArticle
-      ? `<span class="article-current">📦 Actuellement : <strong>${escapeHtml(currentArticle.nom)}</strong> <span style="color:var(--gray-500);">(${escapeHtml(currentArticle.categorie || '')} · ${escapeHtml(currentArticle.unite || '')})</span></span>`
-      : `<span class="article-current" style="color:var(--red-dark);">⚠️ Aucun article rattaché — cette étiquette n'apparaît pas dans le stock</span>`;
-
-    // Footer en mode édition (bouton supprimer visible, save = saveEdit)
-    $('btn-delete-edit').style.display = '';
-    $('btn-save-edit').textContent = 'Enregistrer';
-    $('btn-save-edit').onclick = saveEdit;
-    $('modal-edit').querySelector('.modal-header h3').textContent = '🏷️ Édition étiquette';
+    const t = item.trac || {};
+    const errMsg = item.scan.statut === 'erreur' ? `<div class="resume-box" style="background:var(--red-bg); border-left-color:var(--red);"><span class="lbl">🔴 Erreur DB :</span>${escapeHtml(item.scan.claude_erreur_message || '')}</div>` : '';
 
     $('modal-edit-body').innerHTML = `
       ${imgHtml}
       ${errMsg}
-
-      <div class="article-search-block">
-        ${currentArticleHtml}
-        <input type="text" id="edit-article-search" class="article-search-input"
-               placeholder="🔍 Rechercher un autre article pour re-rattacher…"
-               oninput="renderArticleSearch()">
-        <div class="article-results" id="edit-article-results"></div>
-      </div>
-
       <div class="field-row">
-        <label>Produit (libellé étiquette)</label>
+        <label>Produit</label>
         <input type="text" id="edit-produit" value="${escapeHtml(t.produit || '')}" placeholder="Ex : Escalopes de poulet sous vide">
       </div>
       <div class="field-row">
-        <div class="row">
-          <div>
-            <label>Catégorie</label>
-            <input type="text" id="edit-categorie" value="${escapeHtml(t.categorie || '')}" placeholder="Ex : viande_porcine">
-          </div>
-          <div>
-            <label>Fabricant</label>
-            <input type="text" id="edit-fabricant" value="${escapeHtml(t.fabricant || '')}" placeholder="Ex : Iller SAS">
-          </div>
-        </div>
+        <label>Fabricant</label>
+        <input type="text" id="edit-fabricant" value="${escapeHtml(t.fabricant || '')}" placeholder="Ex : Distribution Iller">
       </div>
       <div class="field-row">
         <div class="row">
@@ -1353,57 +867,10 @@
             <input type="date" id="edit-ddm" value="${t.ddm || ''}">
           </div>
         </div>
-        <div class="hint">DLC = Date Limite de Consommation · DDM = Date de Durabilité Minimale</div>
-      </div>
-      <div class="field-row">
-        <div class="row">
-          <div>
-            <label>Agrément CE / estampille</label>
-            <input type="text" id="edit-estampille" value="${escapeHtml(t.estampille || '')}" placeholder="Ex : FR 67-300-003">
-          </div>
-          <div>
-            <label>Origine</label>
-            <input type="text" id="edit-origine" value="${escapeHtml(t.origine || '')}" placeholder="Ex : France">
-          </div>
-        </div>
-      </div>
-      <div class="field-row">
-        <label>Ingrédients</label>
-        <textarea id="edit-ingredients" rows="2" placeholder="Liste des ingrédients">${escapeHtml(t.ingredients || '')}</textarea>
+        <div class="hint">DLC = Date Limite de Consommation (frais) · DDM = Date de Durabilité Minimale (épicerie)</div>
       </div>
     `;
     $('modal-edit').classList.add('show');
-  }
-
-  function renderArticleSearch() {
-    const q = ($('edit-article-search').value || '').toLowerCase().trim();
-    const res = $('edit-article-results');
-    if (!q) { res.style.display = 'none'; res.innerHTML = ''; return; }
-    const matches = State.allArticles.filter(a => (a.nom || '').toLowerCase().includes(q)).slice(0, 10);
-    if (!matches.length) {
-      res.innerHTML = `<div class="article-result-row" style="color:var(--gray-500); font-style:italic;">Aucun article ne correspond</div>`;
-    } else {
-      res.innerHTML = matches.map(a => `
-        <div class="article-result-row" data-aid="${a.id}">
-          ${escapeHtml(a.nom)}
-          <div class="sub">${escapeHtml(a.categorie || '—')} · ${escapeHtml(a.unite || '—')} · ${escapeHtml(a.etablissement || '—')}</div>
-        </div>`).join('');
-      res.querySelectorAll('[data-aid]').forEach(el => {
-        el.addEventListener('click', () => {
-          const a = State.allArticles.find(x => x.id === el.dataset.aid);
-          if (!a) return;
-          State.editingNewArticleId = a.id;
-          $('edit-article-search').value = a.nom;
-          // Mettre à jour le label "Actuellement"
-          const cur = document.querySelector('.article-current');
-          if (cur) {
-            cur.innerHTML = `📦 Sera rattaché à : <strong style="color:var(--purple-dark);">${escapeHtml(a.nom)}</strong> <span style="color:var(--gray-500);">(${escapeHtml(a.categorie || '')} · ${escapeHtml(a.unite || '')})</span>`;
-          }
-          res.style.display = 'none';
-        });
-      });
-    }
-    res.style.display = 'block';
   }
   function closeEdit() {
     $('modal-edit').classList.remove('show');
@@ -1415,104 +882,36 @@
     const btn = $('btn-save-edit');
     btn.innerHTML = '<span class="spinner"></span> Enregistrement…'; btn.disabled = true;
 
-    const newPoidsRaw = $('edit-poids').value;
-    const newPoids = newPoidsRaw ? parseFloat(newPoidsRaw) : null;
-
     const updates = {
       produit: $('edit-produit').value.trim() || null,
-      categorie: $('edit-categorie').value.trim() || null,
       fabricant: $('edit-fabricant').value.trim() || null,
       lot: $('edit-lot').value.trim() || null,
-      poids_net_kg: newPoids,
+      poids_net_kg: $('edit-poids').value ? parseFloat($('edit-poids').value) : null,
       dlc: $('edit-dlc').value || null,
       ddm: $('edit-ddm').value || null,
-      estampille: $('edit-estampille').value.trim() || null,
-      origine: $('edit-origine').value.trim() || null,
-      ingredients: $('edit-ingredients').value.trim() || null,
     };
 
-    // Re-rattachement article (si modifié dans le modal)
-    const articleChanged = State.editingNewArticleId !== State.editingInitialArticleId;
-    if (articleChanged && State.editingNewArticleId) {
-      updates.article_id = State.editingNewArticleId;
-      updates.match_par_id = currentUser.id;
-      updates.match_par_nom = currentUser.nom;
-      updates.match_at = new Date().toISOString();
+    // Si pas encore d'enregistrement scan_tracabilite, INSERT, sinon UPDATE
+    const existing = State.editingTrac && State.editingTrac.id;
+    let res;
+    if (existing) {
+      res = await sb.from('scan_tracabilite').update(updates).eq('id', State.editingTrac.id);
+    } else {
+      res = await sb.from('scan_tracabilite').insert({ scan_id: scanId, ...updates, confiance: 100 });
     }
 
-    try {
-      // 1. UPDATE ou INSERT scan_tracabilite
-      const existing = State.editingTrac && State.editingTrac.id;
-      let tracId;
-      if (existing) {
-        const { error } = await sb.from('scan_tracabilite').update(updates).eq('id', existing);
-        if (error) throw error;
-        tracId = existing;
-      } else {
-        const { data, error } = await sb.from('scan_tracabilite')
-          .insert({ scan_id: scanId, ...updates, confiance: 100 }).select().single();
-        if (error) throw error;
-        tracId = data.id;
-      }
+    btn.innerHTML = 'Enregistrer'; btn.disabled = false;
+    if (res.error) { showToast('Erreur : ' + res.error.message, 'error'); return; }
 
-      // 2. Synchroniser stock_mouvements si poids OU article a changé
-      const poidsChanged = Math.abs((newPoids || 0) - (State.editingInitialPoids || 0)) > 0.001;
-      if (poidsChanged || articleChanged) {
-        // Cherche un mouvement ENTREE existant pour ce scan_tracabilite
-        const { data: movs } = await sb.from('stock_mouvements')
-          .select('*').eq('scan_tracabilite_id', tracId).eq('type', 'ENTREE');
-        const targetArticleId = State.editingNewArticleId || State.editingInitialArticleId;
-        if (movs && movs.length > 0) {
-          // UPDATE existant
-          const movPatch = { quantite: newPoids || 0 };
-          if (articleChanged && targetArticleId) movPatch.article_id = targetArticleId;
-          const { error: errMov } = await sb.from('stock_mouvements')
-            .update(movPatch).eq('id', movs[0].id);
-          if (errMov) console.warn('Sync ENTREE échoué:', errMov.message);
-        } else if (newPoids && targetArticleId) {
-          // INSERT (cas où aucun mouvement n'existait, ex: scan jamais rattaché auparavant)
-          const { data: scanRow } = await sb.from('scans').select('etablissement').eq('id', scanId).single();
-          await sb.from('stock_mouvements').insert({
-            type: 'ENTREE',
-            article_id: targetArticleId,
-            scan_tracabilite_id: tracId,
-            quantite: newPoids,
-            unite: 'kg',
-            etablissement: scanRow?.etablissement || State.editingTrac?.etablissement || currentEtab,
-            motif: 'Étiquette scannée',
-            source_table: 'scan_tracabilite',
-            source_id: tracId,
-            created_by_id: currentUser.id,
-            created_by_nom: currentUser.nom,
-            created_by_initiales: currentUser.initiales || null,
-          });
-        }
-      }
-
-      // 3. Si le scan était en erreur DB, on remet "valide"
-      const currentScanState = State.currentScans[scanId]?.scan;
-      if (currentScanState?.statut === 'erreur') {
-        await sb.from('scans').update({ statut: 'valide', claude_erreur_message: null }).eq('id', scanId);
-      }
-
-      let msg = '✓ Étiquette enregistrée';
-      if (poidsChanged && articleChanged) msg += ' (poids + article synchronisés en stock)';
-      else if (poidsChanged) msg += ` (entrée stock ajustée à ${(newPoids || 0).toFixed(3)} kg)`;
-      else if (articleChanged) msg += ' (article rattaché mis à jour)';
-      showToast(msg, 'success');
-      closeEdit();
-      // Refresh selon l'écran d'origine
-      if (State.editingFromScreen === 'etiquettes') {
-        reloadEtiquettes();
-      } else if (State.currentSession) {
-        openDetail(State.currentSession.id);
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('Erreur : ' + err.message, 'error');
-    } finally {
-      btn.innerHTML = 'Enregistrer'; btn.disabled = false;
+    // Si le scan était en erreur DB, on remet "valide"
+    if (State.currentScans[scanId].scan.statut === 'erreur') {
+      await sb.from('scans').update({ statut: 'valide', claude_erreur_message: null }).eq('id', scanId);
     }
+
+    showToast('Étiquette enregistrée. Pense à relancer le rapprochement.', 'success');
+    closeEdit();
+    // Refresh détail
+    openDetail(State.currentSession.id);
   }
 
   // ====== RE-RAPPROCHEMENT ======
@@ -1575,324 +974,6 @@
     showToast(`Session validée par ${adm.nom}`, 'success');
     closeValidate();
     openDetail(State.currentSession.id);
-  }
-
-  // ====== SUPPRESSION ÉTIQUETTE ======
-  function deleteEtiquette() {
-    if (!State.editingScanId) return;
-    $('modal-delete-confirm').classList.add('show');
-  }
-  function closeDeleteConfirm() {
-    $('modal-delete-confirm').classList.remove('show');
-  }
-  async function confirmDeleteEtiquette() {
-    const scanId = State.editingScanId;
-    if (!scanId) return;
-    const btn = $('btn-confirm-delete');
-    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Suppression…';
-    try {
-      // 1. Récupérer le scan_tracabilite (pour storage_path et scan_tracabilite_id)
-      const tracId = State.editingTrac?.id;
-      // 2. Supprimer les mouvements de stock liés
-      if (tracId) {
-        await sb.from('stock_mouvements').delete().eq('scan_tracabilite_id', tracId);
-      }
-      // 3. Supprimer la ligne scan_tracabilite
-      if (tracId) {
-        await sb.from('scan_tracabilite').delete().eq('id', tracId);
-      }
-      // 4. Récupérer storage_path puis supprimer le fichier Storage
-      const { data: scanRow } = await sb.from('scans').select('storage_path').eq('id', scanId).single();
-      if (scanRow?.storage_path) {
-        await sb.storage.from('scans').remove([scanRow.storage_path]);
-      }
-      // 5. Supprimer le scan
-      const { error } = await sb.from('scans').delete().eq('id', scanId);
-      if (error) throw error;
-      showToast('🗑 Étiquette supprimée', 'success');
-      closeDeleteConfirm();
-      closeEdit();
-      // Refresh selon l'écran d'origine
-      if (State.editingFromScreen === 'etiquettes') {
-        reloadEtiquettes();
-      } else if (State.currentSession) {
-        openDetail(State.currentSession.id);
-      }
-    } catch (e) {
-      console.error(e);
-      showToast('Erreur : ' + e.message, 'error');
-    } finally {
-      btn.disabled = false; btn.innerHTML = '🗑 Confirmer la suppression';
-    }
-  }
-
-  // ====== ARTICLES (cache + autocomplete) ======
-  async function loadArticlesIfNeeded() {
-    if (State.allArticles.length > 0) return;
-    // Articles distincts depuis stock_par_lot (référentiel actuel)
-    const { data, error } = await sb.from('stock_par_lot')
-      .select('article_id, article_nom, article_categorie, article_unite, etablissement')
-      .limit(2000);
-    if (error) { console.warn('Articles load err:', error.message); return; }
-    // Déduplication par article_id
-    const seen = new Set();
-    State.allArticles = (data || []).filter(r => {
-      if (!r.article_id || seen.has(r.article_id)) return false;
-      seen.add(r.article_id);
-      return true;
-    }).map(r => ({
-      id: r.article_id, nom: r.article_nom,
-      categorie: r.article_categorie, unite: r.article_unite,
-      etablissement: r.etablissement,
-    })).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-  }
-
-  // ====== ONGLET ÉTIQUETTES ======
-  function switchTab(tab) {
-    State.currentTab = tab;
-    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-    if (tab === 'sessions') {
-      showScreen('list');
-    } else if (tab === 'etiquettes') {
-      showScreen('etiquettes');
-      reloadEtiquettes();
-      loadArticlesIfNeeded();
-    }
-  }
-  function setEtqFilterEtab(e) {
-    State.etqFilterEtab = e;
-    document.querySelectorAll('.chip[data-etq-etab]').forEach(c => c.classList.toggle('active', c.dataset.etqEtab === e));
-    reloadEtiquettes();
-  }
-  function setEtqDateToday() {
-    const today = new Date().toISOString().slice(0, 10);
-    $('etq-date-from').value = today;
-    $('etq-date-to').value = today;
-    reloadEtiquettes();
-  }
-  function setEtqPb(v) {
-    State.etqPb = v;
-    document.querySelectorAll('.chip[data-etq-pb]').forEach(c => c.classList.toggle('active', c.dataset.etqPb === v));
-    renderEtiquettes();
-  }
-
-  async function reloadEtiquettes() {
-    const from = $('etq-date-from').value;
-    const to = $('etq-date-to').value;
-    State.etqDateFrom = from; State.etqDateTo = to;
-    $('etq-list-container').innerHTML = '<div class="full-loader"><div class="spinner"></div> Chargement des étiquettes…</div>';
-
-    // Bornes timestamp pour scans (créés entre 00:00:00 from et 23:59:59 to en UTC souple)
-    const fromTs = from + 'T00:00:00';
-    const toTs = to + 'T23:59:59';
-
-    // Stratégie en 2 requêtes : on évite l'embed imbriqué scans→scan_sessions
-    // qui plante avec 'more than one relationship' (FK ambigu : session_id vs bl_facture_scan_id)
-    let q = sb.from('scan_tracabilite')
-      .select(`
-        *,
-        scans!inner(id, etablissement, statut, storage_path, mime_type, confiance_globale, claude_extraction_jsonb, created_at, created_by_nom, session_id, type_document)
-      `)
-      .gte('scans.created_at', fromTs)
-      .lte('scans.created_at', toTs)
-      .order('created_at', { ascending: false, foreignTable: 'scans' });
-
-    if (State.etqFilterEtab !== 'all') {
-      q = q.eq('scans.etablissement', State.etqFilterEtab);
-    }
-    // On limite aux étiquettes produit
-    q = q.eq('scans.type_document', 'etiquette_produit');
-
-    const { data, error } = await q;
-    if (error) {
-      $('etq-list-container').innerHTML = `<div class="empty"><div class="icon">❌</div><div class="text">Erreur : ${escapeHtml(error.message)}</div></div>`;
-      return;
-    }
-
-    // 2e requête : récupérer les sessions associées en une fois
-    const sessionIds = [...new Set((data || []).map(t => t.scans?.session_id).filter(Boolean))];
-    const sessionsById = {};
-    if (sessionIds.length > 0) {
-      const { data: sessions } = await sb.from('scan_sessions')
-        .select('id, fournisseur_nom, date_reception')
-        .in('id', sessionIds);
-      (sessions || []).forEach(s => { sessionsById[s.id] = s; });
-    }
-
-    // Rattacher les noms d'articles via cache (chargé en parallèle)
-    await loadArticlesIfNeeded();
-    const articleById = {};
-    State.allArticles.forEach(a => { articleById[a.id] = a; });
-
-    State.etqRows = (data || []).map(t => ({
-      trac: t,
-      scan: t.scans,
-      session: t.scans?.session_id ? sessionsById[t.scans.session_id] || null : null,
-      article: t.article_id ? articleById[t.article_id] : null,
-      thumbUrl: null, // chargée à la demande
-    }));
-
-    // Compteur onglet
-    $('tab-etq-count').textContent = State.etqRows.length;
-
-    renderEtiquettes();
-    // Précharger les thumbnails de façon asynchrone (signed URLs en batch)
-    preloadThumbs();
-  }
-
-  async function preloadThumbs() {
-    // Limiter pour ne pas exploser : seulement les 60 premiers (page courante)
-    const subset = State.etqRows.slice(0, 60).filter(r => r.scan?.storage_path && !r.thumbUrl);
-    const promises = subset.map(async (r, idx) => {
-      try {
-        const { data } = await sb.storage.from('scans').createSignedUrl(r.scan.storage_path, 600);
-        if (data?.signedUrl) {
-          r.thumbUrl = data.signedUrl;
-          const imgEl = document.querySelector(`[data-thumb-trac="${r.trac.id}"]`);
-          if (imgEl) {
-            imgEl.outerHTML = `<img src="${data.signedUrl}" class="etq-thumb-cell" alt="" onclick="event.stopPropagation(); viewPhotoUrl('${data.signedUrl}')">`;
-          }
-        }
-      } catch {}
-    });
-    await Promise.all(promises);
-  }
-
-  function viewPhotoUrl(url) {
-    $('viewer-img').src = url;
-    $('modal-viewer').classList.add('show');
-  }
-
-  function classifyEtq(row) {
-    // Pour les filtres et le tri par priorité de problème
-    const t = row.trac, s = row.scan;
-    const sansPoids = !t.poids_net_kg || Number(t.poids_net_kg) <= 0;
-    const sansArticle = !t.article_id;
-    const confBasse = (s?.confiance_globale != null) && Number(s.confiance_globale) < 70;
-    const today = new Date().toISOString().slice(0, 10);
-    const dlcDep = t.dlc && t.dlc < today;
-    return { sansPoids, sansArticle, confBasse, dlcDep,
-      hasProbleme: sansPoids || sansArticle || confBasse };
-  }
-
-  function renderEtiquettes() {
-    const search = ($('etq-search').value || '').toLowerCase().trim();
-    State.etqSearch = search;
-
-    // Filtrage problème
-    let rows = State.etqRows.slice();
-    if (State.etqPb !== 'all') {
-      rows = rows.filter(r => {
-        const c = classifyEtq(r);
-        if (State.etqPb === 'probleme') return c.hasProbleme;
-        if (State.etqPb === 'sans_poids') return c.sansPoids;
-        if (State.etqPb === 'sans_article') return c.sansArticle;
-        if (State.etqPb === 'confiance_basse') return c.confBasse;
-        if (State.etqPb === 'dlc_dep') return c.dlcDep;
-        return true;
-      });
-    }
-    // Recherche
-    if (search) {
-      rows = rows.filter(r => {
-        const txt = [r.trac.produit, r.trac.lot, r.trac.fabricant, r.session?.fournisseur_nom, r.article?.nom]
-          .filter(Boolean).join(' ').toLowerCase();
-        return txt.includes(search);
-      });
-    }
-    // Tri : problèmes en haut, puis date desc
-    rows.sort((a, b) => {
-      const ca = classifyEtq(a), cb = classifyEtq(b);
-      const pa = (ca.sansArticle ? 4 : 0) + (ca.sansPoids ? 2 : 0) + (ca.confBasse ? 1 : 0);
-      const pb = (cb.sansArticle ? 4 : 0) + (cb.sansPoids ? 2 : 0) + (cb.confBasse ? 1 : 0);
-      if (pa !== pb) return pb - pa; // priorité élevée d'abord
-      // sinon date scan desc
-      const da = new Date(a.scan?.created_at || 0).getTime();
-      const db = new Date(b.scan?.created_at || 0).getTime();
-      return db - da;
-    });
-
-    // Stats
-    const stats = { total: State.etqRows.length, sansPoids: 0, sansArticle: 0, confBasse: 0, dlcDep: 0 };
-    State.etqRows.forEach(r => {
-      const c = classifyEtq(r);
-      if (c.sansPoids) stats.sansPoids++;
-      if (c.sansArticle) stats.sansArticle++;
-      if (c.confBasse) stats.confBasse++;
-      if (c.dlcDep) stats.dlcDep++;
-    });
-    $('etq-stats-row').innerHTML = `
-      <div class="stat-card"><div class="number">${stats.total}</div><div class="label">Étiquettes</div></div>
-      <div class="stat-card red"><div class="number">${stats.sansPoids}</div><div class="label">⚖️ Sans poids</div></div>
-      <div class="stat-card red"><div class="number">${stats.sansArticle}</div><div class="label">🔗 Sans article</div></div>
-      <div class="stat-card amber"><div class="number">${stats.confBasse}</div><div class="label">🤖 Confiance &lt;70</div></div>
-      <div class="stat-card red"><div class="number">${stats.dlcDep}</div><div class="label">📅 DLC dépassée</div></div>
-    `;
-
-    if (rows.length === 0) {
-      $('etq-list-container').innerHTML = `<div class="empty"><div class="icon">📭</div><div class="text">Aucune étiquette pour ces filtres</div></div>`;
-      return;
-    }
-
-    const html = rows.map(r => {
-      const t = r.trac, s = r.scan;
-      const c = classifyEtq(r);
-      const nom = t.produit ? escapeHtml(t.produit) : '<span class="em">(non lu)</span>';
-      const sub = [
-        t.lot ? `Lot ${escapeHtml(t.lot)}` : null,
-        t.dlc ? `DLC ${fmtDate(t.dlc)}${c.dlcDep ? ' ⚠️' : ''}` : null,
-        t.fabricant ? escapeHtml(t.fabricant) : null,
-      ].filter(Boolean).join(' · ');
-      const articleHtml = r.article
-        ? `<div class="etq-article">→ ${escapeHtml(r.article.nom)}</div>`
-        : `<div class="etq-article missing">→ non rattaché</div>`;
-      const confVal = s?.confiance_globale ?? null;
-      const confCls = confVal == null ? 'low' : (confVal >= 80 ? 'high' : (confVal >= 60 ? 'mid' : 'low'));
-      const confTxt = confVal == null ? '—' : `${confVal}%`;
-      const poidsHtml = t.poids_net_kg
-        ? `<span>${Number(t.poids_net_kg).toFixed(3)} kg</span>`
-        : `<span class="missing">poids ?</span>`;
-      // Miniature : placeholder qu'on remplace au preload
-      const thumbHtml = r.thumbUrl
-        ? `<img src="${r.thumbUrl}" class="etq-thumb-cell" alt="" onclick="event.stopPropagation(); viewPhotoUrl('${r.thumbUrl}')">`
-        : `<div class="etq-thumb-placeholder" data-thumb-trac="${t.id}">📷</div>`;
-      const sessionInfo = r.session
-        ? `${escapeHtml(r.session.fournisseur_nom || '—')} · ${fmtDate(r.session.date_reception)}`
-        : 'Scan unitaire';
-      const heure = s?.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
-      return `
-        <tr class="etq-row" onclick="openEdit('${s.id}', 'etiquettes')">
-          <td>${thumbHtml}</td>
-          <td>
-            <div class="etq-prod">${nom}</div>
-            <div class="etq-sub">${sub || '<em style="color:var(--gray-400);">aucune métadonnée</em>'}</div>
-            ${articleHtml}
-          </td>
-          <td class="col-hide-mobile" style="font-size:.78rem; color:var(--gray-500);">
-            ${escapeHtml(sessionInfo)}<br>${heure}
-          </td>
-          <td class="etq-poids-cell ${c.sansPoids ? 'missing' : ''}">${poidsHtml}</td>
-          <td><span class="etq-conf ${confCls}">${confTxt}</span></td>
-          <td style="text-align:right;">✏️</td>
-        </tr>
-      `;
-    }).join('');
-
-    $('etq-list-container').innerHTML = `
-      <div class="etq-table-wrap">
-        <table>
-          <thead><tr>
-            <th style="width:60px;">Photo</th>
-            <th>Produit · Lot · Article</th>
-            <th class="col-hide-mobile">Session · Heure</th>
-            <th style="text-align:right;">Poids</th>
-            <th>Conf.</th>
-            <th></th>
-          </tr></thead>
-          <tbody>${html}</tbody>
-        </table>
-      </div>
-    `;
   }
 
   // ====== INIT ======
