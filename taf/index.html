@@ -1989,25 +1989,39 @@
       const task = tasks.find(t => t.id === id);
       if (!task || task.fait_par_id || task.date_debut_execution) return;
       const nowISO = new Date().toISOString();
-      // Mise à jour optimiste en local pour un retour visuel immédiat
-      task.date_debut_execution = nowISO;
-      task.debut_par_id = currentUser.id;
-      task.debut_par_initiales = currentUser.initiales;
-      task.duree_accumulee_secondes = task.duree_accumulee_secondes || 0;
-      renderFiltered();
-      await DB.updateTask(id, {
-        date_debut_execution: nowISO,
-        debut_par_id: currentUser.id,
-        debut_par_initiales: currentUser.initiales,
-        duree_accumulee_secondes: task.duree_accumulee_secondes
-      });
-      showToast('Chrono démarré ⏱', 'success');
+      // Phase 5 : si la tâche est production + fiche avec ingrédients principaux,
+      // on N'EXÉCUTE PAS le démarrage chrono ici — on laisse openFicheConsultModal
+      // décider (mode obligatoire = bouton Démarrer dans la modale).
+      let chronoDemareDici = true;
+      if (task.is_production && task.fiche_id) {
+        // On déclenche le chrono uniquement si la fiche n'a pas d'ingrédient principal.
+        // openFicheConsultModal vérifie ça et appelle reallyStartChrono(taskId) si besoin.
+        chronoDemareDici = false;
+      }
+
+      if (chronoDemareDici) {
+        // Mise à jour optimiste en local pour un retour visuel immédiat
+        task.date_debut_execution = nowISO;
+        task.debut_par_id = currentUser.id;
+        task.debut_par_initiales = currentUser.initiales;
+        task.duree_accumulee_secondes = task.duree_accumulee_secondes || 0;
+        renderFiltered();
+        await DB.updateTask(id, {
+          date_debut_execution: nowISO,
+          debut_par_id: currentUser.id,
+          debut_par_initiales: currentUser.initiales,
+          duree_accumulee_secondes: task.duree_accumulee_secondes
+        });
+        showToast('Chrono démarré ⏱', 'success');
+      }
 
       // === Affichage fiche technique pour les TAF de production ===
+      // Phase 5 : si la fiche a des ingrédients principaux, on bloque le démarrage
+      //           du chrono tant qu'ils ne sont pas scannés (mode obligatoire).
       if (task.is_production) {
         if (task.fiche_id) {
           window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: task.tache };
-          openFicheConsultModal(task.fiche_id, task.tache);
+          openFicheConsultModal(task.fiche_id, task.tache, { fromStart: true });
         } else {
           showToast('⚠ Fiche à créer pour cette tâche', 'error');
         }
@@ -2025,7 +2039,7 @@
   // récupère ses ingrédients, puis affiche la modale plein écran.
   // L'utilisateur peut la réduire (bouton ▾) → la fiche reste accessible
   // via un bandeau au pied d'écran tant que la session de cuisine dure.
-  async function openFicheConsultModal(ficheId, taskName) {
+  async function openFicheConsultModal(ficheId, taskName, opts = {}) {
     if (!ficheId) return;
     try {
       // Cache fiches
@@ -2044,7 +2058,7 @@
         .order('ordre');
       if (error) throw error;
 
-      renderFiche(fiche, ings || [], taskName);
+      renderFiche(fiche, ings || [], taskName, opts);
       // Affichage plein écran
       document.getElementById('fiche-overlay').classList.remove('minimized');
       document.getElementById('fiche-overlay').classList.add('show');
@@ -2058,7 +2072,7 @@
   }
 
   // Construit le HTML de la fiche : meta + ingrédients + instructions
-  function renderFiche(fiche, ings, taskName) {
+  function renderFiche(fiche, ings, taskName, opts = {}) {
     const title = `📖 ${esc(fiche.nom)}`;
     document.getElementById('fiche-title').textContent = title;
 
@@ -2086,19 +2100,44 @@
     }
     const metaHTML = metaItems.length ? `<div class="fiche-meta">${metaItems.join('')}</div>` : '';
 
-    // Ingrédients principaux à scanner (Scan-FEFO Phase 3)
+    // Ingrédients principaux à scanner (Scan-FEFO Phase 5 — mode obligatoire)
     const principaux = ings.filter(i => i.est_principal);
+    const obligatoire = opts.fromStart === true;
+    const taskId = window.__currentTafContext?.task_id;
+    const pending = taskId ? getPendingScans(taskId) : {};
     let scanHTML = '';
     if (principaux.length > 0) {
+      const allScanned = principaux.every(i => pending[i.id]);
       scanHTML = `
-        <h3 style="color:#92400e">🎯 Ingrédients à scanner</h3>
+        <h3 style="color:#92400e">🎯 Ingrédients à scanner ${obligatoire ? '<span style="font-size:0.75rem;color:#dc2626;font-weight:400">(obligatoire)</span>' : ''}</h3>
         <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
-          ${principaux.map(i => `
-            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
+          ${principaux.map(i => {
+            const sc = pending[i.id];
+            if (sc) {
+              const dlcStr = sc.dlc ? new Date(sc.dlc).toLocaleDateString('fr-FR') : '?';
+              return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#dcfce7; border:1px solid #86efac; border-radius:8px;">
+                <span style="font-size:1.3rem; line-height:1">✓</span>
+                <span style="flex:1; color:#15803d; font-size:0.85rem;"><strong>${esc(i.nom)}</strong><br><span style="font-size:0.75rem; color:#166534;">${esc(sc.produit || '?')} · lot ${esc(sc.lot || '?')} · DLC ${dlcStr}</span></span>
+                <button onclick="rescanIngredient('${i.id}', ${i.article_id ? `'${i.article_id}'` : 'null'}, '${esc(i.nom).replace(/'/g, '\\\'')}')" style="font-size:0.72rem; padding:5px 9px; background:white; border:1px solid #86efac; border-radius:4px; color:#15803d; cursor:pointer;">↻</button>
+              </div>`;
+            }
+            return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
               <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
               <button class="btn-action" style="background:#7c3aed; color:white; padding:8px 14px; font-size:0.85rem;" onclick="openScannerForIngredient('${i.id}', ${i.article_id ? `'${i.article_id}'` : 'null'}, '${esc(i.nom).replace(/'/g, '\\\'')}')">📷 Scanner</button>
-            </div>`).join('')}
-        </div>`;
+            </div>`;
+          }).join('')}
+        </div>
+        ${obligatoire && allScanned ? `
+          <button onclick="confirmStartChronoFromScan('${taskId}')" style="width:100%; background:#16a34a; color:white; padding:14px; font-size:1rem; font-weight:700; border:none; border-radius:8px; margin-bottom:14px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,.1);">▶ Démarrer le chrono</button>
+        ` : obligatoire ? `
+          <div style="background:#fef3c7; border:1px solid #fcd34d; padding:10px 14px; border-radius:6px; margin-bottom:14px; font-size:0.85rem; color:#92400e;">
+            ⚠ Scanne tous les ingrédients principaux pour pouvoir démarrer le chrono.
+          </div>
+        ` : ''}`;
+    } else if (obligatoire) {
+      // Pas d'ingrédient principal mais fiche présente : on peut démarrer direct
+      scanHTML = `
+        <button onclick="confirmStartChronoFromScan('${taskId}')" style="width:100%; background:#16a34a; color:white; padding:14px; font-size:1rem; font-weight:700; border:none; border-radius:8px; margin-bottom:14px; cursor:pointer;">▶ Démarrer le chrono (pas d'ingrédient à scanner)</button>`;
     }
 
     // Ingrédients (liste complète)
