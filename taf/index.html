@@ -2073,6 +2073,9 @@
 
   // Construit le HTML de la fiche : meta + ingrédients + instructions
   function renderFiche(fiche, ings, taskName, opts = {}) {
+    // Stocker pour que openScannerForIngredient/rescanIngredient retrouvent les infos
+    window.__currentFicheIngs = ings;
+    window.__currentFiche = fiche;
     const title = `📖 ${esc(fiche.nom)}`;
     document.getElementById('fiche-title').textContent = title;
 
@@ -2118,12 +2121,12 @@
               return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#dcfce7; border:1px solid #86efac; border-radius:8px;">
                 <span style="font-size:1.3rem; line-height:1">✓</span>
                 <span style="flex:1; color:#15803d; font-size:0.85rem;"><strong>${esc(i.nom)}</strong><br><span style="font-size:0.75rem; color:#166534;">${esc(sc.produit || '?')} · lot ${esc(sc.lot || '?')} · DLC ${dlcStr}</span></span>
-                <button onclick="rescanIngredient('${i.id}', ${i.article_id ? `'${i.article_id}'` : 'null'}, '${esc(i.nom).replace(/'/g, '\\\'')}')" style="font-size:0.72rem; padding:5px 9px; background:white; border:1px solid #86efac; border-radius:4px; color:#15803d; cursor:pointer;">↻</button>
+                <button onclick="rescanIngredient('${i.id}')" style="font-size:0.72rem; padding:5px 9px; background:white; border:1px solid #86efac; border-radius:4px; color:#15803d; cursor:pointer;">↻</button>
               </div>`;
             }
             return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
               <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
-              <button class="btn-action" style="background:#7c3aed; color:white; padding:8px 14px; font-size:0.85rem;" onclick="openScannerForIngredient('${i.id}', ${i.article_id ? `'${i.article_id}'` : 'null'}, '${esc(i.nom).replace(/'/g, '\\\'')}')">📷 Scanner</button>
+              <button class="btn-action" style="background:#7c3aed; color:white; padding:8px 14px; font-size:0.85rem;" onclick="openScannerForIngredient('${i.id}')">📷 Scanner</button>
             </div>`;
           }).join('')}
         </div>
@@ -2191,12 +2194,17 @@
   }
 
   // ====== SCAN-FEFO Phase 3 — Lancement scanner + retour ======
-  function openScannerForIngredient(ingredientId, articleId, nomIngredient) {
+  function openScannerForIngredient(ingredientId) {
     const ctx = window.__currentTafContext || {};
     if (!ctx.task_id) {
       showToast('Erreur : contexte TAF perdu', 'error');
       return;
     }
+    // Récupérer article_id et nom depuis les ings stockés en mémoire
+    const ings = window.__currentFicheIngs || [];
+    const ing = ings.find(i => i.id === ingredientId);
+    const articleId = ing?.article_id || null;
+    const nomIngredient = ing?.nom || '';
     // Stocker le contexte pour le retour (TAF lira ça quand le scanner redirigera)
     localStorage.setItem('scan_fefo_context', JSON.stringify({
       task_id: ctx.task_id,
