@@ -627,6 +627,50 @@
       font-size: 1.1rem; font-weight: 700; line-height: 1;
     }
 
+
+    /* ====== Scan-FEFO : animation message d'attente + bouton scanner ====== */
+    @keyframes pulse-warning {
+      0%, 100% {
+        background: #fef3c7;
+        border-color: #fcd34d;
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+      }
+      50% {
+        background: #fde68a;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+      }
+    }
+    .scan-warning-pulse {
+      animation: pulse-warning 1.5s ease-in-out infinite;
+    }
+    .btn-scan-camera {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: #7c3aed;
+      color: white;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem;
+      line-height: 1.1;
+      box-shadow: 0 2px 4px rgba(124, 58, 237, 0.3);
+      transition: all .15s;
+    }
+    .btn-scan-camera:hover, .btn-scan-camera:active {
+      background: #6d28d9;
+      transform: scale(.97);
+    }
+    .btn-scan-camera .scan-cam-emoji {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
     /* ====== FICHE TECHNIQUE — modale consultation au démarrage TAF ====== */
     .fiche-overlay {
       display: none; position: fixed; inset: 0; z-index: 240;
@@ -2126,14 +2170,14 @@
             }
             return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
               <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
-              <button class="btn-action" style="background:#7c3aed; color:white; padding:8px 14px; font-size:0.85rem;" onclick="openScannerForIngredient('${i.id}')">📷 Scanner</button>
+              <button class="btn-scan-camera" onclick="openScannerForIngredient('${i.id}')"><span class="scan-cam-emoji">📷</span><span>Scanner</span></button>
             </div>`;
           }).join('')}
         </div>
         ${obligatoire && allScanned ? `
           <button onclick="confirmStartChronoFromScan('${taskId}')" style="width:100%; background:#16a34a; color:white; padding:14px; font-size:1rem; font-weight:700; border:none; border-radius:8px; margin-bottom:14px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,.1);">▶ Démarrer le chrono</button>
         ` : obligatoire ? `
-          <div style="background:#fef3c7; border:1px solid #fcd34d; padding:10px 14px; border-radius:6px; margin-bottom:14px; font-size:0.85rem; color:#92400e;">
+          <div class="scan-warning-pulse" style="background:#fef3c7; border:1px solid #fcd34d; padding:10px 14px; border-radius:6px; margin-bottom:14px; font-size:0.85rem; color:#92400e; font-weight:600;">
             ⚠ Scanne tous les ingrédients principaux pour pouvoir démarrer le chrono.
           </div>
         ` : ''}`;
