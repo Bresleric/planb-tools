@@ -4824,6 +4824,63 @@ init();
     patchHeader();
   }
 })();
+
+  // ====== SCAN-FEFO/TAF-LABEL : auto-ouverture étiquette ======
+  // Si on arrive depuis /taf/ après validation d'une production avec
+  // ?prod_id=xxx&action=etiquette, on ouvre directement showEtiquette
+  // pour la production fraîchement créée.
+  (async function autoOpenEtiquetteFromTaf() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const prodId = urlParams.get('prod_id');
+    const action = urlParams.get('action');
+    const ret = urlParams.get('return');
+    if (!prodId || action !== 'etiquette') return;
+
+    // Attendre que sb (supabase) soit défini + données prêtes (polling max 5s)
+    let tries = 0;
+    while (tries < 25 && (typeof sb === 'undefined' || !sb)) {
+      await new Promise(r => setTimeout(r, 200));
+      tries++;
+    }
+    if (typeof sb === 'undefined' || !sb) {
+      console.warn('[TAF-LABEL] supabase non chargé');
+      return;
+    }
+    // Petite pause pour laisser allLots se charger si possible
+    await new Promise(r => setTimeout(r, 400));
+    try {
+      const { data: prod, error } = await sb.from('productions').select('*').eq('id', prodId).single();
+      if (error || !prod) {
+        console.warn('[TAF-LABEL] production introuvable', prodId, error);
+        return;
+      }
+      if (typeof showEtiquette === 'function') {
+        showEtiquette(prod);
+      } else {
+        console.warn('[TAF-LABEL] showEtiquette() non disponible');
+      }
+      // Bouton retour TAF en haut de la modale étiquette
+      if (ret === 'taf') {
+        setTimeout(() => {
+          const eti = document.getElementById('etiquette');
+          if (eti) {
+            const headerBar = eti.querySelector('.etiquette-header-bar');
+            if (headerBar && !document.getElementById('btn-back-taf')) {
+              const btn = document.createElement('button');
+              btn.id = 'btn-back-taf';
+              btn.textContent = '← TAF';
+              btn.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;';
+              btn.onclick = () => { window.location.href = '../taf/'; };
+              eti.querySelector('.etiquette-card').style.position = 'relative';
+              eti.querySelector('.etiquette-card').appendChild(btn);
+            }
+          }
+        }, 200);
+      }
+    } catch (e) {
+      console.error('[TAF-LABEL] erreur', e);
+    }
+  })();
 </script>
 
 </body>

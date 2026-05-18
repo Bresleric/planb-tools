@@ -4130,10 +4130,12 @@
       closeProductionModal();
       tasks = await DB.getTasks(filterDate);
       renderFiltered();
-      showToast('Production enregistrée ✓', 'success');
+      showToast('Production enregistrée ✓ — ouverture étiquette…', 'success');
 
-      // Afficher l'étiquette
-      showEtiquetteTaf(saved, lot);
+      // Navigation auto vers le module Production pour éditer l'étiquette
+      setTimeout(() => {
+        window.location.href = `../production/?prod_id=${saved.id}&action=etiquette&return=taf`;
+      }, 400);
     } catch (e) {
       console.error(e);
       showToast('Erreur: ' + e.message, 'error');
