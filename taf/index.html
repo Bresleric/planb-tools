@@ -2170,8 +2170,15 @@
     if (principaux.length > 0) {
       const allScanned = principaux.every(i => getScanForIng(i));
       const nbScannes = principaux.filter(i => getScanForIng(i)).length;
+      const nonScannes = principaux.filter(i => !getScanForIng(i));
+      window.__principauxNonScannes = nonScannes.map(i => i.id);
       scanHTML = `
         <h3 style="color:#92400e">🎯 Étiquettes ingrédients (${nbScannes}/${principaux.length} scannées) ${obligatoire ? '<span style="font-size:0.75rem;color:#dc2626;font-weight:400">(obligatoire)</span>' : ''}</h3>
+        ${obligatoire && nonScannes.length > 0 ? `
+          <button onclick="scanAllPrincipaux()" style="width:100%; background:#0891b2; color:white; padding:14px; font-size:1rem; font-weight:700; border:none; border-radius:8px; margin-bottom:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 4px rgba(0,0,0,.1);">
+            <span style="font-size:1.2rem;">📷</span> Scanner ${nonScannes.length > 1 ? `les ${nonScannes.length} étiquettes` : `l'étiquette`}
+          </button>
+        ` : ''}
         <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
           ${principaux.map(i => {
             const sc = getScanForIng(i);
@@ -2193,8 +2200,8 @@
             }
             if (obligatoire) {
               return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
+                <span style="font-size:1.1rem; line-height:1; color:#f59e0b;">○</span>
                 <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
-                <button class="btn-scan-camera" onclick="openScannerForIngredient('${i.id}')"><span class="scan-cam-emoji">📷</span><span>Scanner</span></button>
               </div>`;
             }
             return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px;">
@@ -2266,30 +2273,53 @@
     document.getElementById('fiche-bandeau').classList.remove('show');
   }
 
-  // ====== SCAN-FEFO Phase 3 — Lancement scanner + retour ======
-  function openScannerForIngredient(ingredientId) {
+  // ====== SCAN-FEFO — Lancement du scanner « rafale » (burst) + retour ======
+  // Construit le contexte (liste des ingrédients à scanner) puis ouvre le
+  // scanner en mode rafale : caméra live, un SHOOT par étiquette, le scanner
+  // renvoie tous les résultats d'un coup dans scan_fefo_result.
+  function launchBurstScanner(ingredientIds) {
     const ctx = window.__currentTafContext || {};
     if (!ctx.task_id) {
       showToast('Erreur : contexte TAF perdu', 'error');
       return;
     }
-    // Récupérer article_id et nom depuis les ings stockés en mémoire
-    const ings = window.__currentFicheIngs || [];
-    const ing = ings.find(i => i.id === ingredientId);
-    const articleId = ing?.article_id || null;
-    const nomIngredient = ing?.nom || '';
-    // Stocker le contexte pour le retour (TAF lira ça quand le scanner redirigera)
+    const allIngs = window.__currentFicheIngs || [];
+    const list = (ingredientIds || [])
+      .map(id => allIngs.find(i => i.id === id))
+      .filter(Boolean)
+      .map(i => ({
+        ingredient_id: i.id,
+        article_id_attendu: i.article_id || null,
+        nom_attendu: i.nom || '',
+        quantite: (i.quantite != null ? i.quantite : ''),
+        unite: i.unite || ''
+      }));
+    if (list.length === 0) {
+      showToast('Aucun ingrédient à scanner', 'error');
+      return;
+    }
     localStorage.setItem('scan_fefo_context', JSON.stringify({
       task_id: ctx.task_id,
       fiche_id: ctx.fiche_id,
       tache: ctx.tache,
-      ingredient_id: ingredientId,
-      article_id_attendu: articleId,
-      nom_attendu: nomIngredient,
+      ingredients: list,
       timestamp: Date.now()
     }));
-    // Naviguer vers le scanner en mode unit avec return=taf
-    window.location.href = '../scanner/?mode=unit&return=taf';
+    window.location.href = '../scanner/?mode=burst&return=taf';
+  }
+
+  // Scanne en rafale tous les ingrédients principaux non encore scannés.
+  function scanAllPrincipaux() {
+    const ids = window.__principauxNonScannes || [];
+    if (ids.length > 0) { launchBurstScanner(ids); return; }
+    // Sécurité : si la liste est vide, on rescanne tous les principaux.
+    const allIngs = window.__currentFicheIngs || [];
+    launchBurstScanner(allIngs.filter(i => i.est_principal).map(i => i.id));
+  }
+
+  // Rétro-compat : scan d'un seul ingrédient (utilisé par le bouton ↻ rescan).
+  function openScannerForIngredient(ingredientId) {
+    launchBurstScanner([ingredientId]);
   }
 
   // ====== PHASE A/B — Scans persistés (lus depuis tasks.scans_lots) ======
@@ -2512,6 +2542,36 @@
     }
     localStorage.removeItem('scan_fefo_result');
     localStorage.removeItem('scan_fefo_context');
+
+    // ===== Retour du scanner « rafale » : lot d'étiquettes scannées d'un coup =====
+    if (result && result.batch) {
+      const tid = result.task_id;
+      const scans = result.scans || {};
+      const ids = Object.keys(scans);
+      if (tid && ids.length > 0) {
+        const pending = getPendingScans(tid);
+        ids.forEach(ingId => { pending[ingId] = scans[ingId]; });
+        setPendingScans(tid, pending);
+        // Persister chaque scan en base (tasks.scans_lots) — survit au changement d'iPad
+        for (const ingId of ids) {
+          try { await persistScanToTask(tid, ingId, scans[ingId]); }
+          catch (e) { console.warn('[Scan-FEFO] persist batch:', e); }
+        }
+      }
+      const nbErr = (result.errors || []).length;
+      showToast(
+        ids.length + ' étiquette(s) enregistrée(s)' + (nbErr ? ' · ' + nbErr + ' à refaire' : ''),
+        nbErr ? 'error' : 'success'
+      );
+      setTimeout(() => {
+        const task = tasks.find(t => t.id === tid);
+        if (task && task.fiche_id) {
+          window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: task.tache };
+          openFicheConsultModal(task.fiche_id, task.tache, { fromStart: true });
+        }
+      }, 300);
+      return;
+    }
 
     if (context.task_id && context.ingredient_id) {
       const pending = getPendingScans(context.task_id);
