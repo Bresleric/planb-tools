@@ -2273,6 +2273,36 @@
     document.getElementById('fiche-bandeau').classList.remove('show');
   }
 
+  // ====== PHASE B-2 — Contrôle « étiquettes scannées » avant validation production ======
+  // Retourne la liste des ingrédients principaux NON scannés pour une tâche.
+  // Relit tasks.scans_lots en base : le scan a pu être fait sur un autre iPad.
+  async function principauxNonScannesForTask(task) {
+    if (!task || !task.is_production || !task.fiche_id) return [];
+    let principaux = [];
+    try {
+      const { data, error } = await supabaseClient.from('fiche_ingredients')
+        .select('id, nom, est_principal')
+        .eq('fiche_id', task.fiche_id);
+      if (error) throw error;
+      principaux = (data || []).filter(i => i.est_principal === true);
+    } catch (e) {
+      console.warn('[B-2] lecture fiche_ingredients:', e);
+      return []; // erreur de lecture : ne pas bloquer la validation
+    }
+    if (principaux.length === 0) return [];
+    let scans = {};
+    try {
+      const { data: t } = await supabaseClient.from('tasks')
+        .select('scans_lots').eq('id', task.id).single();
+      scans = (t && t.scans_lots) ? t.scans_lots : {};
+      task.scans_lots = scans; // rafraîchir l'objet en mémoire
+    } catch (e) {
+      console.warn('[B-2] lecture tasks.scans_lots:', e);
+      scans = task.scans_lots || {};
+    }
+    return principaux.filter(i => !scans[i.id]);
+  }
+
   // ====== SCAN-FEFO — Lancement du scanner « rafale » (burst) + retour ======
   // Construit le contexte (liste des ingrédients à scanner) puis ouvre le
   // scanner en mode rafale : caméra live, un SHOOT par étiquette, le scanner
@@ -2563,12 +2593,22 @@
         ids.length + ' étiquette(s) enregistrée(s)' + (nbErr ? ' · ' + nbErr + ' à refaire' : ''),
         nbErr ? 'error' : 'success'
       );
-      setTimeout(() => {
+      setTimeout(async () => {
         const task = tasks.find(t => t.id === tid);
-        if (task && task.fiche_id) {
-          window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: task.tache };
-          openFicheConsultModal(task.fiche_id, task.tache, { fromStart: true });
+        if (!task || !task.fiche_id) return;
+        window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: task.tache };
+        // Phase B-2 : si on bloquait une validation de production faute de
+        // scans, et que toutes les étiquettes sont désormais là, ouvrir
+        // directement la modale de production au lieu de rouvrir la fiche.
+        if (window.__pendingProductionValidation === tid) {
+          const manquants = await principauxNonScannesForTask(task);
+          if (manquants.length === 0) {
+            window.__pendingProductionValidation = null;
+            openProductionModal(task);
+            return;
+          }
         }
+        openFicheConsultModal(task.fiche_id, task.tache, { fromStart: true });
       }, 300);
       return;
     }
@@ -2745,6 +2785,17 @@
         // Vérifier si c'est une tâche production
         const task = tasks.find(t => t.id === id);
         if (task && task.is_production) {
+          // Phase B-2 : interdire la validation tant que les étiquettes des
+          // ingrédients principaux ne sont pas scannées (traçabilité HACCP).
+          const manquants = await principauxNonScannesForTask(task);
+          if (manquants.length > 0) {
+            const noms = manquants.map(i => i.nom).join(', ');
+            showToast('⚠ Étiquette(s) à scanner avant de valider : ' + noms, 'error');
+            window.__pendingProductionValidation = task.id;
+            window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: task.tache };
+            openFicheConsultModal(task.fiche_id, task.tache, { fromStart: true });
+            return;
+          }
           // Ouvrir la modale de saisie production
           openProductionModal(task);
         } else {
@@ -4189,6 +4240,20 @@
     if (!nom || !quantite || !categorie) {
       showToast('Remplissez nom, quantité et catégorie', 'error');
       return;
+    }
+
+    // Phase B-2 — garde-fou : pas d'enregistrement de production tant que les
+    // étiquettes des ingrédients principaux ne sont pas toutes scannées.
+    {
+      const taskB2 = tasks.find(t => t.id === taskId);
+      if (taskB2) {
+        const manquants = await principauxNonScannesForTask(taskB2);
+        if (manquants.length > 0) {
+          const noms = manquants.map(i => i.nom).join(', ');
+          showToast('⚠ Étiquette(s) non scannée(s) : ' + noms + ' — scan obligatoire', 'error');
+          return;
+        }
+      }
     }
 
     // Validation checklist actions post-production (si présente)
