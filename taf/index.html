@@ -2102,7 +2102,12 @@
         .order('ordre');
       if (error) throw error;
 
-      renderFiche(fiche, ings || [], taskName, opts);
+      // PHASE A — charger les scans persistés (stock_mouvements + scan_tracabilite)
+      // pour la task courante (ou sa production_id si déjà créée)
+      const __taskIdForScans = window.__currentTafContext?.task_id;
+      const persistedScans = await loadPersistedScansForTask(__taskIdForScans);
+
+      renderFiche(fiche, ings || [], taskName, { ...opts, persistedScans });
       // Affichage plein écran
       document.getElementById('fiche-overlay').classList.remove('minimized');
       document.getElementById('fiche-overlay').classList.add('show');
@@ -2148,29 +2153,53 @@
     const metaHTML = metaItems.length ? `<div class="fiche-meta">${metaItems.join('')}</div>` : '';
 
     // Ingrédients principaux à scanner (Scan-FEFO Phase 5 — mode obligatoire)
+    // PHASE A : on fusionne pending (localStorage, non encore poussé en DB)
+    // ET persistedScans (déjà en stock_mouvements). On affiche la section
+    // dès qu'il y a au moins un ingrédient principal — pas seulement en démarrage.
     const principaux = ings.filter(i => i.est_principal);
     const obligatoire = opts.fromStart === true;
     const taskId = window.__currentTafContext?.task_id;
     const pending = taskId ? getPendingScans(taskId) : {};
+    const persisted = opts.persistedScans || {};
+    function getScanForIng(ing) {
+      if (pending[ing.id]) return { ...pending[ing.id], _src: 'pending' };
+      if (ing.article_id && persisted[ing.article_id]) return { ...persisted[ing.article_id], _src: 'persisted' };
+      return null;
+    }
     let scanHTML = '';
     if (principaux.length > 0) {
-      const allScanned = principaux.every(i => pending[i.id]);
+      const allScanned = principaux.every(i => getScanForIng(i));
+      const nbScannes = principaux.filter(i => getScanForIng(i)).length;
       scanHTML = `
-        <h3 style="color:#92400e">🎯 Ingrédients à scanner ${obligatoire ? '<span style="font-size:0.75rem;color:#dc2626;font-weight:400">(obligatoire)</span>' : ''}</h3>
+        <h3 style="color:#92400e">🎯 Étiquettes ingrédients (${nbScannes}/${principaux.length} scannées) ${obligatoire ? '<span style="font-size:0.75rem;color:#dc2626;font-weight:400">(obligatoire)</span>' : ''}</h3>
         <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
           ${principaux.map(i => {
-            const sc = pending[i.id];
+            const sc = getScanForIng(i);
             if (sc) {
               const dlcStr = sc.dlc ? new Date(sc.dlc).toLocaleDateString('fr-FR') : '?';
+              const fabStr = sc.fabricant ? ` · ${esc(sc.fabricant)}` : '';
+              const poidsStr = sc.poids_net_kg ? ` · ${sc.poids_net_kg} kg` : '';
+              const srcBadge = sc._src === 'persisted'
+                ? '<span title="Persisté en base" style="font-size:0.65rem;background:#bbf7d0;color:#14532d;padding:1px 5px;border-radius:3px;margin-left:4px;">DB</span>'
+                : '<span title="En attente" style="font-size:0.65rem;background:#fef3c7;color:#854d0e;padding:1px 5px;border-radius:3px;margin-left:4px;">pending</span>';
+              const rescanBtn = obligatoire
+                ? `<button onclick="rescanIngredient('${i.id}')" style="font-size:0.72rem; padding:5px 9px; background:white; border:1px solid #86efac; border-radius:4px; color:#15803d; cursor:pointer;">↻</button>`
+                : '';
               return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#dcfce7; border:1px solid #86efac; border-radius:8px;">
                 <span style="font-size:1.3rem; line-height:1">✓</span>
-                <span style="flex:1; color:#15803d; font-size:0.85rem;"><strong>${esc(i.nom)}</strong><br><span style="font-size:0.75rem; color:#166534;">${esc(sc.produit || '?')} · lot ${esc(sc.lot || '?')} · DLC ${dlcStr}</span></span>
-                <button onclick="rescanIngredient('${i.id}')" style="font-size:0.72rem; padding:5px 9px; background:white; border:1px solid #86efac; border-radius:4px; color:#15803d; cursor:pointer;">↻</button>
+                <span style="flex:1; color:#15803d; font-size:0.85rem;"><strong>${esc(i.nom)}</strong>${srcBadge}<br><span style="font-size:0.75rem; color:#166534;">${esc(sc.produit || '?')} · lot ${esc(sc.lot || '?')} · DLC ${dlcStr}${fabStr}${poidsStr}</span></span>
+                ${rescanBtn}
               </div>`;
             }
-            return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
-              <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
-              <button class="btn-scan-camera" onclick="openScannerForIngredient('${i.id}')"><span class="scan-cam-emoji">📷</span><span>Scanner</span></button>
+            if (obligatoire) {
+              return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;">
+                <span style="flex:1; font-weight:600; color:#78350f;">${esc(i.nom)} <span style="font-weight:400; color:#92400e; font-size:0.78rem;">(${esc(String(i.quantite))} ${esc(i.unite || '')})</span></span>
+                <button class="btn-scan-camera" onclick="openScannerForIngredient('${i.id}')"><span class="scan-cam-emoji">📷</span><span>Scanner</span></button>
+              </div>`;
+            }
+            return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px;">
+              <span style="font-size:1.1rem; line-height:1; color:#94a3b8">○</span>
+              <span style="flex:1; color:#64748b; font-size:0.85rem;"><strong>${esc(i.nom)}</strong> <span style="font-size:0.72rem">(non scanné)</span></span>
             </div>`;
           }).join('')}
         </div>
@@ -2263,6 +2292,38 @@
     window.location.href = '../scanner/?mode=unit&return=taf';
   }
 
+  // ====== PHASE A/B — Scans persistés (lus depuis tasks.scans_lots) ======
+  // Retourne un dict indexé par article_id pour le matching dans renderFiche.
+  async function loadPersistedScansForTask(taskId) {
+    if (!taskId) return {};
+    try {
+      const { data: t, error } = await supabaseClient.from('tasks')
+        .select('scans_lots').eq('id', taskId).single();
+      if (error) {
+        console.warn('[Phase B] loadPersistedScans:', error);
+        return {};
+      }
+      const scansLots = (t && t.scans_lots) ? t.scans_lots : {};
+      const byArticle = {};
+      Object.values(scansLots).forEach(sc => {
+        if (!sc || !sc.article_id) return;
+        byArticle[sc.article_id] = {
+          lot: sc.lot,
+          dlc: sc.dlc,
+          produit: sc.produit,
+          fabricant: sc.fabricant,
+          poids_net_kg: sc.poids_net_kg,
+          source: 'scans_lots',
+          scan_tracabilite_id: sc.scan_tracabilite_id,
+        };
+      });
+      return byArticle;
+    } catch (e) {
+      console.warn('[Phase B] loadPersistedScansForTask:', e);
+      return {};
+    }
+  }
+
   // ====== SCAN-FEFO Phase 5 — Pending scans + traitement async ======
   function getPendingScans(taskId) {
     try {
@@ -2275,6 +2336,44 @@
   }
   function clearPendingScans(taskId) {
     localStorage.removeItem('scan_fefo_pending_' + taskId);
+  }
+
+  // ====== PHASE B — Persistance des scans dans tasks.scans_lots ======
+  // Mémorise l'étiquette scannée pour un ingrédient, en base, afin qu'elle
+  // survive jusqu'à la validation de la production (multi-iPads).
+  async function persistScanToTask(taskId, ingredientId, scanData) {
+    if (!taskId || !ingredientId || !scanData) return;
+    try {
+      let enriched = { ...scanData };
+      // Enrichir avec fabricant + poids depuis scan_tracabilite (best-effort)
+      if (scanData.scan_tracabilite_id) {
+        try {
+          const { data: st } = await supabaseClient.from('scan_tracabilite')
+            .select('fabricant, poids_net_kg, produit, lot, dlc')
+            .eq('id', scanData.scan_tracabilite_id).single();
+          if (st) {
+            enriched.fabricant = st.fabricant ?? null;
+            enriched.poids_net_kg = st.poids_net_kg ?? null;
+            if (!enriched.produit) enriched.produit = st.produit;
+            if (!enriched.lot) enriched.lot = st.lot;
+            if (!enriched.dlc) enriched.dlc = st.dlc;
+          }
+        } catch (e) { /* enrichissement non bloquant */ }
+      }
+      // Relire scans_lots en base pour ne pas écraser un scan concurrent
+      let scansLots = {};
+      try {
+        const { data: fresh } = await supabaseClient.from('tasks')
+          .select('scans_lots').eq('id', taskId).single();
+        if (fresh && fresh.scans_lots) scansLots = { ...fresh.scans_lots };
+      } catch (e) { /* colonne absente ? on repart de {} */ }
+      scansLots[ingredientId] = enriched;
+      const task = tasks.find(t => t.id === taskId);
+      if (task) task.scans_lots = scansLots;
+      await DB.updateTask(taskId, { scans_lots: scansLots });
+    } catch (e) {
+      console.warn('[Phase B] persistScanToTask:', e);
+    }
   }
 
   function rescanIngredient(ingredientId) {
@@ -2314,7 +2413,9 @@
     closeFiche();
     renderFiltered();
     showToast('Chrono démarré ⏱', 'success');
-    processAllPendingScans(taskId).catch(e => console.error('processAllPendingScans:', e));
+    // PHASE B : le scan ne crée plus de sortie stock ici (INSERT cassé +
+    // doublon). Les scans sont déjà persistés dans tasks.scans_lots ;
+    // la sortie stock unique se fait à la validation de la production.
   }
 
   async function processAllPendingScans(taskId) {
@@ -2425,6 +2526,9 @@
         timestamp: result.timestamp
       };
       setPendingScans(context.task_id, pending);
+      // PHASE B — persister aussi en base (tasks.scans_lots) pour survivre
+      // au changement d'iPad jusqu'à la validation de la production
+      await persistScanToTask(context.task_id, context.ingredient_id, pending[context.ingredient_id]);
       showToast(`Scan enregistré : ${result.produit || '?'}`, 'success');
       setTimeout(() => {
         const task = tasks.find(t => t.id === context.task_id);
@@ -3485,6 +3589,7 @@
   // ====== PRODUCTION MODAL (TAF integration) ======
   // État des matières premières pour la production en cours
   let prodMatieres = []; // [{ ingredient_id, article_id, article_nom, qty_theorique, lots: [...], selections: { lot_id: qty } }]
+  let prodScannedLots = {}; // PHASE B : scans_lots de la tâche en cours de validation
   let prodFicheRendement = null;
   let prodChoiceMode = null; // 'existing' | 'new' | null (si task a déjà une fiche)
   let prodChosenFicheId = null;
@@ -3595,7 +3700,7 @@
           renderProdFicheResume(fiche);
         }
         // Charger les ingrédients de la fiche + lots disponibles
-        await loadProductionMatieres(task.fiche_id);
+        await loadProductionMatieres(task.fiche_id, task.scans_lots || {});
         // Charger la checklist d'actions post-production
         await loadActionsPostForProd(task.fiche_id);
       } catch (e) {
@@ -3744,11 +3849,13 @@
     wrap.style.display = (metaLine || instrHTML) ? '' : 'none';
   }
 
-  async function loadProductionMatieres(ficheId) {
+  async function loadProductionMatieres(ficheId, scansLots) {
     try {
+      // PHASE B : mémoriser les scans reçus pour pré-remplir les lots
+      prodScannedLots = scansLots || {};
       // 1. Ingrédients de la fiche AVEC article_id rattaché
       const { data: ings, error: e1 } = await sb.from('fiche_ingredients')
-        .select('id, nom, quantite, unite, article_id, ordre')
+        .select('id, nom, quantite, unite, article_id, ordre, est_principal')
         .eq('fiche_id', ficheId)
         .not('article_id', 'is', null)
         .order('ordre');
@@ -3773,6 +3880,7 @@
         ingredient_id: ing.id,
         ingredient_nom: ing.nom,
         article_id: ing.article_id,
+        est_principal: ing.est_principal === true,
         qty_fiche: ing.quantite,
         unite_fiche: ing.unite,
         lots: (lots || []).filter(l => l.article_id === ing.article_id),
@@ -3823,6 +3931,37 @@
       }
       m.qty_manque = restant > 0.001 ? restant : 0;
     });
+    // PHASE B : forcer les lots réellement scannés par-dessus le FEFO théorique
+    applyScannedLotsToMatieres();
+  }
+
+  // Force la sélection sur l'étiquette réellement scannée dans le TAF.
+  function applyScannedLotsToMatieres() {
+    const scans = Object.values(prodScannedLots || {});
+    prodMatieres.forEach(m => { m.scanne = false; m.scan_info = null; });
+    if (!scans.length) return;
+    prodMatieres.forEach(m => {
+      const scan = scans.find(s => s && s.article_id === m.article_id && s.scan_tracabilite_id);
+      if (!scan) return;
+      const scanLotId = scan.scan_tracabilite_id;
+      // S'assurer que le lot scanné apparaît dans la liste (même si épuisé en stock)
+      if (!m.lots.find(l => l.scan_tracabilite_id === scanLotId)) {
+        m.lots.unshift({
+          scan_tracabilite_id: scanLotId,
+          article_id: m.article_id,
+          article_nom: scan.produit || m.ingredient_nom,
+          lot: scan.lot || '?',
+          dlc: scan.dlc || null,
+          quantite_restante: Number(scan.poids_net_kg) || Number(m.qty_theorique) || 0,
+          fabricant: scan.fabricant || null,
+        });
+      }
+      // Forcer la sélection sur le seul lot scanné
+      m.selections = {};
+      m.selections[scanLotId] = Number((m.qty_theorique || 0).toFixed(3));
+      m.scanne = true;
+      m.scan_info = scan;
+    });
   }
 
   function renderMatieresList() {
@@ -3862,7 +4001,7 @@
       div.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">
           <div style="flex:1; min-width:0;">
-            <div style="font-size:13px; font-weight:600; color:#111827;">${_esc(m.ingredient_nom)}</div>
+            <div style="font-size:13px; font-weight:600; color:#111827;">${_esc(m.ingredient_nom)}${m.scanne ? ' <span style="font-size:9px;background:#bbf7d0;color:#14532d;padding:1px 6px;border-radius:3px;font-weight:700;">✓ ÉTIQUETTE SCANNÉE</span>' : (m.est_principal ? ' <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-weight:700;">⚠ NON SCANNÉ</span>' : '')}</div>
             <div style="font-size:11px; color:#6b7280;">→ ${_esc(m.lots[0]?.article_nom || 'Article inconnu')}</div>
           </div>
           <div style="text-align:right;">
