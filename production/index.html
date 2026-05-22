@@ -3685,7 +3685,7 @@ function showEtiquette(production) {
 
   const html = `
     <div class="etiquette-modal active" id="etiquette">
-      <div class="etiquette-card">
+      <div class="etiquette-card" style="max-height:88vh; overflow-y:auto;">
         <div class="etiquette-header-bar">ÉTIQUETTE PRODUCTION — ${escapeHtml(currentEtablissement).toUpperCase()}</div>
         <div class="etiquette-body">
           <div class="etiquette-title">${escapeHtml(production.nom_produit)}</div>
@@ -3717,6 +3717,12 @@ function showEtiquette(production) {
             <div class="lbl">DATE LIMITE DE CONSOMMATION</div>
             <div class="val">${dlcStr}</div>
           </div>` : ''}
+          <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--gray-200); text-align:left;">
+            <div style="color:var(--gray-500); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:8px;">🎯 Matières premières / lots utilisés</div>
+            <div id="etiquette-trace-body" style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:12px; color:var(--gray-500);">Chargement de la traçabilité…</div>
+            </div>
+          </div>
         </div>
         <div class="etiquette-actions">
           <button class="etiquette-btn close" onclick="closeEtiquette()">Fermer</button>
@@ -3727,11 +3733,69 @@ function showEtiquette(production) {
     </div>
   `;
   document.body.insertAdjacentHTML('beforeend', html);
+  loadEtiquetteTrace(production.id);
 }
 
 function closeEtiquette() {
   const el = document.getElementById('etiquette');
   if (el) el.remove();
+}
+
+// ====== PHASE C — Traçabilité : étiquettes / lots utilisés pour une production ======
+// Lit les mouvements de sortie de stock de la production et les rapproche des
+// étiquettes scannées (scan_tracabilite) pour afficher produit / lot / DLC / fabricant.
+async function loadEtiquetteTrace(prodId) {
+  const body = document.getElementById('etiquette-trace-body');
+  if (!body) return;
+  try {
+    const { data: movs, error } = await sb.from('stock_mouvements')
+      .select('quantite, unite, scan_tracabilite_id')
+      .eq('source_table', 'production')
+      .eq('source_id', prodId);
+    if (error) throw error;
+    if (!movs || movs.length === 0) {
+      body.innerHTML = '<div style="font-size:12px; color:var(--gray-500);">Aucune sortie de stock enregistrée — traçabilité des lots indisponible pour cette production.</div>';
+      return;
+    }
+    const tracIds = [...new Set(movs.map(m => m.scan_tracabilite_id).filter(Boolean))];
+    const tracById = {};
+    if (tracIds.length) {
+      const { data: tracs } = await sb.from('scan_tracabilite')
+        .select('id, produit, lot, dlc, fabricant')
+        .in('id', tracIds);
+      (tracs || []).forEach(t => { tracById[t.id] = t; });
+    }
+    const now = Date.now();
+    body.innerHTML = movs.map(m => {
+      const t = m.scan_tracabilite_id ? tracById[m.scan_tracabilite_id] : null;
+      const qte = (m.quantite != null ? m.quantite : '?') + ' ' + (m.unite || '');
+      if (!t) {
+        return '<div style="display:flex; gap:8px; padding:8px 10px; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px;">'
+          + '<span>⚠</span><div><div style="font-weight:600; font-size:0.8rem; color:#92400e;">Lot sans étiquette scannée</div>'
+          + '<div style="font-size:0.7rem; color:#92400e;">Quantité utilisée : ' + escapeHtml(qte) + '</div></div></div>';
+      }
+      let dlc = '?', expired = false;
+      if (t.dlc) {
+        const d = new Date(t.dlc);
+        dlc = d.toLocaleDateString('fr-FR');
+        if (d.getTime() < now) expired = true;
+      }
+      const fab = t.fabricant ? ' · ' + escapeHtml(t.fabricant) : '';
+      const dlcHtml = expired
+        ? '<span style="color:#b91c1c; font-weight:700;">DLC ' + dlc + ' ⚠ périmé</span>'
+        : 'DLC ' + dlc;
+      const bg = expired ? '#fef2f2' : '#f0fdf4';
+      const bd = expired ? '#fca5a5' : '#86efac';
+      return '<div style="display:flex; gap:8px; padding:8px 10px; background:' + bg + '; border:1px solid ' + bd + '; border-radius:6px;">'
+        + '<span>' + (expired ? '⚠' : '🏷️') + '</span><div><div style="font-weight:600; font-size:0.8rem; color:var(--gray-800);">'
+        + escapeHtml(t.produit || 'Produit ?') + '</div>'
+        + '<div style="font-size:0.7rem; color:var(--gray-600);">Lot ' + escapeHtml(t.lot || '?') + ' · '
+        + dlcHtml + fab + ' · ' + escapeHtml(qte) + '</div></div></div>';
+    }).join('');
+  } catch (e) {
+    console.error('[Phase C] loadEtiquetteTrace:', e);
+    body.innerHTML = '<div style="font-size:12px; color:#b91c1c;">Erreur de chargement de la traçabilité.</div>';
+  }
 }
 
 // Charge jsPDF depuis CDN une seule fois, retourne une promesse résolue quand disponible.
