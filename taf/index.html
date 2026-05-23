@@ -4030,6 +4030,11 @@
         selections: {}, // { lot_id: qty }
       }));
 
+      // 3 bis. Rapprocher chaque étiquette scannée avec un lot réellement en
+      // stock (réception), par empreinte DLC + poids. La sortie de stock
+      // visera alors le lot reçu, pas l'étiquette orpheline de production.
+      await rapprocherScansAvecStock();
+
       // 4. Pré-remplir avec les lots FEFO selon la quantité produite saisie
       recalcMatieresFefo();
 
@@ -4078,61 +4083,141 @@
     applyScannedLotsToMatieres();
   }
 
+  // Rapproche chaque étiquette scannée (production) avec un lot réellement en
+  // stock (réception), par empreinte : DLC identique + poids net identique.
+  // Pose etiquette._rapproche = { ...lot stock } ou null. Mutation en place de
+  // prodScannedLots. Appelée une fois à l'ouverture de la modale production.
+  async function rapprocherScansAvecStock() {
+    const etiquettes = [];
+    Object.values(prodScannedLots || {}).forEach(sc => {
+      if (!sc) return;
+      etiquettes.push(sc);
+      if (Array.isArray(sc.lots_supplementaires)) {
+        sc.lots_supplementaires.forEach(ex => { if (ex) etiquettes.push(ex); });
+      }
+    });
+    etiquettes.forEach(e => { e._rapproche = null; });
+    if (!etiquettes.length) return;
+    // Charger le stock disponible — tous articles confondus (le rapprochement
+    // se fait étiquette ↔ étiquette, indépendamment du catalogue).
+    let stock = [];
+    try {
+      const { data, error } = await sb.from('stock_par_lot')
+        .select('scan_tracabilite_id, article_id, article_nom, produit, lot, dlc, fabricant, quantite_initiale, quantite_restante, scan_at')
+        .eq('etablissement', currentEtablissement)
+        .gt('quantite_restante', 0);
+      if (error) throw error;
+      stock = data || [];
+    } catch (e) {
+      console.warn('[Rapprochement] lecture stock_par_lot:', e);
+      return;
+    }
+    // Réception la plus ancienne d'abord
+    stock.sort((a, b) => new Date(a.scan_at || 0) - new Date(b.scan_at || 0));
+    const norm = (d) => d ? String(d).slice(0, 10) : null;
+    const used = {};
+    etiquettes.forEach(e => {
+      const eDlc = norm(e.dlc);
+      const ePoids = Number(e.poids_net_kg);
+      if (!eDlc || !isFinite(ePoids) || ePoids <= 0) return; // pas d'empreinte fiable
+      // Empreinte forte : DLC identique + poids net identique au gramme près
+      const match = stock.find(s => {
+        if (used[s.scan_tracabilite_id]) return false;
+        if (norm(s.dlc) !== eDlc) return false;
+        const sPoids = Number(s.quantite_initiale);
+        return isFinite(sPoids) && Math.abs(sPoids - ePoids) < 0.001;
+      });
+      if (match) {
+        used[match.scan_tracabilite_id] = true;
+        e._rapproche = {
+          scan_tracabilite_id: match.scan_tracabilite_id,
+          article_id: match.article_id,
+          article_nom: match.article_nom,
+          produit: match.produit,
+          lot: match.lot,
+          dlc: match.dlc,
+          fabricant: match.fabricant,
+          quantite_restante: match.quantite_restante,
+          scan_at: match.scan_at,
+        };
+      }
+    });
+  }
+
   // Force la sélection sur le(s) lot(s) réellement scanné(s) dans le TAF.
-  // Un ingrédient peut avoir plusieurs lots (plusieurs paquets) : on répartit
-  // alors la quantité théorique à parts égales sur tous les lots scannés.
+  // Un ingrédient peut avoir plusieurs lots (plusieurs paquets). Si une
+  // étiquette a été rapprochée d'un lot en stock, la sortie vise CE lot reçu.
+  // Quantité : celle de la fiche si renseignée, sinon le poids des étiquettes.
   function applyScannedLotsToMatieres() {
     const scans = Object.values(prodScannedLots || {});
-    prodMatieres.forEach(m => { m.scanne = false; m.scan_info = null; m.scan_nb_lots = 0; });
+    prodMatieres.forEach(m => {
+      m.scanne = false; m.scan_info = null; m.scan_nb_lots = 0;
+      m.scan_nb_rapproches = 0; m.qty_source = 'fiche';
+    });
     if (!scans.length) return;
     prodMatieres.forEach(m => {
-      const scan = scans.find(s => s && s.article_id === m.article_id && s.scan_tracabilite_id);
+      // Matching matière ↔ scan : article_id résolu, sinon article_id_attendu
+      const scan = scans.find(s => s && s.scan_tracabilite_id &&
+        ((s.article_id && s.article_id === m.article_id) ||
+         (s.article_id_attendu && s.article_id_attendu === m.article_id)));
       if (!scan) return;
-      // Rassembler le lot principal + les lots supplémentaires, dédoublonnés
+      // Lot principal + lots supplémentaires, dédoublonnés
       const candidats = [scan].concat(
         Array.isArray(scan.lots_supplementaires) ? scan.lots_supplementaires : []
       ).filter(s => s && s.scan_tracabilite_id);
       const seen = {};
-      const lots = [];
+      const etiquettes = [];
       candidats.forEach(s => {
         if (seen[s.scan_tracabilite_id]) return;
         seen[s.scan_tracabilite_id] = true;
-        lots.push(s);
+        etiquettes.push(s);
       });
-      if (!lots.length) return;
-      // S'assurer que chaque lot scanné apparaît dans la liste (même si épuisé)
-      lots.forEach(s => {
-        if (!m.lots.find(l => l.scan_tracabilite_id === s.scan_tracabilite_id)) {
-          m.lots.unshift({
-            scan_tracabilite_id: s.scan_tracabilite_id,
-            article_id: m.article_id,
-            article_nom: s.produit || m.ingredient_nom,
-            lot: s.lot || '?',
-            dlc: s.dlc || null,
-            quantite_restante: Number(s.poids_net_kg) || Number(m.qty_theorique) || 0,
-            fabricant: s.fabricant || null,
-          });
-        }
-      });
-      // Répartir la quantité théorique sur les lots scannés
+      if (!etiquettes.length) return;
       m.selections = {};
       const total = Number(m.qty_theorique || 0);
-      const n = lots.length;
-      if (n === 1) {
-        m.selections[lots[0].scan_tracabilite_id] = Number(total.toFixed(3));
-      } else {
-        const part = total / n;
-        let cumul = 0;
-        lots.forEach((s, i) => {
-          // le dernier lot absorbe l'arrondi pour que la somme soit exacte
-          const q = (i === n - 1) ? (total - cumul) : Number(part.toFixed(3));
-          cumul += q;
-          m.selections[s.scan_tracabilite_id] = Number(q.toFixed(3));
-        });
-      }
+      const useFiche = total > 0;       // fiche renseignée ?
+      const n = etiquettes.length;
+      const part = useFiche ? total / n : 0;
+      let cumul = 0;
+      let nbRapproches = 0;
+      etiquettes.forEach((s, i) => {
+        const rap = s._rapproche || null;
+        if (rap) nbRapproches++;
+        // Lot effectif : le lot en stock rapproché, sinon l'étiquette elle-même
+        const effId = rap ? rap.scan_tracabilite_id : s.scan_tracabilite_id;
+        const existing = m.lots.find(l => l.scan_tracabilite_id === effId);
+        if (!existing) {
+          m.lots.unshift({
+            scan_tracabilite_id: effId,
+            article_id: rap ? rap.article_id : m.article_id,
+            article_nom: (rap ? rap.produit : s.produit) || m.ingredient_nom,
+            lot: (rap ? rap.lot : s.lot) || '?',
+            dlc: (rap ? rap.dlc : s.dlc) || null,
+            quantite_restante: rap ? Number(rap.quantite_restante)
+              : (Number(s.poids_net_kg) || Number(m.qty_theorique) || 0),
+            fabricant: (rap ? rap.fabricant : s.fabricant) || null,
+            _rapproche: !!rap,
+            _rap_recu_le: rap ? rap.scan_at : null,
+          });
+        } else if (rap) {
+          existing._rapproche = true;
+          existing._rap_recu_le = rap.scan_at;
+        }
+        // Quantité : répartition de la fiche, sinon poids de l'étiquette
+        let q;
+        if (useFiche) {
+          q = (i === n - 1) ? (total - cumul) : Number(part.toFixed(3));
+        } else {
+          q = Number(s.poids_net_kg) || 0;
+        }
+        cumul += q;
+        m.selections[effId] = Number(q.toFixed(3));
+      });
       m.scanne = true;
       m.scan_info = scan;
       m.scan_nb_lots = n;
+      m.scan_nb_rapproches = nbRapproches;
+      m.qty_source = useFiche ? 'fiche' : 'etiquette';
     });
   }
 
@@ -4184,18 +4269,30 @@
             : days < 0 ? ' · <span style="color:#b91c1c;font-weight:600;">DLC dépassée</span>'
             : days <= 7 ? ' · <span style="color:#c2410c;">DLC dans ' + days + 'j</span>'
             : ' · DLC dans ' + days + 'j';
+          // Indicateur de rapprochement avec le stock
+          let rapTxt = '';
+          if (lot && lot._rapproche) {
+            const reculeTxt = lot._rap_recu_le
+              ? ' (reçu le ' + new Date(lot._rap_recu_le).toLocaleDateString('fr-FR') + ')' : '';
+            rapTxt = '<div style="font-size:10.5px; color:#15803d; font-weight:600;">✓ rapproché au stock' + reculeTxt + '</div>';
+          } else if (m.scanne) {
+            rapTxt = '<div style="font-size:10.5px; color:#c2410c; font-weight:600;">⚠ pas trouvé en stock — réception manquante ?</div>';
+          }
           return '<div style="font-size:11.5px; color:#374151;">' + lotLabel
-            + ' · <strong>' + fmtQty(q) + ' ' + _esc(m.unite_fiche || '') + '</strong>' + dlcTxt + '</div>';
+            + ' · <strong>' + fmtQty(q) + ' ' + _esc(m.unite_fiche || '') + '</strong>' + dlcTxt + rapTxt + '</div>';
         }).join('');
       }
       const manque = m.qty_manque > 0
         ? '<div style="font-size:10px; color:#b91c1c;">⚠ Stock manquant : ' + m.qty_manque.toFixed(2) + ' ' + _esc(m.unite_fiche || '') + '</div>'
         : '';
+      const qtyNote = (m.scanne && m.qty_source === 'etiquette')
+        ? '<div style="font-size:10px; color:#6b7280;">Quantité = poids des étiquettes scannées (fiche sans quantité renseignée).</div>'
+        : '';
       div.innerHTML =
         '<span style="font-size:1.1rem; line-height:1.3; color:' + icoColor + ';">' + ico + '</span>'
         + '<div style="flex:1; min-width:0;">'
         + '<div style="font-size:13px; font-weight:600; color:#111827;">' + _esc(m.ingredient_nom) + badge + '</div>'
-        + lotsLines + manque
+        + lotsLines + manque + qtyNote
         + '</div>';
       container.appendChild(div);
     });
@@ -4495,9 +4592,11 @@
           Object.entries(m.selections).forEach(([lotId, qty]) => {
             const q = parseFloat(qty);
             if (!q || q <= 0) return;
+            // article_id du lot effectif (lot rapproché = article de la réception)
+            const lotObj = m.lots.find(l => l.scan_tracabilite_id === lotId);
             sortieRows.push({
               type: 'SORTIE',
-              article_id: m.article_id,
+              article_id: (lotObj && lotObj.article_id) || m.article_id,
               scan_tracabilite_id: lotId,
               quantite: q,
               unite: m.unite_fiche || 'kg',
