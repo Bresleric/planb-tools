@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Achats / Factures — PlanB Tools</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f4f5f7;color:#1f2937;font-size:14px;}
+.top{background:#1F3864;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:12px;}
+.top a{color:#fff;text-decoration:none;font-size:13px;opacity:.85;}
+.top h1{font-size:17px;font-weight:700;}
+.wrap{max-width:1180px;margin:0 auto;padding:18px;}
+.sub{font-size:12px;color:#6b7280;margin-bottom:14px;}
+.kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.kpi{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;flex:1;min-width:150px;}
+.kpi .v{font-size:22px;font-weight:700;color:#1F3864;}
+.kpi .l{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+.tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e5e7eb;}
+.tab{padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.tab.on{color:#1F3864;border-bottom-color:#1F3864;}
+.panel{display:none;}.panel.on{display:block;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
+input[type=text],select{padding:7px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff;}
+input[type=text]{min-width:220px;}
+label.cb{font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer;}
+.cnt{font-size:12px;color:#6b7280;margin-left:auto;}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;}
+th{background:#2F5496;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding:8px 9px;text-align:left;cursor:pointer;white-space:nowrap;}
+th.num,td.num{text-align:right;}
+td{padding:7px 9px;border-top:1px solid #eef0f2;font-size:13px;}
+tr:nth-child(even) td{background:#fafbfc;}
+.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;}
+.b-no{background:#fef3c7;color:#92400e;}
+.msg{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:14px;border-radius:8px;font-size:13px;}
+.foot{font-size:11px;color:#9ca3af;margin-top:14px;}
+</style>
+</head>
+<body>
+<div class="top"><a href="../index.html">← Accueil</a><h1>🛒 Achats / Factures</h1></div>
+<div class="wrap">
+  <div class="sub" id="sub">Chargement de la base des factures…</div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs">
+    <div class="tab on" data-p="produits">Produits achetés</div>
+    <div class="tab" data-p="ingredients">Par ingrédient</div>
+    <div class="tab" data-p="factures">Factures</div>
+  </div>
+
+  <div class="panel on" id="p-produits">
+    <div class="filters">
+      <input type="text" id="f-search" placeholder="Rechercher un produit, une référence…">
+      <select id="f-four"><option value="">Tous fournisseurs</option></select>
+      <label class="cb"><input type="checkbox" id="f-nonratt"> Non rattachés seulement</label>
+      <span class="cnt" id="c-produits"></span>
+    </div>
+    <table><thead><tr>
+      <th data-k="fournisseur">Fournisseur</th><th data-k="date_facture">Date</th>
+      <th data-k="designation">Désignation</th><th data-k="reference">Réf.</th>
+      <th class="num" data-k="quantite">Qté</th><th data-k="unite">Unité</th>
+      <th class="num" data-k="montant_ht">Montant HT</th>
+      <th data-k="ingredient_nom">Ingrédient rattaché</th>
+    </tr></thead><tbody id="t-produits"></tbody></table>
+  </div>
+
+  <div class="panel" id="p-ingredients">
+    <div class="filters">
+      <input type="text" id="i-search" placeholder="Rechercher un ingrédient…">
+      <span class="cnt" id="c-ingredients"></span>
+    </div>
+    <table><thead><tr>
+      <th data-k="ingredient_nom">Ingrédient</th><th class="num" data-k="nb_achats">Nb achats</th>
+      <th class="num" data-k="pu_moyen">Prix moyen</th><th class="num" data-k="pu_min">Prix mini</th>
+      <th class="num" data-k="pu_max">Prix maxi</th><th class="num" data-k="dernier_pu">Dernier prix</th>
+      <th data-k="dernier_achat">Dernier achat</th>
+    </tr></thead><tbody id="t-ingredients"></tbody></table>
+  </div>
+
+  <div class="panel" id="p-factures">
+    <div class="filters">
+      <input type="text" id="x-search" placeholder="Rechercher une facture…">
+      <select id="x-four"><option value="">Tous fournisseurs</option></select>
+      <span class="cnt" id="c-factures"></span>
+    </div>
+    <table><thead><tr>
+      <th data-k="fournisseur">Fournisseur</th><th data-k="date_facture">Date</th>
+      <th data-k="numero_facture">N° facture</th><th data-k="etablissement">Restaurant</th>
+      <th class="num" data-k="total_ht">Total HT</th><th class="num" data-k="total_ttc">Total TTC</th>
+      <th class="num" data-k="nb_lignes">Lignes</th>
+    </tr></thead><tbody id="t-factures"></tbody></table>
+  </div>
+
+  <div class="foot">Source : tables Supabase factures_achats / factures_achats_lignes. Rechargez la page pour rafraîchir.</div>
+</div>
+
+<script>
+const SUPABASE_URL='https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const D={produits:[],ingredients:[],factures:[]};
+const sort={produits:{k:'date_facture',a:0},ingredients:{k:'nb_achats',a:0},factures:{k:'date_facture',a:0}};
+const eur=v=>(v==null||v===''||isNaN(Number(v)))?'':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+async function fetchAll(table,cols,orderCol){
+  let all=[],from=0;const step=1000;
+  while(true){
+    let qy=sb.from(table).select(cols).range(from,from+step-1);
+    if(orderCol) qy=qy.order(orderCol,{ascending:false,nullsFirst:false});
+    const {data,error}=await qy;
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data||data.length<step) break;
+    from+=step;
+  }
+  return all;
+}
+
+async function load(){
+  try{
+    D.factures=await fetchAll('factures_achats',
+      'fournisseur,date_facture,numero_facture,etablissement,total_ht,total_tva,total_ttc,nb_lignes,date_anomalie','date_facture');
+    D.produits=await fetchAll('factures_achats_lignes',
+      'fournisseur,date_facture,designation,reference,quantite,unite,montant_ht,ingredient_nom','date_facture');
+    try{ D.ingredients=await fetchAll('v_prix_ingredients_factures','*',null); }
+    catch(e){ D.ingredients=[]; }
+  }catch(e){
+    document.getElementById('sub').innerHTML='<div class="msg">Impossible de lire la base : '+esc(e&&e.message||e)+'</div>';
+    return;
+  }
+  const nbRatt=D.produits.filter(x=>x.ingredient_nom).length;
+  const totHt=D.factures.filter(x=>!x.date_anomalie).reduce((s,x)=>s+(Number(x.total_ht)||0),0);
+  const pct=D.produits.length?Math.round(100*nbRatt/D.produits.length):0;
+  document.getElementById('kpis').innerHTML=
+    kpi(D.factures.length,'Factures')+kpi(eur(totHt),'Total achats HT')+
+    kpi(D.produits.length,'Lignes produit')+kpi(pct+' %','Produits rattachés');
+  document.getElementById('sub').textContent=
+    'Factures d’achats matières premières · '+nbRatt+' produits sur '+D.produits.length+' rattachés au référentiel d’ingrédients.';
+  fillSelect('f-four',D.produits,'fournisseur');
+  fillSelect('x-four',D.factures,'fournisseur');
+  renderProduits();renderIngredients();renderFactures();
+}
+function kpi(v,l){return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>';}
+function fillSelect(id,data,key){
+  const vals=[...new Set(data.map(x=>x[key]).filter(Boolean))].sort();
+  document.getElementById(id).insertAdjacentHTML('beforeend',
+    vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join(''));
+}
+function sortData(arr,s){
+  const a=arr.slice();a.sort((x,y)=>{
+    let p=x[s.k],r=y[s.k];
+    if(p!=null&&p!==''&&!isNaN(parseFloat(p))&&!isNaN(parseFloat(r))){p=parseFloat(p);r=parseFloat(r);}
+    else{p=(p||'').toString().toLowerCase();r=(r||'').toString().toLowerCase();}
+    return (p<r?-1:p>r?1:0)*(s.a?1:-1);
+  });return a;
+}
+function renderProduits(){
+  const term=document.getElementById('f-search').value.toLowerCase().trim();
+  const fo=document.getElementById('f-four').value;
+  const nr=document.getElementById('f-nonratt').checked;
+  let rows=D.produits.filter(x=>{
+    if(fo&&x.fournisseur!==fo)return false;
+    if(nr&&x.ingredient_nom)return false;
+    if(term&&!((x.designation||'')+' '+(x.reference||'')+' '+(x.ingredient_nom||'')).toLowerCase().includes(term))return false;
+    return true;
+  });
+  rows=sortData(rows,sort.produits);
+  const tot=rows.length;rows=rows.slice(0,500);
+  document.getElementById('c-produits').textContent=tot+' produit(s)'+(tot>500?' · 500 affichés':'');
+  document.getElementById('t-produits').innerHTML=rows.map(x=>'<tr>'+
+    '<td>'+esc(x.fournisseur)+'</td><td>'+esc(x.date_facture)+'</td>'+
+    '<td>'+esc(x.designation)+'</td><td>'+esc(x.reference)+'</td>'+
+    '<td class="num">'+esc(x.quantite)+'</td><td>'+esc(x.unite)+'</td>'+
+    '<td class="num">'+eur(x.montant_ht)+'</td>'+
+    '<td>'+(x.ingredient_nom?esc(x.ingredient_nom):'<span class="badge b-no">à rattacher</span>')+'</td></tr>').join('')
+    ||'<tr><td colspan="8" style="padding:16px;color:#6b7280">Aucun résultat.</td></tr>';
+}
+function renderIngredients(){
+  const term=document.getElementById('i-search').value.toLowerCase().trim();
+  let rows=D.ingredients.filter(x=>!term||(x.ingredient_nom||'').toLowerCase().includes(term));
+  rows=sortData(rows,sort.ingredients);
+  document.getElementById('c-ingredients').textContent=rows.length+' ingrédient(s)';
+  document.getElementById('t-ingredients').innerHTML=rows.map(x=>'<tr>'+
+    '<td>'+esc(x.ingredient_nom)+'</td><td class="num">'+esc(x.nb_achats)+'</td>'+
+    '<td class="num">'+eur(x.pu_moyen)+'</td><td class="num">'+eur(x.pu_min)+'</td>'+
+    '<td class="num">'+eur(x.pu_max)+'</td><td class="num">'+eur(x.dernier_pu)+'</td>'+
+    '<td>'+esc(x.dernier_achat)+'</td></tr>').join('')
+    ||'<tr><td colspan="7" style="padding:16px;color:#6b7280">Aucune donnée.</td></tr>';
+}
+function renderFactures(){
+  const term=document.getElementById('x-search').value.toLowerCase().trim();
+  const fo=document.getElementById('x-four').value;
+  let rows=D.factures.filter(x=>{
+    if(fo&&x.fournisseur!==fo)return false;
+    if(term&&!((x.numero_facture||'')+' '+(x.fournisseur||'')).toLowerCase().includes(term))return false;
+    return true;
+  });
+  rows=sortData(rows,sort.factures);
+  document.getElementById('c-factures').textContent=rows.length+' facture(s)';
+  document.getElementById('t-factures').innerHTML=rows.map(x=>'<tr>'+
+    '<td>'+esc(x.fournisseur)+'</td><td>'+esc(x.date_facture)+'</td>'+
+    '<td>'+esc(x.numero_facture)+'</td><td>'+esc(x.etablissement)+'</td>'+
+    '<td class="num">'+eur(x.total_ht)+'</td><td class="num">'+eur(x.total_ttc)+'</td>'+
+    '<td class="num">'+esc(x.nb_lignes)+'</td></tr>').join('')
+    ||'<tr><td colspan="7" style="padding:16px;color:#6b7280">Aucun résultat.</td></tr>';
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');document.getElementById('p-'+t.dataset.p).classList.add('on');
+});
+document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+  const panel=th.closest('.panel').id.replace('p-','');const s=sort[panel];
+  if(s.k===th.dataset.k)s.a=!s.a;else{s.k=th.dataset.k;s.a=0;}
+  ({produits:renderProduits,ingredients:renderIngredients,factures:renderFactures}[panel])();
+});
+['f-search','f-four','f-nonratt'].forEach(id=>{const e=document.getElementById(id);e.oninput=renderProduits;e.onchange=renderProduits;});
+document.getElementById('i-search').oninput=renderIngredients;
+['x-search','x-four'].forEach(id=>{const e=document.getElementById(id);e.oninput=renderFactures;e.onchange=renderFactures;});
+load();
+</script>
+</body>
+</html>
