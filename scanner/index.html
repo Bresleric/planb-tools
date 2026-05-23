@@ -105,7 +105,7 @@
     .burst-ing { font-size:19px; font-weight:800; color:#78350f; margin-top:2px; }
     .burst-ing small { font-size:13px; font-weight:600; color:#92400e; }
     .burst-cam-wrap { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; margin-bottom:8px; }
-    #burst-video { width:100%; height:auto; display:block; }
+    #burst-video, #sburst-video { width:100%; height:auto; display:block; }
     .burst-frame { position:absolute; left:5%; right:5%; top:22%; bottom:22%; border:3px solid #22d3ee; border-radius:8px; box-shadow:0 0 0 9999px rgba(0,0,0,.38); pointer-events:none; }
     .burst-flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
     .burst-flash.go { animation:burstFlash .35s ease-out; }
@@ -518,6 +518,44 @@
       <canvas id="burst-canvas" style="display:none;"></canvas>
     </section>
 
+    <!-- ============ ÉCRAN SBURST — scan « rafale » d'une réception groupée ============ -->
+    <section id="screen-sburst" class="screen">
+
+      <!-- Phase 1 : activation de la caméra -->
+      <div id="sburst-activate" class="card" style="text-align:center;">
+        <div style="font-size:42px; margin-bottom:4px;">📦</div>
+        <div style="font-size:16px; font-weight:700; color:var(--gray-900);">Réception — scan des étiquettes</div>
+        <div id="sburst-activate-info" style="font-size:13px; color:var(--gray-600); margin:8px 0 16px;">—</div>
+        <button class="btn btn-primary" id="btn-sburst-start"><span class="emoji">📷</span><span>Activer la caméra</span></button>
+        <div id="sburst-cam-error" style="display:none; margin-top:12px; font-size:13px; color:var(--red-700);"></div>
+        <button class="btn btn-secondary" id="btn-sburst-fallback" style="display:none; margin-top:10px;"><span class="emoji">📸</span><span>Utiliser l'appareil photo standard</span></button>
+        <button class="btn btn-ghost" id="btn-sburst-cancel-1" style="margin-top:10px;">← Retour à la réception</button>
+      </div>
+
+      <!-- Phase 2 : capture en direct -->
+      <div id="sburst-capture" style="display:none;">
+        <div class="burst-head">
+          <div class="burst-step" id="sburst-step">ÉTIQUETTES</div>
+          <div class="burst-ing" id="sburst-title">—</div>
+        </div>
+        <div class="burst-cam-wrap" id="sburst-cam-wrap">
+          <video id="sburst-video" playsinline muted autoplay></video>
+          <div class="burst-frame" id="sburst-frame"></div>
+          <div class="burst-flash" id="sburst-flash"></div>
+        </div>
+        <div class="burst-hint" id="sburst-hint">Placez l'étiquette dans le cadre, puis appuyez sur SHOOT</div>
+        <button class="btn-shoot" id="btn-sburst-shoot"><span>📸</span><span>SHOOT</span></button>
+        <button class="btn btn-success" id="btn-sburst-end" style="margin-top:10px;"><span class="emoji">✓</span><span>Fin de scan des étiquettes →</span></button>
+        <button class="btn btn-secondary" id="btn-sburst-import" style="display:none; margin-top:10px;"><span class="emoji">📁</span><span>Importer le BL (PDF / image)</span></button>
+        <button class="btn btn-ghost" id="btn-sburst-skip-bl" style="display:none; margin-top:8px;">Pas de BL — terminer la réception</button>
+        <div class="burst-results" id="sburst-results"></div>
+        <button class="btn btn-ghost" id="btn-sburst-cancel-2" style="margin-top:4px;">← Retour à la réception</button>
+      </div>
+
+      <input type="file" class="file-input-hidden" id="sburst-file-input" accept="image/*">
+      <canvas id="sburst-canvas" style="display:none;"></canvas>
+    </section>
+
   </main>
 
   <div class="toast" id="toast"></div>
@@ -598,6 +636,7 @@
         'result': 'Résultat',
         'inventory': 'Inventaire',
         'burst': 'Étiquettes MP',
+        'sburst': 'Réception — scan',
       };
       $('header-title').textContent = titles[name] || 'Scanner';
 
@@ -745,13 +784,17 @@
       $('session-date').value = new Date().toISOString().slice(0, 10);
     }
 
-    $('fournisseur-search').addEventListener('input', (e) => {
-      const q = e.target.value.toLowerCase().trim();
+    // Liste déroulante des fournisseurs : s'ouvre dès le clic/focus sur le champ,
+    // se filtre à la frappe, et propose la création d'un fournisseur libre.
+    function renderFournisseurResults() {
+      const raw = $('fournisseur-search').value.trim();
+      const q = raw.toLowerCase();
       const res = $('fournisseur-results');
-      if (!q) { res.classList.remove('visible'); State.sessionFournisseur = null; $('btn-start-session').disabled = true; return; }
-      const matches = State.fournisseurs.filter(f => f.nom.toLowerCase().includes(q)).slice(0, 8);
+      const list = q
+        ? State.fournisseurs.filter(f => f.nom.toLowerCase().includes(q))
+        : State.fournisseurs.slice();
       res.innerHTML = '';
-      matches.forEach(f => {
+      list.slice(0, 60).forEach(f => {
         const item = document.createElement('div');
         item.className = 'result';
         item.textContent = f.nom;
@@ -763,20 +806,43 @@
         });
         res.appendChild(item);
       });
-      // option "saisie libre"
-      if (q.length >= 3) {
+      // Option de création d'un fournisseur inexistant (saisie libre).
+      if (raw.length >= 3 && !State.fournisseurs.some(f => f.nom.toLowerCase() === q)) {
         const item = document.createElement('div');
         item.className = 'result';
-        item.style.cssText = 'font-style:italic; color:var(--gray-600);';
-        item.textContent = `Utiliser le nom libre : "${e.target.value.trim()}"`;
+        item.style.cssText = 'font-style:italic; color:var(--primary-dark); font-weight:600;';
+        item.textContent = '＋ Créer le fournisseur : "' + raw + '"';
         item.addEventListener('click', () => {
-          State.sessionFournisseur = { id: null, nom: e.target.value.trim() };
+          State.sessionFournisseur = { id: null, nom: raw };
+          $('fournisseur-search').value = raw;
           res.classList.remove('visible');
           $('btn-start-session').disabled = false;
         });
         res.appendChild(item);
       }
+      if (res.children.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'result';
+        empty.style.color = 'var(--gray-500)';
+        empty.textContent = 'Aucun fournisseur — saisis un nom (3 caractères min.) pour le créer';
+        res.appendChild(empty);
+      }
       res.classList.add('visible');
+    }
+
+    $('fournisseur-search').addEventListener('focus', renderFournisseurResults);
+    $('fournisseur-search').addEventListener('input', () => {
+      // Toute modification du texte annule la sélection précédente.
+      State.sessionFournisseur = null;
+      $('btn-start-session').disabled = true;
+      renderFournisseurResults();
+    });
+    document.addEventListener('click', (e) => {
+      const inp = $('fournisseur-search');
+      const wrap = inp && inp.closest('.input-search');
+      if (wrap && !wrap.contains(e.target)) {
+        $('fournisseur-results').classList.remove('visible');
+      }
     });
 
     $('btn-start-session').addEventListener('click', async () => {
@@ -808,7 +874,7 @@
     $('btn-cancel-new-session').addEventListener('click', () => showScreen('home'));
 
     // ====== SESSION : capture étiquettes ======
-    $('btn-session-camera').addEventListener('click', () => $('input-session-camera').click());
+    $('btn-session-camera').addEventListener('click', () => initSessionBurst());
     $('btn-session-import').addEventListener('click', () => $('input-session-import').click());
     $('btn-session-bl').addEventListener('click', () => $('input-session-bl').click());
 
@@ -1798,6 +1864,265 @@
       if (!confirm(msg)) return;
       $('btn-burst-validate').click();
     });
+
+    // ====== MODE SBURST — Scan « rafale » des étiquettes d'une réception groupée ======
+    const SBurst = {
+      phase: 'etiquette',   // 'etiquette' | 'bl'
+      stream: null,
+      useFallback: false,
+      count: 0,             // nb d'étiquettes scannées dans cette session
+      rows: [],             // [{ n, status:'pending'|'ok'|'err', produit, lot, dlc, error }]
+    };
+
+    function initSessionBurst() {
+      if (!State.currentSessionId) {
+        showToast('Aucune réception en cours', 'error');
+        return;
+      }
+      SBurst.phase = 'etiquette';
+      SBurst.useFallback = false;
+      SBurst.count = 0;
+      SBurst.rows = [];
+      const f = (State.sessionFournisseur && State.sessionFournisseur.nom) || 'Réception en cours';
+      $('sburst-activate-info').textContent = 'Fournisseur : ' + f;
+      $('sburst-activate').style.display = '';
+      $('sburst-capture').style.display = 'none';
+      $('sburst-cam-error').style.display = 'none';
+      $('btn-sburst-fallback').style.display = 'none';
+      $('btn-sburst-start').disabled = false;
+      showScreen('sburst');
+    }
+
+    function sburstApplyPhase() {
+      const bl = SBurst.phase === 'bl';
+      $('sburst-step').textContent = bl ? 'BL / FACTURE' : 'ÉTIQUETTES';
+      $('sburst-title').textContent = bl
+        ? 'Scanne le bon de livraison ou la facture'
+        : (SBurst.count + ' étiquette' + (SBurst.count > 1 ? 's' : '') + ' scannée' + (SBurst.count > 1 ? 's' : ''));
+      $('sburst-frame').style.display = bl ? 'none' : '';
+      $('sburst-hint').textContent = bl
+        ? 'Cadre la totalité du document, puis SHOOT — ou importe le PDF'
+        : "Place l'étiquette dans le cadre, puis appuie sur SHOOT";
+      const lbl = $('btn-sburst-shoot').querySelector('span:last-child');
+      if (lbl) lbl.textContent = bl ? 'SHOOT — BL' : 'SHOOT';
+      $('btn-sburst-end').style.display = bl ? 'none' : '';
+      $('btn-sburst-import').style.display = bl ? '' : 'none';
+      $('btn-sburst-skip-bl').style.display = bl ? '' : 'none';
+    }
+
+    // --- Activation de la caméra live ---
+    $('btn-sburst-start').addEventListener('click', async () => {
+      $('btn-sburst-start').disabled = true;
+      try {
+        SBurst.stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+        $('sburst-activate').style.display = 'none';
+        $('sburst-capture').style.display = '';
+        $('sburst-cam-wrap').style.display = '';
+        SBurst.useFallback = false;
+        const v = $('sburst-video');
+        v.srcObject = SBurst.stream;
+        try { await v.play(); } catch (e) {}
+        sburstApplyPhase();
+        renderSburstRows();
+      } catch (err) {
+        console.error('[SBurst] getUserMedia:', err);
+        $('btn-sburst-start').disabled = false;
+        $('sburst-cam-error').textContent =
+          'Caméra en direct indisponible (' + (err && err.name ? err.name : 'erreur')
+          + "). Tu peux utiliser l'appareil photo standard.";
+        $('sburst-cam-error').style.display = '';
+        $('btn-sburst-fallback').style.display = '';
+      }
+    });
+
+    // --- Repli : appareil photo natif ---
+    $('btn-sburst-fallback').addEventListener('click', () => {
+      SBurst.useFallback = true;
+      $('sburst-activate').style.display = 'none';
+      $('sburst-capture').style.display = '';
+      $('sburst-cam-wrap').style.display = 'none';
+      sburstApplyPhase();
+      $('sburst-hint').textContent = "Appuie sur SHOOT pour ouvrir l'appareil photo";
+      renderSburstRows();
+    });
+
+    // --- SHOOT ---
+    $('btn-sburst-shoot').addEventListener('click', () => {
+      if (SBurst.useFallback) {
+        const fi = $('sburst-file-input');
+        fi.setAttribute('accept', SBurst.phase === 'bl' ? 'image/*,application/pdf' : 'image/*');
+        fi.setAttribute('capture', 'environment');
+        fi.click();
+        return;
+      }
+      if (!SBurst.stream) return;
+      const v = $('sburst-video');
+      if (!v.videoWidth) { showToast('Caméra pas encore prête…'); return; }
+      const cw = v.videoWidth, ch = v.videoHeight;
+      let sx, sy, sw, sh;
+      if (SBurst.phase === 'bl') {
+        sx = 0; sy = 0; sw = cw; sh = ch;                       // BL : plein cadre
+      } else {
+        sx = Math.round(cw * 0.05); sy = Math.round(ch * 0.22); // étiquette : bande centrale
+        sw = Math.round(cw * 0.90); sh = Math.round(ch * 0.56);
+      }
+      const cv = $('sburst-canvas');
+      cv.width = sw; cv.height = sh;
+      cv.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, sw, sh);
+      const fl = $('sburst-flash');
+      fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+      cv.toBlob(b => { if (b) sburstHandleBlob(b); }, 'image/jpeg', 0.92);
+    });
+
+    // --- Bouton « Importer le BL » (phase BL uniquement) ---
+    $('btn-sburst-import').addEventListener('click', () => {
+      const fi = $('sburst-file-input');
+      fi.setAttribute('accept', 'image/*,application/pdf');
+      fi.removeAttribute('capture');
+      fi.click();
+    });
+
+    $('sburst-file-input').addEventListener('change', e => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) sburstHandleBlob(f);
+    });
+
+    // --- Traite une capture : étiquette (boucle) ou BL (termine) ---
+    function sburstHandleBlob(fileOrBlob) {
+      if (SBurst.phase === 'bl') {
+        showToast('📄 BL envoyé — analyse en tâche de fond');
+        extractSessionShot(fileOrBlob, true, null);
+        sburstStopCamera();
+        showScreen('session');
+        try { refreshSessionList(); } catch (e) {}
+        return;
+      }
+      SBurst.count++;
+      const row = { n: SBurst.count, status: 'pending', produit: null, lot: null, dlc: null };
+      SBurst.rows.unshift(row);
+      extractSessionShot(fileOrBlob, false, row);   // tâche de fond
+      sburstApplyPhase();
+      renderSburstRows();
+    }
+
+    // --- Upload + INSERT scan + extraction Claude Vision (tâche de fond) ---
+    async function extractSessionShot(fileOrBlob, isBL, row) {
+      try {
+        const isFile = !!fileOrBlob.name;
+        const ext = isFile ? ((fileOrBlob.name.split('.').pop() || 'jpg').toLowerCase()) : 'jpg';
+        const ctype = fileOrBlob.type || 'image/jpeg';
+        const today = new Date().toISOString().slice(0, 10);
+        const uuid = crypto.randomUUID();
+        const path = currentEtab + '/' + today + '/' + uuid + '.' + ext;
+        const { error: upErr } = await sb.storage.from('scans').upload(path, fileOrBlob, {
+          cacheControl: '3600', upsert: false, contentType: ctype,
+        });
+        if (upErr) throw new Error('Upload : ' + upErr.message);
+        const { data: ins, error: insErr } = await sb.from('scans').insert({
+          etablissement: currentEtab,
+          type_document: isBL ? 'bl_facture' : 'etiquette_produit',
+          voie_capture: isFile ? 'pdf_scanner_pro' : 'camera_inapp',
+          storage_path: path,
+          mime_type: ctype,
+          taille_octets: fileOrBlob.size,
+          session_id: State.currentSessionId,
+          created_by_id: currentUser.id,
+          created_by_nom: currentUser.nom,
+          created_by_initiales: currentUser.initiales,
+        }).select('id').single();
+        if (insErr) throw new Error('INSERT : ' + insErr.message);
+        const scanId = ins.id;
+        if (isBL) {
+          try {
+            await sb.from('scan_sessions')
+              .update({ bl_facture_scan_id: scanId, statut: 'bl_scanne' })
+              .eq('id', State.currentSessionId);
+          } catch (e) { console.warn('[SBurst] maj session BL:', e); }
+        }
+        await callExtract(scanId);
+        if (row) {
+          let trac = null;
+          for (let i = 0; i < 6 && !trac; i++) {
+            const { data } = await sb.from('scan_tracabilite')
+              .select('produit, lot, dlc').eq('scan_id', scanId).maybeSingle();
+            if (data) { trac = data; break; }
+            await new Promise(r => setTimeout(r, 450));
+          }
+          row.status = 'ok';
+          row.produit = trac ? trac.produit : null;
+          row.lot = trac ? trac.lot : null;
+          row.dlc = trac ? trac.dlc : null;
+        }
+      } catch (e) {
+        console.error('[SBurst] extraction:', e);
+        if (row) { row.status = 'err'; row.error = (e && e.message) || 'Erreur'; }
+      } finally {
+        if (row) renderSburstRows();
+        try { refreshSessionList(); } catch (e) {}
+      }
+    }
+
+    // --- Liste des étiquettes scannées (mise à jour au fil des extractions) ---
+    function renderSburstRows() {
+      const box = $('sburst-results');
+      if (!box) return;
+      if (SBurst.rows.length === 0) {
+        box.innerHTML = '<div style="font-size:12px; color:var(--gray-500);">Aucune étiquette scannée pour l\'instant.</div>';
+        return;
+      }
+      box.innerHTML = SBurst.rows.map(r => {
+        if (r.status === 'pending') {
+          return '<div class="burst-row pending"><span class="burst-mini-spin"></span>'
+            + '<div class="br-main"><div class="br-name">Étiquette ' + r.n + '</div>'
+            + '<div class="br-sub">analyse Claude Vision en cours…</div></div></div>';
+        }
+        if (r.status === 'err') {
+          return '<div class="burst-row err"><span class="br-ico">⚠</span>'
+            + '<div class="br-main"><div class="br-name">Étiquette ' + r.n + '</div>'
+            + '<div class="br-sub">Échec : ' + burstEsc(r.error || '') + '</div></div></div>';
+        }
+        const dlc = r.dlc ? new Date(r.dlc).toLocaleDateString('fr-FR') : '?';
+        return '<div class="burst-row ok"><span class="br-ico">✓</span>'
+          + '<div class="br-main"><div class="br-name">' + burstEsc(r.produit || ('Étiquette ' + r.n)) + '</div>'
+          + '<div class="br-sub">lot ' + burstEsc(r.lot || '?') + ' · DLC ' + dlc + '</div></div></div>';
+      }).join('');
+    }
+
+    // --- Fin du scan des étiquettes → passage à la numérisation du BL ---
+    $('btn-sburst-end').addEventListener('click', () => {
+      SBurst.phase = 'bl';
+      sburstApplyPhase();
+      renderSburstRows();
+      showToast('Scanne maintenant le BL / la facture');
+    });
+
+    // --- Pas de BL : on termine et on revient à la réception ---
+    $('btn-sburst-skip-bl').addEventListener('click', () => {
+      sburstStopCamera();
+      showScreen('session');
+      try { refreshSessionList(); } catch (e) {}
+    });
+
+    $('btn-sburst-cancel-1').addEventListener('click', () => {
+      sburstStopCamera();
+      showScreen('session');
+    });
+    $('btn-sburst-cancel-2').addEventListener('click', () => {
+      sburstStopCamera();
+      showScreen('session');
+      try { refreshSessionList(); } catch (e) {}
+    });
+
+    function sburstStopCamera() {
+      try {
+        if (SBurst.stream) { SBurst.stream.getTracks().forEach(t => t.stop()); SBurst.stream = null; }
+        const v = $('sburst-video'); if (v) v.srcObject = null;
+      } catch (e) {}
+    }
 
     // ====== MODE INVENTAIRE (vérif stock) ======
     const InvState = { scanId: null, extraction: null };
