@@ -2186,15 +2186,24 @@
               const dlcStr = sc.dlc ? new Date(sc.dlc).toLocaleDateString('fr-FR') : '?';
               const fabStr = sc.fabricant ? ` · ${esc(sc.fabricant)}` : '';
               const poidsStr = sc.poids_net_kg ? ` · ${sc.poids_net_kg} kg` : '';
+              const extras = Array.isArray(sc.lots_supplementaires) ? sc.lots_supplementaires : [];
+              const nbLots = 1 + extras.length;
               const srcBadge = sc._src === 'persisted'
                 ? '<span title="Persisté en base" style="font-size:0.65rem;background:#bbf7d0;color:#14532d;padding:1px 5px;border-radius:3px;margin-left:4px;">DB</span>'
                 : '<span title="En attente" style="font-size:0.65rem;background:#fef3c7;color:#854d0e;padding:1px 5px;border-radius:3px;margin-left:4px;">pending</span>';
+              const nbBadge = nbLots > 1
+                ? `<span title="Plusieurs lots scannés" style="font-size:0.65rem;background:#0891b2;color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">${nbLots} lots</span>`
+                : '';
+              const extrasStr = extras.map(ex => {
+                const exDlc = ex && ex.dlc ? new Date(ex.dlc).toLocaleDateString('fr-FR') : '?';
+                return `<br><span style="font-size:0.72rem; color:#166534;">+ lot ${esc((ex && ex.lot) || '?')} · DLC ${exDlc}</span>`;
+              }).join('');
               const rescanBtn = obligatoire
                 ? `<button onclick="rescanIngredient('${i.id}')" style="font-size:0.72rem; padding:5px 9px; background:white; border:1px solid #86efac; border-radius:4px; color:#15803d; cursor:pointer;">↻</button>`
                 : '';
               return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#dcfce7; border:1px solid #86efac; border-radius:8px;">
                 <span style="font-size:1.3rem; line-height:1">✓</span>
-                <span style="flex:1; color:#15803d; font-size:0.85rem;"><strong>${esc(i.nom)}</strong>${srcBadge}<br><span style="font-size:0.75rem; color:#166534;">${esc(sc.produit || '?')} · lot ${esc(sc.lot || '?')} · DLC ${dlcStr}${fabStr}${poidsStr}</span></span>
+                <span style="flex:1; color:#15803d; font-size:0.85rem;"><strong>${esc(i.nom)}</strong>${srcBadge}${nbBadge}<br><span style="font-size:0.75rem; color:#166534;">${esc(sc.produit || '?')} · lot ${esc(sc.lot || '?')} · DLC ${dlcStr}${fabStr}${poidsStr}</span>${extrasStr}</span>
                 ${rescanBtn}
               </div>`;
             }
@@ -2375,6 +2384,7 @@
           poids_net_kg: sc.poids_net_kg,
           source: 'scans_lots',
           scan_tracabilite_id: sc.scan_tracabilite_id,
+          lots_supplementaires: Array.isArray(sc.lots_supplementaires) ? sc.lots_supplementaires : [],
         };
       });
       return byArticle;
@@ -2401,24 +2411,39 @@
   // ====== PHASE B — Persistance des scans dans tasks.scans_lots ======
   // Mémorise l'étiquette scannée pour un ingrédient, en base, afin qu'elle
   // survive jusqu'à la validation de la production (multi-iPads).
-  async function persistScanToTask(taskId, ingredientId, scanData) {
+  // Enrichit un scan avec fabricant + poids depuis scan_tracabilite (best-effort).
+  async function enrichScanFromTrac(scanData) {
+    const enriched = { ...scanData };
+    if (scanData && scanData.scan_tracabilite_id) {
+      try {
+        const { data: st } = await supabaseClient.from('scan_tracabilite')
+          .select('fabricant, poids_net_kg, produit, lot, dlc')
+          .eq('id', scanData.scan_tracabilite_id).single();
+        if (st) {
+          enriched.fabricant = st.fabricant ?? enriched.fabricant ?? null;
+          enriched.poids_net_kg = st.poids_net_kg ?? enriched.poids_net_kg ?? null;
+          if (!enriched.produit) enriched.produit = st.produit;
+          if (!enriched.lot) enriched.lot = st.lot;
+          if (!enriched.dlc) enriched.dlc = st.dlc;
+        }
+      } catch (e) { /* enrichissement non bloquant */ }
+    }
+    return enriched;
+  }
+
+  // Mémorise en base le lot principal + d'éventuels lots supplémentaires d'un
+  // même ingrédient. extraScans = tableau de scans (les paquets en plus).
+  async function persistScanToTask(taskId, ingredientId, scanData, extraScans) {
     if (!taskId || !ingredientId || !scanData) return;
     try {
-      let enriched = { ...scanData };
-      // Enrichir avec fabricant + poids depuis scan_tracabilite (best-effort)
-      if (scanData.scan_tracabilite_id) {
-        try {
-          const { data: st } = await supabaseClient.from('scan_tracabilite')
-            .select('fabricant, poids_net_kg, produit, lot, dlc')
-            .eq('id', scanData.scan_tracabilite_id).single();
-          if (st) {
-            enriched.fabricant = st.fabricant ?? null;
-            enriched.poids_net_kg = st.poids_net_kg ?? null;
-            if (!enriched.produit) enriched.produit = st.produit;
-            if (!enriched.lot) enriched.lot = st.lot;
-            if (!enriched.dlc) enriched.dlc = st.dlc;
-          }
-        } catch (e) { /* enrichissement non bloquant */ }
+      const enriched = await enrichScanFromTrac(scanData);
+      // Lots supplémentaires (autres paquets du même ingrédient)
+      if (Array.isArray(extraScans) && extraScans.length) {
+        const enrichedExtras = [];
+        for (const ex of extraScans) {
+          if (ex) enrichedExtras.push(await enrichScanFromTrac(ex));
+        }
+        if (enrichedExtras.length) enriched.lots_supplementaires = enrichedExtras;
       }
       // Relire scans_lots en base pour ne pas écraser un scan concurrent
       let scansLots = {};
@@ -2577,20 +2602,27 @@
     if (result && result.batch) {
       const tid = result.task_id;
       const scans = result.scans || {};
+      const extras = result.extras || {};
       const ids = Object.keys(scans);
+      let nbExtras = 0;
       if (tid && ids.length > 0) {
         const pending = getPendingScans(tid);
         ids.forEach(ingId => { pending[ingId] = scans[ingId]; });
         setPendingScans(tid, pending);
         // Persister chaque scan en base (tasks.scans_lots) — survit au changement d'iPad
         for (const ingId of ids) {
-          try { await persistScanToTask(tid, ingId, scans[ingId]); }
+          const ex = Array.isArray(extras[ingId]) ? extras[ingId] : [];
+          nbExtras += ex.length;
+          try { await persistScanToTask(tid, ingId, scans[ingId], ex); }
           catch (e) { console.warn('[Scan-FEFO] persist batch:', e); }
         }
       }
       const nbErr = (result.errors || []).length;
+      const nbTotal = ids.length + nbExtras;
       showToast(
-        ids.length + ' étiquette(s) enregistrée(s)' + (nbErr ? ' · ' + nbErr + ' à refaire' : ''),
+        nbTotal + ' étiquette(s) enregistrée(s)'
+          + (nbExtras ? ' (dont ' + nbExtras + ' lot' + (nbExtras > 1 ? 's' : '') + ' suppl.)' : '')
+          + (nbErr ? ' · ' + nbErr + ' à refaire' : ''),
         nbErr ? 'error' : 'success'
       );
       setTimeout(async () => {
@@ -4046,32 +4078,61 @@
     applyScannedLotsToMatieres();
   }
 
-  // Force la sélection sur l'étiquette réellement scannée dans le TAF.
+  // Force la sélection sur le(s) lot(s) réellement scanné(s) dans le TAF.
+  // Un ingrédient peut avoir plusieurs lots (plusieurs paquets) : on répartit
+  // alors la quantité théorique à parts égales sur tous les lots scannés.
   function applyScannedLotsToMatieres() {
     const scans = Object.values(prodScannedLots || {});
-    prodMatieres.forEach(m => { m.scanne = false; m.scan_info = null; });
+    prodMatieres.forEach(m => { m.scanne = false; m.scan_info = null; m.scan_nb_lots = 0; });
     if (!scans.length) return;
     prodMatieres.forEach(m => {
       const scan = scans.find(s => s && s.article_id === m.article_id && s.scan_tracabilite_id);
       if (!scan) return;
-      const scanLotId = scan.scan_tracabilite_id;
-      // S'assurer que le lot scanné apparaît dans la liste (même si épuisé en stock)
-      if (!m.lots.find(l => l.scan_tracabilite_id === scanLotId)) {
-        m.lots.unshift({
-          scan_tracabilite_id: scanLotId,
-          article_id: m.article_id,
-          article_nom: scan.produit || m.ingredient_nom,
-          lot: scan.lot || '?',
-          dlc: scan.dlc || null,
-          quantite_restante: Number(scan.poids_net_kg) || Number(m.qty_theorique) || 0,
-          fabricant: scan.fabricant || null,
+      // Rassembler le lot principal + les lots supplémentaires, dédoublonnés
+      const candidats = [scan].concat(
+        Array.isArray(scan.lots_supplementaires) ? scan.lots_supplementaires : []
+      ).filter(s => s && s.scan_tracabilite_id);
+      const seen = {};
+      const lots = [];
+      candidats.forEach(s => {
+        if (seen[s.scan_tracabilite_id]) return;
+        seen[s.scan_tracabilite_id] = true;
+        lots.push(s);
+      });
+      if (!lots.length) return;
+      // S'assurer que chaque lot scanné apparaît dans la liste (même si épuisé)
+      lots.forEach(s => {
+        if (!m.lots.find(l => l.scan_tracabilite_id === s.scan_tracabilite_id)) {
+          m.lots.unshift({
+            scan_tracabilite_id: s.scan_tracabilite_id,
+            article_id: m.article_id,
+            article_nom: s.produit || m.ingredient_nom,
+            lot: s.lot || '?',
+            dlc: s.dlc || null,
+            quantite_restante: Number(s.poids_net_kg) || Number(m.qty_theorique) || 0,
+            fabricant: s.fabricant || null,
+          });
+        }
+      });
+      // Répartir la quantité théorique sur les lots scannés
+      m.selections = {};
+      const total = Number(m.qty_theorique || 0);
+      const n = lots.length;
+      if (n === 1) {
+        m.selections[lots[0].scan_tracabilite_id] = Number(total.toFixed(3));
+      } else {
+        const part = total / n;
+        let cumul = 0;
+        lots.forEach((s, i) => {
+          // le dernier lot absorbe l'arrondi pour que la somme soit exacte
+          const q = (i === n - 1) ? (total - cumul) : Number(part.toFixed(3));
+          cumul += q;
+          m.selections[s.scan_tracabilite_id] = Number(q.toFixed(3));
         });
       }
-      // Forcer la sélection sur le seul lot scanné
-      m.selections = {};
-      m.selections[scanLotId] = Number((m.qty_theorique || 0).toFixed(3));
       m.scanne = true;
       m.scan_info = scan;
+      m.scan_nb_lots = n;
     });
   }
 
@@ -4112,7 +4173,7 @@
       div.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">
           <div style="flex:1; min-width:0;">
-            <div style="font-size:13px; font-weight:600; color:#111827;">${_esc(m.ingredient_nom)}${m.scanne ? ' <span style="font-size:9px;background:#bbf7d0;color:#14532d;padding:1px 6px;border-radius:3px;font-weight:700;">✓ ÉTIQUETTE SCANNÉE</span>' : (m.est_principal ? ' <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-weight:700;">⚠ NON SCANNÉ</span>' : '')}</div>
+            <div style="font-size:13px; font-weight:600; color:#111827;">${_esc(m.ingredient_nom)}${m.scanne ? ' <span style="font-size:9px;background:#bbf7d0;color:#14532d;padding:1px 6px;border-radius:3px;font-weight:700;">✓ ' + ((m.scan_nb_lots || 1) > 1 ? (m.scan_nb_lots + ' ÉTIQUETTES SCANNÉES') : 'ÉTIQUETTE SCANNÉE') + '</span>' : (m.est_principal ? ' <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-weight:700;">⚠ NON SCANNÉ</span>' : '')}</div>
             <div style="font-size:11px; color:#6b7280;">→ ${_esc(m.lots[0]?.article_nom || 'Article inconnu')}</div>
           </div>
           <div style="text-align:right;">

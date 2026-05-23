@@ -124,6 +124,10 @@
     .burst-row .br-name { font-weight:700; color:var(--gray-900); }
     .burst-row .br-sub { font-size:11px; color:var(--gray-600); }
     .burst-redo { font-size:12px; padding:7px 11px; background:#fff; border:1px solid var(--gray-300); border-radius:6px; color:var(--gray-700); cursor:pointer; flex-shrink:0; }
+    .burst-ing-group { display:flex; flex-direction:column; gap:4px; }
+    .burst-ing-group .burst-row.extra { margin-left:22px; }
+    .burst-add-extra { align-self:flex-start; margin-left:22px; font-size:12px; font-weight:700; padding:6px 12px; background:#ecfeff; border:1px dashed #67e8f9; border-radius:6px; color:#0e7490; cursor:pointer; }
+    .burst-add-extra.finish { background:#dcfce7; border:1px solid #86efac; color:#15803d; }
     .burst-mini-spin { width:18px; height:18px; border:3px solid var(--gray-200); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; flex-shrink:0; }
 
     /* Vue résultat (mode unit) + édition */
@@ -1528,7 +1532,9 @@
       ctx: null,           // { task_id, fiche_id, tache, ingredients:[...] }
       idx: 0,              // index de l'ingrédient en cours
       stream: null,        // MediaStream getUserMedia
-      results: {},         // ingredient_id -> { ...scan } | { error } | { _pending:true }
+      results: {},         // ingredient_id -> { ...scan } | { error } | { _pending:true }  (lot principal)
+      extras: {},          // ingredient_id -> [ { ...scan } | { error } | { _pending } ]   (lots supplémentaires)
+      addingExtraFor: null,// ingredient_id en cours d'ajout d'étiquette supplémentaire, ou null
       jobs: 0,             // nb d'extractions Claude Vision en cours
       useFallback: false,  // true = appareil photo natif iOS (getUserMedia indispo)
     };
@@ -1552,6 +1558,8 @@
       Burst.ctx = ctx;
       Burst.idx = 0;
       Burst.results = {};
+      Burst.extras = {};
+      Burst.addingExtraFor = null;
       Burst.jobs = 0;
       Burst.useFallback = false;
       const n = ctx.ingredients.length;
@@ -1574,6 +1582,13 @@
     function burstUpdateHeader() {
       const ing = burstCurrentIng();
       if (!ing) return;
+      if (Burst.addingExtraFor === ing.ingredient_id) {
+        const n = (Burst.extras[ing.ingredient_id] || []).length;
+        $('burst-step').textContent = 'Étiquette supplémentaire'
+          + (n ? ' · ' + n + ' ajoutée' + (n > 1 ? 's' : '') : '');
+        $('burst-ing').innerHTML = '➕ ' + burstEsc(ing.nom_attendu || 'Ingrédient');
+        return;
+      }
       $('burst-step').textContent = 'Étiquette ' + (Burst.idx + 1) + ' / ' + Burst.ctx.ingredients.length;
       const q = (ing.quantite != null && ing.quantite !== '')
         ? ' <small>(' + burstEsc(ing.quantite) + ' ' + burstEsc(ing.unite || '') + ')</small>' : '';
@@ -1648,11 +1663,23 @@
     function burstHandleBlob(blob) {
       const ing = burstCurrentIng();
       if (!ing) return;
-      Burst.results[ing.ingredient_id] = { _pending: true };
+      const ingId = ing.ingredient_id;
       Burst.jobs++;
-      renderBurstResults();
-      extractBurstShot(blob, ing);   // tâche de fond — pas de await
-      burstAdvance();
+      if (Burst.addingExtraFor === ingId) {
+        // Étiquette supplémentaire : on l'empile et on reste sur cet ingrédient
+        Burst.extras[ingId] = Burst.extras[ingId] || [];
+        const exIdx = Burst.extras[ingId].length;
+        Burst.extras[ingId].push({ _pending: true });
+        renderBurstResults();
+        burstUpdateHeader();
+        extractBurstShot(blob, ing, exIdx);   // tâche de fond — pas de await
+        // pas d'avance : l'utilisateur peut shooter un autre lot du même ingrédient
+      } else {
+        Burst.results[ingId] = { _pending: true };
+        renderBurstResults();
+        extractBurstShot(blob, ing, null);    // tâche de fond — pas de await
+        burstAdvance();
+      }
     }
 
     // --- Avance vers le prochain ingrédient sans résultat ---
@@ -1668,8 +1695,18 @@
       }
     }
 
+    // --- Range un résultat dans le bon emplacement (lot principal ou supplémentaire) ---
+    function burstSetResult(ingId, extraIdx, value) {
+      if (extraIdx == null) {
+        Burst.results[ingId] = value;
+      } else {
+        Burst.extras[ingId] = Burst.extras[ingId] || [];
+        Burst.extras[ingId][extraIdx] = value;
+      }
+    }
+
     // --- Extraction Claude Vision en tâche de fond ---
-    async function extractBurstShot(blob, ing) {
+    async function extractBurstShot(blob, ing, extraIdx) {
       try {
         const today = new Date().toISOString().slice(0, 10);
         const uuid = crypto.randomUUID();
@@ -1705,7 +1742,7 @@
           await new Promise(r => setTimeout(r, 450));
         }
 
-        Burst.results[ing.ingredient_id] = {
+        burstSetResult(ing.ingredient_id, extraIdx, {
           ingredient_id: ing.ingredient_id,
           scan_id: scanId,
           scan_tracabilite_id: trac ? trac.id : null,
@@ -1718,10 +1755,10 @@
           fabricant: trac ? trac.fabricant : null,
           poids_net_kg: trac ? trac.poids_net_kg : null,
           timestamp: Date.now(),
-        };
+        });
       } catch (err) {
         console.error('[Burst] extraction:', err);
-        Burst.results[ing.ingredient_id] = { error: (err && err.message) || 'Erreur extraction' };
+        burstSetResult(ing.ingredient_id, extraIdx, { error: (err && err.message) || 'Erreur extraction' });
       } finally {
         Burst.jobs--;
         renderBurstResults();
@@ -1729,53 +1766,114 @@
       }
     }
 
+    // --- HTML d'une ligne de résultat (lot principal ou supplémentaire) ---
+    function burstRowHtml(r, label, ingId, extraIdx, isTarget) {
+      const lbl = burstEsc(label);
+      const isExtra = extraIdx != null;
+      const cls = isExtra ? 'burst-row extra' : 'burst-row';
+      const redoAttr = 'data-redo-ing="' + burstEsc(ingId) + '" data-redo-extra="'
+        + (isExtra ? extraIdx : '') + '"';
+      if (!r) {
+        return '<div class="' + cls + ' pending"><span class="br-ico">' + (isTarget ? '🎯' : '○')
+          + '</span><div class="br-main"><div class="br-name">' + lbl
+          + '</div><div class="br-sub">en attente de scan</div></div></div>';
+      }
+      if (r._pending) {
+        return '<div class="' + cls + ' pending"><span class="burst-mini-spin"></span>'
+          + '<div class="br-main"><div class="br-name">' + lbl
+          + '</div><div class="br-sub">analyse Claude Vision en cours…</div></div></div>';
+      }
+      if (r.error) {
+        return '<div class="' + cls + ' err"><span class="br-ico">⚠</span><div class="br-main">'
+          + '<div class="br-name">' + lbl + '</div>'
+          + '<div class="br-sub">Échec : ' + burstEsc(r.error) + '</div></div>'
+          + '<button class="burst-redo" ' + redoAttr + '>↻ Refaire</button></div>';
+      }
+      const dlc = r.dlc ? new Date(r.dlc).toLocaleDateString('fr-FR') : '?';
+      const mismatch = r.article_id_attendu && r.article_id && r.article_id !== r.article_id_attendu;
+      const noMatch = !r.article_id;
+      const warn = mismatch
+        ? '<div class="br-sub" style="color:#b91c1c;font-weight:700;">⚠ Produit différent de l\'ingrédient attendu</div>'
+        : (noMatch ? '<div class="br-sub" style="color:#b45309;font-weight:700;">⚠ Article non reconnu — à vérifier</div>' : '');
+      return '<div class="' + cls + ' ' + (mismatch || noMatch ? 'err' : 'ok') + '">'
+        + '<span class="br-ico">' + (mismatch || noMatch ? '⚠' : '✓') + '</span>'
+        + '<div class="br-main"><div class="br-name">' + lbl + '</div>'
+        + '<div class="br-sub">' + burstEsc(r.produit || '?') + ' · lot ' + burstEsc(r.lot || '?')
+        + ' · DLC ' + dlc + '</div>' + warn + '</div>'
+        + '<button class="burst-redo" ' + redoAttr + '>↻ Refaire</button></div>';
+    }
+
     // --- Liste des résultats sous la caméra ---
     function renderBurstResults() {
       const box = $('burst-results');
       if (!box || !Burst.ctx) return;
       box.innerHTML = Burst.ctx.ingredients.map((ing, i) => {
-        const r = Burst.results[ing.ingredient_id];
-        const nom = burstEsc(ing.nom_attendu || 'Ingrédient');
-        if (!r) {
-          return '<div class="burst-row pending"><span class="br-ico">' + (i === Burst.idx ? '🎯' : '○')
-            + '</span><div class="br-main"><div class="br-name">' + nom
-            + '</div><div class="br-sub">en attente de scan</div></div></div>';
+        const ingId = ing.ingredient_id;
+        const nom = ing.nom_attendu || 'Ingrédient';
+        const primaryTarget = (i === Burst.idx && Burst.addingExtraFor == null);
+        let html = burstRowHtml(Burst.results[ingId], nom, ingId, null, primaryTarget);
+        const exList = Burst.extras[ingId] || [];
+        exList.forEach((er, ei) => {
+          html += burstRowHtml(er, nom + ' — lot ' + (ei + 2), ingId, ei, false);
+        });
+        // Bouton « ajouter une étiquette » : visible dès que le lot principal a un résultat
+        if (Burst.addingExtraFor === ingId) {
+          html += '<button class="burst-add-extra finish" data-finish-extra="1">'
+            + '✓ Terminé pour ' + burstEsc(nom) + '</button>';
+        } else if (Burst.results[ingId]) {
+          html += '<button class="burst-add-extra" data-add-extra="' + burstEsc(ingId) + '">'
+            + '➕ Autre étiquette pour ' + burstEsc(nom) + '</button>';
         }
-        if (r._pending) {
-          return '<div class="burst-row pending"><span class="burst-mini-spin"></span>'
-            + '<div class="br-main"><div class="br-name">' + nom
-            + '</div><div class="br-sub">analyse Claude Vision en cours…</div></div></div>';
-        }
-        if (r.error) {
-          return '<div class="burst-row err"><span class="br-ico">⚠</span><div class="br-main">'
-            + '<div class="br-name">' + nom + '</div>'
-            + '<div class="br-sub">Échec : ' + burstEsc(r.error) + '</div></div>'
-            + '<button class="burst-redo" data-redo="' + i + '">↻ Refaire</button></div>';
-        }
-        const dlc = r.dlc ? new Date(r.dlc).toLocaleDateString('fr-FR') : '?';
-        const mismatch = r.article_id_attendu && r.article_id && r.article_id !== r.article_id_attendu;
-        const noMatch = !r.article_id;
-        const warn = mismatch
-          ? '<div class="br-sub" style="color:#b91c1c;font-weight:700;">⚠ Produit différent de l\'ingrédient attendu</div>'
-          : (noMatch ? '<div class="br-sub" style="color:#b45309;font-weight:700;">⚠ Article non reconnu — à vérifier</div>' : '');
-        return '<div class="burst-row ' + (mismatch || noMatch ? 'err' : 'ok') + '">'
-          + '<span class="br-ico">' + (mismatch || noMatch ? '⚠' : '✓') + '</span>'
-          + '<div class="br-main"><div class="br-name">' + nom + '</div>'
-          + '<div class="br-sub">' + burstEsc(r.produit || '?') + ' · lot ' + burstEsc(r.lot || '?')
-          + ' · DLC ' + dlc + '</div>' + warn + '</div>'
-          + '<button class="burst-redo" data-redo="' + i + '">↻ Refaire</button></div>';
+        return '<div class="burst-ing-group">' + html + '</div>';
       }).join('');
-      box.querySelectorAll('[data-redo]').forEach(btn => {
-        btn.addEventListener('click', () => burstRedo(parseInt(btn.dataset.redo, 10)));
+      box.querySelectorAll('[data-redo-ing]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const ex = btn.dataset.redoExtra;
+          burstRedo(btn.dataset.redoIng, ex === '' ? null : parseInt(ex, 10));
+        });
+      });
+      box.querySelectorAll('[data-add-extra]').forEach(btn => {
+        btn.addEventListener('click', () => burstAddExtra(btn.dataset.addExtra));
+      });
+      box.querySelectorAll('[data-finish-extra]').forEach(btn => {
+        btn.addEventListener('click', () => burstFinishExtra());
       });
     }
 
-    // --- Refaire le scan d'un ingrédient précis ---
-    function burstRedo(i) {
-      if (i == null || i < 0 || !Burst.ctx) return;
-      const ing = Burst.ctx.ingredients[i];
-      if (!ing) return;
-      delete Burst.results[ing.ingredient_id];
+    // --- Passer en mode « ajout d'étiquette supplémentaire » pour un ingrédient ---
+    function burstAddExtra(ingId) {
+      if (!Burst.ctx) return;
+      const i = Burst.ctx.ingredients.findIndex(x => x.ingredient_id === ingId);
+      if (i < 0) return;
+      Burst.addingExtraFor = ingId;
+      Burst.idx = i;
+      $('btn-burst-shoot').style.display = '';
+      $('btn-burst-validate').style.display = 'none';
+      burstUpdateHeader();
+      renderBurstResults();
+    }
+
+    // --- Quitter le mode « ajout d'étiquette supplémentaire » ---
+    function burstFinishExtra() {
+      Burst.addingExtraFor = null;
+      burstAdvance();           // revient au 1er ingrédient sans lot principal, sinon rien
+      burstUpdateHeader();
+      renderBurstResults();
+      burstMaybeShowValidate();
+    }
+
+    // --- Refaire le scan d'un lot précis (principal ou supplémentaire) ---
+    function burstRedo(ingId, extraIdx) {
+      if (!Burst.ctx || ingId == null) return;
+      const i = Burst.ctx.ingredients.findIndex(x => x.ingredient_id === ingId);
+      if (i < 0) return;
+      if (extraIdx == null) {
+        delete Burst.results[ingId];
+        Burst.addingExtraFor = null;
+      } else {
+        if (Burst.extras[ingId]) Burst.extras[ingId].splice(extraIdx, 1);
+        Burst.addingExtraFor = ingId;   // le prochain SHOOT rajoute une étiquette
+      }
       Burst.idx = i;
       $('btn-burst-shoot').style.display = '';
       $('btn-burst-validate').style.display = 'none';
@@ -1786,6 +1884,7 @@
     // --- Bouton Valider : visible quand tout est scanné et extrait ---
     function burstMaybeShowValidate() {
       if (!Burst.ctx) return;
+      if (Burst.addingExtraFor) { $('btn-burst-validate').style.display = 'none'; return; }
       const ready = Burst.jobs <= 0 && Burst.ctx.ingredients.every(ing => {
         const r = Burst.results[ing.ingredient_id];
         return r && !r._pending;
@@ -1797,24 +1896,36 @@
     $('btn-burst-validate').addEventListener('click', async () => {
       $('btn-burst-validate').disabled = true;
       const scans = {};
+      const extras = {};
       const errors = [];
       const validIds = [];
+      const packScan = (r) => ({
+        scan_tracabilite_id: r.scan_tracabilite_id,
+        article_id: r.article_id,
+        article_id_attendu: r.article_id_attendu,
+        nom_attendu: r.nom_attendu,
+        produit: r.produit,
+        lot: r.lot,
+        dlc: r.dlc,
+        fabricant: r.fabricant,
+        poids_net_kg: r.poids_net_kg,
+        timestamp: r.timestamp,
+      });
       Object.keys(Burst.results).forEach(ingId => {
         const r = Burst.results[ingId];
         if (!r || r.error || r._pending) { errors.push(ingId); return; }
-        scans[ingId] = {
-          scan_tracabilite_id: r.scan_tracabilite_id,
-          article_id: r.article_id,
-          article_id_attendu: r.article_id_attendu,
-          nom_attendu: r.nom_attendu,
-          produit: r.produit,
-          lot: r.lot,
-          dlc: r.dlc,
-          fabricant: r.fabricant,
-          poids_net_kg: r.poids_net_kg,
-          timestamp: r.timestamp,
-        };
+        scans[ingId] = packScan(r);
         if (r.scan_id) validIds.push(r.scan_id);
+      });
+      // Lots supplémentaires : on ne garde que ceux extraits sans erreur
+      Object.keys(Burst.extras).forEach(ingId => {
+        const arr = (Burst.extras[ingId] || [])
+          .filter(r => r && !r.error && !r._pending);
+        if (!arr.length) return;
+        extras[ingId] = arr.map(r => {
+          if (r.scan_id) validIds.push(r.scan_id);
+          return packScan(r);
+        });
       });
       try {
         if (validIds.length) {
@@ -1835,6 +1946,7 @@
           fiche_id: Burst.ctx.fiche_id,
           tache: Burst.ctx.tache,
           scans: scans,
+          extras: extras,
           errors: errors,
           timestamp: Date.now(),
         }));
