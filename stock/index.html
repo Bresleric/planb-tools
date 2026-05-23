@@ -87,6 +87,9 @@
     .group-header { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
     .group-title { font-size:18px; font-weight:700; color:var(--gray-900); line-height:1.25; }
     .group-meta { font-size:13px; color:var(--gray-600); margin-top:4px; line-height:1.45; }
+    .group-scanneurs { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .group-scanneurs .gs-label { font-size:11px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px; font-weight:600; }
+    .scanneur-badge { display:inline-flex; align-items:center; gap:3px; padding:3px 9px; background:var(--blue-100); color:var(--blue-700); border-radius:999px; font-size:12px; font-weight:700; }
     .group-badge { padding:3px 10px; background:var(--orange-100); color:var(--orange-700); border-radius:999px; font-size:12px; font-weight:600; flex-shrink:0; }
     .group-actions { display:flex; flex-direction:column; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); }
     .group-actions.expanded { display:flex; }
@@ -125,6 +128,7 @@
     }
     .group-card.visible .group-title { font-size:22px; text-align:center; }
     .group-card.visible .group-meta { font-size:14px; text-align:center; }
+    .group-card.visible .group-scanneurs { justify-content:center; }
     .group-thumb .thumb-icon { font-size:64px; color:var(--gray-400); }
     .group-thumb .thumb-loading { font-size:14px; color:var(--gray-400); }
     .group-thumb .thumb-count {
@@ -184,6 +188,7 @@
     .photo-tile { position:relative; aspect-ratio:1; background:var(--gray-100); border-radius:var(--radius-sm); overflow:hidden; cursor:zoom-in; border:1px solid var(--gray-200); }
     .photo-tile img { width:100%; height:100%; object-fit:cover; display:block; }
     .photo-tile .photo-meta { position:absolute; bottom:0; left:0; right:0; padding:4px 6px; font-size:10px; color:white; background:linear-gradient(transparent, rgba(0,0,0,0.7)); line-height:1.2; }
+    .photo-tile .photo-scanneur { position:absolute; top:5px; left:5px; padding:2px 8px; font-size:11px; font-weight:700; letter-spacing:0.3px; color:white; background:rgba(29,78,216,0.92); border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,0.35); }
     .photo-tile.pdf { display:flex; align-items:center; justify-content:center; flex-direction:column; }
     .photo-tile.pdf .pdf-icon { font-size:42px; }
     .photo-tile.pdf .pdf-label { font-size:10px; color:var(--gray-600); margin-top:4px; word-break:break-all; padding:0 4px; text-align:center; }
@@ -435,7 +440,7 @@
         // 2. Scans à rattacher : join scan_tracabilite + scans pour filtrer par etablissement et statut
         const etabFilter = State.filterEtab === 'all' ? null : State.filterEtab;
         let q = sb.from('scan_tracabilite')
-          .select('id, scan_id, produit, lot, poids_net_kg, dlc, categorie, fabricant, scans!inner(id, etablissement, statut, created_at)')
+          .select('id, scan_id, produit, lot, poids_net_kg, dlc, categorie, fabricant, scans!inner(id, etablissement, statut, created_at, created_by_id, created_by_nom, created_by_initiales)')
           .is('article_id', null);
         if (etabFilter) q = q.eq('scans.etablissement', etabFilter);
         const { data: scans, error: e2 } = await q.in('scans.statut', ['valide', 'en_attente_validation', 'extrait']).limit(500);
@@ -454,6 +459,7 @@
               lots: new Set(),
               etablissements: new Set(),
               fabricants: new Set(),
+              scanneurs: new Map(),   // created_by_id -> { initiales, nom }
               categorie_haccp: s.categorie,
             };
           }
@@ -462,6 +468,12 @@
           if (s.lot) byKey[key].lots.add(s.lot);
           if (s.scans?.etablissement) byKey[key].etablissements.add(s.scans.etablissement);
           if (s.fabricant) byKey[key].fabricants.add(s.fabricant);
+          if (s.scans?.created_by_id) {
+            byKey[key].scanneurs.set(s.scans.created_by_id, {
+              initiales: s.scans.created_by_initiales || '',
+              nom: s.scans.created_by_nom || '',
+            });
+          }
         });
         State.groups = Object.values(byKey).sort((a, b) => b.scans.length - a.scans.length);
 
@@ -622,6 +634,13 @@
       div.className = 'group-card';
       const lotsArr = [...g.lots];
       const etabArr = [...g.etablissements];
+      // Collaborateur(s) ayant scanné les étiquettes du groupe
+      const scanneurs = [...(g.scanneurs ? g.scanneurs.values() : [])];
+      const scanneursHtml = scanneurs.length ? `
+            <div class="group-scanneurs">
+              <span class="gs-label">Scanné par</span>
+              ${scanneurs.map(p => `<span class="scanneur-badge" title="${escapeHtml(p.nom || '')}">👤 ${escapeHtml(p.initiales || p.nom || '?')}</span>`).join('')}
+            </div>` : '';
       // Contenu initial de la tuile photo (mis à jour par loadThumbs)
       let thumbInner;
       if (g.thumbUrl) {
@@ -646,6 +665,7 @@
               ${etabArr.join(', ')}
               ${g.categorie_haccp ? ' · cat: ' + g.categorie_haccp : ''}
             </div>
+            ${scanneursHtml}
           </div>
         </div>
         <div class="group-actions">
@@ -797,6 +817,12 @@
         grid.innerHTML = '';
         enriched.forEach(e => {
           const tile = document.createElement('div');
+          // Collaborateur ayant scanné cette photo
+          const scInit = e.traca?.scans?.created_by_initiales || e.traca?.scans?.created_by_nom || '';
+          const scNom = e.traca?.scans?.created_by_nom || '';
+          const scanneurHtml = scInit
+            ? `<div class="photo-scanneur" title="Scanné par ${escapeHtml(scNom)}">👤 ${escapeHtml(scInit)}</div>`
+            : '';
           if (e.isImage && e.url) {
             tile.className = 'photo-tile';
             const lot = e.traca?.lot ? 'Lot ' + e.traca.lot : '';
@@ -804,6 +830,7 @@
             const meta = [lot, poids].filter(Boolean).join(' · ');
             tile.innerHTML = `
               <img src="${e.url}" alt="" loading="lazy">
+              ${scanneurHtml}
               ${meta ? `<div class="photo-meta">${escapeHtml(meta)}</div>` : ''}
             `;
             tile.addEventListener('click', () => openLightbox(e.url));
@@ -811,6 +838,7 @@
             // PDF ou autre
             tile.className = 'photo-tile pdf';
             tile.innerHTML = `
+              ${scanneurHtml}
               <span class="pdf-icon">📄</span>
               <div class="pdf-label">${escapeHtml((e.scan.storage_path || '').split('/').pop() || '')}</div>
             `;
