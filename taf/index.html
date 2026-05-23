@@ -1032,9 +1032,7 @@
       <div class="form-group" id="prod-matieres-section" style="display:none;">
         <label>📦 Matières premières utilisées</label>
         <div id="prod-matieres-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-        <div style="font-size:11px; color:var(--gray-500); margin-top:8px; line-height:1.4;">
-          Lots triés par DLC croissante (FEFO). Quantités calculées selon le ratio quantité produite / rendement de la fiche. Ajustables si besoin.
-        </div>
+        <div id="prod-matieres-hint" style="font-size:11px; color:var(--gray-500); margin-top:8px; line-height:1.4;"></div>
       </div>
 
       <!-- Actions post-production : checklist obligatoire si la fiche en définit -->
@@ -3733,6 +3731,7 @@
   // État des matières premières pour la production en cours
   let prodMatieres = []; // [{ ingredient_id, article_id, article_nom, qty_theorique, lots: [...], selections: { lot_id: qty } }]
   let prodScannedLots = {}; // PHASE B : scans_lots de la tâche en cours de validation
+  let prodMatieresEditMode = false; // false = récap lecture seule ; true = sélection manuelle des lots
   let prodFicheRendement = null;
   let prodChoiceMode = null; // 'existing' | 'new' | null (si task a déjà une fiche)
   let prodChosenFicheId = null;
@@ -3996,6 +3995,7 @@
     try {
       // PHASE B : mémoriser les scans reçus pour pré-remplir les lots
       prodScannedLots = scansLots || {};
+      prodMatieresEditMode = false; // on ouvre toujours sur le récap lecture seule
       // 1. Ingrédients de la fiche AVEC article_id rattaché
       const { data: ings, error: e1 } = await sb.from('fiche_ingredients')
         .select('id, nom, quantite, unite, article_id, ordre, est_principal')
@@ -4136,7 +4136,79 @@
     });
   }
 
+  // Aiguillage : récapitulatif lecture seule (défaut) ou sélection manuelle.
   function renderMatieresList() {
+    const container = document.getElementById('prod-matieres-list');
+    if (!container) return;
+    const hint = document.getElementById('prod-matieres-hint');
+    if (!prodMatieres.length) {
+      container.innerHTML = '';
+      if (hint) hint.textContent = '';
+      return;
+    }
+    if (prodMatieresEditMode) {
+      if (hint) hint.textContent = 'Sélection manuelle : lots triés par DLC croissante (FEFO). Quantités calculées selon le ratio quantité produite / rendement de la fiche.';
+      renderMatieresEditable();
+    } else {
+      if (hint) hint.textContent = 'Récapitulatif des lots qui seront décomptés du stock — issus des étiquettes scannées. Rien à sélectionner.';
+      renderMatieresRecap();
+    }
+  }
+
+  // Récapitulatif lecture seule : aucune sélection à faire.
+  function renderMatieresRecap() {
+    const container = document.getElementById('prod-matieres-list');
+    container.innerHTML = '';
+    const fmtQty = (q) => {
+      const n = Number(q) || 0;
+      return (Math.round(n * 1000) / 1000).toString();
+    };
+    prodMatieres.forEach(m => {
+      const entries = Object.entries(m.selections || {}).filter(([, q]) => (parseFloat(q) || 0) > 0);
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex; gap:10px; padding:8px 10px; background:white; border:1px solid var(--gray-200); border-radius:6px;';
+      const ico = m.scanne ? '✓' : '📦';
+      const icoColor = m.scanne ? '#15803d' : '#6b7280';
+      const badge = m.scanne
+        ? ' <span style="font-size:9px;background:#bbf7d0;color:#14532d;padding:1px 6px;border-radius:3px;font-weight:700;">✓ ' + ((m.scan_nb_lots || 1) > 1 ? (m.scan_nb_lots + ' LOTS SCANNÉS') : 'SCANNÉ') + '</span>'
+        : (m.est_principal ? ' <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-weight:700;">⚠ NON SCANNÉ</span>' : '');
+      let lotsLines;
+      if (!entries.length) {
+        lotsLines = '<div style="font-size:11px; color:#b91c1c;">⚠ Aucun lot retenu — à vérifier</div>';
+      } else {
+        lotsLines = entries.map(([id, q]) => {
+          const lot = m.lots.find(l => l.scan_tracabilite_id === id);
+          const lotLabel = lot ? ('lot ' + _esc(lot.lot || '?')) : 'lot ?';
+          const days = lot ? _daysToDlc(lot.dlc) : null;
+          const dlcTxt = days == null ? ''
+            : days < 0 ? ' · <span style="color:#b91c1c;font-weight:600;">DLC dépassée</span>'
+            : days <= 7 ? ' · <span style="color:#c2410c;">DLC dans ' + days + 'j</span>'
+            : ' · DLC dans ' + days + 'j';
+          return '<div style="font-size:11.5px; color:#374151;">' + lotLabel
+            + ' · <strong>' + fmtQty(q) + ' ' + _esc(m.unite_fiche || '') + '</strong>' + dlcTxt + '</div>';
+        }).join('');
+      }
+      const manque = m.qty_manque > 0
+        ? '<div style="font-size:10px; color:#b91c1c;">⚠ Stock manquant : ' + m.qty_manque.toFixed(2) + ' ' + _esc(m.unite_fiche || '') + '</div>'
+        : '';
+      div.innerHTML =
+        '<span style="font-size:1.1rem; line-height:1.3; color:' + icoColor + ';">' + ico + '</span>'
+        + '<div style="flex:1; min-width:0;">'
+        + '<div style="font-size:13px; font-weight:600; color:#111827;">' + _esc(m.ingredient_nom) + badge + '</div>'
+        + lotsLines + manque
+        + '</div>';
+      container.appendChild(div);
+    });
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.textContent = '✏️ Ajuster les lots / quantités';
+    toggle.style.cssText = 'align-self:flex-start; margin-top:2px; font-size:12px; padding:6px 12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; color:#475569; cursor:pointer;';
+    toggle.addEventListener('click', () => { prodMatieresEditMode = true; renderMatieresList(); });
+    container.appendChild(toggle);
+  }
+
+  // Sélection manuelle des lots (mode « Ajuster »).
+  function renderMatieresEditable() {
     const container = document.getElementById('prod-matieres-list');
     if (!prodMatieres.length) { container.innerHTML = ''; return; }
     container.innerHTML = '';
@@ -4215,6 +4287,12 @@
       });
       container.appendChild(div);
     });
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.textContent = '← Revenir au récapitulatif';
+    back.style.cssText = 'align-self:flex-start; margin-top:2px; font-size:12px; padding:6px 12px; background:#ecfeff; border:1px solid #67e8f9; border-radius:6px; color:#0e7490; cursor:pointer;';
+    back.addEventListener('click', () => { prodMatieresEditMode = false; renderMatieresList(); });
+    container.appendChild(back);
   }
 
   function _daysToDlc(dlc) {
