@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Produits vendus — PlanB Tools</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f4f5f7;color:#1f2937;font-size:14px;}
+.top{background:#1F3864;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:12px;}
+.top a{color:#fff;text-decoration:none;font-size:13px;opacity:.85;}
+.top h1{font-size:17px;font-weight:700;}
+.wrap{max-width:1180px;margin:0 auto;padding:18px;}
+.sub{font-size:12px;color:#6b7280;margin-bottom:14px;}
+.kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.kpi{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;}
+.kpi .v{font-size:22px;font-weight:700;color:#1F3864;}
+.kpi .l{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
+input[type=text],select{padding:7px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff;}
+input[type=text]{min-width:240px;}
+.cnt{font-size:12px;color:#6b7280;margin-left:auto;}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;}
+th{background:#2F5496;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding:8px 9px;text-align:left;cursor:pointer;white-space:nowrap;}
+th.num,td.num{text-align:right;}
+td{padding:7px 9px;border-top:1px solid #eef0f2;font-size:13px;}
+tr:nth-child(even) td{background:#fafbfc;}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;}
+.b-on{background:#dcfce7;color:#166534;}
+.b-off{background:#e5e7eb;color:#6b7280;}
+.msg{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:14px;border-radius:8px;font-size:13px;}
+.foot{font-size:11px;color:#9ca3af;margin-top:14px;}
+</style>
+</head>
+<body>
+<div class="top"><a href="../index.html">← Accueil</a><h1>🍽️ Produits vendus</h1></div>
+<div class="wrap">
+  <div class="sub" id="sub">Chargement du catalogue…</div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="filters">
+    <input type="text" id="f-search" placeholder="Rechercher un produit…">
+    <select id="f-etab"><option value="">Tous les restaurants</option></select>
+    <select id="f-type"><option value="">Tous les types</option></select>
+    <select id="f-vis">
+      <option value="">Tous</option>
+      <option value="on">À la carte</option>
+      <option value="off">Masqués</option>
+    </select>
+    <span class="cnt" id="cnt"></span>
+  </div>
+
+  <table><thead><tr>
+    <th data-k="etablissement">Restaurant</th>
+    <th data-k="nom">Produit</th>
+    <th class="num" data-k="prix_vente_ttc">Prix TTC</th>
+    <th data-k="tva">TVA</th>
+    <th data-k="type_produit">Type</th>
+    <th data-k="categorie">Catégorie</th>
+    <th data-k="lieu_envoi">Envoi</th>
+    <th data-k="visible">État</th>
+  </tr></thead><tbody id="tbody"></tbody></table>
+
+  <div class="foot">Source : table Supabase produits_vendus (catalogue L'Addition). Rechargez la page pour rafraîchir.</div>
+</div>
+
+<script>
+const SUPABASE_URL='https://dzrherfavgiuygnimtux.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let DATA=[];
+const sort={k:'nom',a:1};
+const eur=v=>(v==null||v===''||isNaN(Number(v)))?'':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function fetchAll(table,cols){
+  let all=[],from=0;const step=1000;
+  while(true){
+    const {data,error}=await sb.from(table).select(cols).range(from,from+step-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data||data.length<step) break;
+    from+=step;
+  }
+  return all;
+}
+async function load(){
+  try{
+    DATA=await fetchAll('produits_vendus',
+      'addition_id,etablissement,nom,prix_vente_ttc,tva,type_produit,categorie,lieu_envoi,visible');
+  }catch(e){
+    document.getElementById('sub').innerHTML='<div class="msg">Impossible de lire la base : '+esc(e&&e.message||e)+'</div>';
+    return;
+  }
+  const nb=DATA.length;
+  const vis=DATA.filter(x=>x.visible).length;
+  const fr=DATA.filter(x=>x.etablissement==='Freddy').length;
+  const li=DATA.filter(x=>x.etablissement==='Liesel').length;
+  document.getElementById('kpis').innerHTML=
+    kpi(nb,'Produits')+kpi(vis,'À la carte')+kpi(fr,'Freddy')+kpi(li,'Liesel');
+  document.getElementById('sub').textContent=
+    'Catalogue des cartes Freddy et Liesel — prix de vente, TVA et catégorie depuis L’Addition.';
+  fillSelect('f-etab','etablissement');
+  fillSelect('f-type','type_produit');
+  render();
+}
+function kpi(v,l){return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>';}
+function fillSelect(id,key){
+  const vals=[...new Set(DATA.map(x=>x[key]).filter(Boolean))].sort();
+  document.getElementById(id).insertAdjacentHTML('beforeend',
+    vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join(''));
+}
+function sortData(arr){
+  const a=arr.slice();a.sort((x,y)=>{
+    let p=x[sort.k],r=y[sort.k];
+    if(p!=null&&p!==''&&!isNaN(parseFloat(p))&&!isNaN(parseFloat(r))){p=parseFloat(p);r=parseFloat(r);}
+    else{p=(p==null?'':p).toString().toLowerCase();r=(r==null?'':r).toString().toLowerCase();}
+    return (p<r?-1:p>r?1:0)*(sort.a?1:-1);
+  });return a;
+}
+function render(){
+  const term=document.getElementById('f-search').value.toLowerCase().trim();
+  const fe=document.getElementById('f-etab').value;
+  const ft=document.getElementById('f-type').value;
+  const fv=document.getElementById('f-vis').value;
+  let rows=DATA.filter(x=>{
+    if(fe&&x.etablissement!==fe)return false;
+    if(ft&&x.type_produit!==ft)return false;
+    if(fv==='on'&&!x.visible)return false;
+    if(fv==='off'&&x.visible)return false;
+    if(term&&!((x.nom||'')+' '+(x.categorie||'')+' '+(x.type_produit||'')).toLowerCase().includes(term))return false;
+    return true;
+  });
+  rows=sortData(rows);
+  document.getElementById('cnt').textContent=rows.length+' produit(s)';
+  document.getElementById('tbody').innerHTML=rows.map(x=>'<tr>'+
+    '<td>'+esc(x.etablissement)+'</td>'+
+    '<td>'+esc(x.nom)+'</td>'+
+    '<td class="num">'+eur(x.prix_vente_ttc)+'</td>'+
+    '<td>'+esc(x.tva)+'</td>'+
+    '<td>'+esc(x.type_produit)+'</td>'+
+    '<td>'+esc(x.categorie)+'</td>'+
+    '<td>'+esc(x.lieu_envoi)+'</td>'+
+    '<td>'+(x.visible?'<span class="badge b-on">À la carte</span>':'<span class="badge b-off">Masqué</span>')+'</td>'+
+    '</tr>').join('')
+    ||'<tr><td colspan="8" style="padding:16px;color:#6b7280">Aucun résultat.</td></tr>';
+}
+document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+  if(sort.k===th.dataset.k)sort.a=sort.a?0:1;else{sort.k=th.dataset.k;sort.a=1;}
+  render();
+});
+['f-search','f-etab','f-type','f-vis'].forEach(id=>{
+  const e=document.getElementById(id);e.oninput=render;e.onchange=render;
+});
+load();
+</script>
+</body>
+</html>
