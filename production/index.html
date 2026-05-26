@@ -1179,12 +1179,63 @@ function factorToBase(uRec, base){
   return null; // base "boîte 1 L" ou inconnue : pas de conversion fiable
 }
 
-// Coût d'une ligne d'ingrédient. Priorité au prix saisi sur la fiche, sinon prix de référence.
-// src : 'saisi' | 'ref' (référence fiable) | 'refv' (référence à vérifier) | 'inconv' | 'none'
-function coutLigneMatiere(ing){
+// Cascade composant : coût matière d'une fiche composant, par unité de rendement.
+// Cache mémoizé, réinitialisé à chaque rechargement de allFiches.
+let _composantCoutCache = new Map();
+
+function coutFicheParUnite(fiche, visiting) {
+  if (!fiche || !Array.isArray(fiche.ingredients) || !fiche.ingredients.length) return null;
+  const rendement = parseFloat(fiche.rendement_quantite);
+  if (!(rendement > 0)) return null;
+  if (_composantCoutCache.has(fiche.id)) return _composantCoutCache.get(fiche.id);
+  visiting = visiting || new Set();
+  if (visiting.has(fiche.id)) return null; // garde anti-cycle
+  visiting.add(fiche.id);
+  let total = 0, okAny = false;
+  for (const ing of fiche.ingredients) {
+    const c = coutLigneMatiere(ing, visiting);
+    if (c && c.cout != null) { total += c.cout; okAny = true; }
+  }
+  visiting.delete(fiche.id);
+  const res = okAny ? (total / rendement) : null;
+  _composantCoutCache.set(fiche.id, res);
+  return res;
+}
+
+// Facteur de conversion d'une unité de ligne vers l'unité de rendement d'un composant.
+// Réutilise factorToBase pour le poids et le volume, tolère portion/pièce/part 1:1.
+function factorComposant(lineUnit, ficheUnit) {
+  const norm = u => (u||'').toString().toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\./g,'');
+  const a = norm(lineUnit), b = norm(ficheUnit);
+  if (!a || !b) return null;
+  const pieces = ['piece','pieces','pce','pces','pc','portion','portions','part','parts',''];
+  if (pieces.includes(a) && pieces.includes(b)) return 1;
+  if (a === b) return 1;
+  const wF = factorToBase(lineUnit, 'kg'), wT = factorToBase(ficheUnit, 'kg');
+  if (wF !== null && wT !== null) return wF / wT;
+  const vF = factorToBase(lineUnit, 'L'), vT = factorToBase(ficheUnit, 'L');
+  if (vF !== null && vT !== null) return vF / vT;
+  return null;
+}
+
+// Coût d'une ligne d'ingrédient. Priorité au prix saisi sur la fiche, sinon cascade composant, sinon prix de référence.
+// src : 'saisi' | 'comp' (cascade composant) | 'comp-inconv' | 'ref' (référence fiable) | 'refv' (à vérifier) | 'inconv' | 'none'
+function coutLigneMatiere(ing, visiting){
   const q = parseFloat(ing.quantite) || 0;
   const puSaisi = parseFloat(ing.prix_unitaire) || 0;
   if(puSaisi > 0) return {cout:q*puSaisi, src:'saisi'};
+  if(ing.article_id && Array.isArray(allFiches)){
+    const comp = allFiches.find(f => f.article_id === ing.article_id);
+    if(comp){
+      const cu = coutFicheParUnite(comp, visiting);
+      if(cu != null){
+        const fc = factorComposant(ing.unite, comp.rendement_unite);
+        if(fc === null) return {cout:null, src:'comp-inconv'};
+        return {cout:q*cu*fc, src:'comp'};
+      }
+    }
+  }
   const r = ing.article_id ? REF_PRIX[ing.article_id] : null;
   if(r){
     const f = factorToBase(ing.unite, r.b);
@@ -2531,6 +2582,19 @@ async function loadFiches() {
   showLoading(true);
   try {
     allFiches = await DB.getFiches();
+    // Charger en bloc les ingrédients de toutes les fiches (utilisé par la cascade composant).
+    const ids = allFiches.map(f => f.id);
+    if (ids.length) {
+      const { data: ings, error: eIng } = await sb.from('fiche_ingredients')
+        .select('id, fiche_id, nom, quantite, unite, article_id, prix_unitaire, ordre, est_principal')
+        .in('fiche_id', ids);
+      if (eIng) throw eIng;
+      const byFiche = {};
+      (ings || []).forEach(i => { (byFiche[i.fiche_id] = byFiche[i.fiche_id] || []).push(i); });
+      allFiches = allFiches.map(f => ({ ...f, ingredients: byFiche[f.id] || [] }));
+    }
+    // Données rafraîchies → on invalide le cache des coûts composant.
+    if (typeof _composantCoutCache !== 'undefined') _composantCoutCache.clear();
     renderFiches();
   } catch (e) {
     console.error(e);
@@ -3109,6 +3173,14 @@ async function viewFiche(id) {
         puTxt = `${c.ref.p.toFixed(2)} €/${c.ref.b} <span title="Prix de référence${aVerif ? ' — à vérifier' : ''}" style="color:${col};font-weight:700">≈</span>`;
         coutTxt = `${(c.cout || 0).toFixed(2)} €`;
         totalCost += c.cout;
+      } else if (c.src === 'comp') {
+        nbEstime++;
+        puTxt = `<span title="Coût remonté du composant" style="color:#7c3aed;font-weight:700">⤴ composant</span>`;
+        coutTxt = `${(c.cout || 0).toFixed(2)} €`;
+        totalCost += c.cout;
+      } else if (c.src === 'comp-inconv') {
+        coutTxt = `<span style="color:#d97706" title="Unité « ${ing.unite} » non convertible vers l'unité de rendement du composant">à vérifier</span>`;
+        nbSansPrix++;
       } else if (c.src === 'inconv') {
         puTxt = `${c.ref.p.toFixed(2)} €/${c.ref.b}`;
         coutTxt = `<span style="color:#d97706" title="Unité « ${ing.unite} » non convertible vers ${c.ref.b}">à vérifier</span>`;
