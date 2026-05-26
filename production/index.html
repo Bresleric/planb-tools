@@ -988,13 +988,20 @@
         <button class="chip" data-fp-cat="mise_en_place" type="button">🔪 Mise en place</button>
         <button class="chip" data-fp-cat="produit_intermediaire" type="button">🥘 Prod. interm.</button>
         <button class="chip" data-fp-cat="produit_fini" type="button">✨ Prod. fini</button>
-        <button class="chip" data-fp-cat="plat" type="button">🍽 Plat</button>
       </div>
-      <div id="fp-results" style="max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:8px; padding:4px;"></div>
-      <div style="margin-top:10px; padding:8px 10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:0.78rem; color:#075985;">
-        La fiche que vous cherchez n'existe pas ? Créez-la d'abord via l'onglet
-        <button type="button" class="chip" onclick="closeFichePicker(); switchTab('create');" style="margin-left:6px; padding:2px 8px;">➕ Créer une fiche</button>
+      <div id="fp-results" style="max-height:42vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:8px; padding:4px;"></div>
+
+      <!-- Production "à créer" : la fiche n'existe pas encore -->
+      <div style="margin-top:12px; padding:10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px;">
+        <div style="font-size:0.82rem; color:#9a3412; margin-bottom:6px;">
+          <strong>La fiche n'existe pas ?</strong> Lance une <em>Production à créer</em> — un admin la transformera en fiche après.
+        </div>
+        <textarea id="fp-acreer-motif" rows="2" placeholder="Décris le produit (nom, ingrédients principaux, etc.)" style="width:100%; padding:6px 8px; font-size:0.85rem; border:1px solid #fdba74; border-radius:6px; resize:vertical;"></textarea>
+        <button type="button" id="fp-btn-acreer" onclick="startProductionACreer()" style="margin-top:6px; width:100%; padding:9px; font-size:13px; font-weight:700; border:none; border-radius:6px; background:#ea580c; color:white; cursor:pointer;">
+          ▶︎ Démarrer une production à créer
+        </button>
       </div>
+
       <div style="display:flex; gap:8px; margin-top:14px;">
         <button class="btn-submit" style="flex:1; background:var(--gray-400);" onclick="closeFichePicker()">Annuler</button>
       </div>
@@ -4898,6 +4905,9 @@ function pdRenderFichePickerResults() {
   const cat = document.querySelector('#fiche-picker-modal .chip.active[data-fp-cat]')?.dataset.fpCat || 'all';
   const fiches = (allFiches || [])
     .filter(f => f.etablissement === currentEtablissement)
+    // Production directe : exclure les fiches "plat" (cuisinées à la commande,
+    // pas produites à l'avance)
+    .filter(f => f.categorie !== 'plat')
     .filter(f => cat === 'all' || f.categorie === cat)
     .filter(f => !q || (f.nom || '').toLowerCase().includes(q) || (f.code_court || '').toLowerCase().includes(q))
     .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
@@ -4938,6 +4948,105 @@ try {
     } catch (err) { console.warn('[PD] fp-cat click:', err); }
   });
 } catch (e) { console.warn('[PD] addEventListener init:', e); }
+
+// ===== 2 bis. PRODUCTION "À CRÉER" (la fiche n'existe pas encore) =====
+async function startProductionACreer() {
+  const motifEl = document.getElementById('fp-acreer-motif');
+  const motif = (motifEl?.value || '').trim();
+  if (motif.length < 5) {
+    showToast('Décris le produit en au moins 5 caractères', 'error');
+    motifEl?.focus();
+    return;
+  }
+  showLoading(true);
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayStr = today.toISOString().slice(0, 10);
+    // Task spontanee + a_traiter : invisible TAF, mais visible admin pour
+    // créer la fiche après coup.
+    const taskPayload = {
+      echeance: todayStr,
+      tache: 'À créer : ' + motif.slice(0, 80),
+      fiche_id: null,
+      etablissement: currentEtablissement,
+      attribue_a_id: currentUser.id,
+      attribue_a_nom: currentUser.nom,
+      attribue_a_initiales: currentUser.initiales || null,
+      createur_id: currentUser.id,
+      createur_nom: currentUser.nom,
+      date_creation: new Date().toISOString(),
+      priorite: 3,
+      is_production: true,
+      a_traiter: true,
+      spontanee: true,
+      duree_accumulee_secondes: 0,
+      observation: motif
+    };
+    const { data: task, error } = await sb.from('tasks').insert(taskPayload).select().single();
+    if (error) throw error;
+    window.__pdSession = {
+      mode: 'a_creer',
+      taskId: task.id,
+      ficheId: null,
+      ficheNom: 'À créer : ' + motif,
+      motif: motif,
+      ingredients: [],
+      principaux: [],
+      task: task
+    };
+    window.__currentTafContext = { task_id: task.id, fiche_id: null, tache: task.tache };
+    window.__currentFicheIngs = [];
+    closeFichePicker();
+    showLoading(false);
+    await pdOpenProductionModalForACreer(motif, task);
+    // Pas de scan à attendre → chrono démarre immédiatement
+    await pdStartChronoAfterScan();
+  } catch (e) {
+    showLoading(false);
+    console.error('startProductionACreer:', e);
+    showToast('Erreur démarrage production à créer : ' + (e.message || e), 'error');
+  }
+}
+
+async function pdOpenProductionModalForACreer(motif, task) {
+  // Préparer le formulaire : pas de fiche, description en titre
+  const ficheSelect = document.getElementById('p-fiche-select');
+  ficheSelect.innerHTML = '<option value="">— Production à créer (pas de fiche) —</option>';
+  ficheSelect.disabled = true;
+  document.getElementById('p-nom').value = motif.length > 60 ? motif.slice(0, 60) : motif;
+  document.getElementById('p-quantite').value = '';
+  document.getElementById('p-unite').value = 'kg';
+  document.getElementById('p-observation').value = motif;
+  document.getElementById('p-dlc-manual').value = '';
+  document.getElementById('p-dlc-auto').style.display = 'none';
+  document.getElementById('p-dlc-auto-value').textContent = '';
+  // Aucune catégorie pré-sélectionnée — le collaborateur choisit
+  document.querySelectorAll('#p-categorie .chip').forEach(chip => {
+    chip.classList.remove('active');
+    chip.onclick = () => {
+      document.querySelectorAll('#p-categorie .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    };
+  });
+  // Pas d'actions post-production
+  const apGroup = document.getElementById('p-actions-post-group');
+  if (apGroup) apGroup.style.display = 'none';
+  const apRows = document.getElementById('p-actions-post-rows');
+  if (apRows) apRows.innerHTML = '';
+
+  // Titre + bandeau visible (chrono uniquement, pas de scanner)
+  document.getElementById('pd-title').textContent = 'Production à créer';
+  document.getElementById('pd-directe-bar').style.display = '';
+  document.getElementById('pd-fiche-required-mark').style.display = 'none';
+  // Cache le bouton scanner + status (rien à scanner)
+  document.getElementById('pd-btn-scanner').style.display = 'none';
+  document.getElementById('pd-scan-status').textContent = 'Pas de fiche → aucune étiquette à scanner. Le chrono démarre immédiatement.';
+  // Masquer la section MP (pas de fiche, pas d'ingrédients)
+  const matSec = document.getElementById('pd-matieres-section');
+  if (matSec) matSec.style.display = 'none';
+  pdRefreshDirecteBar();
+  document.getElementById('production-modal').style.display = 'flex';
+}
 
 // ===== 2. CRÉATION DE LA TASK SPONTANEE + OUVERTURE MODALE PROD =====
 async function selectFicheAndStart(ficheId) {
@@ -4980,6 +5089,7 @@ async function selectFicheAndStart(ficheId) {
 
     // 3) Mémoriser la session
     window.__pdSession = {
+      mode: 'fiche',
       taskId: task.id,
       ficheId: fiche.id,
       ficheNom: fiche.nom,
@@ -5112,7 +5222,9 @@ function pdRefreshDirecteBar() {
   }
   const status = document.getElementById('pd-scan-status');
   if (status) {
-    if ((s.principaux || []).length === 0) {
+    if (s.mode === 'a_creer') {
+      status.textContent = 'Production à créer : pas de fiche → aucune étiquette à scanner.';
+    } else if ((s.principaux || []).length === 0) {
       status.textContent = 'Aucun ingrédient principal sur cette fiche — scan non requis.';
     } else if (nonScannes.length > 0) {
       status.textContent = nonScannes.length + ' ingrédient(s) principal(aux) à scanner avant de pouvoir valider.';
@@ -5737,13 +5849,16 @@ try { saveProduction = async function pdSaveProductionWrapper() {
     // Pas de session de production directe → comportement original
     return _pdOriginalSaveProduction();
   }
-  // Garde-fou B-2 : tous les principaux doivent être scannés
-  const scansLots = (s.task && s.task.scans_lots) || {};
-  const nonScannes = (s.principaux || []).filter(i => !scansLots[i.id]);
-  if (nonScannes.length > 0) {
-    const noms = nonScannes.map(i => i.nom).join(', ');
-    showToast('⚠ Étiquette(s) non scannée(s) : ' + noms + ' — scan obligatoire', 'error');
-    return;
+  const isACreer = (s.mode === 'a_creer');
+  // Garde-fou B-2 (mode fiche uniquement) : tous les principaux doivent être scannés
+  if (!isACreer) {
+    const scansLots = (s.task && s.task.scans_lots) || {};
+    const nonScannes = (s.principaux || []).filter(i => !scansLots[i.id]);
+    if (nonScannes.length > 0) {
+      const noms = nonScannes.map(i => i.nom).join(', ');
+      showToast('⚠ Étiquette(s) non scannée(s) : ' + noms + ' — scan obligatoire', 'error');
+      return;
+    }
   }
   // Si le chrono n'a jamais démarré (cas : 0 principaux), on le démarre ici
   if (!s.task.date_debut_execution && (s.task.duree_accumulee_secondes || 0) === 0) {
@@ -5806,7 +5921,8 @@ try { saveProduction = async function pdSaveProductionWrapper() {
     const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
     allLots.push(lot);
     const productionPayload = {
-      fiche_id: s.ficheId,
+      fiche_id: s.ficheId || null,
+      a_creer_motif: isACreer ? (s.motif || null) : null,
       lot_id: lot.id,
       nom_produit: nom,
       categorie: categorie,
@@ -5833,8 +5949,8 @@ try { saveProduction = async function pdSaveProductionWrapper() {
       } catch (logErr) { console.error('Log actions post échoué:', logErr); }
     }
 
-    // Sorties de stock pour chaque lot sélectionné
-    try {
+    // Sorties de stock — mode fiche uniquement (en mode "à créer", pas d'ingrédients)
+    if (!isACreer) try {
       const sortieRows = [];
       pdMatieres.forEach(m => {
         Object.entries(m.selections).forEach(([lotId, qty]) => {
