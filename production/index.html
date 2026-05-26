@@ -4860,7 +4860,11 @@ window.__pdChronoTimer = null;
 let pdMatieres = [];
 let pdScannedLots = {};
 let pdMatieresEditMode = false;
-const _esc = escapeHtml;
+// _esc / escapeHtml : on déclare sans dépendre de l'ordre d'exécution
+function _esc(s) {
+  if (typeof escapeHtml === 'function') return escapeHtml(s);
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 function _daysToDlc(dlc) {
   if (!dlc) return null;
@@ -4918,16 +4922,22 @@ function pdRenderFichePickerResults() {
   });
 }
 
-document.addEventListener('input', (e) => {
-  if (e.target && e.target.id === 'fp-search') pdRenderFichePickerResults();
-});
-document.addEventListener('click', (e) => {
-  const chip = e.target.closest && e.target.closest('#fiche-picker-modal .chip[data-fp-cat]');
-  if (!chip) return;
-  document.querySelectorAll('#fiche-picker-modal .chip[data-fp-cat]').forEach(c => c.classList.remove('active'));
-  chip.classList.add('active');
-  pdRenderFichePickerResults();
-});
+try {
+  document.addEventListener('input', (e) => {
+    try {
+      if (e.target && e.target.id === 'fp-search') pdRenderFichePickerResults();
+    } catch (err) { console.warn('[PD] fp-search:', err); }
+  });
+  document.addEventListener('click', (e) => {
+    try {
+      const chip = e.target && e.target.closest && e.target.closest('#fiche-picker-modal .chip[data-fp-cat]');
+      if (!chip) return;
+      document.querySelectorAll('#fiche-picker-modal .chip[data-fp-cat]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      pdRenderFichePickerResults();
+    } catch (err) { console.warn('[PD] fp-cat click:', err); }
+  });
+} catch (e) { console.warn('[PD] addEventListener init:', e); }
 
 // ===== 2. CRÉATION DE LA TASK SPONTANEE + OUVERTURE MODALE PROD =====
 async function selectFicheAndStart(ficheId) {
@@ -5261,9 +5271,14 @@ async function pdPersistScanToTask(taskId, ingredientId, scanData, extraScans) {
 }
 
 // Au chargement de la page, vérifier si on revient du scanner avec un résultat
-window.addEventListener('DOMContentLoaded', function pdCheckScanReturn() {
-  setTimeout(() => pdProcessScanReturn(), 900);
-});
+try {
+  window.addEventListener('DOMContentLoaded', function pdCheckScanReturn() {
+    setTimeout(() => {
+      try { pdProcessScanReturn(); }
+      catch (e) { console.warn('[PD] pdProcessScanReturn:', e); }
+    }, 900);
+  });
+} catch (e) { console.warn('[PD] addEventListener DOMContentLoaded:', e); }
 
 async function pdProcessScanReturn() {
   const rawResult = localStorage.getItem('scan_fefo_result');
@@ -5714,8 +5729,9 @@ function pdRenderMatieresEditable() {
 // On wrap la fonction existante. Si __pdSession est actif on applique B-2
 // (scan obligatoire des principaux), on crée les sorties stock et on ferme la
 // tâche spontanée.
-const _pdOriginalSaveProduction = saveProduction;
-saveProduction = async function pdSaveProductionWrapper() {
+let _pdOriginalSaveProduction;
+try { _pdOriginalSaveProduction = saveProduction; } catch (e) { console.warn('[PD] capture saveProduction:', e); }
+try { saveProduction = async function pdSaveProductionWrapper() {
   const s = window.__pdSession;
   if (!s) {
     // Pas de session de production directe → comportement original
@@ -5873,12 +5889,13 @@ saveProduction = async function pdSaveProductionWrapper() {
     showToast('Erreur: ' + e.message, 'error');
   }
   showLoading(false);
-};
+}; } catch (e) { console.warn('[PD] wrap saveProduction:', e); }
 
 // Wrap closeProductionModal pour demander confirmation + supprimer la task
 // spontanée si on annule la production directe
-const _pdOriginalCloseProductionModal = closeProductionModal;
-closeProductionModal = function pdCloseProductionModalWrapper() {
+let _pdOriginalCloseProductionModal;
+try { _pdOriginalCloseProductionModal = closeProductionModal; } catch (e) { console.warn('[PD] capture closeProductionModal:', e); }
+try { closeProductionModal = function pdCloseProductionModalWrapper() {
   const s = window.__pdSession;
   if (!s) return _pdOriginalCloseProductionModal();
   const total = pdElapsedSeconds();
@@ -5892,7 +5909,9 @@ closeProductionModal = function pdCloseProductionModalWrapper() {
   })();
   pdResetSession();
   _pdOriginalCloseProductionModal();
-};
+}; } catch (e) { console.warn('[PD] wrap closeProductionModal:', e); }
+
+try { console.log('[PD] Production directe — module charge OK'); } catch(e) {}
 
 // ============= INIT =============
 init();
