@@ -111,6 +111,7 @@
     .fiche-card.cat-mise_en_place { border-left-color: var(--blue); }
     .fiche-card.cat-produit_intermediaire { border-left-color: var(--orange); }
     .fiche-card.cat-produit_fini { border-left-color: var(--green); }
+    .fiche-card.cat-plat { border-left-color: var(--red); }
     .fiche-card.inactive { opacity: 0.5; }
 
     .fiche-icon { font-size: 1.5rem; flex-shrink: 0; }
@@ -128,6 +129,7 @@
     .badge-cat.mise_en_place { background: var(--blue-bg); color: var(--blue); }
     .badge-cat.produit_intermediaire { background: var(--orange-light); color: var(--orange-dark); }
     .badge-cat.produit_fini { background: var(--green-bg); color: var(--green); }
+    .badge-cat.plat { background: var(--red-bg); color: var(--red); }
     .badge-dlc { background: #fef3c7; color: #92400e; }
     .badge-allergene { background: var(--red-bg); color: var(--red); }
     .badge-cost { background: var(--green-bg); color: #15803d; }
@@ -264,22 +266,6 @@
     .ingredient-row .ing-unite { width: 60px; }
     .ingredient-row .ing-prix { width: 70px; text-align: right; }
     .ingredient-row .ing-total { width: 65px; text-align: right; font-weight: 600; font-size: 0.8rem; color: var(--gray-600); }
-    .ingredient-row .ing-principal-wrap {
-      display: inline-flex; align-items: center; gap: 2px;
-      cursor: pointer; padding: 4px 6px; border-radius: 6px;
-      border: 1px solid #d1d5db; background: white;
-      transition: background .15s;
-    }
-    .ingredient-row .ing-principal-wrap:has(input:checked) {
-      background: #fef3c7; border-color: #f59e0b;
-    }
-    .ingredient-row .ing-principal { margin: 0; cursor: pointer; }
-    .ingredient-row .ing-principal-icon {
-      font-size: 0.95rem; opacity: .35; user-select: none;
-    }
-    .ingredient-row .ing-principal-wrap:has(input:checked) .ing-principal-icon {
-      opacity: 1;
-    }
     .ingredient-row.no-article { background: #fff5e6; border-left: 3px solid #f59e0b; padding-left: 8px; }
     .ingredient-row.has-article { background: #ecfdf5; border-left: 3px solid #10b981; padding-left: 8px; flex-wrap: wrap; }
     .ing-article-info { width: 100%; font-size: 11px; color: #047857; padding: 2px 4px 0 4px; font-weight: 600; }
@@ -652,6 +638,7 @@
       <button class="filter-chip" data-cat="mise_en_place">Mise en place</button>
       <button class="filter-chip" data-cat="produit_intermediaire">Prod. interméd.</button>
       <button class="filter-chip" data-cat="produit_fini">Prod. fini</button>
+      <button class="filter-chip" data-cat="plat">Plat</button>
     </div>
     <div class="search-bar">
       <input type="text" class="search-input" id="search-input" placeholder="Rechercher une fiche...">
@@ -777,6 +764,7 @@
             <button class="chip active" data-val="produit_fini">Produit fini</button>
             <button class="chip" data-val="produit_intermediaire">Produit intermédiaire</button>
             <button class="chip" data-val="mise_en_place">Mise en place</button>
+            <button class="chip" data-val="plat">Plat</button>
           </div>
         </div>
 
@@ -1098,6 +1086,113 @@ let allProductions = [];
 let allLots = [];
 let allArticlesAppro = []; // référentiel appro_ingredients pour rattachement
 let articleLastPrice = {}; // {article_id: dernier prix unitaire connu (€)}
+
+// ============= COÛTS MATIÈRE — prix de référence =============
+// Prix d'achat normalisés (référentiel appro, achats au 28/03/2026). Clé = id appro_ingredient.
+// p = prix €/unité de base · b = unité de base · f = fiabilité.
+// Source : Referentiel_Prix_Normalise.xlsx. À rebrancher sur la base ultérieurement.
+const REF_PRIX = {
+  "2e8769ef-9ea7-49f1-84d1-fdcbdc6b7202":{p:7.21,b:"kg",f:"Fiable"},
+  "9e6a6e3e-d5f7-4503-896d-bdfe54d30b5b":{p:9.9,b:"L",f:"Fiable"},
+  "ee571dac-a7e8-4c01-88ab-d785b40fac48":{p:9.17,b:"boîte 1 L",f:"À vérifier"},
+  "66ef41d3-024b-438e-8e82-cec96a55eff2":{p:7.76,b:"kg",f:"Fiable"},
+  "8f66b1f0-10ac-4680-9317-466df1d6fd50":{p:9.45,b:"kg",f:"Fiable"},
+  "f43150d0-182b-43e6-9abc-3040b49c74cd":{p:8.47,b:"kg",f:"Fiable"},
+  "c6c60775-acaa-4f2e-84c0-afa365224b12":{p:13.24,b:"kg",f:"Fiable"},
+  "12b42469-7fed-418c-a5e6-014f093ed765":{p:10.7,b:"kg",f:"Fiable"},
+  "12ad3290-c7be-42d4-8d41-39146ec9fc0d":{p:28.51,b:"kg",f:"Fiable"},
+  "72ccfc81-df9f-421e-828f-ce618a65c9a4":{p:9.08,b:"boîte 1 L",f:"À vérifier"},
+  "3a498e7c-985c-4643-be57-b535140483b1":{p:1.2,b:"kg",f:"Fiable"},
+  "8ffdc0eb-66ed-48e0-95e7-29fe26be7acb":{p:4.8,b:"kg",f:"Fiable"},
+  "71d63292-5155-4847-868d-d8f4c067b703":{p:2.86,b:"kg",f:"Fiable"},
+  "bc39734d-6155-4f32-86b5-8a2beb74fef4":{p:14.59,b:"kg",f:"Fiable"},
+  "832e1ee7-405c-4361-943e-9e92cf5a6aaa":{p:14.5,b:"kg",f:"Fiable"},
+  "8542102a-113d-4930-af13-caaeace95267":{p:34.8,b:"kg",f:"Fiable"},
+  "c4fa0b27-5849-40d3-bad0-7aa8175f67b0":{p:3.8,b:"kg",f:"Fiable"},
+  "63450983-cda9-432a-a5ba-21f6fa3eb674":{p:10.19,b:"boîte 1 L",f:"À vérifier"},
+  "72b3014e-d4af-4499-9f14-be7033b41f72":{p:4.91,b:"L",f:"Fiable"},
+  "262082db-206d-41a0-9533-7e84a779a6c8":{p:0.27,b:"cube",f:"Fiable"},
+  "fe98a6a4-fc95-483b-bdbd-0c89b899cbfd":{p:19.33,b:"kg",f:"Fiable"},
+  "0308783d-4b59-459a-bb53-0d084dedab9b":{p:2.88,b:"kg",f:"À vérifier"},
+  "b377aefd-21d8-4410-9a08-0fec2b8ffdc0":{p:19.74,b:"kg",f:"Fiable"},
+  "2624e228-91a4-4d1d-a2bf-95a3ba3f7f2f":{p:0.73,b:"kg",f:"Fiable"},
+  "adb5f86b-9046-46b4-91db-59d0462f5941":{p:3.16,b:"kg",f:"Fiable"},
+  "a254e1c6-6e19-480f-bc3e-276d3d8e7493":{p:18.7,b:"kg",f:"Fiable"},
+  "6d165c4c-910a-4ce0-b57d-bd960fab8e5f":{p:251.6,b:"kg",f:"Fiable"},
+  "71b838ff-5f05-4468-adb9-c10e298cbaf6":{p:1.66,b:"kg",f:"Fiable"},
+  "3d01bad7-4cfb-4a58-9670-d5d81263bfc6":{p:1.86,b:"L",f:"Fiable"},
+  "a7f3d5c7-4806-4ef5-a9bc-967c9150bdec":{p:9.88,b:"kg",f:"À vérifier"},
+  "789480d6-244b-4e9d-ae61-24cda5236301":{p:8.93,b:"kg",f:"Fiable"},
+  "9b61225f-751b-4cb6-b043-1fcb4994d590":{p:1.47,b:"L",f:"Fiable"},
+  "84d0dada-e330-4662-a8c9-d5aec07ada5a":{p:9.37,b:"kg",f:"Fiable"},
+  "5ddd8b9e-6754-4182-a925-6587fe368ca4":{p:8.47,b:"kg",f:"Fiable"},
+  "9547ce9a-da6d-4159-91b1-85b9b9c0ddf7":{p:9.42,b:"kg",f:"Fiable"},
+  "123b41b6-e459-48e8-8615-5b559904b694":{p:6.02,b:"L",f:"À vérifier"},
+  "b17fc9d7-0858-41c5-9c1a-1918b99cf4d9":{p:1.87,b:"L",f:"Fiable"},
+  "03330980-7d50-4e86-afa1-6062f23c2a0e":{p:3.46,b:"kg",f:"Fiable"},
+  "ed0dbb92-04f6-4d34-bb52-44cdf56848b6":{p:15.1,b:"kg",f:"Fiable"},
+  "49062068-6eea-4607-aa54-9195c0c9df3b":{p:24.43,b:"kg",f:"Fiable"},
+  "8378895c-2ddb-45b1-b8e2-1de430bd4f0e":{p:2.02,b:"kg",f:"Fiable"},
+  "74a6910e-efb9-4629-b073-7db77460debe":{p:20.13,b:"kg",f:"Fiable"},
+  "4626e50f-e67c-4dc6-bc0c-65ab3dd793e1":{p:7.02,b:"kg",f:"Fiable"},
+  "a0f92002-6af3-4b58-b821-d80b312aaca1":{p:0.27,b:"pièce",f:"Fiable"},
+  "e3c40fc3-44bf-4c98-8753-3caae59586fb":{p:5.64,b:"kg",f:"Fiable"},
+  "474434aa-4340-49ea-afa4-9aa7525ed6d1":{p:16.26,b:"kg",f:"Fiable"},
+  "1e1e045a-89e6-4656-a001-e564d11e7e27":{p:4.1,b:"kg",f:"À vérifier"},
+  "8dd02dbb-8ed1-433c-9a10-696e6a3de0bc":{p:1.88,b:"kg",f:"À vérifier"},
+  "f4bbfeb0-df42-4179-82f9-a69a3184f852":{p:7.29,b:"kg",f:"Fiable"},
+  "257720a8-5308-457e-bcdd-3acf5e93af71":{p:6.43,b:"kg",f:"Fiable"},
+  "40653a14-0005-439a-baa1-dfae7ba25c28":{p:1.14,b:"pièce",f:"Fiable"},
+  "e39ebc70-c258-4223-a8a1-08de7c69fa7c":{p:1.27,b:"kg",f:"Fiable"},
+  "c4a57233-111b-4e32-b0bf-0e65f27a43ef":{p:1.83,b:"kg",f:"Fiable"},
+  "61e1ff7f-b60d-40b6-a448-1af76ce5ce6f":{p:1.25,b:"kg",f:"Fiable"},
+  "523bbba6-4ab7-47be-801a-0f9d0b3e9397":{p:1.35,b:"L",f:"Fiable"},
+  "fd8ffc66-1858-4490-9832-c6ed58f362e3":{p:1.38,b:"L",f:"Fiable"},
+  "949df978-f47f-4b3d-bb41-dcf5b5df2484":{p:0.77,b:"L",f:"Fiable"}
+};
+
+// Facteur de conversion d'une unité de recette vers l'unité de base d'un prix de référence.
+// Retourne null si la conversion n'est pas fiable.
+function factorToBase(uRec, base){
+  const u=(uRec||'').toString().toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\./g,'');
+  if(base==='kg'){
+    if(u==='g'||u==='gr'||u==='grs') return 0.001;
+    if(u==='kg') return 1;
+    if(u==='cac') return 0.005;   // 1 c. à café ≈ 5 g
+    if(u==='cas') return 0.015;   // 1 c. à soupe ≈ 15 g
+    return null;
+  }
+  if(base==='L'){
+    if(u==='ml') return 0.001;
+    if(u==='cl') return 0.01;
+    if(u==='l'||u==='litre'||u==='brique') return 1;
+    if(u==='cac') return 0.005;
+    if(u==='cas') return 0.015;
+    return null;
+  }
+  if(base==='pièce'){
+    if(['piece','pieces','pce','pces','portion','portions',''].includes(u)) return 1;
+    return null;
+  }
+  if(base==='cube') return u==='cube' ? 1 : null;
+  return null; // base "boîte 1 L" ou inconnue : pas de conversion fiable
+}
+
+// Coût d'une ligne d'ingrédient. Priorité au prix saisi sur la fiche, sinon prix de référence.
+// src : 'saisi' | 'ref' (référence fiable) | 'refv' (référence à vérifier) | 'inconv' | 'none'
+function coutLigneMatiere(ing){
+  const q = parseFloat(ing.quantite) || 0;
+  const puSaisi = parseFloat(ing.prix_unitaire) || 0;
+  if(puSaisi > 0) return {cout:q*puSaisi, src:'saisi'};
+  const r = ing.article_id ? REF_PRIX[ing.article_id] : null;
+  if(r){
+    const f = factorToBase(ing.unite, r.b);
+    if(f===null) return {cout:null, src:'inconv', ref:r};
+    return {cout:q*r.p*f, src:(r.f==='Fiable'?'ref':'refv'), ref:r};
+  }
+  return {cout:null, src:'none'};
+}
 let currentFilter = 'all';
 let searchTerm = '';
 let editingFicheId = null;
@@ -1109,13 +1204,15 @@ let dlcFilter = 'all'; // all, ok, j2, j1, depasse
 const CATEGORIES = {
   mise_en_place: 'Mise en place',
   produit_intermediaire: 'Produit intermédiaire',
-  produit_fini: 'Produit fini'
+  produit_fini: 'Produit fini',
+  plat: 'Plat'
 };
 
 const CAT_ICONS = {
   mise_en_place: '🔪',
   produit_intermediaire: '🥘',
-  produit_fini: '✨'
+  produit_fini: '✨',
+  plat: '🍽️'
 };
 
 const ALLERGENES_LABELS = {
@@ -1971,10 +2068,6 @@ function addIngredientRow(data = {}) {
     <input type="number" class="ing-prix" placeholder="P.U. €" min="0" step="0.01" value="${data.prix_unitaire || ''}">
     <span class="ing-total">${((data.quantite || 0) * (data.prix_unitaire || 0)).toFixed(2)} €</span>
     <button type="button" class="btn-link-art" onclick="openArticlePicker(${id})" title="${linkBtnTitle}">${linkBtnLabel}</button>
-    <label class="ing-principal-wrap" title="🎯 Marquer comme ingrédient PRINCIPAL — à scanner obligatoirement au démarrage de la tâche (Scan-FEFO)">
-      <input type="checkbox" class="ing-principal" ${data.est_principal ? 'checked' : ''}>
-      <span class="ing-principal-icon">🎯</span>
-    </label>
     <button class="btn-remove-ing" onclick="removeIngredientRow(${id})">×</button>
   `;
   if (linkedArticle) {
@@ -2253,7 +2346,6 @@ const DB = {
         cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
         ordre: i,
         article_id: ing.article_id || null,
-        est_principal: !!ing.est_principal,
       }));
       const { error } = await sb.from('fiche_ingredients').insert(rows);
       if (error) throw error;
@@ -2998,25 +3090,51 @@ async function viewFiche(id) {
     `;
   }
 
-  // Ingredients table
+  // Ingredients table — coût matière calculé live (prix saisi ou prix de référence)
   let ingredientsHTML = '';
   if (ingredients.length > 0) {
     let totalCost = 0;
+    let nbEstime = 0, nbSansPrix = 0;
     const rows = ingredients.map(ing => {
-      const cost = (ing.quantite || 0) * (ing.prix_unitaire || 0);
-      totalCost += cost;
+      const c = coutLigneMatiere(ing);
+      let puTxt = '-', coutTxt = '-';
+      if (c.src === 'saisi') {
+        puTxt = parseFloat(ing.prix_unitaire).toFixed(2) + ' €';
+        coutTxt = (c.cout || 0).toFixed(2) + ' €';
+        totalCost += c.cout;
+      } else if (c.src === 'ref' || c.src === 'refv') {
+        const aVerif = c.src === 'refv';
+        nbEstime++;
+        const col = aVerif ? '#d97706' : '#2563eb';
+        puTxt = `${c.ref.p.toFixed(2)} €/${c.ref.b} <span title="Prix de référence${aVerif ? ' — à vérifier' : ''}" style="color:${col};font-weight:700">≈</span>`;
+        coutTxt = `${(c.cout || 0).toFixed(2)} €`;
+        totalCost += c.cout;
+      } else if (c.src === 'inconv') {
+        puTxt = `${c.ref.p.toFixed(2)} €/${c.ref.b}`;
+        coutTxt = `<span style="color:#d97706" title="Unité « ${ing.unite} » non convertible vers ${c.ref.b}">à vérifier</span>`;
+        nbSansPrix++;
+      } else {
+        coutTxt = `<span style="color:#9ca3af" title="Aucun prix de référence pour cet ingrédient">–</span>`;
+        nbSansPrix++;
+      }
       return `
         <tr>
           <td>${ing.nom}</td>
           <td style="text-align:right">${ing.quantite}</td>
           <td>${ing.unite}</td>
-          <td style="text-align:right">${ing.prix_unitaire > 0 ? parseFloat(ing.prix_unitaire).toFixed(2) + ' €' : '-'}</td>
-          <td style="text-align:right">${cost > 0 ? cost.toFixed(2) + ' €' : '-'}</td>
+          <td style="text-align:right">${puTxt}</td>
+          <td style="text-align:right">${coutTxt}</td>
         </tr>
       `;
     }).join('');
 
     const portionCost = fiche.rendement_quantite > 0 ? (totalCost / fiche.rendement_quantite) : 0;
+    const partielNote = nbSansPrix > 0
+      ? ` <span style="font-weight:400;color:#d97706;font-size:0.85em">(partiel — ${nbSansPrix} ingrédient${nbSansPrix > 1 ? 's' : ''} sans prix)</span>`
+      : '';
+    const legende = nbEstime > 0
+      ? `<tr><td colspan="5" style="font-size:0.78em;color:#6b7280;font-weight:400;padding-top:8px;text-align:left">≈ coût estimé d'après les prix de référence (achats au 28/03/2026). Un prix saisi manuellement sur la fiche reste prioritaire.</td></tr>`
+      : '';
 
     ingredientsHTML = `
       <div class="detail-section">
@@ -3028,10 +3146,11 @@ async function viewFiche(id) {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr class="total-row">
-              <td colspan="4">Coût total matière</td>
+              <td colspan="4">Coût total matière${partielNote}</td>
               <td style="text-align:right">${totalCost.toFixed(2)} €</td>
             </tr>
             ${portionCost > 0 ? `<tr class="total-row"><td colspan="4">Coût par portion (${fiche.rendement_quantite} ${fiche.rendement_unite || 'portions'})</td><td style="text-align:right">${portionCost.toFixed(2)} €</td></tr>` : ''}
+            ${legende}
           </tfoot>
         </table>
       </div>
@@ -3313,8 +3432,7 @@ async function saveFiche() {
     const cost = qty * prix;
     coutTotal += cost;
     const articleId = row.dataset.articleId || null;
-    const estPrincipal = row.querySelector('.ing-principal')?.checked || false;
-    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId, est_principal: estPrincipal });
+    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId });
   });
 
   const rendement = parseFloat(document.getElementById('f-rendement-qty').value) || 0;
@@ -3685,7 +3803,7 @@ function showEtiquette(production) {
 
   const html = `
     <div class="etiquette-modal active" id="etiquette">
-      <div class="etiquette-card" style="max-height:88vh; overflow-y:auto;">
+      <div class="etiquette-card">
         <div class="etiquette-header-bar">ÉTIQUETTE PRODUCTION — ${escapeHtml(currentEtablissement).toUpperCase()}</div>
         <div class="etiquette-body">
           <div class="etiquette-title">${escapeHtml(production.nom_produit)}</div>
@@ -3717,12 +3835,6 @@ function showEtiquette(production) {
             <div class="lbl">DATE LIMITE DE CONSOMMATION</div>
             <div class="val">${dlcStr}</div>
           </div>` : ''}
-          <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--gray-200); text-align:left;">
-            <div style="color:var(--gray-500); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:8px;">🎯 Matières premières / lots utilisés</div>
-            <div id="etiquette-trace-body" style="display:flex; flex-direction:column; gap:6px;">
-              <div style="font-size:12px; color:var(--gray-500);">Chargement de la traçabilité…</div>
-            </div>
-          </div>
         </div>
         <div class="etiquette-actions">
           <button class="etiquette-btn close" onclick="closeEtiquette()">Fermer</button>
@@ -3733,69 +3845,11 @@ function showEtiquette(production) {
     </div>
   `;
   document.body.insertAdjacentHTML('beforeend', html);
-  loadEtiquetteTrace(production.id);
 }
 
 function closeEtiquette() {
   const el = document.getElementById('etiquette');
   if (el) el.remove();
-}
-
-// ====== PHASE C — Traçabilité : étiquettes / lots utilisés pour une production ======
-// Lit les mouvements de sortie de stock de la production et les rapproche des
-// étiquettes scannées (scan_tracabilite) pour afficher produit / lot / DLC / fabricant.
-async function loadEtiquetteTrace(prodId) {
-  const body = document.getElementById('etiquette-trace-body');
-  if (!body) return;
-  try {
-    const { data: movs, error } = await sb.from('stock_mouvements')
-      .select('quantite, unite, scan_tracabilite_id')
-      .eq('source_table', 'production')
-      .eq('source_id', prodId);
-    if (error) throw error;
-    if (!movs || movs.length === 0) {
-      body.innerHTML = '<div style="font-size:12px; color:var(--gray-500);">Aucune sortie de stock enregistrée — traçabilité des lots indisponible pour cette production.</div>';
-      return;
-    }
-    const tracIds = [...new Set(movs.map(m => m.scan_tracabilite_id).filter(Boolean))];
-    const tracById = {};
-    if (tracIds.length) {
-      const { data: tracs } = await sb.from('scan_tracabilite')
-        .select('id, produit, lot, dlc, fabricant')
-        .in('id', tracIds);
-      (tracs || []).forEach(t => { tracById[t.id] = t; });
-    }
-    const now = Date.now();
-    body.innerHTML = movs.map(m => {
-      const t = m.scan_tracabilite_id ? tracById[m.scan_tracabilite_id] : null;
-      const qte = (m.quantite != null ? m.quantite : '?') + ' ' + (m.unite || '');
-      if (!t) {
-        return '<div style="display:flex; gap:8px; padding:8px 10px; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px;">'
-          + '<span>⚠</span><div><div style="font-weight:600; font-size:0.8rem; color:#92400e;">Lot sans étiquette scannée</div>'
-          + '<div style="font-size:0.7rem; color:#92400e;">Quantité utilisée : ' + escapeHtml(qte) + '</div></div></div>';
-      }
-      let dlc = '?', expired = false;
-      if (t.dlc) {
-        const d = new Date(t.dlc);
-        dlc = d.toLocaleDateString('fr-FR');
-        if (d.getTime() < now) expired = true;
-      }
-      const fab = t.fabricant ? ' · ' + escapeHtml(t.fabricant) : '';
-      const dlcHtml = expired
-        ? '<span style="color:#b91c1c; font-weight:700;">DLC ' + dlc + ' ⚠ périmé</span>'
-        : 'DLC ' + dlc;
-      const bg = expired ? '#fef2f2' : '#f0fdf4';
-      const bd = expired ? '#fca5a5' : '#86efac';
-      return '<div style="display:flex; gap:8px; padding:8px 10px; background:' + bg + '; border:1px solid ' + bd + '; border-radius:6px;">'
-        + '<span>' + (expired ? '⚠' : '🏷️') + '</span><div><div style="font-weight:600; font-size:0.8rem; color:var(--gray-800);">'
-        + escapeHtml(t.produit || 'Produit ?') + '</div>'
-        + '<div style="font-size:0.7rem; color:var(--gray-600);">Lot ' + escapeHtml(t.lot || '?') + ' · '
-        + dlcHtml + fab + ' · ' + escapeHtml(qte) + '</div></div></div>';
-    }).join('');
-  } catch (e) {
-    console.error('[Phase C] loadEtiquetteTrace:', e);
-    body.innerHTML = '<div style="font-size:12px; color:#b91c1c;">Erreur de chargement de la traçabilité.</div>';
-  }
 }
 
 // Charge jsPDF depuis CDN une seule fois, retourne une promesse résolue quand disponible.
@@ -4888,63 +4942,6 @@ init();
     patchHeader();
   }
 })();
-
-  // ====== SCAN-FEFO/TAF-LABEL : auto-ouverture étiquette ======
-  // Si on arrive depuis /taf/ après validation d'une production avec
-  // ?prod_id=xxx&action=etiquette, on ouvre directement showEtiquette
-  // pour la production fraîchement créée.
-  (async function autoOpenEtiquetteFromTaf() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const prodId = urlParams.get('prod_id');
-    const action = urlParams.get('action');
-    const ret = urlParams.get('return');
-    if (!prodId || action !== 'etiquette') return;
-
-    // Attendre que sb (supabase) soit défini + données prêtes (polling max 5s)
-    let tries = 0;
-    while (tries < 25 && (typeof sb === 'undefined' || !sb)) {
-      await new Promise(r => setTimeout(r, 200));
-      tries++;
-    }
-    if (typeof sb === 'undefined' || !sb) {
-      console.warn('[TAF-LABEL] supabase non chargé');
-      return;
-    }
-    // Petite pause pour laisser allLots se charger si possible
-    await new Promise(r => setTimeout(r, 400));
-    try {
-      const { data: prod, error } = await sb.from('productions').select('*').eq('id', prodId).single();
-      if (error || !prod) {
-        console.warn('[TAF-LABEL] production introuvable', prodId, error);
-        return;
-      }
-      if (typeof showEtiquette === 'function') {
-        showEtiquette(prod);
-      } else {
-        console.warn('[TAF-LABEL] showEtiquette() non disponible');
-      }
-      // Bouton retour TAF en haut de la modale étiquette
-      if (ret === 'taf') {
-        setTimeout(() => {
-          const eti = document.getElementById('etiquette');
-          if (eti) {
-            const headerBar = eti.querySelector('.etiquette-header-bar');
-            if (headerBar && !document.getElementById('btn-back-taf')) {
-              const btn = document.createElement('button');
-              btn.id = 'btn-back-taf';
-              btn.textContent = '← TAF';
-              btn.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;';
-              btn.onclick = () => { window.location.href = '../taf/'; };
-              eti.querySelector('.etiquette-card').style.position = 'relative';
-              eti.querySelector('.etiquette-card').appendChild(btn);
-            }
-          }
-        }, 200);
-      }
-    } catch (e) {
-      console.error('[TAF-LABEL] erreur', e);
-    }
-  })();
 </script>
 
 </body>
