@@ -670,10 +670,10 @@
       }, 200);
     }
 
-    // ===== Scan « rafale » : scan groupé des étiquettes MP depuis le TAF =====
-    if (returnTo === 'taf' && forcedMode === 'burst') {
+    // ===== Scan « rafale » : scan groupé des étiquettes MP depuis le TAF ou la Production directe =====
+    if ((returnTo === 'taf' || returnTo === 'production') && forcedMode === 'burst') {
       State.mode = 'burst';
-      window.__scanFefoReturnMode = 'taf';
+      window.__scanFefoReturnMode = returnTo; // 'taf' ou 'production'
       setTimeout(() => {
         if (typeof initBurst === 'function') initBurst();
       }, 200);
@@ -1951,7 +1951,8 @@
           timestamp: Date.now(),
         }));
       } catch (e) { console.error('[Burst] enregistrement résultat:', e); }
-      window.location.href = '../taf/';
+      const dest = (window.__scanFefoReturnMode === 'production') ? '../production/' : '../taf/';
+      window.location.href = dest;
     });
 
     function burstStopCamera() {
@@ -1963,16 +1964,18 @@
 
     $('btn-burst-cancel-1').addEventListener('click', () => {
       burstStopCamera();
-      window.location.href = '../taf/';
+      const dest = (window.__scanFefoReturnMode === 'production') ? '../production/' : '../taf/';
+      window.location.href = dest;
     });
     $('btn-burst-cancel-2').addEventListener('click', () => {
       const done = Burst.ctx ? Burst.ctx.ingredients.filter(ing => {
         const r = Burst.results[ing.ingredient_id];
         return r && !r.error && !r._pending;
       }).length : 0;
+      const dest = (window.__scanFefoReturnMode === 'production') ? 'la production' : 'le TAF';
       const msg = done > 0
-        ? 'Revenir au TAF ? Les ' + done + ' étiquette(s) déjà scannée(s) seront enregistrées.'
-        : 'Annuler le scan et revenir au TAF ?';
+        ? 'Revenir à ' + dest + ' ? Les ' + done + ' étiquette(s) déjà scannée(s) seront enregistrées.'
+        : 'Annuler le scan et revenir à ' + dest + ' ?';
       if (!confirm(msg)) return;
       $('btn-burst-validate').click();
     });

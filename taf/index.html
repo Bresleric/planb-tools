@@ -1249,10 +1249,14 @@
       const nextDay = new Date(dateFilter);
       nextDay.setDate(nextDay.getDate() + 1);
       const dsNext = dateStr(nextDay);
+      // Exclure les tâches « spontanees » (créées depuis le module Production
+      // pour une production directe sans TAF planifiée — elles vivent dans
+      // leur propre flux côté Production et n'ont pas à polluer le TAF).
       const { data } = await supabaseClient.from('tasks').select('*')
         .eq('etablissement', currentEtablissement)
         .gte('echeance', ds)
         .lt('echeance', dsNext)
+        .or('spontanee.is.null,spontanee.eq.false')
         .order('priorite', { ascending: false });
       return data || [];
     },
