@@ -266,22 +266,6 @@
     .ingredient-row .ing-unite { width: 60px; }
     .ingredient-row .ing-prix { width: 70px; text-align: right; }
     .ingredient-row .ing-total { width: 65px; text-align: right; font-weight: 600; font-size: 0.8rem; color: var(--gray-600); }
-    .ingredient-row .ing-principal-wrap {
-      display: inline-flex; align-items: center; gap: 2px;
-      cursor: pointer; padding: 4px 6px; border-radius: 6px;
-      border: 1px solid #d1d5db; background: white;
-      transition: background .15s;
-    }
-    .ingredient-row .ing-principal-wrap:has(input:checked) {
-      background: #fef3c7; border-color: #f59e0b;
-    }
-    .ingredient-row .ing-principal { margin: 0; cursor: pointer; }
-    .ingredient-row .ing-principal-icon {
-      font-size: 0.95rem; opacity: .35; user-select: none;
-    }
-    .ingredient-row .ing-principal-wrap:has(input:checked) .ing-principal-icon {
-      opacity: 1;
-    }
     .ingredient-row.no-article { background: #fff5e6; border-left: 3px solid #f59e0b; padding-left: 8px; }
     .ingredient-row.has-article { background: #ecfdf5; border-left: 3px solid #10b981; padding-left: 8px; flex-wrap: wrap; }
     .ing-article-info { width: 100%; font-size: 11px; color: #047857; padding: 2px 4px 0 4px; font-weight: 600; }
@@ -889,6 +873,10 @@
             <span class="label">Coût par portion :</span>
             <span class="amount" id="cost-portion">0.00 €</span>
           </div>
+          <div class="cost-summary" id="cost-litre-summary" style="display:none; margin-top: 4px;">
+            <span class="label">Prix au litre <span id="cost-litre-detail" style="color:#6b7280;font-weight:400;font-size:0.85em"></span> :</span>
+            <span class="amount" id="cost-litre">0.00 €</span>
+          </div>
         </div>
 
         <!-- Actions post-production (sous-produits & actions induites) - admin only -->
@@ -1198,6 +1186,33 @@ function factorToBase(uRec, base){
 // Prix calculé par unité de valeur (vue v_prix_ingredients_uv).
 // Rempli par loadFiches() : clé = ingredient_id, valeur = { uv, prix }.
 let PRIX_UV = {};
+
+// Volume utile (litres) déduit du conditionnement GN. Renvoie null si non parsable.
+// Reconnait "GN 1/1-20", "GN 1/2 65", "GN 2/3 - 100", etc.
+function volumeLitresFromCond(s) {
+  if (!s) return null;
+  const m = String(s).match(/GN\s*(\d+)\s*\/\s*(\d+)\s*[-\s]+\s*(\d+)/i);
+  if (!m) return null;
+  const num = parseInt(m[1], 10), den = parseInt(m[2], 10), depth = parseInt(m[3], 10);
+  if (!num || !den || !depth) return null;
+  // Volumes utiles standard pour GN 1/1 (en L)
+  const vol11 = {20:2.5, 40:5.5, 65:9.0, 100:14.0, 150:21.0, 200:28.0};
+  let base = vol11[depth];
+  if (base == null) {
+    const depths = Object.keys(vol11).map(Number).sort((a,b)=>a-b);
+    if (depth < depths[0] || depth > depths[depths.length-1]) {
+      base = depth * (28/200); // extrapolation linéaire
+    } else {
+      let lo = depths[0], hi = depths[depths.length-1];
+      for (let i=0;i<depths.length-1;i++) {
+        if (depths[i] <= depth && depth <= depths[i+1]) { lo=depths[i]; hi=depths[i+1]; break; }
+      }
+      const t = (depth-lo)/(hi-lo);
+      base = vol11[lo] + t*(vol11[hi]-vol11[lo]);
+    }
+  }
+  return Math.round(base * (num/den) * 100) / 100;
+}
 
 // Cascade composant : coût matière d'une fiche composant, par unité de rendement.
 // Cache mémoizé, réinitialisé à chaque rechargement de allFiches.
@@ -2146,10 +2161,6 @@ function addIngredientRow(data = {}) {
     <input type="number" class="ing-prix" placeholder="P.U. €" min="0" step="0.01" value="${data.prix_unitaire || ''}">
     <span class="ing-total">${((data.quantite || 0) * (data.prix_unitaire || 0)).toFixed(2)} €</span>
     <button type="button" class="btn-link-art" onclick="openArticlePicker(${id})" title="${linkBtnTitle}">${linkBtnLabel}</button>
-    <label class="ing-principal-wrap" title="🎯 Marquer comme ingrédient PRINCIPAL — à scanner obligatoirement au démarrage de la tâche (Scan-FEFO)">
-      <input type="checkbox" class="ing-principal" ${data.est_principal ? 'checked' : ''}>
-      <span class="ing-principal-icon">🎯</span>
-    </label>
     <button class="btn-remove-ing" onclick="removeIngredientRow(${id})">×</button>
   `;
   if (linkedArticle) {
@@ -2375,9 +2386,24 @@ function updateCostSummary() {
     } else {
       portionDiv.style.display = 'none';
     }
+    // Prix au litre déduit du conditionnement (GN…)
+    const litreDiv = document.getElementById('cost-litre-summary');
+    const cond = document.getElementById('f-conditionnement')?.value || '';
+    const vol = volumeLitresFromCond(cond);
+    if (litreDiv) {
+      if (vol && vol > 0 && total > 0) {
+        litreDiv.style.display = 'flex';
+        document.getElementById('cost-litre').textContent = (total / vol).toFixed(2) + ' €';
+        document.getElementById('cost-litre-detail').textContent = `(${cond.trim()} ≈ ${vol} L)`;
+      } else {
+        litreDiv.style.display = 'none';
+      }
+    }
   } else {
     costDiv.style.display = 'none';
     portionDiv.style.display = 'none';
+    const litreDiv = document.getElementById('cost-litre-summary');
+    if (litreDiv) litreDiv.style.display = 'none';
   }
 }
 
@@ -2428,7 +2454,6 @@ const DB = {
         cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
         ordre: i,
         article_id: ing.article_id || null,
-        est_principal: !!ing.est_principal,
       }));
       const { error } = await sb.from('fiche_ingredients').insert(rows);
       if (error) throw error;
@@ -3278,6 +3303,7 @@ async function viewFiche(id) {
               <td style="text-align:right">${totalCost.toFixed(2)} €</td>
             </tr>
             ${portionCost > 0 ? `<tr class="total-row"><td colspan="4">Coût par portion (${fiche.rendement_quantite} ${fiche.rendement_unite || 'portions'})</td><td style="text-align:right">${portionCost.toFixed(2)} €</td></tr>` : ''}
+            ${(() => { const v = volumeLitresFromCond(fiche.conditionnement); return (v && v > 0 && totalCost > 0) ? `<tr class="total-row"><td colspan="4">Prix au litre <span style="color:#6b7280;font-weight:400;font-size:0.85em">(${escapeHtml(fiche.conditionnement)} ≈ ${v} L)</span></td><td style="text-align:right">${(totalCost/v).toFixed(2)} €</td></tr>` : ''; })()}
             ${legende}
           </tfoot>
         </table>
@@ -3560,8 +3586,7 @@ async function saveFiche() {
     const cost = qty * prix;
     coutTotal += cost;
     const articleId = row.dataset.articleId || null;
-    const estPrincipal = row.querySelector('.ing-principal')?.checked || false;
-    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId, est_principal: estPrincipal });
+    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId });
   });
 
   const rendement = parseFloat(document.getElementById('f-rendement-qty').value) || 0;
@@ -4533,6 +4558,7 @@ function closeModal() {
 
 // Listen for rendement changes to recalculate cost per portion
 document.getElementById('f-rendement-qty')?.addEventListener('input', updateCostSummary);
+document.getElementById('f-conditionnement')?.addEventListener('input', updateCostSummary);
 
 // ============= ONGLET RATTACHEMENT =============
 // Vue d'audit + matching ingrédients <-> articles appro_ingredients.
