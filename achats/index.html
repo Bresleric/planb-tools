@@ -115,9 +115,10 @@ tr:nth-child(even) td{background:#fafbfc;}
       <th data-k="designation">Désignation</th><th data-k="reference">Réf.</th>
       <th class="num" data-k="quantite">Qté</th><th data-k="unite">Unité</th>
       <th class="num" data-k="montant_ht">Montant HT</th>
+      <th class="num" data-k="prix_uv">Prix UV</th>
       <th data-k="ingredient_nom">Ingrédient rattaché</th>
     </tr></thead><tbody id="t-produits"></tbody></table>
-    <div class="foot">Cliquez sur la pastille de la colonne « Ingrédient rattaché » pour rattacher un produit. Le choix s’applique à toutes les factures où ce produit apparaît.</div>
+    <div class="foot">Cliquez sur la pastille de la colonne « Ingrédient rattaché » pour rattacher un produit. Le choix s’applique à toutes les factures où ce produit apparaît. La colonne « Prix UV » affiche le coût ramené à l'unité de valeur de l'ingrédient (ex. €/kg, €/pièce…) — apparaît dès qu'un facteur de conversion est saisi.</div>
   </div>
 
   <div class="panel" id="p-ingredients">
@@ -308,8 +309,19 @@ function fillCats(){
   document.getElementById('mc-cats').innerHTML=cats.map(c=>'<option value="'+esc(c)+'">').join('');
 }
 function sortData(arr,s){
+  // Prix UV est une valeur calculée (montant / (qte × facteur))
+  const compute=x=>{
+    if(s.k==='prix_uv'){
+      const fac=Number(x.facteur_unite_valeur),qte=Number(x.quantite),mt=Number(x.montant_ht);
+      if(!fac||fac<=0||!qte||qte<=0||!mt) return null;
+      return mt/(qte*fac);
+    }
+    return x[s.k];
+  };
   const a=arr.slice();a.sort((x,y)=>{
-    let p=x[s.k],r=y[s.k];
+    let p=compute(x),r=compute(y);
+    if(p==null&&r==null) return 0;
+    if(p==null) return 1; if(r==null) return -1;
     if(p!=null&&p!==''&&!isNaN(parseFloat(p))&&!isNaN(parseFloat(r))){p=parseFloat(p);r=parseFloat(r);}
     else{p=(p||'').toString().toLowerCase();r=(r||'').toString().toLowerCase();}
     return (p<r?-1:p>r?1:0)*(s.a?1:-1);
@@ -340,8 +352,24 @@ function renderProduits(){
     '<td>'+esc(x.designation)+'</td><td>'+esc(x.reference)+'</td>'+
     '<td class="num">'+esc(x.quantite)+'</td><td>'+esc(x.unite)+'</td>'+
     '<td class="num">'+eur(x.montant_ht)+'</td>'+
+    '<td class="num">'+prixUvCell(x)+'</td>'+
     '<td class="ing-cell">'+ingCell(x)+'</td></tr>').join('')
-    ||'<tr><td colspan="8" style="padding:16px;color:#6b7280">Aucun résultat.</td></tr>';
+    ||'<tr><td colspan="9" style="padding:16px;color:#6b7280">Aucun résultat.</td></tr>';
+}
+// Coût d'une ligne ramené à l'unité de valeur de son ingrédient.
+// Renvoie une chaîne HTML pour la cellule "Prix UV".
+function prixUvCell(x){
+  const fac=Number(x.facteur_unite_valeur);
+  const qte=Number(x.quantite);
+  const mt=Number(x.montant_ht);
+  if(!x.ingredient_id || !fac || fac<=0 || !qte || qte<=0 || !mt) return '<span style="color:#9ca3af">—</span>';
+  const ing=D.ings.find(i=>i.id===x.ingredient_id);
+  const uv=(ing && ing.unite_valeur)||'';
+  if(!uv) return '<span style="color:#9ca3af">—</span>';
+  const px=mt/(qte*fac);
+  return '<span title="'+esc(x.quantite)+' × '+esc(fac)+' = '+(qte*fac).toFixed(3).replace(/\.?0+$/,'')+' '+esc(uv)+'">'+
+    px.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+
+    ' €/'+esc(uv)+'</span>';
 }
 function renderIngredients(){
   const term=document.getElementById('i-search').value.toLowerCase().trim();
