@@ -65,6 +65,14 @@ tr:nth-child(even) td{background:#fafbfc;}
 .mc-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#166534;margin-bottom:7px;}
 .m-create .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
 .m-create input{padding:6px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;min-width:0;}
+.m-conv{margin:10px 16px 0;padding:10px 11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;}
+.m-conv .mc-title{color:#1d4ed8;}
+.m-conv .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:#1e3a8a;margin-bottom:6px;}
+.m-conv select,.m-conv input{padding:6px 9px;border:1px solid #93c5fd;border-radius:7px;font-size:13px;background:#fff;}
+.m-conv input[type=number]{width:90px;}
+.m-conv .mc-save{padding:7px 12px;border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;}
+.m-conv .mc-save:hover{background:#1e3a8a;}
+.m-conv .mc-hint{font-size:11px;color:#6b7280;margin-top:4px;}
 #mc-nom{flex:2 1 140px;}
 #mc-cat{flex:1 1 110px;}
 .mc-go{padding:7px 12px;border:1px solid #166534;background:#166534;color:#fff;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
@@ -162,6 +170,32 @@ tr:nth-child(even) td{background:#fafbfc;}
         <button class="mc-go" id="mc-go">Créer + rattacher</button>
       </div>
     </div>
+    <div class="m-conv" id="m-conv" style="display:none">
+      <div class="mc-title">Unité de valeur & conversion</div>
+      <div class="row">
+        <span>Cet ingrédient est compté en</span>
+        <select id="m-uv">
+          <option value="">— non définie —</option>
+          <option value="pièce">pièce</option>
+          <option value="kg">kg</option>
+          <option value="g">g</option>
+          <option value="L">L</option>
+          <option value="cl">cl</option>
+          <option value="ml">ml</option>
+          <option value="botte">botte</option>
+          <option value="sachet">sachet</option>
+          <option value="boîte">boîte</option>
+          <option value="tranche">tranche</option>
+        </select>
+      </div>
+      <div class="row" id="m-conv-fac">
+        <span>1 <strong id="m-uligne">—</strong> de ce produit =</span>
+        <input type="number" id="m-fac" min="0" step="any" placeholder="?" inputmode="decimal">
+        <strong id="m-uvtarget">—</strong>
+        <button class="mc-save" id="m-conv-save">Enregistrer</button>
+      </div>
+      <div class="mc-hint">L'unité de valeur s'applique à l'ingrédient (tous produits). Le facteur s'applique à toutes les lignes du produit courant.</div>
+    </div>
     <div class="m-actions">
       <button class="b-na" id="b-na">Pas une matière première</button>
       <button class="b-reset" id="b-reset" style="display:none">Réinitialiser</button>
@@ -235,7 +269,7 @@ async function load(){
     try{ D.ingredients=await fetchAll('v_prix_ingredients_factures','*',null); }
     catch(e){ D.ingredients=[]; }
     try{
-      D.ings=await fetchAll('appro_ingredients','id,nom,categorie,actif',null);
+      D.ings=await fetchAll('appro_ingredients','id,nom,categorie,unite_valeur,actif',null);
       D.ings=D.ings.filter(i=>i.actif!==false).sort((a,b)=>
         ((a.categorie||'zz')+a.nom).toLowerCase()<((b.categorie||'zz')+b.nom).toLowerCase()?-1:1);
       D.ings.forEach(i=>{ i._toks=toks(i.nom); i._search=norm((i.nom||'')+' '+(i.categorie||'')); });
@@ -369,9 +403,62 @@ function openModal(ligneId){
   document.getElementById('mc-cat').value='';
   renderIngList();
   document.getElementById('modal').classList.add('on');
+  updateMConv();
   document.getElementById('m-search').focus();
 }
 function closeModal(){ document.getElementById('modal').classList.remove('on');curId=null; }
+/* ---- Unité de valeur & facteur de conversion (section m-conv) ---- */
+function normUnit(u){ return (u||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\./g,'').trim(); }
+function updateMConv(){
+  const box=document.getElementById('m-conv');
+  const x=D.produits.find(p=>p.id===curId);
+  if(!x||!x.ingredient_id){ box.style.display='none'; return; }
+  const ing=D.ings.find(i=>i.id===x.ingredient_id);
+  if(!ing){ box.style.display='none'; return; }
+  box.style.display='block';
+  const uv=ing.unite_valeur||'';
+  document.getElementById('m-uv').value=uv;
+  document.getElementById('m-uligne').textContent=x.unite||'?';
+  document.getElementById('m-uvtarget').textContent=uv||'— pièce(s)';
+  const fac=document.getElementById('m-fac');
+  fac.value=(x.facteur_unite_valeur!=null && x.facteur_unite_valeur!=='')?x.facteur_unite_valeur:'';
+  // Masque la ligne de facteur quand l'unité de valeur n'est pas définie ou égale à l'unité de la ligne.
+  const sameUnit = uv && normUnit(uv)===normUnit(x.unite);
+  document.getElementById('m-conv-fac').style.display=(uv && !sameUnit)?'flex':'none';
+}
+async function saveConv(){
+  const x=D.produits.find(p=>p.id===curId);
+  if(!x||!x.ingredient_id) return;
+  const uv=(document.getElementById('m-uv').value||'').trim();
+  const facStr=document.getElementById('m-fac').value;
+  const fac=facStr===''?null:Number(facStr);
+  const modal=document.querySelector('#modal .modal');
+  modal.classList.add('m-busy');
+  try{
+    // 1. Unité de valeur sur l'ingrédient
+    const ing=D.ings.find(i=>i.id===x.ingredient_id);
+    if(ing && (ing.unite_valeur||'')!==uv){
+      const {error:e1}=await sb.rpc('ai_definir_unite_valeur',
+        {p_ingredient_id:x.ingredient_id,p_unite_valeur:uv||null});
+      if(e1) throw e1;
+      ing.unite_valeur=uv||null;
+    }
+    // 2. Facteur sur le produit (propagé sur toutes les lignes)
+    const sameUnit = uv && normUnit(uv)===normUnit(x.unite);
+    if(uv && !sameUnit && fac!=null && fac>0){
+      const {error:e2}=await sb.rpc('fa_definir_facteur_unite',
+        {p_ligne_id:x.id,p_facteur:fac});
+      if(e2) throw e2;
+      const key=prodKey(x);
+      D.produits.forEach(p=>{ if(prodKey(p)===key) p.facteur_unite_valeur=fac; });
+    }
+    closeModal();
+    updateHeader();
+    renderProduits();
+  }catch(e){
+    alert('Échec de l\'enregistrement : '+(e&&e.message||e));
+  }finally{ modal.classList.remove('m-busy'); }
+}
 function renderIngList(){
   const x=D.produits.find(p=>p.id===curId)||{};
   const term=norm(document.getElementById('m-search').value);
@@ -403,9 +490,20 @@ async function doRattach(ingId,na){
         p.rattachement_na=ingId?false:!!na;
       }
     });
-    closeModal();
     updateHeader();
     renderProduits();
+    // Si on a rattaché à un ingrédient, on garde le modal ouvert pour saisir
+    // l'unité de valeur et le facteur. Pour un reset / hors-MP, on ferme.
+    if(ingId){
+      // Met à jour la sélection visuelle dans la liste sans tout re-rendre.
+      document.querySelectorAll('#m-list .ing-item').forEach(el=>{
+        el.classList.toggle('sel', el.dataset.id===ingId);
+      });
+      document.getElementById('b-reset').style.display='';
+      updateMConv();
+    }else{
+      closeModal();
+    }
   }catch(e){
     alert('Échec du rattachement : '+(e&&e.message||e)+
       '\n\nVérifiez que le script outil_rattachement_factures.sql a bien été exécuté dans Supabase.');
@@ -415,7 +513,7 @@ async function doCreer(){
   if(!curId) return;
   const nom=document.getElementById('mc-nom').value.trim();
   const cat=document.getElementById('mc-cat').value.trim();
-  if(!nom){ alert('Indique le nom du nouvel ingrédient.'); return; }
+  if(nom.length<3){ alert('Le nom du nouvel ingrédient doit comporter au moins 3 caractères.'); return; }
   const ligneId=curId;
   const modal=document.querySelector('#modal .modal');
   modal.classList.add('m-busy');
@@ -437,9 +535,14 @@ async function doCreer(){
     const key=prodKey(src);
     D.produits.forEach(p=>{ if(prodKey(p)===key){ p.ingredient_id=ingId;p.ingredient_nom=ingNom;p.rattachement_na=false; } });
     const dejaLa=row.deja_existant;
-    closeModal();
     updateHeader();
     renderProduits();
+    document.getElementById('mc-nom').value='';
+    document.getElementById('mc-cat').value='';
+    mcNomTouched=false;
+    renderIngList();
+    document.getElementById('b-reset').style.display='';
+    updateMConv();
     if(dejaLa) alert('L’ingrédient « '+ingNom+' » existait déjà — le produit y a été rattaché.');
   }catch(e){
     alert('Échec de la création : '+(e&&e.message||e));
@@ -484,6 +587,15 @@ document.getElementById('b-na').onclick=()=>doRattach(null,true);
 document.getElementById('b-reset').onclick=()=>doRattach(null,false);
 document.getElementById('b-cancel').onclick=closeModal;
 document.getElementById('m-close').onclick=closeModal;
+document.getElementById('m-uv').addEventListener('change',()=>{
+  const x=D.produits.find(p=>p.id===curId);
+  if(!x) return;
+  const uv=document.getElementById('m-uv').value;
+  document.getElementById('m-uvtarget').textContent=uv||'— pièce(s)';
+  const sameUnit = uv && normUnit(uv)===normUnit(x.unite);
+  document.getElementById('m-conv-fac').style.display=(uv && !sameUnit)?'flex':'none';
+});
+document.getElementById('m-conv-save').onclick=saveConv;
 document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
