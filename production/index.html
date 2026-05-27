@@ -266,6 +266,22 @@
     .ingredient-row .ing-unite { width: 60px; }
     .ingredient-row .ing-prix { width: 70px; text-align: right; }
     .ingredient-row .ing-total { width: 65px; text-align: right; font-weight: 600; font-size: 0.8rem; color: var(--gray-600); }
+    .ingredient-row .ing-principal-wrap {
+      display: inline-flex; align-items: center; gap: 2px;
+      cursor: pointer; padding: 4px 6px; border-radius: 6px;
+      border: 1px solid #d1d5db; background: white;
+      transition: background .15s;
+    }
+    .ingredient-row .ing-principal-wrap:has(input:checked) {
+      background: #fef3c7; border-color: #f59e0b;
+    }
+    .ingredient-row .ing-principal { margin: 0; cursor: pointer; }
+    .ingredient-row .ing-principal-icon {
+      font-size: 0.95rem; opacity: .35; user-select: none;
+    }
+    .ingredient-row .ing-principal-wrap:has(input:checked) .ing-principal-icon {
+      opacity: 1;
+    }
     .ingredient-row.no-article { background: #fff5e6; border-left: 3px solid #f59e0b; padding-left: 8px; }
     .ingredient-row.has-article { background: #ecfdf5; border-left: 3px solid #10b981; padding-left: 8px; flex-wrap: wrap; }
     .ing-article-info { width: 100%; font-size: 11px; color: #047857; padding: 2px 4px 0 4px; font-weight: 600; }
@@ -2130,6 +2146,10 @@ function addIngredientRow(data = {}) {
     <input type="number" class="ing-prix" placeholder="P.U. €" min="0" step="0.01" value="${data.prix_unitaire || ''}">
     <span class="ing-total">${((data.quantite || 0) * (data.prix_unitaire || 0)).toFixed(2)} €</span>
     <button type="button" class="btn-link-art" onclick="openArticlePicker(${id})" title="${linkBtnTitle}">${linkBtnLabel}</button>
+    <label class="ing-principal-wrap" title="🎯 Marquer comme ingrédient PRINCIPAL — à scanner obligatoirement au démarrage de la tâche (Scan-FEFO)">
+      <input type="checkbox" class="ing-principal" ${data.est_principal ? 'checked' : ''}>
+      <span class="ing-principal-icon">🎯</span>
+    </label>
     <button class="btn-remove-ing" onclick="removeIngredientRow(${id})">×</button>
   `;
   if (linkedArticle) {
@@ -2408,6 +2428,7 @@ const DB = {
         cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
         ordre: i,
         article_id: ing.article_id || null,
+        est_principal: !!ing.est_principal,
       }));
       const { error } = await sb.from('fiche_ingredients').insert(rows);
       if (error) throw error;
@@ -3539,7 +3560,8 @@ async function saveFiche() {
     const cost = qty * prix;
     coutTotal += cost;
     const articleId = row.dataset.articleId || null;
-    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId });
+    const estPrincipal = row.querySelector('.ing-principal')?.checked || false;
+    ingredients.push({ nom: ingNom, quantite: qty, unite, prix_unitaire: prix, article_id: articleId, est_principal: estPrincipal });
   });
 
   const rendement = parseFloat(document.getElementById('f-rendement-qty').value) || 0;
