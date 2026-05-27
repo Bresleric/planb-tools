@@ -433,6 +433,8 @@ async function saveConv(){
   const facStr=document.getElementById('m-fac').value;
   const fac=facStr===''?null:Number(facStr);
   const modal=document.querySelector('#modal .modal');
+  const btn=document.getElementById('m-conv-save');
+  const btnOrig=btn.textContent;
   modal.classList.add('m-busy');
   try{
     // 1. Unité de valeur sur l'ingrédient
@@ -452,7 +454,15 @@ async function saveConv(){
       const key=prodKey(x);
       D.produits.forEach(p=>{ if(prodKey(p)===key) p.facteur_unite_valeur=fac; });
     }
-    closeModal();
+    // Feedback visuel — on garde le modal ouvert pour que le user voie le résultat.
+    btn.textContent='✓ Enregistré';
+    btn.style.background='#16a34a';
+    btn.style.borderColor='#16a34a';
+    setTimeout(()=>{
+      btn.textContent=btnOrig;
+      btn.style.background='';
+      btn.style.borderColor='';
+    }, 1800);
     updateHeader();
     renderProduits();
   }catch(e){
