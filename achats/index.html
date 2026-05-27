@@ -188,14 +188,14 @@ tr:nth-child(even) td{background:#fafbfc;}
           <option value="boîte">boîte</option>
           <option value="tranche">tranche</option>
         </select>
+        <button class="mc-save" id="m-conv-save">Enregistrer</button>
       </div>
       <div class="row" id="m-conv-fac">
         <span>1 <strong id="m-uligne">—</strong> de ce produit =</span>
         <input type="number" id="m-fac" min="0" step="any" placeholder="?" inputmode="decimal">
         <strong id="m-uvtarget">—</strong>
-        <button class="mc-save" id="m-conv-save">Enregistrer</button>
       </div>
-      <div class="mc-hint">L'unité de valeur s'applique à l'ingrédient (tous produits). Le facteur s'applique à toutes les lignes du produit courant.</div>
+      <div class="mc-hint">L'unité de valeur s'applique à l'ingrédient (tous produits). Le facteur s'applique à toutes les lignes du produit courant. Si l'unité de la ligne est la même que l'unité de valeur, le facteur est automatiquement 1 (pas de champ à saisir).</div>
     </div>
     <div class="m-actions">
       <button class="b-na" id="b-na">Pas une matière première</button>
@@ -473,14 +473,19 @@ async function saveConv(){
       if(e1) throw e1;
       ing.unite_valeur=uv||null;
     }
-    // 2. Facteur sur le produit (propagé sur toutes les lignes)
+    // 2. Facteur sur le produit (propagé sur toutes les lignes du même fournisseur+ref)
+    // - unités identiques (ligne KG / UV kg) → facteur implicite 1
+    // - unités différentes → facteur saisi par l'utilisateur
     const sameUnit = uv && normUnit(uv)===normUnit(x.unite);
-    if(uv && !sameUnit && fac!=null && fac>0){
-      const {error:e2}=await sb.rpc('fa_definir_facteur_unite',
-        {p_ligne_id:x.id,p_facteur:fac});
-      if(e2) throw e2;
-      const key=prodKey(x);
-      D.produits.forEach(p=>{ if(prodKey(p)===key) p.facteur_unite_valeur=fac; });
+    if(uv){
+      const facteurToSave = sameUnit ? 1 : fac;
+      if(facteurToSave != null && facteurToSave > 0){
+        const {error:e2}=await sb.rpc('fa_definir_facteur_unite',
+          {p_ligne_id:x.id,p_facteur:facteurToSave});
+        if(e2) throw e2;
+        const key=prodKey(x);
+        D.produits.forEach(p=>{ if(prodKey(p)===key) p.facteur_unite_valeur=facteurToSave; });
+      }
     }
     // Feedback visuel — on garde le modal ouvert pour que le user voie le résultat.
     btn.textContent='✓ Enregistré';
