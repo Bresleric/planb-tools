@@ -2689,6 +2689,18 @@ async function loadFiches() {
     // Données rafraîchies → on invalide le cache des coûts composant.
     if (typeof _composantCoutCache !== 'undefined') _composantCoutCache.clear();
     renderFiches();
+    // Si la page a été ouverte avec ?edit_fiche=<id> (lien depuis le TAF),
+    // on enchaîne directement sur l'édition de la fiche correspondante.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const editId = params.get('edit_fiche');
+      if (editId && typeof editFiche === 'function' && (allFiches || []).some(f => f.id === editId)) {
+        // Nettoyer l'URL pour éviter de rééditer à chaque rechargement
+        const cleanUrl = window.location.pathname + window.location.hash;
+        history.replaceState({}, '', cleanUrl);
+        setTimeout(() => { editFiche(editId); }, 60);
+      }
+    } catch (eFromTaf) { console.warn('[edit_fiche from TAF] :', eFromTaf); }
   } catch (e) {
     console.error(e);
     showToast('Erreur de chargement', 'error');

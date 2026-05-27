@@ -1057,6 +1057,7 @@
     <div class="fiche-header">
       <h2 id="fiche-title">📖 Fiche technique</h2>
       <div class="fiche-header-actions">
+        <button id="fiche-edit-btn" class="fiche-btn-icon" onclick="editFicheFromTaf()" title="Modifier la fiche technique" style="display:none;">✏️</button>
         <button class="fiche-btn-icon" onclick="minimizeFiche()" title="Réduire">▾</button>
         <button class="fiche-btn-icon" onclick="closeFiche()" title="Fermer">✕</button>
       </div>
@@ -2129,6 +2130,13 @@
     window.__currentFiche = fiche;
     const title = `📖 ${esc(fiche.nom)}`;
     document.getElementById('fiche-title').textContent = title;
+    // Bouton ✏️ Modifier la fiche : visible aux admins uniquement
+    try {
+      const editBtn = document.getElementById('fiche-edit-btn');
+      if (editBtn) {
+        editBtn.style.display = (currentUser && currentUser.role === 'admin') ? '' : 'none';
+      }
+    } catch (e) { /* non bloquant */ }
 
     // Meta : rendement, temps prépa/cuisson/repos, DLC, température
     const metaItems = [];
@@ -2673,6 +2681,26 @@
       }, 300);
     } else {
       showToast(`Scan reçu sans contexte : ${result.produit || '?'}`, 'success');
+    }
+  }
+
+  // Ouvre la fiche technique courante en édition dans le module Production.
+  // Réservé aux admins ; renvoie vers ../production/?edit_fiche=<id>.
+  function editFicheFromTaf() {
+    try {
+      if (!currentUser || currentUser.role !== 'admin') {
+        showToast('Modification réservée aux admins', 'error');
+        return;
+      }
+      const fiche = window.__currentFiche;
+      if (!fiche || !fiche.id) {
+        showToast('Aucune fiche ouverte', 'error');
+        return;
+      }
+      window.location.href = '../production/?edit_fiche=' + encodeURIComponent(fiche.id);
+    } catch (e) {
+      console.error('editFicheFromTaf:', e);
+      showToast('Erreur ouverture fiche', 'error');
     }
   }
 
