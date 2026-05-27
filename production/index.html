@@ -4949,6 +4949,14 @@ try {
   });
 } catch (e) { console.warn('[PD] addEventListener init:', e); }
 
+// Helper : déduit le créneau (Matin / Midi / Soir) depuis l'heure actuelle
+function pdGuessCreneau() {
+  const h = new Date().getHours();
+  if (h < 11) return 'Matin';
+  if (h < 16) return 'Midi';
+  return 'Soir';
+}
+
 // ===== 2 bis. PRODUCTION "À CRÉER" (la fiche n'existe pas encore) =====
 async function startProductionACreer() {
   const motifEl = document.getElementById('fp-acreer-motif');
@@ -4975,6 +4983,8 @@ async function startProductionACreer() {
       createur_id: currentUser.id,
       createur_nom: currentUser.nom,
       date_creation: new Date().toISOString(),
+      creneau: pdGuessCreneau(),
+      equipe: currentUser.equipe || 'cuisine',
       priorite: 3,
       is_production: true,
       a_traiter: true,
@@ -5070,6 +5080,8 @@ async function selectFicheAndStart(ficheId) {
       createur_id: currentUser.id,
       createur_nom: currentUser.nom,
       date_creation: new Date().toISOString(),
+      creneau: fiche.creneau || pdGuessCreneau(),
+      equipe: fiche.equipe || currentUser.equipe || 'cuisine',
       categorie: fiche.categorie || null,
       categorie_production: fiche.categorie || null,
       priorite: 3,
