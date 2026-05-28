@@ -144,9 +144,10 @@
         .order('categorie').order('ordre'),
       sb.from('contenants').select('*').eq('actif', true).order('famille').order('ordre'),
       sb.from('unites').select('*').eq('actif', true).order('type').order('ordre'),
+      // Fiches PF/PI visibles chez `currentEtablissement` (rattachées OU partagées Freddy↔Liesel)
       sb.from('fiches_techniques')
         .select('id, nom, categorie')
-        .eq('etablissement', currentEtablissement)
+        .or(`etablissement.eq.${currentEtablissement},partagee.eq.true`)
         .eq('actif', true)
         .in('categorie', ['produit_fini', 'produit_intermediaire', 'mise_en_place'])
         .order('nom')

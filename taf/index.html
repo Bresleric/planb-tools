@@ -1317,8 +1317,12 @@
 
     // ====== PRODUCTION (TAF integration) ======
     async getFiches(etab) {
+      // Une fiche est visible chez `etab` si :
+      //   - elle est rattachée à cet établissement, OU
+      //   - elle est marquée `partagee = true` (carte commune Freddy/Liesel).
       const { data, error } = await supabaseClient.from('fiches_techniques').select('*')
-        .eq('etablissement', etab).eq('actif', true).order('nom');
+        .or(`etablissement.eq.${etab},partagee.eq.true`)
+        .eq('actif', true).order('nom');
       if (error) throw error;
       return data || [];
     },

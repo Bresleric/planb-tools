@@ -789,6 +789,16 @@
           <input type="text" class="form-input" id="f-sous-cat" placeholder="Ex: sauces, garnitures, desserts...">
         </div>
 
+        <div class="form-group" style="background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; padding:10px;">
+          <label style="color:#1e40af; display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="f-partagee" checked style="width:18px; height:18px; cursor:pointer;">
+            <span>🔁 Fiche partagée avec l'autre restaurant</span>
+          </label>
+          <div style="font-size:11px; color:#1e3a8a; margin-top:6px; line-height:1.4; padding-left:26px;">
+            Coché par défaut (Freddy et Liesel ont une carte commune à ~99%). Décoche uniquement si cette fiche est spécifique à un seul restaurant.
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Rendement (quantité)</label>
@@ -2430,10 +2440,13 @@ function updateCostSummary() {
 // ============= DB OPERATIONS =============
 const DB = {
   async getFiches() {
+    // Visible chez `currentEtablissement` si :
+    //   - rattachée à cet établissement, OU
+    //   - marquée `partagee = true` (carte commune Freddy/Liesel).
     const { data, error } = await sb
       .from('fiches_techniques')
       .select('*')
-      .eq('etablissement', currentEtablissement)
+      .or(`etablissement.eq.${currentEtablissement},partagee.eq.true`)
       .order('nom');
     if (error) throw error;
     return data || [];
@@ -2689,18 +2702,6 @@ async function loadFiches() {
     // Données rafraîchies → on invalide le cache des coûts composant.
     if (typeof _composantCoutCache !== 'undefined') _composantCoutCache.clear();
     renderFiches();
-    // Si la page a été ouverte avec ?edit_fiche=<id> (lien depuis le TAF),
-    // on enchaîne directement sur l'édition de la fiche correspondante.
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const editId = params.get('edit_fiche');
-      if (editId && typeof editFiche === 'function' && (allFiches || []).some(f => f.id === editId)) {
-        // Nettoyer l'URL pour éviter de rééditer à chaque rechargement
-        const cleanUrl = window.location.pathname + window.location.hash;
-        history.replaceState({}, '', cleanUrl);
-        setTimeout(() => { editFiche(editId); }, 60);
-      }
-    } catch (eFromTaf) { console.warn('[edit_fiche from TAF] :', eFromTaf); }
   } catch (e) {
     console.error(e);
     showToast('Erreur de chargement', 'error');
@@ -3445,6 +3446,8 @@ async function editFiche(id) {
   document.getElementById('f-conditionnement').value = fiche.conditionnement || '';
   document.getElementById('f-instructions').value = fiche.instructions || '';
   document.getElementById('f-notes').value = fiche.notes || '';
+  // Partage Freddy/Liesel — true par défaut si non défini (rétrocompat fiches antérieures à la migration)
+  document.getElementById('f-partagee').checked = fiche.partagee !== false;
 
   // Category chips
   document.querySelectorAll('#f-categorie .chip').forEach(c => {
@@ -3662,6 +3665,7 @@ async function saveFiche() {
     cout_total: coutTotal,
     cout_portion: coutPortion,
     etablissement: currentEtablissement,
+    partagee: document.getElementById('f-partagee').checked,
     updated_at: new Date().toISOString()
   };
 
@@ -3721,6 +3725,7 @@ function resetForm() {
   document.getElementById('f-conditionnement').value = '';
   document.getElementById('f-instructions').value = '';
   document.getElementById('f-notes').value = '';
+  document.getElementById('f-partagee').checked = true;
 
   document.querySelectorAll('#f-categorie .chip').forEach((c, i) => c.classList.toggle('active', i === 0));
   document.querySelectorAll('.allergen-chip').forEach(c => c.classList.remove('active'));
@@ -4630,10 +4635,10 @@ async function loadRattachement() {
   const list = document.getElementById('rt-fiches-list');
   list.innerHTML = '<div class="empty-state" style="padding:24px; text-align:center; color:var(--gray-500);">Chargement…</div>';
   try {
-    // Fiches actives de l'établissement courant
+    // Fiches actives visibles chez `currentEtablissement` (rattachées OU partagées)
     const { data: fiches, error: e1 } = await sb.from('fiches_techniques')
-      .select('id, nom, categorie, sous_categorie, etablissement, rendement_quantite, rendement_unite, actif, article_id')
-      .eq('etablissement', currentEtablissement)
+      .select('id, nom, categorie, sous_categorie, etablissement, partagee, rendement_quantite, rendement_unite, actif, article_id')
+      .or(`etablissement.eq.${currentEtablissement},partagee.eq.true`)
       .eq('actif', true)
       .order('nom');
     if (e1) throw e1;
