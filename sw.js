@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v3';   // bump à chaque mise à jour du SW (v3 : Lot 1 partagee fiches_techniques, 28/05/2026)
+const CACHE_NAME = 'planb-tools-v4';   // bump à chaque mise à jour du SW (v4 : Lot 2 partagee checklists + taches_recurrentes, 28/05/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

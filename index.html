@@ -1174,10 +1174,11 @@
 
             try {
                 // 2. Check-Lists : checklists actives pour aujourd'hui, non complétées (tout service)
+                // Inclut les checklists rattachées à l'établissement courant OU partagées (partagee=true)
                 const { data: clData } = await supabaseClient
                     .from('checklists')
                     .select('id, frequence, jours_semaine, jour_mois, service, checklist_items(id)')
-                    .eq('etablissement', currentEstablishment)
+                    .or(`etablissement.eq.${currentEstablishment},partagee.eq.true`)
                     .eq('actif', true);
 
                 const todayDate = new Date();

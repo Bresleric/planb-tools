@@ -1189,6 +1189,16 @@
                     </select>
                 </div>
 
+                <div class="form-group" style="background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; padding:10px;">
+                    <label style="color:#1e40af; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="form-partagee" style="width:18px; height:18px; cursor:pointer;">
+                        <span>🔁 Check-list partagée avec l'autre restaurant</span>
+                    </label>
+                    <div style="font-size:11px; color:#1e3a8a; margin-top:6px; line-height:1.4; padding-left:26px;">
+                        Décoché par défaut. Coche pour rendre cette check-list visible dans les 2 restaurants.
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Éléments de la check-list</label>
                     <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px;">
@@ -1448,10 +1458,11 @@
                 if (isDemo) {
                     checklists = demoChecklists;
                 } else {
+                    // Inclut checklists rattachées à l'établissement OU partagées (partagee=true)
                     const { data, error } = await supabaseClient
                         .from('checklists')
                         .select('*, checklist_items(*)')
-                        .eq('etablissement', currentEstablishment)
+                        .or(`etablissement.eq.${currentEstablishment},partagee.eq.true`)
                         .eq('actif', true)
                         .order('ordre');
 
@@ -1855,10 +1866,11 @@
             try {
                 if (isDemo) return;
 
+                // Inclut checklists rattachées à l'établissement OU partagées (partagee=true)
                 const { data, error } = await supabaseClient
                     .from('checklists')
                     .select('*, checklist_items(id)')
-                    .eq('etablissement', currentEstablishment)
+                    .or(`etablissement.eq.${currentEstablishment},partagee.eq.true`)
                     .eq('actif', true);
 
                 if (error) throw error;
@@ -1938,10 +1950,11 @@
                 if (isDemo) {
                     checklists = demoChecklists;
                 } else {
+                    // Liste admin : inclut checklists rattachées à l'établissement OU partagées
                     const { data, error } = await supabaseClient
                         .from('checklists')
                         .select('*, checklist_items(*)')
-                        .eq('etablissement', currentEstablishment)
+                        .or(`etablissement.eq.${currentEstablishment},partagee.eq.true`)
                         .order('ordre');
 
                     if (error) throw error;
@@ -1998,6 +2011,7 @@
             document.getElementById('form-frequence').value = '';
             document.getElementById('form-service').value = '';
             document.getElementById('form-jour-mois').value = '';
+            document.getElementById('form-partagee').checked = false;
             document.querySelectorAll('.hebdo-day').forEach(cb => cb.checked = false);
             document.getElementById('items-editor').innerHTML = '';
             addItemRow();
@@ -2141,7 +2155,8 @@
                             frequence,
                             service,
                             jours_semaine: jourseSemaine,
-                            jour_mois: jourMois
+                            jour_mois: jourMois,
+                            partagee: document.getElementById('form-partagee')?.checked || false
                         })
                         .eq('id', currentChecklistForModal);
 
@@ -2178,6 +2193,7 @@
                             jours_semaine: jourseSemaine,
                             jour_mois: jourMois,
                             etablissement: currentEstablishment,
+                            partagee: document.getElementById('form-partagee')?.checked || false,
                             actif: true,
                             ordre: 999,
                             created_by_id: currentUser.id,
@@ -2235,6 +2251,7 @@
                 document.getElementById('form-equipe').value = cl.equipe || '';
                 document.getElementById('form-frequence').value = cl.frequence || '';
                 document.getElementById('form-service').value = cl.service || '';
+                document.getElementById('form-partagee').checked = cl.partagee === true;
 
                 // Frequence-specific fields
                 onFrequenceChange();

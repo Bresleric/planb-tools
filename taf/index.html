@@ -1295,8 +1295,10 @@
     },
 
     async getRecurrences(etab) {
+      // Visible chez `etab` si rattachée à cet établissement OU marquée partagee=true.
       const { data } = await supabaseClient.from('taches_recurrentes').select('*')
-        .eq('etablissement', etab).order('nom');
+        .or(`etablissement.eq.${etab},partagee.eq.true`)
+        .order('nom');
       return data || [];
     },
 
@@ -4834,6 +4836,15 @@
         <label>Date de début</label>
         <input class="form-input" type="date" id="rec-debut" value="${dateStr(new Date())}">
       </div>
+      <div class="form-group" style="background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; padding:10px;">
+        <label style="color:#1e40af; display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="rec-partagee" style="width:18px; height:18px; cursor:pointer;">
+          <span>🔁 Récurrence partagée avec l'autre restaurant</span>
+        </label>
+        <div style="font-size:11px; color:#1e3a8a; margin-top:6px; line-height:1.4; padding-left:26px;">
+          Décoché par défaut. Coche si cette récurrence doit aussi générer des tâches dans l'autre restaurant.
+        </div>
+      </div>
     `, [
       { label: 'Annuler', action: 'closeModal()' },
       { label: 'Créer', cls: 'primary', action: 'submitRecurrence()' }
@@ -4894,6 +4905,7 @@
         observation: document.getElementById('rec-obs').value.trim() || null,
         date_debut: document.getElementById('rec-debut').value || dateStr(new Date()),
         etablissement: currentEtablissement,
+        partagee: document.getElementById('rec-partagee')?.checked || false,
         actif: true,
         cree_par_id: currentUser.id,
         cree_par_nom: currentUser.nom
