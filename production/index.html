@@ -1366,6 +1366,19 @@ function init() {
   const userInfo = document.getElementById('user-info');
   userInfo.textContent = `${currentUser.initiales || currentUser.nom} · ${currentEtablissement}`;
 
+  // ?edit_fiche=<id> : ouverture directe en mode édition (lien depuis le TAF).
+  // On mémorise l'id, on nettoie l'URL, et on planifie l'édition après le
+  // chargement complet de allFiches (sinon editFiche ne trouve pas la fiche).
+  try {
+    const _params = new URLSearchParams(window.location.search);
+    const _editId = _params.get('edit_fiche');
+    if (_editId) {
+      window.__pendingEditFiche = _editId;
+      const _clean = window.location.pathname + window.location.hash;
+      history.replaceState({}, '', _clean);
+    }
+  } catch (e) { console.warn('[init] edit_fiche param:', e); }
+
   // Tab create is now accessed via FAB button on fiches tab (manager+ only)
 
   // Chaque setup est isolé : une erreur dans l'un ne doit pas empêcher les autres
@@ -1412,6 +1425,11 @@ function init() {
       || (initialTab === 'rattachement' && !canRattacher())
       || (initialTab === 'fiches' && !canSeeFiches())) {
     initialTab = 'productions';
+  }
+  // ?edit_fiche=... : on bascule d'office sur l'onglet "create" pour éviter
+  // un flash de l'onglet Productions avant que loadFiches déclenche editFiche.
+  if (window.__pendingEditFiche && canEdit()) {
+    initialTab = 'create';
   }
   switchTab(initialTab);
 }
@@ -2702,6 +2720,19 @@ async function loadFiches() {
     // Données rafraîchies → on invalide le cache des coûts composant.
     if (typeof _composantCoutCache !== 'undefined') _composantCoutCache.clear();
     renderFiches();
+    // ?edit_fiche=<id> depuis le TAF : déclencher l'édition maintenant que
+    // allFiches est peuplé. On laisse 0ms (microtask) pour que tout DOM
+    // setup soit terminé avant editFiche.
+    try {
+      const _editId = window.__pendingEditFiche;
+      if (_editId && typeof editFiche === 'function' && (allFiches || []).some(f => f.id === _editId)) {
+        window.__pendingEditFiche = null;
+        setTimeout(() => { try { editFiche(_editId); } catch (e) { console.warn('[edit_fiche] :', e); } }, 0);
+      } else if (_editId) {
+        showToast('Fiche introuvable (id ' + _editId + ')', 'error');
+        window.__pendingEditFiche = null;
+      }
+    } catch (eFromTaf) { console.warn('[loadFiches edit_fiche] :', eFromTaf); }
   } catch (e) {
     console.error(e);
     showToast('Erreur de chargement', 'error');
