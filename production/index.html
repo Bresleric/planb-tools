@@ -939,7 +939,7 @@
 
   <!-- FAB BUTTONS -->
   <button class="fab-button" id="fab-fiches" onclick="switchTab('create')" title="Nouvelle fiche technique" style="display:none;">+</button>
-  <button class="fab-button" id="fab-productions" onclick="openProductionModal()" style="display:none;">+</button>
+  <button class="fab-button" id="fab-productions" onclick="openProductionDirecte()" style="display:none;">+</button>
   <button class="fab-button" id="fab-stock" onclick="StockPFPI && StockPFPI.openModal()" title="Nouvelle ligne de stock" style="display:none;">+</button>
 
   <!-- PRODUCTION EDIT MODAL (correction nom / fiche / quantité) -->
@@ -1005,13 +1005,61 @@
     </div>
   </div>
 
+  <!-- FICHE PICKER MODAL (Production directe — étape 1) -->
+  <div class="modal-overlay" id="fiche-picker-modal" style="display:none;">
+    <div class="modal-box" style="max-width:540px; text-align:left;">
+      <h3 style="text-align:center;">Nouvelle production — Choisir la fiche</h3>
+      <div class="form-group">
+        <label>Recherche</label>
+        <input type="text" class="form-input" id="fp-search" placeholder="Rechercher une fiche technique…" autocomplete="off">
+      </div>
+      <div class="form-group" style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="chip active" data-fp-cat="all" type="button">Toutes</button>
+        <button class="chip" data-fp-cat="mise_en_place" type="button">🔪 Mise en place</button>
+        <button class="chip" data-fp-cat="produit_intermediaire" type="button">🥘 Prod. interm.</button>
+        <button class="chip" data-fp-cat="produit_fini" type="button">✨ Prod. fini</button>
+      </div>
+      <div id="fp-results" style="max-height:42vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:8px; padding:4px;"></div>
+      <div style="margin-top:12px; padding:10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px;">
+        <div style="font-size:0.82rem; color:#9a3412; margin-bottom:6px;">
+          <strong>La fiche n'existe pas ?</strong> Lance une <em>Production à créer</em> — un admin la transformera en fiche après.
+        </div>
+        <textarea id="fp-acreer-motif" rows="2" placeholder="Décris le produit (nom, ingrédients principaux, etc.)" style="width:100%; padding:6px 8px; font-size:0.85rem; border:1px solid #fdba74; border-radius:6px; resize:vertical;"></textarea>
+        <button type="button" id="fp-btn-acreer" onclick="startProductionACreer()" style="margin-top:6px; width:100%; padding:9px; font-size:13px; font-weight:700; border:none; border-radius:6px; background:#ea580c; color:white; cursor:pointer;">
+          ▶︎ Démarrer une production à créer
+        </button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn-submit" style="flex:1; background:var(--gray-400);" onclick="closeFichePicker()">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PRODUCTION MODAL (New Production) -->
   <div class="modal-overlay" id="production-modal" style="display:none;">
-    <div class="modal-box" style="max-width:500px; text-align:left;">
-      <h3 style="text-align:center;">Nouvelle production</h3>
+    <div class="modal-box" style="max-width:560px; text-align:left;">
+      <h3 style="text-align:center;" id="pd-title">Nouvelle production</h3>
+      <!-- Bandeau Production directe : chrono + scanner -->
+      <div id="pd-directe-bar" style="display:none; margin-bottom:12px; padding:10px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:11px; color:#3730a3; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">⏱ Chrono production</div>
+            <div id="pd-chrono-display" style="font-size:22px; font-weight:700; color:#1e1b4b; font-variant-numeric:tabular-nums;">00:00</div>
+            <div id="pd-chrono-state" style="font-size:11px; color:#6366f1;">En attente du scan…</div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="chip" id="pd-btn-pause" style="display:none;" onclick="pdPauseChrono()">⏸ Pause</button>
+            <button type="button" class="chip" id="pd-btn-resume" style="display:none;" onclick="pdResumeChrono()">▶︎ Reprendre</button>
+          </div>
+        </div>
+        <button type="button" id="pd-btn-scanner" style="display:none; width:100%; margin-top:10px; padding:11px; font-size:14px; font-weight:700; border:none; border-radius:8px; background:#7c3aed; color:white; cursor:pointer;">
+          📷 Scanner les étiquettes (<span id="pd-scan-count">0</span>)
+        </button>
+        <div id="pd-scan-status" style="font-size:11.5px; color:#3730a3; margin-top:6px;"></div>
+      </div>
       <div class="production-form">
-        <div class="form-group">
-          <label>Fiche technique (optionnel)</label>
+        <div class="form-group" id="pd-fiche-row">
+          <label>Fiche technique <span id="pd-fiche-required-mark" style="display:none; color:#dc2626;">*</span></label>
           <select class="form-select" id="p-fiche-select">
             <option value="">Sélectionner une fiche...</option>
           </select>
@@ -1068,6 +1116,12 @@
         <div class="form-group">
           <label>Observation</label>
           <textarea class="form-textarea" id="p-observation" rows="2" placeholder="Notes..."></textarea>
+        </div>
+        <!-- Récap MP (Production directe) : lots décomptés du stock -->
+        <div class="form-group" id="pd-matieres-section" style="display:none;">
+          <label>🥩 Matières premières utilisées</label>
+          <div id="pd-matieres-hint" style="font-size:11px; color:#6b7280; margin-bottom:6px;"></div>
+          <div id="pd-matieres-list" style="display:flex; flex-direction:column; gap:6px;"></div>
         </div>
         <!-- Actions post-production : checklist obligatoire si la fiche en définit -->
         <div class="form-group" id="p-actions-post-group" style="display:none; background:#fef3c7; border:1px solid #fbbf24; border-radius:8px; padding:10px;">
@@ -4947,6 +5001,1195 @@ function rtOpenCreateModal(fiche, ing, rowEl) {
 }
 
 // (extension de applyArticleSelection / createArticle existants gérée plus bas)
+
+
+// ====================================================================
+// =============== PRODUCTION DIRECTE (Option A, B-2 strict) ============
+// Bouton ➕ → choix fiche → task spontanee + chrono → scan obligatoire
+// des ingrédients principaux → modale production avec récap MP rapproché
+// au stock → validation : sorties stock + tâche cachée fermée.
+// Tout ce code vit en parallèle du flow existant pour ne rien casser.
+// ====================================================================
+
+// État courant d'une session de production directe
+window.__pdSession = null; // { taskId, ficheId, ficheNom, ingredients, principaux, scans, durations, etc. }
+window.__pdChronoTimer = null;
+let pdMatieres = [];
+let pdScannedLots = {};
+let pdMatieresEditMode = false;
+// _esc / escapeHtml : on déclare sans dépendre de l'ordre d'exécution
+function _esc(s) {
+  if (typeof escapeHtml === 'function') return escapeHtml(s);
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function _daysToDlc(dlc) {
+  if (!dlc) return null;
+  const td = new Date(); td.setHours(0,0,0,0);
+  const d = new Date(dlc); d.setHours(0,0,0,0);
+  return Math.round((d - td) / (1000*60*60*24));
+}
+
+// ===== 1. FICHE PICKER =====
+function openProductionDirecte() {
+  // Réinitialiser la modale production (au cas où elle aurait été utilisée
+  // sans production directe avant)
+  pdResetSession();
+  // Afficher le picker
+  document.getElementById('fp-search').value = '';
+  document.querySelectorAll('#fiche-picker-modal .chip[data-fp-cat]').forEach(c => {
+    c.classList.toggle('active', c.dataset.fpCat === 'all');
+  });
+  pdRenderFichePickerResults();
+  document.getElementById('fiche-picker-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('fp-search').focus(), 80);
+}
+
+function closeFichePicker() {
+  document.getElementById('fiche-picker-modal').style.display = 'none';
+}
+
+function pdRenderFichePickerResults() {
+  const container = document.getElementById('fp-results');
+  const q = (document.getElementById('fp-search').value || '').toLowerCase().trim();
+  const cat = document.querySelector('#fiche-picker-modal .chip.active[data-fp-cat]')?.dataset.fpCat || 'all';
+  const fiches = (allFiches || [])
+    .filter(f => f.etablissement === currentEtablissement)
+    // Production directe : exclure les fiches "plat" (cuisinées à la commande,
+    // pas produites à l'avance)
+    .filter(f => f.categorie !== 'plat')
+    .filter(f => cat === 'all' || f.categorie === cat)
+    .filter(f => !q || (f.nom || '').toLowerCase().includes(q) || (f.code_court || '').toLowerCase().includes(q))
+    .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+  if (!fiches.length) {
+    container.innerHTML = '<div style="padding:14px; text-align:center; color:#6b7280; font-size:13px;">Aucune fiche ne correspond.</div>';
+    return;
+  }
+  container.innerHTML = fiches.map(f => {
+    const ico = f.categorie === 'plat' ? '🍽' : f.categorie === 'produit_fini' ? '✨'
+      : f.categorie === 'produit_intermediaire' ? '🥘' : '🔪';
+    const code = f.code_court ? '<span style="font-size:10px; color:#6b7280; background:#f1f5f9; padding:1px 5px; border-radius:3px; margin-left:6px;">' + _esc(f.code_court) + '</span>' : '';
+    return `
+      <button type="button" data-fp-fiche="${f.id}"
+        style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; background:white; border:none; border-bottom:1px solid var(--gray-200); text-align:left; cursor:pointer;">
+        <span style="font-size:18px;">${ico}</span>
+        <span style="flex:1; font-size:13.5px; color:#111827;">${_esc(f.nom)}${code}</span>
+        <span style="font-size:11px; color:#7c3aed;">▶</span>
+      </button>`;
+  }).join('');
+  container.querySelectorAll('[data-fp-fiche]').forEach(btn => {
+    btn.addEventListener('click', () => selectFicheAndStart(btn.dataset.fpFiche));
+  });
+}
+
+try {
+  document.addEventListener('input', (e) => {
+    try {
+      if (e.target && e.target.id === 'fp-search') pdRenderFichePickerResults();
+    } catch (err) { console.warn('[PD] fp-search:', err); }
+  });
+  document.addEventListener('click', (e) => {
+    try {
+      const chip = e.target && e.target.closest && e.target.closest('#fiche-picker-modal .chip[data-fp-cat]');
+      if (!chip) return;
+      document.querySelectorAll('#fiche-picker-modal .chip[data-fp-cat]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      pdRenderFichePickerResults();
+    } catch (err) { console.warn('[PD] fp-cat click:', err); }
+  });
+} catch (e) { console.warn('[PD] addEventListener init:', e); }
+
+// Helper : déduit le créneau (Matin / Midi / Soir) depuis l'heure actuelle
+function pdGuessCreneau() {
+  const h = new Date().getHours();
+  if (h < 11) return 'Matin';
+  if (h < 16) return 'Midi';
+  return 'Soir';
+}
+
+// ===== 2 bis. PRODUCTION "À CRÉER" (la fiche n'existe pas encore) =====
+async function startProductionACreer() {
+  const motifEl = document.getElementById('fp-acreer-motif');
+  const motif = (motifEl?.value || '').trim();
+  if (motif.length < 5) {
+    showToast('Décris le produit en au moins 5 caractères', 'error');
+    motifEl?.focus();
+    return;
+  }
+  showLoading(true);
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayStr = today.toISOString().slice(0, 10);
+    // Task spontanee + a_traiter : invisible TAF, mais visible admin pour
+    // créer la fiche après coup.
+    const taskPayload = {
+      echeance: todayStr,
+      tache: 'À créer : ' + motif.slice(0, 80),
+      fiche_id: null,
+      etablissement: currentEtablissement,
+      attribue_a_id: currentUser.id,
+      attribue_a_nom: currentUser.nom,
+      attribue_a_initiales: currentUser.initiales || null,
+      createur_id: currentUser.id,
+      createur_nom: currentUser.nom,
+      date_creation: new Date().toISOString(),
+      creneau: pdGuessCreneau(),
+      equipe: currentUser.equipe || 'cuisine',
+      priorite: 3,
+      is_production: true,
+      a_traiter: true,
+      spontanee: true,
+      duree_accumulee_secondes: 0,
+      observation: motif
+    };
+    const { data: task, error } = await sb.from('tasks').insert(taskPayload).select().single();
+    if (error) throw error;
+    window.__pdSession = {
+      mode: 'a_creer',
+      taskId: task.id,
+      ficheId: null,
+      ficheNom: 'À créer : ' + motif,
+      motif: motif,
+      ingredients: [],
+      principaux: [],
+      task: task
+    };
+    window.__currentTafContext = { task_id: task.id, fiche_id: null, tache: task.tache };
+    window.__currentFicheIngs = [];
+    closeFichePicker();
+    showLoading(false);
+    await pdOpenProductionModalForACreer(motif, task);
+    // Pas de scan à attendre → chrono démarre immédiatement
+    await pdStartChronoAfterScan();
+  } catch (e) {
+    showLoading(false);
+    console.error('startProductionACreer:', e);
+    showToast('Erreur démarrage production à créer : ' + (e.message || e), 'error');
+  }
+}
+
+async function pdOpenProductionModalForACreer(motif, task) {
+  // Préparer le formulaire : pas de fiche, description en titre
+  const ficheSelect = document.getElementById('p-fiche-select');
+  ficheSelect.innerHTML = '<option value="">— Production à créer (pas de fiche) —</option>';
+  ficheSelect.disabled = true;
+  document.getElementById('p-nom').value = motif.length > 60 ? motif.slice(0, 60) : motif;
+  document.getElementById('p-quantite').value = '';
+  document.getElementById('p-unite').value = 'kg';
+  document.getElementById('p-observation').value = motif;
+  document.getElementById('p-dlc-manual').value = '';
+  document.getElementById('p-dlc-auto').style.display = 'none';
+  document.getElementById('p-dlc-auto-value').textContent = '';
+  // Aucune catégorie pré-sélectionnée — le collaborateur choisit
+  document.querySelectorAll('#p-categorie .chip').forEach(chip => {
+    chip.classList.remove('active');
+    chip.onclick = () => {
+      document.querySelectorAll('#p-categorie .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    };
+  });
+  // Pas d'actions post-production
+  const apGroup = document.getElementById('p-actions-post-group');
+  if (apGroup) apGroup.style.display = 'none';
+  const apRows = document.getElementById('p-actions-post-rows');
+  if (apRows) apRows.innerHTML = '';
+
+  // Titre + bandeau visible (chrono uniquement, pas de scanner)
+  document.getElementById('pd-title').textContent = 'Production à créer';
+  document.getElementById('pd-directe-bar').style.display = '';
+  document.getElementById('pd-fiche-required-mark').style.display = 'none';
+  // Cache le bouton scanner + status (rien à scanner)
+  document.getElementById('pd-btn-scanner').style.display = 'none';
+  document.getElementById('pd-scan-status').textContent = 'Pas de fiche → aucune étiquette à scanner. Le chrono démarre immédiatement.';
+  // Masquer la section MP (pas de fiche, pas d'ingrédients)
+  const matSec = document.getElementById('pd-matieres-section');
+  if (matSec) matSec.style.display = 'none';
+  pdRefreshDirecteBar();
+  document.getElementById('production-modal').style.display = 'flex';
+}
+
+// ===== 2. CRÉATION DE LA TASK SPONTANEE + OUVERTURE MODALE PROD =====
+async function selectFicheAndStart(ficheId) {
+  const fiche = (allFiches || []).find(f => f.id === ficheId);
+  if (!fiche) { showToast('Fiche introuvable', 'error'); return; }
+  showLoading(true);
+  try {
+    // 1) Création task spontanee (production lancée sans TAF planifiée)
+    // Le flag spontanee=true rend la tâche invisible côté TAF mais conserve
+    // toute la mécanique (chrono, stats par personne, scans_lots, etc.).
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayStr = today.toISOString().slice(0, 10);
+    const taskPayload = {
+      echeance: todayStr,
+      tache: fiche.nom,
+      fiche_id: fiche.id,
+      etablissement: currentEtablissement,
+      attribue_a_id: currentUser.id,
+      attribue_a_nom: currentUser.nom,
+      attribue_a_initiales: currentUser.initiales || null,
+      createur_id: currentUser.id,
+      createur_nom: currentUser.nom,
+      date_creation: new Date().toISOString(),
+      creneau: fiche.creneau || pdGuessCreneau(),
+      equipe: fiche.equipe || currentUser.equipe || 'cuisine',
+      categorie: fiche.categorie || null,
+      categorie_production: fiche.categorie || null,
+      priorite: 3,
+      is_production: true,
+      spontanee: true,
+      duree_accumulee_secondes: 0
+    };
+    const { data: task, error } = await sb.from('tasks').insert(taskPayload).select().single();
+    if (error) throw error;
+
+    // 2) Charger les ingrédients de la fiche
+    const { data: ings } = await sb.from('fiche_ingredients')
+      .select('id, nom, quantite, unite, article_id, ordre, est_principal')
+      .eq('fiche_id', fiche.id)
+      .order('ordre');
+    const principaux = (ings || []).filter(i => i.est_principal === true);
+
+    // 3) Mémoriser la session
+    window.__pdSession = {
+      mode: 'fiche',
+      taskId: task.id,
+      ficheId: fiche.id,
+      ficheNom: fiche.nom,
+      ingredients: ings || [],
+      principaux: principaux,
+      task: task
+    };
+    window.__currentTafContext = { task_id: task.id, fiche_id: fiche.id, tache: fiche.nom };
+    window.__currentFicheIngs = ings || [];
+
+    closeFichePicker();
+    showLoading(false);
+    // 4) Ouvrir la modale production avec pré-remplissage + bandeau directe
+    await pdOpenProductionModalForFiche(fiche, task);
+  } catch (e) {
+    showLoading(false);
+    console.error('selectFicheAndStart:', e);
+    showToast('Erreur démarrage production : ' + (e.message || e), 'error');
+  }
+}
+
+async function pdOpenProductionModalForFiche(fiche, task) {
+  // Pré-remplir tous les champs comme dans openProductionModal mais sans
+  // afficher le bouton "annuler" → renommé "Annuler la production"
+  const ficheSelect = document.getElementById('p-fiche-select');
+  ficheSelect.innerHTML = '<option value="">Sélectionner une fiche...</option>';
+  (allFiches || []).forEach(f => {
+    ficheSelect.innerHTML += `<option value="${f.id}" ${f.id === fiche.id ? 'selected' : ''}>${escapeHtml(f.nom)}</option>`;
+  });
+  ficheSelect.disabled = true; // pas de changement de fiche en cours de production
+  document.getElementById('p-nom').value = fiche.nom;
+  document.getElementById('p-quantite').value = fiche.rendement_quantite || '';
+  document.getElementById('p-unite').value = fiche.rendement_unite || 'kg';
+  document.getElementById('p-observation').value = '';
+  document.getElementById('p-dlc-manual').value = '';
+  document.getElementById('p-dlc-auto').style.display = 'none';
+  document.getElementById('p-dlc-auto-value').textContent = '';
+  document.querySelectorAll('#p-categorie .chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.val === fiche.categorie);
+    chip.onclick = () => {
+      document.querySelectorAll('#p-categorie .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    };
+  });
+  updateDlcAutoDisplay(fiche);
+  await loadActionsPostForProduction(fiche.id);
+
+  // Titre + bandeau directe visible
+  document.getElementById('pd-title').textContent = 'Production directe — ' + fiche.nom;
+  document.getElementById('pd-directe-bar').style.display = '';
+  document.getElementById('pd-fiche-required-mark').style.display = '';
+
+  // Init chrono + scanner UI
+  pdRefreshDirecteBar();
+
+  // Init MP recap (vide tant que pas scanné)
+  pdScannedLots = {};
+  pdMatieresEditMode = false;
+  await pdLoadProductionMatieres(fiche.id, pdScannedLots);
+
+  // Afficher la modale
+  document.getElementById('production-modal').style.display = 'flex';
+}
+
+// Réinitialise tout le contexte (utilisé à l'ouverture et à la fermeture)
+function pdResetSession() {
+  pdChronoTickerStop();
+  window.__pdSession = null;
+  pdScannedLots = {};
+  pdMatieres = [];
+  pdMatieresEditMode = false;
+  const bar = document.getElementById('pd-directe-bar');
+  if (bar) bar.style.display = 'none';
+  const sel = document.getElementById('p-fiche-select');
+  if (sel) sel.disabled = false;
+  const mark = document.getElementById('pd-fiche-required-mark');
+  if (mark) mark.style.display = 'none';
+  const sec = document.getElementById('pd-matieres-section');
+  if (sec) sec.style.display = 'none';
+  const list = document.getElementById('pd-matieres-list');
+  if (list) list.innerHTML = '';
+}
+
+// ===== 3. CHRONO =====
+function pdElapsedSeconds() {
+  const s = window.__pdSession;
+  if (!s || !s.task) return 0;
+  const acc = s.task.duree_accumulee_secondes || 0;
+  if (!s.task.date_debut_execution) return acc;
+  const start = new Date(s.task.date_debut_execution).getTime();
+  return acc + Math.max(0, Math.floor((Date.now() - start) / 1000));
+}
+function pdFormatDureeLive(seconds) {
+  const sec = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function pdChronoTickerStart() {
+  if (window.__pdChronoTimer) return;
+  window.__pdChronoTimer = setInterval(() => {
+    const el = document.getElementById('pd-chrono-display');
+    if (!el) return;
+    el.textContent = pdFormatDureeLive(pdElapsedSeconds());
+  }, 1000);
+}
+function pdChronoTickerStop() {
+  if (window.__pdChronoTimer) {
+    clearInterval(window.__pdChronoTimer);
+    window.__pdChronoTimer = null;
+  }
+}
+function pdRefreshDirecteBar() {
+  const s = window.__pdSession;
+  if (!s) return;
+  // Bouton scanner : visible tant qu'il reste des principaux non scannés
+  const nonScannes = (s.principaux || []).filter(i => !(s.task.scans_lots && s.task.scans_lots[i.id]));
+  const btnScan = document.getElementById('pd-btn-scanner');
+  const cntSpan = document.getElementById('pd-scan-count');
+  if (btnScan) {
+    if (nonScannes.length > 0) {
+      btnScan.style.display = '';
+      cntSpan.textContent = String(nonScannes.length);
+      btnScan.onclick = () => pdLaunchScanner();
+    } else {
+      btnScan.style.display = 'none';
+    }
+  }
+  const status = document.getElementById('pd-scan-status');
+  if (status) {
+    if (s.mode === 'a_creer') {
+      status.textContent = 'Production à créer : pas de fiche → aucune étiquette à scanner.';
+    } else if ((s.principaux || []).length === 0) {
+      status.textContent = 'Aucun ingrédient principal sur cette fiche — scan non requis.';
+    } else if (nonScannes.length > 0) {
+      status.textContent = nonScannes.length + ' ingrédient(s) principal(aux) à scanner avant de pouvoir valider.';
+    } else {
+      status.textContent = '✓ Toutes les étiquettes ont été scannées.';
+    }
+  }
+  // Chrono
+  const display = document.getElementById('pd-chrono-display');
+  const state = document.getElementById('pd-chrono-state');
+  const btnPause = document.getElementById('pd-btn-pause');
+  const btnResume = document.getElementById('pd-btn-resume');
+  if (!s.task.date_debut_execution && (s.task.duree_accumulee_secondes || 0) === 0) {
+    if (display) display.textContent = '00:00';
+    if (state) state.textContent = (s.principaux || []).length > 0
+      ? 'En attente du scan…' : 'Démarre dès que tu valides.';
+    if (btnPause) btnPause.style.display = 'none';
+    if (btnResume) btnResume.style.display = 'none';
+    pdChronoTickerStop();
+  } else if (s.task.date_debut_execution) {
+    if (display) display.textContent = pdFormatDureeLive(pdElapsedSeconds());
+    if (state) state.textContent = '⏱ En cours…';
+    if (btnPause) btnPause.style.display = '';
+    if (btnResume) btnResume.style.display = 'none';
+    pdChronoTickerStart();
+  } else {
+    // Accumulé > 0 mais pas démarré → en pause
+    if (display) display.textContent = pdFormatDureeLive(s.task.duree_accumulee_secondes || 0);
+    if (state) state.textContent = '⏸ En pause';
+    if (btnPause) btnPause.style.display = 'none';
+    if (btnResume) btnResume.style.display = '';
+    pdChronoTickerStop();
+  }
+}
+
+async function pdStartChronoAfterScan() {
+  const s = window.__pdSession;
+  if (!s || !s.task) return;
+  if (s.task.date_debut_execution) return; // déjà démarré
+  const nowISO = new Date().toISOString();
+  s.task.date_debut_execution = nowISO;
+  s.task.debut_par_id = currentUser.id;
+  s.task.debut_par_initiales = currentUser.initiales;
+  s.task.duree_accumulee_secondes = s.task.duree_accumulee_secondes || 0;
+  try {
+    await sb.from('tasks').update({
+      date_debut_execution: nowISO,
+      debut_par_id: currentUser.id,
+      debut_par_initiales: currentUser.initiales,
+      duree_accumulee_secondes: s.task.duree_accumulee_secondes
+    }).eq('id', s.task.id);
+  } catch (e) { console.warn('pdStartChronoAfterScan:', e); }
+  pdRefreshDirecteBar();
+  showToast('Chrono démarré ⏱', 'success');
+}
+
+async function pdPauseChrono() {
+  const s = window.__pdSession;
+  if (!s || !s.task || !s.task.date_debut_execution) return;
+  const total = pdElapsedSeconds();
+  s.task.duree_accumulee_secondes = total;
+  s.task.date_debut_execution = null;
+  try {
+    await sb.from('tasks').update({
+      duree_accumulee_secondes: total,
+      date_debut_execution: null
+    }).eq('id', s.task.id);
+  } catch (e) { console.warn('pdPauseChrono:', e); }
+  pdRefreshDirecteBar();
+  showToast('Chrono en pause ⏸', 'success');
+}
+
+async function pdResumeChrono() {
+  const s = window.__pdSession;
+  if (!s || !s.task || s.task.date_debut_execution) return;
+  const nowISO = new Date().toISOString();
+  s.task.date_debut_execution = nowISO;
+  try {
+    await sb.from('tasks').update({ date_debut_execution: nowISO }).eq('id', s.task.id);
+  } catch (e) { console.warn('pdResumeChrono:', e); }
+  pdRefreshDirecteBar();
+  showToast('Chrono repris ⏱', 'success');
+}
+
+// ===== 4. SCANNER RAFALE =====
+function pdLaunchScanner() {
+  const s = window.__pdSession;
+  if (!s || !s.task) return;
+  const nonScannes = (s.principaux || []).filter(i => !(s.task.scans_lots && s.task.scans_lots[i.id]));
+  const list = nonScannes.map(i => ({
+    ingredient_id: i.id,
+    article_id_attendu: i.article_id || null,
+    nom_attendu: i.nom || '',
+    quantite: (i.quantite != null ? i.quantite : ''),
+    unite: i.unite || ''
+  }));
+  if (!list.length) { showToast('Tout est déjà scanné', 'success'); return; }
+  localStorage.setItem('scan_fefo_context', JSON.stringify({
+    task_id: s.task.id,
+    fiche_id: s.ficheId,
+    tache: s.ficheNom,
+    ingredients: list,
+    timestamp: Date.now(),
+    return_to_pd: true
+  }));
+  // localStorage marker pour rouvrir la modale au retour
+  localStorage.setItem('pd_resume', JSON.stringify({
+    taskId: s.task.id, ficheId: s.ficheId, at: Date.now()
+  }));
+  window.location.href = '../scanner/?mode=burst&return=production';
+}
+
+async function pdEnrichScanFromTrac(scanData) {
+  const enriched = { ...scanData };
+  if (scanData && scanData.scan_tracabilite_id) {
+    try {
+      const { data: st } = await sb.from('scan_tracabilite')
+        .select('fabricant, poids_net_kg, produit, lot, dlc')
+        .eq('id', scanData.scan_tracabilite_id).single();
+      if (st) {
+        enriched.fabricant = st.fabricant ?? enriched.fabricant ?? null;
+        enriched.poids_net_kg = st.poids_net_kg ?? enriched.poids_net_kg ?? null;
+        if (!enriched.produit) enriched.produit = st.produit;
+        if (!enriched.lot) enriched.lot = st.lot;
+        if (!enriched.dlc) enriched.dlc = st.dlc;
+      }
+    } catch (e) { /* non bloquant */ }
+  }
+  return enriched;
+}
+
+async function pdPersistScanToTask(taskId, ingredientId, scanData, extraScans) {
+  if (!taskId || !ingredientId || !scanData) return;
+  try {
+    const enriched = await pdEnrichScanFromTrac(scanData);
+    if (Array.isArray(extraScans) && extraScans.length) {
+      const enrichedExtras = [];
+      for (const ex of extraScans) {
+        if (ex) enrichedExtras.push(await pdEnrichScanFromTrac(ex));
+      }
+      if (enrichedExtras.length) enriched.lots_supplementaires = enrichedExtras;
+    }
+    let scansLots = {};
+    try {
+      const { data: fresh } = await sb.from('tasks')
+        .select('scans_lots').eq('id', taskId).single();
+      if (fresh && fresh.scans_lots) scansLots = { ...fresh.scans_lots };
+    } catch (e) { /* on repart de {} */ }
+    scansLots[ingredientId] = enriched;
+    const s = window.__pdSession;
+    if (s && s.task) s.task.scans_lots = scansLots;
+    await sb.from('tasks').update({ scans_lots: scansLots }).eq('id', taskId);
+  } catch (e) {
+    console.warn('[PD] pdPersistScanToTask:', e);
+  }
+}
+
+// Au chargement de la page, vérifier si on revient du scanner avec un résultat
+try {
+  window.addEventListener('DOMContentLoaded', function pdCheckScanReturn() {
+    setTimeout(() => {
+      try { pdProcessScanReturn(); }
+      catch (e) { console.warn('[PD] pdProcessScanReturn:', e); }
+    }, 900);
+  });
+} catch (e) { console.warn('[PD] addEventListener DOMContentLoaded:', e); }
+
+async function pdProcessScanReturn() {
+  const rawResult = localStorage.getItem('scan_fefo_result');
+  const rawResume = localStorage.getItem('pd_resume');
+  if (!rawResult || !rawResume) return;
+  // Attendre que la session utilisateur soit chargée
+  let tries = 0;
+  while (tries < 25 && (!currentUser || !currentEtablissement)) {
+    await new Promise(r => setTimeout(r, 200));
+    tries++;
+  }
+  if (!currentUser || !currentEtablissement) return;
+
+  let result, resume;
+  try {
+    result = JSON.parse(rawResult);
+    resume = JSON.parse(rawResume);
+  } catch (e) {
+    localStorage.removeItem('scan_fefo_result');
+    localStorage.removeItem('scan_fefo_context');
+    localStorage.removeItem('pd_resume');
+    return;
+  }
+  localStorage.removeItem('scan_fefo_result');
+  localStorage.removeItem('scan_fefo_context');
+  localStorage.removeItem('pd_resume');
+
+  if (!result || !result.batch) return;
+  const tid = result.task_id || resume.taskId;
+  const scans = result.scans || {};
+  const extras = result.extras || {};
+  const ids = Object.keys(scans);
+  let nbExtras = 0;
+  for (const ingId of ids) {
+    const ex = Array.isArray(extras[ingId]) ? extras[ingId] : [];
+    nbExtras += ex.length;
+    try { await pdPersistScanToTask(tid, ingId, scans[ingId], ex); }
+    catch (e) { console.warn('[PD] persist batch:', e); }
+  }
+  const nbErr = (result.errors || []).length;
+  const nbTotal = ids.length + nbExtras;
+  showToast(
+    nbTotal + ' étiquette(s) enregistrée(s)'
+      + (nbExtras ? ' (dont ' + nbExtras + ' suppl.)' : '')
+      + (nbErr ? ' · ' + nbErr + ' à refaire' : ''),
+    nbErr ? 'error' : 'success'
+  );
+  // Recharger la task + rouvrir la modale production directe
+  try {
+    const { data: task } = await sb.from('tasks').select('*').eq('id', tid).single();
+    if (!task || !task.fiche_id) return;
+    const fiche = (allFiches || []).find(f => f.id === task.fiche_id);
+    if (!fiche) {
+      // Cas extrême : fiche pas en mémoire — recharger
+      await loadFiches();
+    }
+    const fiche2 = (allFiches || []).find(f => f.id === task.fiche_id);
+    if (!fiche2) { showToast('Fiche introuvable', 'error'); return; }
+    // Reconstruire la session
+    const { data: ings } = await sb.from('fiche_ingredients')
+      .select('id, nom, quantite, unite, article_id, ordre, est_principal')
+      .eq('fiche_id', task.fiche_id)
+      .order('ordre');
+    const principaux = (ings || []).filter(i => i.est_principal === true);
+    window.__pdSession = {
+      taskId: task.id, ficheId: task.fiche_id, ficheNom: fiche2.nom,
+      ingredients: ings || [], principaux: principaux, task: task
+    };
+    window.__currentTafContext = { task_id: task.id, fiche_id: task.fiche_id, tache: fiche2.nom };
+    window.__currentFicheIngs = ings || [];
+    pdScannedLots = task.scans_lots || {};
+    await pdOpenProductionModalForFiche(fiche2, task);
+    // Démarrer le chrono si tous les principaux sont scannés et qu'il n'est pas encore lancé
+    const nonScannes = principaux.filter(i => !pdScannedLots[i.id]);
+    if (principaux.length > 0 && nonScannes.length === 0) {
+      await pdStartChronoAfterScan();
+    }
+  } catch (e) {
+    console.warn('[PD] pdProcessScanReturn rebuild session:', e);
+  }
+}
+
+// ===== 5. RÉCAP MP + RAPPROCHEMENT STOCK =====
+async function pdLoadProductionMatieres(ficheId, scansLots) {
+  try {
+    pdScannedLots = scansLots || {};
+    pdMatieresEditMode = false;
+    const { data: ings, error: e1 } = await sb.from('fiche_ingredients')
+      .select('id, nom, quantite, unite, article_id, ordre, est_principal')
+      .eq('fiche_id', ficheId)
+      .not('article_id', 'is', null)
+      .order('ordre');
+    if (e1) throw e1;
+    if (!ings || !ings.length) {
+      pdMatieres = [];
+      document.getElementById('pd-matieres-section').style.display = 'none';
+      return;
+    }
+    const articleIds = [...new Set(ings.map(i => i.article_id))];
+    const { data: lots, error: e2 } = await sb.from('stock_par_lot')
+      .select('scan_tracabilite_id, article_id, article_nom, lot, dlc, quantite_restante, fabricant')
+      .in('article_id', articleIds)
+      .eq('etablissement', currentEtablissement)
+      .gt('quantite_restante', 0)
+      .order('dlc', { ascending: true, nullsFirst: false });
+    if (e2) throw e2;
+    pdMatieres = ings.map(ing => ({
+      ingredient_id: ing.id,
+      ingredient_nom: ing.nom,
+      article_id: ing.article_id,
+      est_principal: ing.est_principal === true,
+      qty_fiche: ing.quantite,
+      unite_fiche: ing.unite,
+      lots: (lots || []).filter(l => l.article_id === ing.article_id),
+      selections: {},
+    }));
+    await pdRapprocherScansAvecStock();
+    pdRecalcMatieresFefo();
+    document.getElementById('pd-matieres-section').style.display = '';
+    pdRenderMatieresList();
+    // recalc live quand la quantité produite change
+    const qtyInput = document.getElementById('p-quantite');
+    qtyInput.removeEventListener('input', _pdOnQtyChange);
+    qtyInput.addEventListener('input', _pdOnQtyChange);
+  } catch (e) {
+    console.error('pdLoadProductionMatieres:', e);
+  }
+}
+function _pdOnQtyChange() {
+  pdRecalcMatieresFefo();
+  pdRenderMatieresList();
+}
+
+async function pdRapprocherScansAvecStock() {
+  const etiquettes = [];
+  Object.values(pdScannedLots || {}).forEach(sc => {
+    if (!sc) return;
+    etiquettes.push(sc);
+    if (Array.isArray(sc.lots_supplementaires)) {
+      sc.lots_supplementaires.forEach(ex => { if (ex) etiquettes.push(ex); });
+    }
+  });
+  etiquettes.forEach(e => { e._rapproche = null; });
+  if (!etiquettes.length) return;
+  let stock = [];
+  try {
+    const { data, error } = await sb.from('stock_par_lot')
+      .select('scan_tracabilite_id, article_id, article_nom, produit, lot, dlc, fabricant, quantite_initiale, quantite_restante, scan_at')
+      .eq('etablissement', currentEtablissement)
+      .gt('quantite_restante', 0);
+    if (error) throw error;
+    stock = data || [];
+  } catch (e) {
+    console.warn('[PD] rapprocherScansAvecStock:', e);
+    return;
+  }
+  stock.sort((a, b) => new Date(a.scan_at || 0) - new Date(b.scan_at || 0));
+  const norm = (d) => d ? String(d).slice(0, 10) : null;
+  const used = {};
+  etiquettes.forEach(e => {
+    const eDlc = norm(e.dlc);
+    const ePoids = Number(e.poids_net_kg);
+    if (!eDlc || !isFinite(ePoids) || ePoids <= 0) return;
+    const match = stock.find(s => {
+      if (used[s.scan_tracabilite_id]) return false;
+      if (norm(s.dlc) !== eDlc) return false;
+      const sPoids = Number(s.quantite_initiale);
+      return isFinite(sPoids) && Math.abs(sPoids - ePoids) < 0.001;
+    });
+    if (match) {
+      used[match.scan_tracabilite_id] = true;
+      e._rapproche = {
+        scan_tracabilite_id: match.scan_tracabilite_id,
+        article_id: match.article_id,
+        article_nom: match.article_nom,
+        produit: match.produit,
+        lot: match.lot,
+        dlc: match.dlc,
+        fabricant: match.fabricant,
+        quantite_restante: match.quantite_restante,
+        scan_at: match.scan_at,
+      };
+    }
+  });
+}
+
+function pdRecalcMatieresFefo() {
+  const qtyProd = parseFloat(document.getElementById('p-quantite').value) || 0;
+  const s = window.__pdSession;
+  const fiche = s ? (allFiches || []).find(f => f.id === s.ficheId) : null;
+  const rendement = fiche ? parseFloat(fiche.rendement_quantite) || 0 : 0;
+  const ratio = (qtyProd > 0 && rendement > 0) ? qtyProd / rendement : 1;
+  pdMatieres.forEach(m => {
+    const qtyTheo = (parseFloat(m.qty_fiche) || 0) * ratio;
+    m.qty_theorique = qtyTheo;
+    m.selections = {};
+    let restant = qtyTheo;
+    for (const lot of m.lots) {
+      if (restant <= 0) break;
+      const dispo = Number(lot.quantite_restante);
+      const prendre = Math.min(restant, dispo);
+      m.selections[lot.scan_tracabilite_id] = Number(prendre.toFixed(3));
+      restant -= prendre;
+    }
+    if (restant > 0.001 && m.lots.length > 0) {
+      const firstLot = m.lots[0];
+      m.selections[firstLot.scan_tracabilite_id] =
+        Number(((m.selections[firstLot.scan_tracabilite_id] || 0) + restant).toFixed(3));
+    }
+    m.qty_manque = restant > 0.001 ? restant : 0;
+  });
+  pdApplyScannedLotsToMatieres();
+}
+
+function pdApplyScannedLotsToMatieres() {
+  const scans = Object.values(pdScannedLots || {});
+  pdMatieres.forEach(m => {
+    m.scanne = false; m.scan_info = null; m.scan_nb_lots = 0;
+    m.scan_nb_rapproches = 0; m.qty_source = 'fiche';
+  });
+  if (!scans.length) return;
+  pdMatieres.forEach(m => {
+    const scan = scans.find(s => s && s.scan_tracabilite_id &&
+      ((s.article_id && s.article_id === m.article_id) ||
+       (s.article_id_attendu && s.article_id_attendu === m.article_id)));
+    if (!scan) return;
+    const candidats = [scan].concat(
+      Array.isArray(scan.lots_supplementaires) ? scan.lots_supplementaires : []
+    ).filter(s => s && s.scan_tracabilite_id);
+    const seen = {};
+    const etiquettes = [];
+    candidats.forEach(s => {
+      if (seen[s.scan_tracabilite_id]) return;
+      seen[s.scan_tracabilite_id] = true;
+      etiquettes.push(s);
+    });
+    if (!etiquettes.length) return;
+    m.selections = {};
+    const total = Number(m.qty_theorique || 0);
+    const useFiche = total > 0;
+    const n = etiquettes.length;
+    const part = useFiche ? total / n : 0;
+    let cumul = 0;
+    let nbRapproches = 0;
+    etiquettes.forEach((s, i) => {
+      const rap = s._rapproche || null;
+      if (rap) nbRapproches++;
+      const effId = rap ? rap.scan_tracabilite_id : s.scan_tracabilite_id;
+      const existing = m.lots.find(l => l.scan_tracabilite_id === effId);
+      if (!existing) {
+        m.lots.unshift({
+          scan_tracabilite_id: effId,
+          article_id: rap ? rap.article_id : m.article_id,
+          article_nom: (rap ? rap.produit : s.produit) || m.ingredient_nom,
+          lot: (rap ? rap.lot : s.lot) || '?',
+          dlc: (rap ? rap.dlc : s.dlc) || null,
+          quantite_restante: rap ? Number(rap.quantite_restante)
+            : (Number(s.poids_net_kg) || Number(m.qty_theorique) || 0),
+          fabricant: (rap ? rap.fabricant : s.fabricant) || null,
+          _rapproche: !!rap,
+          _rap_recu_le: rap ? rap.scan_at : null,
+        });
+      } else if (rap) {
+        existing._rapproche = true;
+        existing._rap_recu_le = rap.scan_at;
+      }
+      let q;
+      if (useFiche) {
+        q = (i === n - 1) ? (total - cumul) : Number(part.toFixed(3));
+      } else {
+        q = Number(s.poids_net_kg) || 0;
+      }
+      cumul += q;
+      m.selections[effId] = Number(q.toFixed(3));
+    });
+    m.scanne = true;
+    m.scan_info = scan;
+    m.scan_nb_lots = n;
+    m.scan_nb_rapproches = nbRapproches;
+    m.qty_source = useFiche ? 'fiche' : 'etiquette';
+  });
+}
+
+function pdRenderMatieresList() {
+  const container = document.getElementById('pd-matieres-list');
+  if (!container) return;
+  const hint = document.getElementById('pd-matieres-hint');
+  if (!pdMatieres.length) {
+    container.innerHTML = '';
+    if (hint) hint.textContent = '';
+    return;
+  }
+  if (pdMatieresEditMode) {
+    if (hint) hint.textContent = 'Sélection manuelle : lots triés par DLC croissante (FEFO). Quantités calculées selon le ratio quantité produite / rendement de la fiche.';
+    pdRenderMatieresEditable();
+  } else {
+    if (hint) hint.textContent = 'Récapitulatif des lots qui seront décomptés du stock — issus des étiquettes scannées. Rien à sélectionner.';
+    pdRenderMatieresRecap();
+  }
+}
+
+function pdRenderMatieresRecap() {
+  const container = document.getElementById('pd-matieres-list');
+  container.innerHTML = '';
+  const fmtQty = (q) => {
+    const n = Number(q) || 0;
+    return (Math.round(n * 1000) / 1000).toString();
+  };
+  pdMatieres.forEach(m => {
+    const entries = Object.entries(m.selections || {}).filter(([, q]) => (parseFloat(q) || 0) > 0);
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; gap:10px; padding:8px 10px; background:white; border:1px solid var(--gray-200); border-radius:6px;';
+    const ico = m.scanne ? '✓' : '📦';
+    const icoColor = m.scanne ? '#15803d' : '#6b7280';
+    const badge = m.scanne
+      ? ' <span style="font-size:9px;background:#bbf7d0;color:#14532d;padding:1px 6px;border-radius:3px;font-weight:700;">✓ ' + ((m.scan_nb_lots || 1) > 1 ? (m.scan_nb_lots + ' LOTS SCANNÉS') : 'SCANNÉ') + '</span>'
+      : (m.est_principal ? ' <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-weight:700;">⚠ NON SCANNÉ</span>' : '');
+    let lotsLines;
+    if (!entries.length) {
+      lotsLines = '<div style="font-size:11px; color:#b91c1c;">⚠ Aucun lot retenu — à vérifier</div>';
+    } else {
+      lotsLines = entries.map(([id, q]) => {
+        const lot = m.lots.find(l => l.scan_tracabilite_id === id);
+        const lotLabel = lot ? ('lot ' + _esc(lot.lot || '?')) : 'lot ?';
+        const days = lot ? _daysToDlc(lot.dlc) : null;
+        const dlcTxt = days == null ? ''
+          : days < 0 ? ' · <span style="color:#b91c1c;font-weight:600;">DLC dépassée</span>'
+          : days <= 7 ? ' · <span style="color:#c2410c;">DLC dans ' + days + 'j</span>'
+          : ' · DLC dans ' + days + 'j';
+        let rapTxt = '';
+        if (lot && lot._rapproche) {
+          const reculeTxt = lot._rap_recu_le
+            ? ' (reçu le ' + new Date(lot._rap_recu_le).toLocaleDateString('fr-FR') + ')' : '';
+          rapTxt = '<div style="font-size:10.5px; color:#15803d; font-weight:600;">✓ rapproché au stock' + reculeTxt + '</div>';
+        } else if (m.scanne) {
+          rapTxt = '<div style="font-size:10.5px; color:#c2410c; font-weight:600;">⚠ pas trouvé en stock — réception manquante ?</div>';
+        }
+        return '<div style="font-size:11.5px; color:#374151;">' + lotLabel
+          + ' · <strong>' + fmtQty(q) + ' ' + _esc(m.unite_fiche || '') + '</strong>' + dlcTxt + rapTxt + '</div>';
+      }).join('');
+    }
+    const manque = m.qty_manque > 0
+      ? '<div style="font-size:10px; color:#b91c1c;">⚠ Stock manquant : ' + m.qty_manque.toFixed(2) + ' ' + _esc(m.unite_fiche || '') + '</div>'
+      : '';
+    const qtyNote = (m.scanne && m.qty_source === 'etiquette')
+      ? '<div style="font-size:10px; color:#6b7280;">Quantité = poids des étiquettes scannées (fiche sans quantité renseignée).</div>'
+      : '';
+    div.innerHTML =
+      '<span style="font-size:1.1rem; line-height:1.3; color:' + icoColor + ';">' + ico + '</span>'
+      + '<div style="flex:1; min-width:0;">'
+      + '<div style="font-size:13px; font-weight:600; color:#111827;">' + _esc(m.ingredient_nom) + badge + '</div>'
+      + lotsLines + manque + qtyNote
+      + '</div>';
+    container.appendChild(div);
+  });
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.textContent = '✏️ Ajuster les lots / quantités';
+  toggle.style.cssText = 'align-self:flex-start; margin-top:2px; font-size:12px; padding:6px 12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; color:#475569; cursor:pointer;';
+  toggle.addEventListener('click', () => { pdMatieresEditMode = true; pdRenderMatieresList(); });
+  container.appendChild(toggle);
+}
+
+function pdRenderMatieresEditable() {
+  const container = document.getElementById('pd-matieres-list');
+  if (!pdMatieres.length) { container.innerHTML = ''; return; }
+  container.innerHTML = '';
+  pdMatieres.forEach((m, idx) => {
+    const total = Object.values(m.selections).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+    const ecart = total - (m.qty_theorique || 0);
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 10px; background:white; border:1px solid var(--gray-200); border-radius:6px;';
+    let lotsHtml = '';
+    if (!m.lots.length) {
+      lotsHtml = `<div style="font-size:12px; color:#b91c1c; padding:4px 0;">⚠ Aucun lot dispo en stock.</div>`;
+    } else {
+      m.lots.forEach(l => {
+        const days = _daysToDlc(l.dlc);
+        const dlcCls = days == null ? '#6b7280' : days < 0 ? '#b91c1c' : days <= 2 ? '#b91c1c' : days <= 7 ? '#c2410c' : days <= 14 ? '#a16207' : '#15803d';
+        const dlcLabel = days == null ? 'DLC ?' : days < 0 ? `Dépassée ${-days}j` : days === 0 ? "Aujourd'hui" : days === 1 ? 'Demain' : `Dans ${days}j`;
+        const isSelected = (m.selections[l.scan_tracabilite_id] || 0) > 0;
+        const qtyVal = m.selections[l.scan_tracabilite_id] || '';
+        lotsHtml += `
+          <div style="display:flex; align-items:center; gap:6px; padding:4px 0; ${isSelected ? '' : 'opacity:.7;'}">
+            <input type="checkbox" data-mat="${idx}" data-lot="${l.scan_tracabilite_id}" ${isSelected ? 'checked' : ''} style="width:18px; height:18px;">
+            <div style="flex:1; min-width:0; font-size:12px;">
+              Lot <strong>${_esc(l.lot || '?')}</strong>
+              <span style="color:${dlcCls}; font-weight:600;">· ${dlcLabel}</span>
+              <span style="color:#6b7280;">· ${Number(l.quantite_restante).toFixed(2)} restant</span>
+            </div>
+            <input type="number" step="0.001" min="0" data-mat-qty="${idx}" data-lot="${l.scan_tracabilite_id}" value="${qtyVal}" placeholder="0" style="width:70px; padding:4px 6px; font-size:12px; border:1px solid #d1d5db; border-radius:4px; text-align:right;">
+          </div>
+        `;
+      });
+    }
+    const ecartCls = Math.abs(ecart) < 0.01 ? '#15803d' : ecart < 0 ? '#c2410c' : '#b91c1c';
+    div.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; font-weight:600; color:#111827;">${_esc(m.ingredient_nom)}${m.scanne ? ' <span style="font-size:9px;background:#bbf7d0;color:#14532d;padding:1px 6px;border-radius:3px;font-weight:700;">✓ SCANNÉ</span>' : (m.est_principal ? ' <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-weight:700;">⚠ NON SCANNÉ</span>' : '')}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px; color:#6b7280;">Théorique</div>
+          <div style="font-size:14px; font-weight:700; color:${ecartCls};">
+            ${(m.qty_theorique || 0).toFixed(2)} ${_esc(m.unite_fiche || '')}
+          </div>
+          ${m.qty_manque > 0 ? `<div style="font-size:10px; color:#b91c1c;">⚠ Manque ${m.qty_manque.toFixed(2)}</div>` : ''}
+        </div>
+      </div>
+      ${lotsHtml}
+    `;
+    div.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const matIdx = +cb.dataset.mat;
+        const lotId = cb.dataset.lot;
+        const lot = pdMatieres[matIdx].lots.find(x => x.scan_tracabilite_id === lotId);
+        if (cb.checked) {
+          pdMatieres[matIdx].selections[lotId] = Number(lot.quantite_restante);
+        } else {
+          delete pdMatieres[matIdx].selections[lotId];
+        }
+        pdRenderMatieresList();
+      });
+    });
+    div.querySelectorAll('input[type=number]').forEach(input => {
+      input.addEventListener('input', () => {
+        const matIdx = +input.dataset.matQty;
+        const lotId = input.dataset.lot;
+        const v = parseFloat(input.value);
+        if (isNaN(v) || v <= 0) {
+          delete pdMatieres[matIdx].selections[lotId];
+        } else {
+          pdMatieres[matIdx].selections[lotId] = v;
+        }
+      });
+    });
+    container.appendChild(div);
+  });
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.textContent = '← Revenir au récapitulatif';
+  back.style.cssText = 'align-self:flex-start; margin-top:2px; font-size:12px; padding:6px 12px; background:#ecfeff; border:1px solid #67e8f9; border-radius:6px; color:#0e7490; cursor:pointer;';
+  back.addEventListener('click', () => { pdMatieresEditMode = false; pdRenderMatieresList(); });
+  container.appendChild(back);
+}
+
+// ===== 6. INTERCEPTION DE saveProduction POUR LA PRODUCTION DIRECTE =====
+// On wrap la fonction existante. Si __pdSession est actif on applique B-2
+// (scan obligatoire des principaux), on crée les sorties stock et on ferme la
+// tâche spontanée.
+let _pdOriginalSaveProduction;
+try { _pdOriginalSaveProduction = saveProduction; } catch (e) { console.warn('[PD] capture saveProduction:', e); }
+try { saveProduction = async function pdSaveProductionWrapper() {
+  const s = window.__pdSession;
+  if (!s) {
+    // Pas de session de production directe → comportement original
+    return _pdOriginalSaveProduction();
+  }
+  const isACreer = (s.mode === 'a_creer');
+  // Garde-fou B-2 (mode fiche uniquement) : tous les principaux doivent être scannés
+  if (!isACreer) {
+    const scansLots = (s.task && s.task.scans_lots) || {};
+    const nonScannes = (s.principaux || []).filter(i => !scansLots[i.id]);
+    if (nonScannes.length > 0) {
+      const noms = nonScannes.map(i => i.nom).join(', ');
+      showToast('⚠ Étiquette(s) non scannée(s) : ' + noms + ' — scan obligatoire', 'error');
+      return;
+    }
+  }
+  // Si le chrono n'a jamais démarré (cas : 0 principaux), on le démarre ici
+  if (!s.task.date_debut_execution && (s.task.duree_accumulee_secondes || 0) === 0) {
+    await pdStartChronoAfterScan();
+  }
+  // Calcul durée finale
+  const dureeFinale = pdElapsedSeconds();
+  // Récupérer fiche pour DLC + code produit
+  const fiche = (allFiches || []).find(f => f.id === s.ficheId);
+  const nom = document.getElementById('p-nom').value.trim();
+  const quantite = parseFloat(document.getElementById('p-quantite').value);
+  const unite = document.getElementById('p-unite').value;
+  const observation = document.getElementById('p-observation').value.trim();
+  const categoryChip = document.querySelector('#p-categorie .chip.active');
+  const categorie = categoryChip?.dataset.val;
+  if (!nom || !quantite || !categorie) {
+    showToast('Remplissez nom, quantité et catégorie', 'error');
+    return;
+  }
+  // Checklist actions post-production
+  const apRows = document.querySelectorAll('.p-action-post-row');
+  const apLogEntries = [];
+  for (const r of apRows) {
+    const statut = r.dataset.statut;
+    if (!statut) {
+      showToast('Cochez toutes les actions complémentaires avant de valider', 'error');
+      r.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      r.style.boxShadow = '0 0 0 2px #dc2626';
+      return;
+    }
+    let raison = null;
+    if (statut === 'saute') {
+      raison = r.querySelector('.ap-raison').value.trim();
+      if (!raison) {
+        showToast('Indiquez la raison du saut', 'error');
+        return;
+      }
+    }
+    apLogEntries.push({
+      action_post_id: r.dataset.actionId,
+      libelle_snapshot: r.dataset.libelle,
+      type_snapshot: r.dataset.type,
+      statut, raison_saut: raison,
+      user_id: currentUser.id, user_nom: currentUser.nom,
+      user_initiales: currentUser.initiales || null,
+      etablissement: currentEtablissement,
+    });
+  }
+  showLoading(true);
+  try {
+    const dateStr = selectedProductionDate || formatDateForInput(new Date());
+    const now = new Date();
+    let dlc = null;
+    const dlcManualVal = document.getElementById('p-dlc-manual').value;
+    if (dlcManualVal) dlc = new Date(dlcManualVal).toISOString();
+    else if (fiche && fiche.dlc_jours) dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
+    else if (fiche && fiche.dlc_heures) dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
+    else dlc = new Date(now.getTime() + 3 * 86400000).toISOString();
+    const codeProduct = fiche?.code_court || generateCodeFromName(nom.toUpperCase());
+    const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
+    allLots.push(lot);
+    const productionPayload = {
+      fiche_id: s.ficheId || null,
+      a_creer_motif: isACreer ? (s.motif || null) : null,
+      lot_id: lot.id,
+      nom_produit: nom,
+      categorie: categorie,
+      quantite_produite: quantite,
+      unite: unite,
+      date_production: now.toISOString(),
+      dlc: dlc,
+      temperature_stockage: fiche?.temperature_stockage || null,
+      producteur_id: currentUser.id,
+      producteur_nom: currentUser.nom,
+      producteur_initiales: currentUser.initiales || null,
+      tache_id: s.task.id,
+      statut: 'termine',
+      observation: observation || null,
+      etablissement: currentEtablissement
+    };
+    const saved = await DB.createProduction(productionPayload);
+
+    // Actions post-production
+    if (apLogEntries.length > 0) {
+      try {
+        const enriched = apLogEntries.map(e => ({ ...e, production_id: saved.id }));
+        await DB.logActionsPost(enriched);
+      } catch (logErr) { console.error('Log actions post échoué:', logErr); }
+    }
+
+    // Sorties de stock — mode fiche uniquement (en mode "à créer", pas d'ingrédients)
+    if (!isACreer) try {
+      const sortieRows = [];
+      pdMatieres.forEach(m => {
+        Object.entries(m.selections).forEach(([lotId, qty]) => {
+          const q = parseFloat(qty);
+          if (!q || q <= 0) return;
+          const lotObj = m.lots.find(l => l.scan_tracabilite_id === lotId);
+          sortieRows.push({
+            type: 'SORTIE',
+            article_id: (lotObj && lotObj.article_id) || m.article_id,
+            scan_tracabilite_id: lotId,
+            quantite: q,
+            unite: m.unite_fiche || 'kg',
+            etablissement: currentEtablissement,
+            motif: `Production directe : ${nom}`,
+            source_table: 'production',
+            source_id: saved.id,
+            created_by_id: currentUser.id,
+            created_by_nom: currentUser.nom,
+            created_by_initiales: currentUser.initiales || null,
+          });
+        });
+      });
+      if (sortieRows.length > 0) {
+        const { error: errMov } = await sb.from('stock_mouvements').insert(sortieRows);
+        if (errMov) {
+          console.error('Erreur SORTIE:', errMov);
+          showToast('⚠ Production OK mais sorties non enregistrées : ' + errMov.message, 'error');
+        }
+      }
+    } catch (movErr) { console.error('Erreur mouvements:', movErr); }
+
+    // Marquer la tâche spontanée comme terminée + figer la durée
+    try {
+      await sb.from('tasks').update({
+        fait_par_id: currentUser.id,
+        fait_par_initiales: currentUser.initiales,
+        date_validation: now.toISOString(),
+        duree_secondes: dureeFinale,
+        date_debut_execution: null,
+        production_id: saved.id
+      }).eq('id', s.task.id);
+    } catch (e) { console.warn('Update tâche spontanée:', e); }
+
+    pdChronoTickerStop();
+    showToast('Production enregistrée ✓ (durée ' + pdFormatDureeLive(dureeFinale) + ')', 'success');
+    pdResetSession();
+    closeProductionModal();
+    await loadProductions();
+    showEtiquette(saved);
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur: ' + e.message, 'error');
+  }
+  showLoading(false);
+}; } catch (e) { console.warn('[PD] wrap saveProduction:', e); }
+
+// Wrap closeProductionModal pour demander confirmation + supprimer la task
+// spontanée si on annule la production directe
+let _pdOriginalCloseProductionModal;
+try { _pdOriginalCloseProductionModal = closeProductionModal; } catch (e) { console.warn('[PD] capture closeProductionModal:', e); }
+try { closeProductionModal = function pdCloseProductionModalWrapper() {
+  const s = window.__pdSession;
+  if (!s) return _pdOriginalCloseProductionModal();
+  const total = pdElapsedSeconds();
+  const ok = total < 5 || confirm('Annuler la production en cours ?\n\nLe chrono affiche ' + pdFormatDureeLive(total) + '.\nLes étiquettes scannées seront perdues. Confirmer ?');
+  if (!ok) return;
+  // Supprimer la task spontanée
+  (async () => {
+    try {
+      await sb.from('tasks').delete().eq('id', s.task.id);
+    } catch (e) { console.warn('Suppression task spontanée:', e); }
+  })();
+  pdResetSession();
+  _pdOriginalCloseProductionModal();
+}; } catch (e) { console.warn('[PD] wrap closeProductionModal:', e); }
+
+try { console.log('[PD] Production directe — module charge OK'); } catch(e) {}
 
 // ============= INIT =============
 init();
