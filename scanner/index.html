@@ -129,6 +129,21 @@
     .burst-add-extra { align-self:flex-start; margin-left:22px; font-size:12px; font-weight:700; padding:6px 12px; background:#ecfeff; border:1px dashed #67e8f9; border-radius:6px; color:#0e7490; cursor:pointer; }
     .burst-add-extra.finish { background:#dcfce7; border:1px solid #86efac; color:#15803d; }
     .burst-mini-spin { width:18px; height:18px; border:3px solid var(--gray-200); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; flex-shrink:0; }
+    /* Liste cliquable refonte */
+    .burst-row.clickable { cursor:pointer; transition:transform .08s, box-shadow .12s; }
+    .burst-row.clickable:active { transform:scale(.99); }
+    .burst-row.todo { background:var(--gray-50); border:1px solid var(--gray-200); }
+    .burst-row.analyzing { background:#fef9c3; border:1px solid #fde047; }
+    .burst-row .br-name-line { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .br-src-badge { font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px; background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd; white-space:nowrap; }
+    .br-status-badge { font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; white-space:nowrap; flex-shrink:0; }
+    .br-status-badge.todo { background:#e5e7eb; color:#4b5563; }
+    .br-status-badge.analyzing { background:#fde047; color:#854d0e; }
+    .br-status-badge.ok { background:#86efac; color:#14532d; }
+    .br-status-badge.err { background:#fca5a5; color:#7f1d1d; }
+    .burst-arrow { font-size:16px; color:var(--gray-400); flex-shrink:0; }
+    #burst-finishing { display:none; align-items:center; gap:10px; justify-content:center; padding:12px; background:#fef9c3; border:1px solid #fde047; border-radius:8px; margin:8px 0; font-size:13px; font-weight:700; color:#854d0e; }
+    .burst-cam-title { font-size:13px; color:var(--gray-500); text-align:center; margin-bottom:6px; }
 
     /* Vue résultat (mode unit) + édition */
     .field-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -500,22 +515,36 @@
         <button class="btn btn-ghost" id="btn-burst-cancel-1" style="margin-top:10px;">← Annuler</button>
       </div>
 
-      <!-- Phase 2 : capture en direct -->
+      <!-- Phase 2 : caméra activée -> deux sous-vues (liste cliquable / caméra) -->
       <div id="burst-capture" style="display:none;">
-        <div class="burst-head">
-          <div class="burst-step" id="burst-step">Étiquette 1 / 1</div>
-          <div class="burst-ing" id="burst-ing">—</div>
+
+        <!-- Sous-vue LISTE : toutes les MP, cliquables, badges de statut live -->
+        <div id="burst-list-view">
+          <div class="burst-head">
+            <div class="burst-step">👆 Touchez une matière pour la scanner</div>
+            <div class="burst-ing" id="burst-list-sub" style="font-size:14px;">—</div>
+          </div>
+          <div class="burst-results" id="burst-results"></div>
+          <div id="burst-finishing"><span class="burst-mini-spin"></span><span id="burst-finishing-txt">Attente des analyses…</span></div>
+          <button class="btn btn-success" id="btn-burst-validate" disabled><span class="emoji">✓</span><span>Terminer</span></button>
+          <button class="btn btn-ghost" id="btn-burst-cancel-2" style="margin-top:8px;">← Annuler</button>
         </div>
-        <div class="burst-cam-wrap" id="burst-cam-wrap">
-          <video id="burst-video" playsinline muted autoplay></video>
-          <div class="burst-frame"></div>
-          <div class="burst-flash" id="burst-flash"></div>
+
+        <!-- Sous-vue CAMÉRA : armée pour une MP précise -->
+        <div id="burst-cam-view" style="display:none;">
+          <div class="burst-head">
+            <div class="burst-step">📷 Scan de l'étiquette</div>
+            <div class="burst-ing" id="burst-ing">—</div>
+          </div>
+          <div class="burst-cam-wrap" id="burst-cam-wrap">
+            <video id="burst-video" playsinline muted autoplay></video>
+            <div class="burst-frame"></div>
+            <div class="burst-flash" id="burst-flash"></div>
+          </div>
+          <div class="burst-hint" id="burst-hint">Placez l'étiquette dans le cadre, puis appuyez sur SHOOT</div>
+          <button class="btn-shoot" id="btn-burst-shoot"><span>📸</span><span>SHOOT</span></button>
+          <button class="btn btn-ghost" id="btn-burst-back-list" style="margin-top:8px;">← Retour à la liste</button>
         </div>
-        <div class="burst-hint" id="burst-hint">Placez l'étiquette dans le cadre, puis appuyez sur SHOOT</div>
-        <button class="btn-shoot" id="btn-burst-shoot"><span>📸</span><span>SHOOT</span></button>
-        <div class="burst-results" id="burst-results"></div>
-        <button class="btn btn-success" id="btn-burst-validate" style="display:none;"><span class="emoji">✓</span><span>Valider et revenir au TAF</span></button>
-        <button class="btn btn-ghost" id="btn-burst-cancel-2" style="margin-top:8px;">← Annuler</button>
       </div>
 
       <input type="file" class="file-input-hidden" id="burst-file-input" accept="image/*" capture="environment">
@@ -1527,22 +1556,29 @@
 
     $('btn-unit-restart').addEventListener('click', () => { resetUnitScreen(); showScreen('unit'); });
 
-    // ====== MODE BURST — Scan « rafale » des étiquettes MP (appelé depuis le TAF) ======
+    // ====== MODE BURST — Scan « rafale » non-bloquant à liste cliquable ======
     const Burst = {
-      ctx: null,           // { task_id, fiche_id, tache, ingredients:[...] }
-      idx: 0,              // index de l'ingrédient en cours
-      stream: null,        // MediaStream getUserMedia
-      results: {},         // ingredient_id -> { ...scan } | { error } | { _pending:true }  (lot principal)
-      extras: {},          // ingredient_id -> [ { ...scan } | { error } | { _pending } ]   (lots supplémentaires)
-      addingExtraFor: null,// ingredient_id en cours d'ajout d'étiquette supplémentaire, ou null
-      jobs: 0,             // nb d'extractions Claude Vision en cours
-      useFallback: false,  // true = appareil photo natif iOS (getUserMedia indispo)
+      ctx: null,            // { task_id, fiche_id, tache, ingredients:[...] }
+      order: [],            // ingrédients triés (sources sous-produit d'abord)
+      stream: null,         // MediaStream getUserMedia
+      useFallback: false,   // true = appareil photo natif iOS
+      lots: {},             // ingredient_id -> [ {_pending:true} | {error} | {...scan} ]
+      jobs: 0,              // nb d'extractions Claude Vision en cours
+      armedIng: null,       // ingredient_id armé pour la caméra, ou null (mode liste)
+      finishing: false,     // true quand « Terminer » attend la fin des analyses
     };
 
     function burstEsc(s) {
       return String(s == null ? '' : s)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // Tri : les MP sources d'un sous-produit remontent en haut, le reste garde l'ordre fiche.
+    function burstBuildOrder(ings) {
+      const src = [], rest = [];
+      ings.forEach(i => { (i.is_source_sous_produit ? src : rest).push(i); });
+      return src.concat(rest);
     }
 
     function initBurst() {
@@ -1556,46 +1592,65 @@
         return;
       }
       Burst.ctx = ctx;
-      Burst.idx = 0;
-      Burst.results = {};
-      Burst.extras = {};
-      Burst.addingExtraFor = null;
+      Burst.order = burstBuildOrder(ctx.ingredients);
+      Burst.lots = {};
       Burst.jobs = 0;
+      Burst.armedIng = null;
+      Burst.finishing = false;
       Burst.useFallback = false;
       const n = ctx.ingredients.length;
-      $('burst-activate-info').textContent = (n === 1 ? '1 étiquette à scanner' : n + ' étiquettes à scanner')
+      $('burst-activate-info').textContent = (n === 1 ? '1 matière à scanner' : n + ' matières à scanner')
         + ' pour : ' + (ctx.tache || 'cette tâche');
       $('burst-activate').style.display = '';
       $('burst-capture').style.display = 'none';
       $('burst-cam-error').style.display = 'none';
       $('btn-burst-fallback').style.display = 'none';
       $('btn-burst-start').disabled = false;
-      $('btn-burst-validate').style.display = 'none';
-      $('btn-burst-shoot').style.display = '';
+      $('burst-finishing').style.display = 'none';
       showScreen('burst');
     }
 
-    function burstCurrentIng() {
-      return (Burst.ctx && Burst.ctx.ingredients[Burst.idx]) || null;
+    function burstIngById(ingId) {
+      return (Burst.ctx && Burst.ctx.ingredients.find(i => i.ingredient_id === ingId)) || null;
     }
 
-    function burstUpdateHeader() {
-      const ing = burstCurrentIng();
-      if (!ing) return;
-      if (Burst.addingExtraFor === ing.ingredient_id) {
-        const n = (Burst.extras[ing.ingredient_id] || []).length;
-        $('burst-step').textContent = 'Étiquette supplémentaire'
-          + (n ? ' · ' + n + ' ajoutée' + (n > 1 ? 's' : '') : '');
-        $('burst-ing').innerHTML = '➕ ' + burstEsc(ing.nom_attendu || 'Ingrédient');
-        return;
-      }
-      $('burst-step').textContent = 'Étiquette ' + (Burst.idx + 1) + ' / ' + Burst.ctx.ingredients.length;
+    // --- Statut agrégé d'une MP à partir de ses lots ---
+    function burstIngStatus(ingId) {
+      const arr = Burst.lots[ingId] || [];
+      let green = 0, pending = 0, errors = 0;
+      arr.forEach(r => {
+        if (!r) return;
+        if (r._pending) pending++;
+        else if (r.error) errors++;
+        else green++;
+      });
+      let state;
+      if (arr.length === 0) state = 'todo';
+      else if (green > 0) state = 'ok';
+      else if (pending > 0) state = 'analyzing';
+      else state = 'err';
+      return { state, green, pending, errors, total: arr.length };
+    }
+
+    // --- Bascule des sous-vues liste / caméra ---
+    function burstShowList() {
+      Burst.armedIng = null;
+      $('burst-cam-view').style.display = 'none';
+      $('burst-list-view').style.display = '';
+      if (Burst.ctx) $('burst-list-sub').textContent = Burst.ctx.tache || 'Matières premières';
+      renderBurstList();
+    }
+    function burstShowCam(ing) {
+      $('burst-list-view').style.display = 'none';
+      $('burst-cam-view').style.display = '';
       const q = (ing.quantite != null && ing.quantite !== '')
         ? ' <small>(' + burstEsc(ing.quantite) + ' ' + burstEsc(ing.unite || '') + ')</small>' : '';
-      $('burst-ing').innerHTML = '🥩 ' + burstEsc(ing.nom_attendu || 'Ingrédient') + q;
+      $('burst-ing').innerHTML = '📷 ' + burstEsc(ing.nom_attendu || 'Ingrédient') + q;
+      const v = $('burst-video');
+      if (Burst.stream && v && !v.srcObject) { v.srcObject = Burst.stream; try { v.play(); } catch (e) {} }
     }
 
-    // --- Activation de la caméra live (getUserMedia) ---
+    // --- Activation caméra : on passe ensuite en mode LISTE ---
     $('btn-burst-start').addEventListener('click', async () => {
       $('btn-burst-start').disabled = true;
       try {
@@ -1603,15 +1658,13 @@
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false,
         });
-        $('burst-activate').style.display = 'none';
-        $('burst-capture').style.display = '';
-        $('burst-cam-wrap').style.display = '';
         Burst.useFallback = false;
         const v = $('burst-video');
         v.srcObject = Burst.stream;
         try { await v.play(); } catch (e) {}
-        burstUpdateHeader();
-        renderBurstResults();
+        $('burst-activate').style.display = 'none';
+        $('burst-capture').style.display = '';
+        burstShowList();
       } catch (err) {
         console.error('[Burst] getUserMedia:', err);
         $('btn-burst-start').disabled = false;
@@ -1623,16 +1676,12 @@
       }
     });
 
-    // --- Repli : appareil photo natif iOS ---
+    // --- Repli : appareil photo natif iOS (pas de vidéo live) ---
     $('btn-burst-fallback').addEventListener('click', () => {
       Burst.useFallback = true;
       $('burst-activate').style.display = 'none';
       $('burst-capture').style.display = '';
-      $('burst-cam-wrap').style.display = 'none';
-      $('burst-hint').textContent = "Appuyez sur le bouton pour photographier l'étiquette";
-      $('btn-burst-shoot').innerHTML = '<span>📸</span><span>Prendre la photo</span>';
-      burstUpdateHeader();
-      renderBurstResults();
+      burstShowList();
     });
 
     $('burst-file-input').addEventListener('change', e => {
@@ -1641,7 +1690,21 @@
       if (f) burstHandleBlob(f);
     });
 
-    // --- SHOOT ---
+    // --- Clic sur une MP de la liste : armer la caméra pour cette MP ---
+    function burstArmIngredient(ingId) {
+      const ing = burstIngById(ingId);
+      if (!ing) return;
+      // Re-scan d'une MP entièrement en échec : on purge ses lots ratés avant le retry
+      if (burstIngStatus(ingId).state === 'err') Burst.lots[ingId] = [];
+      Burst.armedIng = ingId;
+      if (Burst.useFallback) {
+        $('burst-file-input').click();   // appareil natif : le change déclenchera burstHandleBlob
+      } else {
+        burstShowCam(ing);
+      }
+    }
+
+    // --- SHOOT (caméra live) ---
     $('btn-burst-shoot').addEventListener('click', () => {
       if (Burst.useFallback) { $('burst-file-input').click(); return; }
       if (!Burst.stream) return;
@@ -1659,54 +1722,28 @@
       cv.toBlob(blob => { if (blob) burstHandleBlob(blob); }, 'image/jpeg', 0.9);
     });
 
-    // --- Une capture est prête : l'attribuer à l'ingrédient courant, lancer l'extraction, avancer ---
+    $('btn-burst-back-list').addEventListener('click', () => { burstShowList(); });
+
+    // --- Une capture est prête : empiler un lot, lancer l'analyse en fond, revenir à la liste ---
     function burstHandleBlob(blob) {
-      const ing = burstCurrentIng();
-      if (!ing) return;
-      const ingId = ing.ingredient_id;
+      const ingId = Burst.armedIng;
+      const ing = burstIngById(ingId);
+      if (!ing) { burstShowList(); return; }
+      Burst.lots[ingId] = Burst.lots[ingId] || [];
+      const lotIdx = Burst.lots[ingId].length;
+      Burst.lots[ingId].push({ _pending: true });
       Burst.jobs++;
-      if (Burst.addingExtraFor === ingId) {
-        // Étiquette supplémentaire : on l'empile et on reste sur cet ingrédient
-        Burst.extras[ingId] = Burst.extras[ingId] || [];
-        const exIdx = Burst.extras[ingId].length;
-        Burst.extras[ingId].push({ _pending: true });
-        renderBurstResults();
-        burstUpdateHeader();
-        extractBurstShot(blob, ing, exIdx);   // tâche de fond — pas de await
-        // pas d'avance : l'utilisateur peut shooter un autre lot du même ingrédient
-      } else {
-        Burst.results[ingId] = { _pending: true };
-        renderBurstResults();
-        extractBurstShot(blob, ing, null);    // tâche de fond — pas de await
-        burstAdvance();
-      }
+      extractBurstShot(blob, ing, lotIdx);   // tâche de fond — pas d'await
+      burstShowList();                        // retour immédiat à la liste
     }
 
-    // --- Avance vers le prochain ingrédient sans résultat ---
-    function burstAdvance() {
-      const next = Burst.ctx.ingredients.findIndex(ing => !Burst.results[ing.ingredient_id]);
-      if (next === -1) {
-        $('btn-burst-shoot').style.display = 'none';
-        burstMaybeShowValidate();
-      } else {
-        Burst.idx = next;
-        burstUpdateHeader();
-        renderBurstResults();
-      }
-    }
-
-    // --- Range un résultat dans le bon emplacement (lot principal ou supplémentaire) ---
-    function burstSetResult(ingId, extraIdx, value) {
-      if (extraIdx == null) {
-        Burst.results[ingId] = value;
-      } else {
-        Burst.extras[ingId] = Burst.extras[ingId] || [];
-        Burst.extras[ingId][extraIdx] = value;
-      }
+    function burstSetLot(ingId, lotIdx, value) {
+      Burst.lots[ingId] = Burst.lots[ingId] || [];
+      Burst.lots[ingId][lotIdx] = value;
     }
 
     // --- Extraction Claude Vision en tâche de fond ---
-    async function extractBurstShot(blob, ing, extraIdx) {
+    async function extractBurstShot(blob, ing, lotIdx) {
       try {
         const today = new Date().toISOString().slice(0, 10);
         const uuid = crypto.randomUUID();
@@ -1742,7 +1779,7 @@
           await new Promise(r => setTimeout(r, 450));
         }
 
-        burstSetResult(ing.ingredient_id, extraIdx, {
+        burstSetLot(ing.ingredient_id, lotIdx, {
           ingredient_id: ing.ingredient_id,
           scan_id: scanId,
           scan_tracabilite_id: trac ? trac.id : null,
@@ -1758,143 +1795,118 @@
         });
       } catch (err) {
         console.error('[Burst] extraction:', err);
-        burstSetResult(ing.ingredient_id, extraIdx, { error: (err && err.message) || 'Erreur extraction' });
+        burstSetLot(ing.ingredient_id, lotIdx, { error: (err && err.message) || 'Erreur extraction' });
       } finally {
         Burst.jobs--;
-        renderBurstResults();
-        burstMaybeShowValidate();
+        renderBurstList();
+        burstCheckFinishing();
       }
     }
 
-    // --- HTML d'une ligne de résultat (lot principal ou supplémentaire) ---
-    function burstRowHtml(r, label, ingId, extraIdx, isTarget) {
-      const lbl = burstEsc(label);
-      const isExtra = extraIdx != null;
-      const cls = isExtra ? 'burst-row extra' : 'burst-row';
-      const redoAttr = 'data-redo-ing="' + burstEsc(ingId) + '" data-redo-extra="'
-        + (isExtra ? extraIdx : '') + '"';
-      if (!r) {
-        return '<div class="' + cls + ' pending"><span class="br-ico">' + (isTarget ? '🎯' : '○')
-          + '</span><div class="br-main"><div class="br-name">' + lbl
-          + '</div><div class="br-sub">en attente de scan</div></div></div>';
-      }
-      if (r._pending) {
-        return '<div class="' + cls + ' pending"><span class="burst-mini-spin"></span>'
-          + '<div class="br-main"><div class="br-name">' + lbl
-          + '</div><div class="br-sub">analyse Claude Vision en cours…</div></div></div>';
-      }
-      if (r.error) {
-        return '<div class="' + cls + ' err"><span class="br-ico">⚠</span><div class="br-main">'
-          + '<div class="br-name">' + lbl + '</div>'
-          + '<div class="br-sub">Échec : ' + burstEsc(r.error) + '</div></div>'
-          + '<button class="burst-redo" ' + redoAttr + '>↻ Refaire</button></div>';
-      }
-      const dlc = r.dlc ? new Date(r.dlc).toLocaleDateString('fr-FR') : '?';
-      const mismatch = r.article_id_attendu && r.article_id && r.article_id !== r.article_id_attendu;
-      const noMatch = !r.article_id;
-      const warn = mismatch
-        ? '<div class="br-sub" style="color:#b91c1c;font-weight:700;">⚠ Produit différent de l\'ingrédient attendu</div>'
-        : (noMatch ? '<div class="br-sub" style="color:#b45309;font-weight:700;">⚠ Article non reconnu — à vérifier</div>' : '');
-      return '<div class="' + cls + ' ' + (mismatch || noMatch ? 'err' : 'ok') + '">'
-        + '<span class="br-ico">' + (mismatch || noMatch ? '⚠' : '✓') + '</span>'
-        + '<div class="br-main"><div class="br-name">' + lbl + '</div>'
-        + '<div class="br-sub">' + burstEsc(r.produit || '?') + ' · lot ' + burstEsc(r.lot || '?')
-        + ' · DLC ' + dlc + '</div>' + warn + '</div>'
-        + '<button class="burst-redo" ' + redoAttr + '>↻ Refaire</button></div>';
-    }
-
-    // --- Liste des résultats sous la caméra ---
-    function renderBurstResults() {
+    // --- Rendu de la liste cliquable ---
+    function renderBurstList() {
       const box = $('burst-results');
       if (!box || !Burst.ctx) return;
-      box.innerHTML = Burst.ctx.ingredients.map((ing, i) => {
+      box.innerHTML = Burst.order.map(ing => {
         const ingId = ing.ingredient_id;
-        const nom = ing.nom_attendu || 'Ingrédient';
-        const primaryTarget = (i === Burst.idx && Burst.addingExtraFor == null);
-        let html = burstRowHtml(Burst.results[ingId], nom, ingId, null, primaryTarget);
-        const exList = Burst.extras[ingId] || [];
-        exList.forEach((er, ei) => {
-          html += burstRowHtml(er, nom + ' — lot ' + (ei + 2), ingId, ei, false);
-        });
-        // Bouton « ajouter une étiquette » : visible dès que le lot principal a un résultat
-        if (Burst.addingExtraFor === ingId) {
-          html += '<button class="burst-add-extra finish" data-finish-extra="1">'
-            + '✓ Terminé pour ' + burstEsc(nom) + '</button>';
-        } else if (Burst.results[ingId]) {
-          html += '<button class="burst-add-extra" data-add-extra="' + burstEsc(ingId) + '">'
-            + '➕ Autre étiquette pour ' + burstEsc(nom) + '</button>';
+        const nom = burstEsc(ing.nom_attendu || 'Ingrédient');
+        const st = burstIngStatus(ingId);
+        const srcBadge = ing.is_source_sous_produit
+          ? '<span class="br-src-badge">→ sous-produit</span>' : '';
+        let rowCls, badgeCls, badgeTxt, sub, icoHtml;
+        if (st.state === 'todo') {
+          rowCls = 'todo'; badgeCls = 'todo'; badgeTxt = 'À scanner';
+          sub = 'Touchez pour scanner'; icoHtml = '<span class="br-ico">○</span>';
+        } else if (st.state === 'analyzing') {
+          rowCls = 'analyzing'; badgeCls = 'analyzing'; badgeTxt = 'Analyse…';
+          sub = 'Analyse Claude Vision en cours…'; icoHtml = '<span class="burst-mini-spin"></span>';
+        } else if (st.state === 'ok') {
+          rowCls = 'ok'; badgeCls = 'ok';
+          badgeTxt = 'Scanné' + (st.green > 1 ? ' · ' + st.green + ' lots' : '');
+          icoHtml = '<span class="br-ico">✓</span>';
+          const firstGreen = (Burst.lots[ingId] || []).find(r => r && !r._pending && !r.error);
+          const dlc = (firstGreen && firstGreen.dlc) ? new Date(firstGreen.dlc).toLocaleDateString('fr-FR') : '?';
+          sub = burstEsc((firstGreen && firstGreen.produit) || '?') + ' · lot '
+            + burstEsc((firstGreen && firstGreen.lot) || '?') + ' · DLC ' + dlc
+            + (st.pending ? ' · +1 en analyse…' : '');
+        } else {
+          rowCls = 'err'; badgeCls = 'err'; badgeTxt = 'À refaire';
+          sub = 'Échec de lecture — touchez pour rescanner'; icoHtml = '<span class="br-ico">⚠</span>';
         }
-        return '<div class="burst-ing-group">' + html + '</div>';
+        return '<div class="burst-row clickable ' + rowCls + '" data-arm-ing="' + burstEsc(ingId) + '">'
+          + icoHtml
+          + '<div class="br-main"><div class="br-name-line"><span class="br-name">' + nom + '</span>' + srcBadge + '</div>'
+          + '<div class="br-sub">' + sub + '</div></div>'
+          + '<span class="br-status-badge ' + badgeCls + '">' + badgeTxt + '</span>'
+          + '<span class="burst-arrow">&rsaquo;</span></div>';
       }).join('');
-      box.querySelectorAll('[data-redo-ing]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const ex = btn.dataset.redoExtra;
-          burstRedo(btn.dataset.redoIng, ex === '' ? null : parseInt(ex, 10));
-        });
+      box.querySelectorAll('[data-arm-ing]').forEach(el => {
+        el.addEventListener('click', () => burstArmIngredient(el.dataset.armIng));
       });
-      box.querySelectorAll('[data-add-extra]').forEach(btn => {
-        btn.addEventListener('click', () => burstAddExtra(btn.dataset.addExtra));
-      });
-      box.querySelectorAll('[data-finish-extra]').forEach(btn => {
-        btn.addEventListener('click', () => burstFinishExtra());
-      });
+      burstUpdateValidate();
     }
 
-    // --- Passer en mode « ajout d'étiquette supplémentaire » pour un ingrédient ---
-    function burstAddExtra(ingId) {
-      if (!Burst.ctx) return;
-      const i = Burst.ctx.ingredients.findIndex(x => x.ingredient_id === ingId);
-      if (i < 0) return;
-      Burst.addingExtraFor = ingId;
-      Burst.idx = i;
-      $('btn-burst-shoot').style.display = '';
-      $('btn-burst-validate').style.display = 'none';
-      burstUpdateHeader();
-      renderBurstResults();
+    // --- MP principales (gating du bouton Terminer) ---
+    function burstPrincipals() {
+      return (Burst.ctx ? Burst.ctx.ingredients : []).filter(i => i.est_principal);
+    }
+    function burstIngNonRed(ingId) {
+      const s = burstIngStatus(ingId);
+      return s.green > 0 || s.pending > 0;
+    }
+    function burstIngResolved(ingId) {
+      return burstIngStatus(ingId).green > 0;
+    }
+    function burstCanFinish() {
+      return burstPrincipals().every(i => burstIngNonRed(i.ingredient_id));
+    }
+    function burstUpdateValidate() {
+      const btn = $('btn-burst-validate');
+      if (btn) btn.disabled = !burstCanFinish();
     }
 
-    // --- Quitter le mode « ajout d'étiquette supplémentaire » ---
-    function burstFinishExtra() {
-      Burst.addingExtraFor = null;
-      burstAdvance();           // revient au 1er ingrédient sans lot principal, sinon rien
-      burstUpdateHeader();
-      renderBurstResults();
-      burstMaybeShowValidate();
-    }
-
-    // --- Refaire le scan d'un lot précis (principal ou supplémentaire) ---
-    function burstRedo(ingId, extraIdx) {
-      if (!Burst.ctx || ingId == null) return;
-      const i = Burst.ctx.ingredients.findIndex(x => x.ingredient_id === ingId);
-      if (i < 0) return;
-      if (extraIdx == null) {
-        delete Burst.results[ingId];
-        Burst.addingExtraFor = null;
-      } else {
-        if (Burst.extras[ingId]) Burst.extras[ingId].splice(extraIdx, 1);
-        Burst.addingExtraFor = ingId;   // le prochain SHOOT rajoute une étiquette
+    // --- Clic « Terminer » ---
+    $('btn-burst-validate').addEventListener('click', () => {
+      if (!burstCanFinish()) return;
+      const ps = burstPrincipals();
+      if (ps.every(i => burstIngResolved(i.ingredient_id))) {
+        burstFinalize();
+        return;
       }
-      Burst.idx = i;
-      $('btn-burst-shoot').style.display = '';
-      $('btn-burst-validate').style.display = 'none';
-      burstUpdateHeader();
-      renderBurstResults();
-    }
-
-    // --- Bouton Valider : visible quand tout est scanné et extrait ---
-    function burstMaybeShowValidate() {
-      if (!Burst.ctx) return;
-      if (Burst.addingExtraFor) { $('btn-burst-validate').style.display = 'none'; return; }
-      const ready = Burst.jobs <= 0 && Burst.ctx.ingredients.every(ing => {
-        const r = Burst.results[ing.ingredient_id];
-        return r && !r._pending;
-      });
-      $('btn-burst-validate').style.display = ready ? '' : 'none';
-    }
-
-    // --- Valider : renvoyer les résultats au TAF ---
-    $('btn-burst-validate').addEventListener('click', async () => {
+      // Des principaux sont encore en analyse (jaune) : on attend leur résolution
+      Burst.finishing = true;
       $('btn-burst-validate').disabled = true;
+      $('burst-finishing').style.display = 'flex';
+      burstUpdateFinishingTxt();
+    });
+
+    function burstUpdateFinishingTxt() {
+      const ps = burstPrincipals();
+      const waiting = ps.filter(i => !burstIngResolved(i.ingredient_id) && burstIngStatus(i.ingredient_id).pending > 0).length;
+      $('burst-finishing-txt').textContent = 'Attente de ' + waiting + ' analyse' + (waiting > 1 ? 's' : '') + '…';
+    }
+
+    function burstCheckFinishing() {
+      burstUpdateValidate();
+      if (!Burst.finishing) return;
+      const ps = burstPrincipals();
+      if (ps.every(i => burstIngResolved(i.ingredient_id))) {
+        burstFinalize();
+        return;
+      }
+      if (!ps.every(i => burstIngNonRed(i.ingredient_id))) {
+        // Un principal est retombé en échec : on rend la main pour rescanner
+        Burst.finishing = false;
+        $('burst-finishing').style.display = 'none';
+        showToast('Une matière a échoué, re-scannez-la', 'error');
+        renderBurstList();
+        return;
+      }
+      burstUpdateFinishingTxt();
+    }
+
+    // --- Finalisation : packe les lots et renvoie au TAF/production (format scan_fefo_result inchangé) ---
+    async function burstFinalize() {
       const scans = {};
       const extras = {};
       const errors = [];
@@ -1911,21 +1923,22 @@
         poids_net_kg: r.poids_net_kg,
         timestamp: r.timestamp,
       });
-      Object.keys(Burst.results).forEach(ingId => {
-        const r = Burst.results[ingId];
-        if (!r || r.error || r._pending) { errors.push(ingId); return; }
-        scans[ingId] = packScan(r);
-        if (r.scan_id) validIds.push(r.scan_id);
-      });
-      // Lots supplémentaires : on ne garde que ceux extraits sans erreur
-      Object.keys(Burst.extras).forEach(ingId => {
-        const arr = (Burst.extras[ingId] || [])
-          .filter(r => r && !r.error && !r._pending);
-        if (!arr.length) return;
-        extras[ingId] = arr.map(r => {
-          if (r.scan_id) validIds.push(r.scan_id);
-          return packScan(r);
-        });
+      Burst.ctx.ingredients.forEach(ing => {
+        const ingId = ing.ingredient_id;
+        const arr = Burst.lots[ingId] || [];
+        const greens = arr.filter(r => r && !r._pending && !r.error);
+        if (greens.length === 0) {
+          if (arr.length > 0) errors.push(ingId);
+          return;
+        }
+        scans[ingId] = packScan(greens[0]);
+        if (greens[0].scan_id) validIds.push(greens[0].scan_id);
+        if (greens.length > 1) {
+          extras[ingId] = greens.slice(1).map(r => {
+            if (r.scan_id) validIds.push(r.scan_id);
+            return packScan(r);
+          });
+        }
       });
       try {
         if (validIds.length) {
@@ -1953,7 +1966,7 @@
       } catch (e) { console.error('[Burst] enregistrement résultat:', e); }
       const dest = (window.__scanFefoReturnMode === 'production') ? '../production/' : '../taf/';
       window.location.href = dest;
-    });
+    }
 
     function burstStopCamera() {
       try {
@@ -1968,16 +1981,13 @@
       window.location.href = dest;
     });
     $('btn-burst-cancel-2').addEventListener('click', () => {
-      const done = Burst.ctx ? Burst.ctx.ingredients.filter(ing => {
-        const r = Burst.results[ing.ingredient_id];
-        return r && !r.error && !r._pending;
-      }).length : 0;
+      const done = Burst.ctx ? Burst.ctx.ingredients.filter(ing => burstIngStatus(ing.ingredient_id).green > 0).length : 0;
       const dest = (window.__scanFefoReturnMode === 'production') ? 'la production' : 'le TAF';
       const msg = done > 0
-        ? 'Revenir à ' + dest + ' ? Les ' + done + ' étiquette(s) déjà scannée(s) seront enregistrées.'
+        ? 'Revenir à ' + dest + ' ? Les ' + done + ' matière(s) déjà scannée(s) seront enregistrées.'
         : 'Annuler le scan et revenir à ' + dest + ' ?';
       if (!confirm(msg)) return;
-      $('btn-burst-validate').click();
+      burstFinalize();
     });
 
     // ====== MODE SBURST — Scan « rafale » des étiquettes d'une réception groupée ======
