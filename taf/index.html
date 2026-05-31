@@ -2368,9 +2368,12 @@
         unite: i.unite || '',
         est_principal: i.est_principal === true,
         is_source_sous_produit: !!(i.article_id && sourceSet.has(i.article_id))
-      }));
+      }))
+      // On n envoie au scanner QUE les MP a scanner : principaux + sources de sous-produit.
+      // Les epices/accessoires (ni principal ni source) sont exclus pour ne pas surcharger l ecran.
+      .filter(x => x.est_principal || x.is_source_sous_produit);
     if (list.length === 0) {
-      showToast('Aucun ingrédient à scanner', 'error');
+      showToast('Aucune matière à scanner (ni principale ni source de sous-produit)', 'error');
       return;
     }
     localStorage.setItem('scan_fefo_context', JSON.stringify({
