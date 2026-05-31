@@ -5641,18 +5641,35 @@ async function pdResumeChrono() {
 }
 
 // ===== 4. SCANNER RAFALE =====
-function pdLaunchScanner() {
+// Set des article_id sources d'un sous-produit pour la fiche (tri + badge dans le scanner).
+async function pdFetchSourcesSousProduits(ficheId) {
+  if (!ficheId) return new Set();
+  try {
+    const { data, error } = await sb.from('fiches_techniques_sous_produits')
+      .select('source_article_id').eq('fiche_id', ficheId);
+    if (error) throw error;
+    return new Set((data || []).map(r => r.source_article_id).filter(Boolean));
+  } catch (e) {
+    console.warn('[Scan-FEFO] lecture sources sous-produits:', e);
+    return new Set();
+  }
+}
+
+async function pdLaunchScanner() {
   const s = window.__pdSession;
   if (!s || !s.task) return;
-  const nonScannes = (s.principaux || []).filter(i => !(s.task.scans_lots && s.task.scans_lots[i.id]));
-  const list = nonScannes.map(i => ({
+  const allIngs = s.ingredients || [];
+  if (!allIngs.length) { showToast('Aucun ingrédient à scanner', 'error'); return; }
+  const sourceSet = await pdFetchSourcesSousProduits(s.ficheId);
+  const list = allIngs.map(i => ({
     ingredient_id: i.id,
     article_id_attendu: i.article_id || null,
     nom_attendu: i.nom || '',
     quantite: (i.quantite != null ? i.quantite : ''),
-    unite: i.unite || ''
+    unite: i.unite || '',
+    est_principal: i.est_principal === true,
+    is_source_sous_produit: !!(i.article_id && sourceSet.has(i.article_id))
   }));
-  if (!list.length) { showToast('Tout est déjà scanné', 'success'); return; }
   localStorage.setItem('scan_fefo_context', JSON.stringify({
     task_id: s.task.id,
     fiche_id: s.ficheId,

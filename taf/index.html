@@ -2332,13 +2332,31 @@
   // Construit le contexte (liste des ingrédients à scanner) puis ouvre le
   // scanner en mode rafale : caméra live, un SHOOT par étiquette, le scanner
   // renvoie tous les résultats d'un coup dans scan_fefo_result.
-  function launchBurstScanner(ingredientIds) {
+  // Récupère le set des article_id qui sont SOURCE d'un sous-produit pour cette fiche.
+  // Sert à remonter ces MP en haut du scanner + badge bleu « → sous-produit ».
+  async function fetchSourcesSousProduits(ficheId) {
+    if (!ficheId) return new Set();
+    try {
+      const { data, error } = await supabaseClient
+        .from('fiches_techniques_sous_produits')
+        .select('source_article_id')
+        .eq('fiche_id', ficheId);
+      if (error) throw error;
+      return new Set((data || []).map(r => r.source_article_id).filter(Boolean));
+    } catch (e) {
+      console.warn('[Scan-FEFO] lecture sources sous-produits:', e);
+      return new Set(); // dégradation gracieuse : pas de tri, mais le scan fonctionne
+    }
+  }
+
+  async function launchBurstScanner(ingredientIds) {
     const ctx = window.__currentTafContext || {};
     if (!ctx.task_id) {
       showToast('Erreur : contexte TAF perdu', 'error');
       return;
     }
     const allIngs = window.__currentFicheIngs || [];
+    const sourceSet = await fetchSourcesSousProduits(ctx.fiche_id);
     const list = (ingredientIds || [])
       .map(id => allIngs.find(i => i.id === id))
       .filter(Boolean)
@@ -2347,7 +2365,9 @@
         article_id_attendu: i.article_id || null,
         nom_attendu: i.nom || '',
         quantite: (i.quantite != null ? i.quantite : ''),
-        unite: i.unite || ''
+        unite: i.unite || '',
+        est_principal: i.est_principal === true,
+        is_source_sous_produit: !!(i.article_id && sourceSet.has(i.article_id))
       }));
     if (list.length === 0) {
       showToast('Aucun ingrédient à scanner', 'error');
@@ -2363,13 +2383,12 @@
     window.location.href = '../scanner/?mode=burst&return=taf';
   }
 
-  // Scanne en rafale tous les ingrédients principaux non encore scannés.
+  // Ouvre le scanner avec TOUTE la liste des MP de la fiche (sources sous-produit en tête).
+  // Le bouton « Terminer » du scanner ne se débloque que sur les principaux.
   function scanAllPrincipaux() {
-    const ids = window.__principauxNonScannes || [];
-    if (ids.length > 0) { launchBurstScanner(ids); return; }
-    // Sécurité : si la liste est vide, on rescanne tous les principaux.
     const allIngs = window.__currentFicheIngs || [];
-    launchBurstScanner(allIngs.filter(i => i.est_principal).map(i => i.id));
+    if (allIngs.length === 0) { showToast('Aucun ingrédient à scanner', 'error'); return; }
+    launchBurstScanner(allIngs.map(i => i.id));
   }
 
   // Rétro-compat : scan d'un seul ingrédient (utilisé par le bouton ↻ rescan).
