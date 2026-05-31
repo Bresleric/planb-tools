@@ -79,3 +79,7 @@
 ---
 
 **Le contrat** : Claude Code respecte le `CLAUDE.md` qui est à la racine du repo. Ce playbook est le condensé de toutes les leçons accumulées sur PBT — il évite à Claude Code de répéter les bourdes du passé.
+
+## Journal des sessions
+
+- 31/05/2026 — Premiere session Claude Code testee avec succes. Bascule officielle effective.
