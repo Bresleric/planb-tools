@@ -1048,7 +1048,7 @@
 
   <!-- PRODUCTION MODAL (New Production) -->
   <div class="modal-overlay" id="production-modal" style="display:none;">
-    <div class="modal-box" style="max-width:560px; text-align:left;">
+    <div class="modal-box" style="max-width:560px; text-align:left; max-height:90vh; overflow-y:auto;">
       <h3 style="text-align:center;" id="pd-title">Nouvelle production</h3>
       <!-- Bandeau Production directe : chrono + scanner -->
       <div id="pd-directe-bar" style="display:none; margin-bottom:12px; padding:10px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px;">
@@ -1132,7 +1132,7 @@
         <div class="form-group" id="pd-matieres-section" style="display:none;">
           <label>🥩 Matières premières utilisées</label>
           <div id="pd-matieres-hint" style="font-size:11px; color:#6b7280; margin-bottom:6px;"></div>
-          <div id="pd-matieres-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+          <div id="pd-matieres-list" style="display:flex; flex-direction:column; gap:6px; max-height:40vh; overflow-y:auto; border:1px solid #e5e7eb; border-radius:6px; padding:4px;"></div>
         </div>
         <!-- Actions post-production : checklist obligatoire si la fiche en définit -->
         <div class="form-group" id="p-actions-post-group" style="display:none; background:#fef3c7; border:1px solid #fbbf24; border-radius:8px; padding:10px;">
