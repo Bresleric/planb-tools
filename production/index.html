@@ -905,6 +905,17 @@
           </div>
         </div>
 
+        <!-- Sous-produits issus de cette production (cru -> N produits cuits) - admin only -->
+        <div class="form-group" id="f-sous-produits-group" style="background:#ecfdf5; border:1px solid #6ee7b7; border-radius:8px; padding:10px;">
+          <label style="color:#065f46;">🍱 Sous-produits issus de cette production</label>
+          <div style="font-size:11px; color:#047857; margin-bottom:8px; line-height:1.4;">
+            Une production en cuisine peut donner <b>plusieurs contenants distincts à étiqueter</b> (ex : choucroute garnie → lard salé cuit, gendarmes, palette…).<br>
+            Déclare ici chaque sous-produit attendu : il sera proposé à la validation pour générer une étiquette/un lot par contenant.
+          </div>
+          <div id="sous-produits-rows"></div>
+          <button class="btn-add-ing" id="btn-add-sous-produit" type="button" style="background:#6ee7b7; color:#065f46; border-color:#34d399;">+ Ajouter un sous-produit</button>
+        </div>
+
         <!-- Actions post-production (sous-produits & actions induites) - admin only -->
         <div class="form-group" id="f-actions-post-group" style="background:#fef3c7; border:1px solid #fbbf24; border-radius:8px; padding:10px;">
           <label style="color:#92400e;">♻️ Actions à effectuer après la production</label>
@@ -1855,6 +1866,11 @@ function setupIngredientForm() {
     addActionPostRow();
   });
 
+  // Bouton "+ Ajouter un sous-produit"
+  document.getElementById('btn-add-sous-produit')?.addEventListener('click', () => {
+    addSousProduitRow();
+  });
+
   // Chips de catégorie de fiche : permettre la sélection (Produit fini / intermédiaire / Mise en place)
   document.querySelectorAll('#f-categorie .chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -2465,6 +2481,77 @@ function addActionPostRow(data = {}) {
   container.appendChild(row);
 }
 
+// ====== SOUS-PRODUITS (1 production -> N contenants/etiquettes) ======
+let sousProduitCounter = 0;
+const SP_UNITES = ['kg', 'g', 'L', 'cl', 'ml', 'pièce', 'portion', 'sachet', 'boîte'];
+const SP_CATEGORIES = [
+  { val: 'mise_en_place', label: '🔪 Mise en place' },
+  { val: 'produit_intermediaire', label: '🥘 Produit intermédiaire' },
+  { val: 'produit_fini', label: '✨ Produit fini' },
+];
+
+// Construit les <option> d'un select d'articles appro_ingredients (nullable)
+function spArticleOptions(selectedId, placeholder) {
+  let html = `<option value="">${placeholder}</option>`;
+  html += allArticlesAppro.map(a =>
+    `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${escapeHtmlProd(a.nom)}</option>`
+  ).join('');
+  return html;
+}
+
+function addSousProduitRow(data = {}) {
+  sousProduitCounter++;
+  const container = document.getElementById('sous-produits-rows');
+  if (!container) return;
+  const escapeAttr = (s) => String(s ?? '').replace(/"/g, '&quot;');
+  const cat = data.categorie || '';
+
+  const row = document.createElement('div');
+  row.className = 'sous-produit-row';
+  row.dataset.idx = sousProduitCounter;
+  row.style.cssText = 'display:flex; flex-direction:column; gap:6px; padding:8px; background:white; border:1px solid #a7f3d0; border-radius:6px; margin-bottom:6px;';
+  row.innerHTML = `
+    <div style="display:flex; gap:6px; align-items:center;">
+      <input type="text" class="sp-nom" placeholder="Nom du sous-produit (ex: Lard salé cuit)" value="${escapeAttr(data.nom)}" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #d1d5db; border-radius:4px;">
+      <button type="button" class="btn-remove-sp" title="Supprimer" style="width:30px; height:30px; border:none; background:#fee2e2; color:#dc2626; border-radius:4px; cursor:pointer; font-size:16px; flex-shrink:0;">×</button>
+    </div>
+    <div class="chip-group sp-categorie" style="gap:4px;">
+      ${SP_CATEGORIES.map(c => `<button type="button" class="chip ${c.val === cat ? 'active' : ''}" data-val="${c.val}" style="font-size:11px; padding:4px 8px;">${c.label}</button>`).join('')}
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <select class="sp-source" title="MP crue d origine (pre-remplit la quantite depuis le scan)" style="flex:1; min-width:160px; padding:6px 8px; font-size:12px; border:1px solid #d1d5db; border-radius:4px;">
+        ${spArticleOptions(data.source_article_id || '', '— MP crue source —')}
+      </select>
+      <input type="number" class="sp-ratio" placeholder="Ratio" title="Multiplicateur cru -> cuit (1 = identique, 2 = double)" min="0" step="0.01" value="${data.ratio_transformation ?? 1}" style="width:80px; padding:6px 8px; font-size:12px; border:1px solid #d1d5db; border-radius:4px;">
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <input type="number" class="sp-qty" placeholder="Qté estimée" title="Fallback si pas de source MP scannee" min="0" step="0.01" value="${data.quantite_estimee ?? ''}" style="width:110px; padding:6px 8px; font-size:12px; border:1px solid #d1d5db; border-radius:4px;">
+      <select class="sp-unite" style="width:90px; padding:6px 8px; font-size:12px; border:1px solid #d1d5db; border-radius:4px;">
+        ${SP_UNITES.map(u => `<option value="${u}" ${u === (data.unite || 'kg') ? 'selected' : ''}>${u}</option>`).join('')}
+      </select>
+      <input type="number" class="sp-dlc-jours" placeholder="DLC j" title="DLC en jours" min="0" value="${data.dlc_jours ?? ''}" style="width:80px; padding:6px 8px; font-size:12px; border:1px solid #d1d5db; border-radius:4px;">
+      <input type="number" class="sp-dlc-heures" placeholder="DLC h" title="DLC en heures" min="0" value="${data.dlc_heures ?? ''}" style="width:80px; padding:6px 8px; font-size:12px; border:1px solid #d1d5db; border-radius:4px;">
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <input type="text" class="sp-temp" placeholder="0-4°C (réfrigéré)" value="${escapeAttr(data.temperature_stockage)}" style="width:150px; padding:6px 8px; font-size:12px; border:1px solid #e5e7eb; border-radius:4px;">
+      <input type="text" class="sp-cond" placeholder="GN 1/2 65, sachet sous-vide, …" value="${escapeAttr(data.conditionnement)}" style="flex:1; min-width:160px; padding:6px 8px; font-size:12px; border:1px solid #e5e7eb; border-radius:4px;">
+    </div>
+    <select class="sp-article" title="Article catalogue du sous-produit CUIT (optionnel)" style="width:100%; padding:6px 8px; font-size:12px; border:1px solid #e5e7eb; border-radius:4px; color:#4b5563;">
+      ${spArticleOptions(data.article_id || '', '— Article catalogue cuit (optionnel) —')}
+    </select>
+  `;
+  // Toggle chips catégorie (sélection unique par ligne)
+  row.querySelectorAll('.sp-categorie .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const wasActive = chip.classList.contains('active');
+      row.querySelectorAll('.sp-categorie .chip').forEach(c => c.classList.remove('active'));
+      if (!wasActive) chip.classList.add('active'); // re-clic = désélection (catégorie nullable)
+    });
+  });
+  row.querySelector('.btn-remove-sp').onclick = () => row.remove();
+  container.appendChild(row);
+}
+
 function updateCostSummary() {
   const rows = document.querySelectorAll('.ingredient-row');
   let total = 0;
@@ -2593,6 +2680,41 @@ const DB = {
         cree_par_nom: user?.nom || null,
       }));
       const { error } = await sb.from('fiches_techniques_actions_post').insert(rows);
+      if (error) throw error;
+    }
+  },
+
+  // ====== SOUS-PRODUITS ======
+  async getSousProduits(ficheId) {
+    const { data, error } = await sb
+      .from('fiches_techniques_sous_produits')
+      .select('*')
+      .eq('fiche_id', ficheId)
+      .order('ordre');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async saveSousProduits(ficheId, sousProduits) {
+    // Delete + insert (même pattern que saveIngredients / saveActionsPost)
+    await sb.from('fiches_techniques_sous_produits').delete().eq('fiche_id', ficheId);
+    if (sousProduits.length > 0) {
+      const rows = sousProduits.map((sp, i) => ({
+        fiche_id: ficheId,
+        ordre: i,
+        nom: sp.nom,
+        article_id: sp.article_id || null,
+        source_article_id: sp.source_article_id || null,
+        ratio_transformation: sp.ratio_transformation ?? 1,
+        categorie: sp.categorie || null,
+        quantite_estimee: sp.quantite_estimee ?? null,
+        unite: sp.unite || null,
+        dlc_jours: sp.dlc_jours ?? null,
+        dlc_heures: sp.dlc_heures ?? null,
+        temperature_stockage: sp.temperature_stockage || null,
+        conditionnement: sp.conditionnement || null,
+      }));
+      const { error } = await sb.from('fiches_techniques_sous_produits').insert(rows);
       if (error) throw error;
     }
   },
@@ -3592,6 +3714,19 @@ async function editFiche(id) {
     }
   }
 
+  // Load sous-produits
+  const spContainer = document.getElementById('sous-produits-rows');
+  if (spContainer) {
+    spContainer.innerHTML = '';
+    sousProduitCounter = 0;
+    try {
+      const sousProduits = await DB.getSousProduits(id);
+      sousProduits.forEach(sp => addSousProduitRow(sp));
+    } catch (e) {
+      console.error('Erreur chargement sous-produits:', e);
+    }
+  }
+
   // Update button text
   document.getElementById('btn-save-fiche').textContent = 'Mettre à jour la fiche';
 
@@ -3773,11 +3908,40 @@ async function saveFiche() {
     actionsPost.push({ libelle, type, instructions });
   });
 
+  // Gather sous-produits (admin only — section gated par canEdit ci-dessus)
+  const sousProduits = [];
+  document.querySelectorAll('.sous-produit-row').forEach(r => {
+    const spNom = r.querySelector('.sp-nom').value.trim();
+    if (!spNom) return; // ligne vide ignorée
+    const parseNum = (sel) => {
+      const v = parseFloat(r.querySelector(sel).value);
+      return Number.isFinite(v) ? v : null;
+    };
+    const parseIntOrNull = (sel) => {
+      const v = parseInt(r.querySelector(sel).value, 10);
+      return Number.isFinite(v) ? v : null;
+    };
+    sousProduits.push({
+      nom: spNom,
+      categorie: r.querySelector('.sp-categorie .chip.active')?.dataset.val || null,
+      source_article_id: r.querySelector('.sp-source').value || null,
+      ratio_transformation: parseNum('.sp-ratio') ?? 1,
+      quantite_estimee: parseNum('.sp-qty'),
+      unite: r.querySelector('.sp-unite').value || null,
+      dlc_jours: parseIntOrNull('.sp-dlc-jours'),
+      dlc_heures: parseIntOrNull('.sp-dlc-heures'),
+      temperature_stockage: r.querySelector('.sp-temp').value.trim() || null,
+      conditionnement: r.querySelector('.sp-cond').value.trim() || null,
+      article_id: r.querySelector('.sp-article').value || null,
+    });
+  });
+
   showLoading(true);
   try {
     const saved = await DB.saveFiche(fiche);
     await DB.saveIngredients(saved.id, ingredients);
     await DB.saveActionsPost(saved.id, actionsPost, currentUser);
+    await DB.saveSousProduits(saved.id, sousProduits);
     showToast(editId ? 'Fiche mise à jour' : 'Fiche créée', 'success');
     editingFicheId = null;
     document.getElementById('edit-id').value = '';
@@ -3825,6 +3989,11 @@ function resetForm() {
   const apContainer = document.getElementById('actions-post-rows');
   if (apContainer) apContainer.innerHTML = '';
   actionPostCounter = 0;
+
+  // Sous-produits
+  const spContainer = document.getElementById('sous-produits-rows');
+  if (spContainer) spContainer.innerHTML = '';
+  sousProduitCounter = 0;
 
   // Réinit zone "Cette fiche produit"
   document.getElementById('f-article-id').value = '';
