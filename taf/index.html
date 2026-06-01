@@ -1030,8 +1030,12 @@
 
       <div class="form-group">
         <label>DLC <span style="font-weight:400; color:var(--gray-500); font-size:11px;">(auto si fiche liée — sinon défaut +3 jours)</span></label>
+        <div id="prod-dlc-auto" style="display:none; padding:6px 10px; background:#f0fdf4; border-radius:6px; font-size:0.82rem; margin-bottom:6px;">
+          <span style="color:#16a34a; font-weight:600;">✅ DLC calculée : </span>
+          <span id="prod-dlc-auto-value" style="font-weight:700;"></span>
+        </div>
         <input type="datetime-local" class="form-input" id="prod-dlc-manual">
-        <p style="font-size:11px; color:var(--gray-500); margin-top:4px;">Laisse vide pour une DLC automatique. Renseigne pour forcer une date (utile sans fiche liée).</p>
+        <p style="font-size:11px; color:var(--gray-500); margin-top:4px;">Laisse vide pour utiliser la DLC calculée ci-dessus. Renseigne uniquement pour forcer une autre date.</p>
       </div>
 
       <!-- MATIÈRES PREMIÈRES (apparaît si la fiche a des ingrédients rattachés) -->
@@ -3870,6 +3874,7 @@
     document.getElementById('prod-unite').value = 'kg';
     document.getElementById('prod-observation').value = '';
     document.getElementById('prod-dlc-manual').value = '';
+    document.getElementById('prod-dlc-auto').style.display = 'none';
     document.getElementById('prod-matieres-section').style.display = 'none';
     document.getElementById('prod-matieres-list').innerHTML = '';
     document.getElementById('prod-motif').value = '';
@@ -3926,7 +3931,38 @@
       }
     }
 
+    // Bandeau DLC calculée (calque le pattern production directe) : informe que la
+    // DLC sera calculee a la validation. Le champ manuel reste vide (override seulement).
+    {
+      const curFicheId = document.getElementById('prod-fiche-id').value || null;
+      const curFiche = curFicheId ? productionFiches.find(f => f.id === curFicheId) : null;
+      updateDlcAutoDisplayTaf(curFiche);
+    }
+
     document.getElementById('production-overlay').classList.add('show');
+  }
+
+  // Affiche un bandeau vert "DLC calculee : <date>" au-dessus du champ DLC manuelle.
+  // Calcule depuis la fiche (dlc_jours/heures) ou defaut +3 jours. Ne pre-remplit
+  // PAS le champ manuel : celui-ci ne sert qu a forcer une autre date.
+  function updateDlcAutoDisplayTaf(fiche) {
+    const div = document.getElementById('prod-dlc-auto');
+    const val = document.getElementById('prod-dlc-auto-value');
+    if (!div || !val) return;
+    const now = new Date();
+    let dlcDate, fromDefault = false;
+    if (fiche && fiche.dlc_jours) {
+      dlcDate = new Date(now.getTime() + fiche.dlc_jours * 86400000);
+    } else if (fiche && fiche.dlc_heures) {
+      dlcDate = new Date(now.getTime() + fiche.dlc_heures * 3600000);
+    } else {
+      dlcDate = new Date(now.getTime() + 3 * 86400000);
+      fromDefault = true;
+    }
+    val.textContent = dlcDate.toLocaleDateString('fr-FR', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+    }) + (fromDefault ? ' (défaut +3 j)' : '');
+    div.style.display = '';
   }
 
   // Setup choix produit (clic sur les 2 boutons)
@@ -3959,6 +3995,7 @@
       document.getElementById('prod-motif').focus();
       // Pas de fiche → pas de checklist d'actions post
       loadActionsPostForProd(null);
+      updateDlcAutoDisplayTaf(null); // bandeau DLC = defaut +3 jours (pas de fiche)
     });
 
     // Autocomplete fiches
@@ -4003,6 +4040,7 @@
               if (f.rendement_quantite) document.getElementById('prod-quantite').value = f.rendement_quantite;
               if (f.rendement_unite) document.getElementById('prod-unite').value = f.rendement_unite;
               prodFicheRendement = f.rendement_quantite || null;
+              updateDlcAutoDisplayTaf(f); // recalcul du bandeau DLC sur la fiche choisie
               await loadProductionMatieres(f.id);
               await loadActionsPostForProd(f.id);
             });
