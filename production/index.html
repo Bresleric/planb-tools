@@ -1087,7 +1087,7 @@
             <button class="chip" data-val="produit_fini">✨ Produit fini</button>
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="pd-qty-row">
           <div class="form-group">
             <label>Quantité *</label>
             <input type="number" class="form-input" id="p-quantite" min="0" step="0.1" placeholder="10">
@@ -1108,7 +1108,7 @@
             </select>
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="pd-dlc-group">
           <label>DLC</label>
           <div id="p-dlc-auto" style="display:none; padding:6px 10px; background:#f0fdf4; border-radius:6px; font-size:0.82rem; margin-bottom:6px;">
             <span style="color:#16a34a; font-weight:600;">✅ DLC calculée : </span>
@@ -1127,6 +1127,14 @@
         <div class="form-group">
           <label>Observation</label>
           <textarea class="form-textarea" id="p-observation" rows="2" placeholder="Notes..."></textarea>
+        </div>
+        <!-- Sous-produits a etiqueter (Phase 3 : mode multi si la fiche en declare) -->
+        <div class="form-group" id="pd-sous-produits-section" style="display:none; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:8px; padding:10px;">
+          <label style="color:#065f46;">🍱 Sous-produits à étiqueter</label>
+          <div style="font-size:11px; color:#047857; margin-bottom:8px; line-height:1.4;">
+            Cette fiche produit plusieurs contenants : chacun aura sa propre étiquette. Les poids sont pré-remplis depuis les matières scannées — ajuste si besoin.
+          </div>
+          <div id="pd-sous-produits-list" style="display:flex; flex-direction:column; gap:8px;"></div>
         </div>
         <!-- Récap MP (Production directe) : lots décomptés du stock -->
         <div class="form-group" id="pd-matieres-section" style="display:none;">
@@ -5568,6 +5576,8 @@ async function pdOpenProductionModalForACreer(motif, task) {
   // Masquer la section MP (pas de fiche, pas d'ingrédients)
   const matSec = document.getElementById('pd-matieres-section');
   if (matSec) matSec.style.display = 'none';
+  // Mode mono force (pas de fiche -> pas de sous-produits)
+  pdApplyMultiMode([], {});
   pdRefreshDirecteBar();
   document.getElementById('production-modal').style.display = 'flex';
 }
@@ -5676,6 +5686,19 @@ async function pdOpenProductionModalForFiche(fiche, task) {
   pdMatieresEditMode = false;
   await pdLoadProductionMatieres(fiche.id, pdScannedLots);
 
+  // Sous-produits (Phase 3) : bascule mode multi si la fiche en declare.
+  // Le prefill des qty se base sur les scans persistes (s.task.scans_lots), donc
+  // se met a jour quand la modale se re-ouvre apres un scan (pdProcessScanReturn).
+  try {
+    const sousProduits = await getSousProduitsCached(fiche.id);
+    if (window.__pdSession) window.__pdSession.sousProduits = sousProduits;
+    const scansLots = (window.__pdSession && window.__pdSession.task && window.__pdSession.task.scans_lots) || pdScannedLots || {};
+    pdApplyMultiMode(sousProduits, scansLots);
+  } catch (e) {
+    console.warn('[sous-produits] setup modale:', e);
+    pdApplyMultiMode([], {});
+  }
+
   // Afficher la modale
   document.getElementById('production-modal').style.display = 'flex';
 }
@@ -5697,6 +5720,105 @@ function pdResetSession() {
   if (sec) sec.style.display = 'none';
   const list = document.getElementById('pd-matieres-list');
   if (list) list.innerHTML = '';
+  // Restaurer le mode mono (qty/DLC visibles, section sous-produits masquee)
+  pdApplyMultiMode([], {});
+}
+
+// ===== SOUS-PRODUITS (Phase 3 — production directe multi) =====
+const _sousProduitsCache = {};
+async function getSousProduitsCached(ficheId) {
+  if (!ficheId) return [];
+  if (_sousProduitsCache[ficheId]) return _sousProduitsCache[ficheId];
+  try {
+    const data = await DB.getSousProduits(ficheId);
+    _sousProduitsCache[ficheId] = data || [];
+    return _sousProduitsCache[ficheId];
+  } catch (e) {
+    console.warn('[sous-produits] lecture:', e);
+    return [];
+  }
+}
+
+// Map article_id -> Σ poids_net_kg (lot principal + lots supplementaires), puis
+// qty pre-remplie par sous-produit : Σ poids x ratio, sinon fallback quantite_estimee.
+function computeSousProduitQtys(sousProduits, scansLots) {
+  const poidsByArticle = {};
+  Object.values(scansLots || {}).forEach(sc => {
+    if (!sc) return;
+    const addPoids = (e) => {
+      if (!e || !e.article_id) return;
+      const p = parseFloat(e.poids_net_kg);
+      if (!Number.isFinite(p)) return;
+      poidsByArticle[e.article_id] = (poidsByArticle[e.article_id] || 0) + p;
+    };
+    addPoids(sc);
+    (sc.lots_supplementaires || []).forEach(addPoids);
+  });
+  return (sousProduits || []).map(sp => {
+    let qty;
+    if (sp.source_article_id && poidsByArticle[sp.source_article_id] != null) {
+      qty = poidsByArticle[sp.source_article_id] * (sp.ratio_transformation != null ? sp.ratio_transformation : 1);
+      qty = Math.round(qty * 100) / 100;
+    } else {
+      qty = (sp.quantite_estimee != null ? sp.quantite_estimee : '');
+    }
+    return { ...sp, _qtyPrefill: qty };
+  });
+}
+
+// Rendu des blocs editables sous-produits dans la modale production directe.
+function pdRenderSousProduits(sousProduits, scansLots) {
+  const section = document.getElementById('pd-sous-produits-section');
+  const list = document.getElementById('pd-sous-produits-list');
+  if (!section || !list) return;
+  if (!sousProduits || !sousProduits.length) {
+    section.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  const withQty = computeSousProduitQtys(sousProduits, scansLots);
+  const now = new Date();
+  list.innerHTML = withQty.map(sp => {
+    let dlcDate;
+    if (sp.dlc_jours) dlcDate = new Date(now.getTime() + sp.dlc_jours * 86400000);
+    else if (sp.dlc_heures) dlcDate = new Date(now.getTime() + sp.dlc_heures * 3600000);
+    else dlcDate = new Date(now.getTime() + 3 * 86400000);
+    const dlcLocal = formatDateTimeLocal(dlcDate);
+    const unite = sp.unite || 'kg';
+    return `
+      <div class="pd-sous-produit-row" data-sp-nom="${escapeHtml(sp.nom)}" data-sp-unite="${escapeHtml(unite)}" data-sp-article-id="${sp.article_id || ''}"
+           style="background:white; border:1px solid #a7f3d0; border-radius:6px; padding:8px;">
+        <div style="font-weight:700; font-size:15px; color:#065f46; margin-bottom:6px;">${escapeHtml(sp.nom)}</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="flex:1; min-width:90px;">
+            <label style="font-size:10px; color:#6b7280; display:block;">Quantité</label>
+            <input type="number" class="pd-sp-qty" min="0" step="0.01" value="${sp._qtyPrefill}"
+                   style="width:100%; padding:6px 8px; font-size:14px; border:1px solid #d1d5db; border-radius:4px;">
+          </div>
+          <div style="width:80px;">
+            <label style="font-size:10px; color:#6b7280; display:block;">Unité</label>
+            <input type="text" class="pd-sp-unite-disp" value="${escapeHtml(unite)}" readonly
+                   style="width:100%; padding:6px 8px; font-size:14px; border:1px solid #e5e7eb; border-radius:4px; background:#f9fafb; color:#6b7280;">
+          </div>
+          <div style="flex:1; min-width:150px;">
+            <label style="font-size:10px; color:#6b7280; display:block;">DLC</label>
+            <input type="datetime-local" class="pd-sp-dlc" value="${dlcLocal}"
+                   style="width:100%; padding:6px 8px; font-size:13px; border:1px solid #d1d5db; border-radius:4px;">
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+  section.style.display = '';
+}
+
+// Bascule mode multi (sous-produits) vs mono. En multi : masque qty/DLC globaux.
+function pdApplyMultiMode(sousProduits, scansLots) {
+  const multi = !!(sousProduits && sousProduits.length);
+  const qtyRow = document.getElementById('pd-qty-row');
+  const dlcGroup = document.getElementById('pd-dlc-group');
+  if (qtyRow) qtyRow.style.display = multi ? 'none' : '';
+  if (dlcGroup) dlcGroup.style.display = multi ? 'none' : '';
+  pdRenderSousProduits(multi ? sousProduits : [], scansLots || {});
 }
 
 // ===== 3. CHRONO =====
@@ -6397,6 +6519,9 @@ try { saveProduction = async function pdSaveProductionWrapper() {
     return _pdOriginalSaveProduction();
   }
   const isACreer = (s.mode === 'a_creer');
+  // Mode multi sous-produits : la fiche declare des sous-produits a etiqueter
+  const sousProduits = (s.sousProduits || []);
+  const isMulti = !isACreer && sousProduits.length > 0;
   // Garde-fou B-2 (mode fiche uniquement) : tous les principaux doivent être scannés
   if (!isACreer) {
     const scansLots = (s.task && s.task.scans_lots) || {};
@@ -6421,7 +6546,8 @@ try { saveProduction = async function pdSaveProductionWrapper() {
   const observation = document.getElementById('p-observation').value.trim();
   const categoryChip = document.querySelector('#p-categorie .chip.active');
   const categorie = categoryChip?.dataset.val;
-  if (!nom || !quantite || !categorie) {
+  // En mode multi, la quantite globale est portee par chaque sous-produit (champ masque)
+  if (!nom || !categorie || (!isMulti && !quantite)) {
     showToast('Remplissez nom, quantité et catégorie', 'error');
     return;
   }
@@ -6458,35 +6584,104 @@ try { saveProduction = async function pdSaveProductionWrapper() {
   try {
     const dateStr = selectedProductionDate || formatDateForInput(new Date());
     const now = new Date();
-    let dlc = null;
-    const dlcManualVal = document.getElementById('p-dlc-manual').value;
-    if (dlcManualVal) dlc = new Date(dlcManualVal).toISOString();
-    else if (fiche && fiche.dlc_jours) dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
-    else if (fiche && fiche.dlc_heures) dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
-    else dlc = new Date(now.getTime() + 3 * 86400000).toISOString();
-    const codeProduct = fiche?.code_court || generateCodeFromName(nom.toUpperCase());
-    const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
-    allLots.push(lot);
-    const productionPayload = {
-      fiche_id: s.ficheId || null,
-      a_creer_motif: isACreer ? (s.motif || null) : null,
-      lot_id: lot.id,
-      nom_produit: nom,
-      categorie: categorie,
-      quantite_produite: quantite,
-      unite: unite,
-      date_production: now.toISOString(),
-      dlc: dlc,
-      temperature_stockage: fiche?.temperature_stockage || null,
-      producteur_id: currentUser.id,
-      producteur_nom: currentUser.nom,
-      producteur_initiales: currentUser.initiales || null,
-      tache_id: s.task.id,
-      statut: 'termine',
-      observation: observation || null,
-      etablissement: currentEtablissement
-    };
-    const saved = await DB.createProduction(productionPayload);
+    let saved;
+    if (isMulti) {
+      // ===== Mode multi : 1 production mere + N productions filles (sous-produits) =====
+      const spData = [];
+      document.querySelectorAll('.pd-sous-produit-row').forEach(r => {
+        const q = parseFloat(r.querySelector('.pd-sp-qty').value);
+        const dlcVal = r.querySelector('.pd-sp-dlc').value;
+        spData.push({
+          nom: r.dataset.spNom,
+          unite: r.dataset.spUnite || 'kg',
+          quantite: Number.isFinite(q) ? q : 0,
+          dlc: dlcVal ? new Date(dlcVal).toISOString() : null,
+        });
+      });
+      // DLC mere = la plus longue des filles, sinon today + 1 jour
+      let motherDlc = null;
+      spData.forEach(sp => { if (sp.dlc && (!motherDlc || sp.dlc > motherDlc)) motherDlc = sp.dlc; });
+      if (!motherDlc) motherDlc = new Date(now.getTime() + 86400000).toISOString();
+      const motherCode = fiche?.code_court || generateCodeFromName(nom.toUpperCase());
+      const motherLot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, motherDlc, motherCode);
+      allLots.push(motherLot);
+      saved = await DB.createProduction({
+        fiche_id: s.ficheId || null,
+        a_creer_motif: null,
+        lot_id: motherLot.id,
+        nom_produit: nom,
+        categorie: categorie,
+        quantite_produite: 1,
+        unite: 'production',
+        date_production: now.toISOString(),
+        dlc: motherDlc,
+        temperature_stockage: fiche?.temperature_stockage || null,
+        producteur_id: currentUser.id,
+        producteur_nom: currentUser.nom,
+        producteur_initiales: currentUser.initiales || null,
+        tache_id: s.task.id,
+        statut: 'termine',
+        observation: observation || null,
+        etablissement: currentEtablissement
+      });
+      // Filles : 1 lot + 1 production par sous-produit, rattachees a la mere
+      for (const sp of spData) {
+        const childCode = generateCodeFromName((sp.nom || 'SP').toUpperCase());
+        const childDlc = sp.dlc || motherDlc;
+        const childLot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, childDlc, childCode);
+        allLots.push(childLot);
+        await DB.createProduction({
+          fiche_id: s.ficheId || null,
+          a_creer_motif: null,
+          lot_id: childLot.id,
+          nom_produit: sp.nom,
+          categorie: categorie,
+          quantite_produite: sp.quantite,
+          unite: sp.unite,
+          date_production: now.toISOString(),
+          dlc: childDlc,
+          temperature_stockage: fiche?.temperature_stockage || null,
+          producteur_id: currentUser.id,
+          producteur_nom: currentUser.nom,
+          producteur_initiales: currentUser.initiales || null,
+          tache_id: s.task.id,
+          statut: 'termine',
+          observation: null,
+          parent_production_id: saved.id,
+          etablissement: currentEtablissement
+        });
+      }
+    } else {
+      // ===== Mode mono (inchange) =====
+      let dlc = null;
+      const dlcManualVal = document.getElementById('p-dlc-manual').value;
+      if (dlcManualVal) dlc = new Date(dlcManualVal).toISOString();
+      else if (fiche && fiche.dlc_jours) dlc = new Date(now.getTime() + fiche.dlc_jours * 86400000).toISOString();
+      else if (fiche && fiche.dlc_heures) dlc = new Date(now.getTime() + fiche.dlc_heures * 3600000).toISOString();
+      else dlc = new Date(now.getTime() + 3 * 86400000).toISOString();
+      const codeProduct = fiche?.code_court || generateCodeFromName(nom.toUpperCase());
+      const lot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
+      allLots.push(lot);
+      saved = await DB.createProduction({
+        fiche_id: s.ficheId || null,
+        a_creer_motif: isACreer ? (s.motif || null) : null,
+        lot_id: lot.id,
+        nom_produit: nom,
+        categorie: categorie,
+        quantite_produite: quantite,
+        unite: unite,
+        date_production: now.toISOString(),
+        dlc: dlc,
+        temperature_stockage: fiche?.temperature_stockage || null,
+        producteur_id: currentUser.id,
+        producteur_nom: currentUser.nom,
+        producteur_initiales: currentUser.initiales || null,
+        tache_id: s.task.id,
+        statut: 'termine',
+        observation: observation || null,
+        etablissement: currentEtablissement
+      });
+    }
 
     // Actions post-production
     if (apLogEntries.length > 0) {
@@ -6545,6 +6740,11 @@ try { saveProduction = async function pdSaveProductionWrapper() {
     showToast('Production enregistrée ✓ (durée ' + pdFormatDureeLive(dureeFinale) + ')', 'success');
     pdResetSession();
     closeProductionModal();
+    if (isMulti) {
+      // Le handler ?prod_id&action=etiquette (commit a) detecte les filles -> PDF N pages
+      window.location.href = '../production/?prod_id=' + saved.id + '&action=etiquette';
+      return;
+    }
     await loadProductions();
     showEtiquette(saved);
   } catch (e) {

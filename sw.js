@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v12';   // bump à chaque mise à jour du SW (v12 : bandeau DLC calculee modale production TAF 31/05/2026)
+const CACHE_NAME = 'planb-tools-v13';   // bump à chaque mise à jour du SW (v13 : production directe multi sous-produits 31/05/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
