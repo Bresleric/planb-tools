@@ -1461,6 +1461,7 @@ function init() {
   loadArticlesAppro();
   loadFiches();
   loadProductions();
+  handleEtiquetteParam(); // retour TAF -> ouverture etiquette (mono ou multi sous-produits)
 
   // Affiche l'onglet "Fiches" uniquement aux admins (référentiel structurant)
   const tabBtnFiches = document.getElementById('tab-btn-fiches');
@@ -2744,6 +2745,7 @@ const DB = {
       .from('productions')
       .select('*')
       .eq('etablissement', currentEtablissement)
+      .is('parent_production_id', null) // masquer les filles (sous-produits) de la liste principale
       .gte('date_production', startOfDay)
       .lte('date_production', endOfDay)
       .order('created_at', { ascending: false });
@@ -4790,6 +4792,199 @@ function printEtiquette(productionId) {
   document.open();
   document.write(printDoc);
   document.close();
+}
+
+// ====== ÉTIQUETTES MULTI (sous-produits) ======
+// Construit l objet de donnees d une etiquette a partir d une production + son lot.
+// Memes champs que ceux extraits dans printEtiquette (mono).
+function buildEtiquettePdfData(production, lot) {
+  const lotNum = lot?.numero_lot || '—';
+  const etabNames = { freddy: 'FR', liesel: 'LI' };
+  const etabShort = etabNames[currentEtablissement] || currentEtablissement.substring(0, 2).toUpperCase();
+  const prodDate = new Date(production.date_production || production.created_at);
+  const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+  const dayName = JOURS[prodDate.getDay()];
+  const dayClass = prodDate.getDay() % 2 === 0 ? 'day-red' : 'day-black';
+  const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  let dlcStr = '—';
+  if (production.dlc) {
+    dlcStr = new Date(production.dlc).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+  const qte = production.quantite_produite ?? '';
+  const unite = production.unite || '';
+  const producteur = production.producteur_initiales || '—';
+  const produit = production.nom_produit || '';
+  return { dayName, dayClass, etabShort, produit, lotNum, qte, unite, producteur, prodDateStr, dlcStr };
+}
+
+// Genere un PDF N pages (1 etiquette 62x89 par entree) et l ouvre dans Safari
+// pour partage vers Brother iPrint&Label. entries = [{ production, lot }].
+function printEtiquettesMulti(entries) {
+  if (!entries || !entries.length) { showToast('Aucune étiquette à imprimer', 'error'); return; }
+  const list = entries.map(e => buildEtiquettePdfData(e.production, e.lot));
+  const N = list.length;
+  const rowsHtml = list.map(d =>
+    '<li><b>' + escapeHtml(d.produit) + '</b> — ' + escapeHtml(String(d.qte)) + escapeHtml(d.unite)
+    + ' · Lot ' + escapeHtml(d.lotNum) + ' · DLC ' + escapeHtml(d.dlcStr) + '</li>'
+  ).join('');
+
+  const printDoc = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title> </title>
+<style>
+  @page { size: 62mm 100mm; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:#f3f4f6; color:#111827;
+    font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; }
+  .wrap { max-width:480px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+  h1 { font-size:1.05rem; color:#374151; margin:0; text-align:center; }
+  ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  li { background:white; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:13px; color:#374151; }
+  .actions { display:flex; flex-direction:column; gap:10px; }
+  .btn { padding:14px 20px; border:0; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; }
+  .btn.print { background:#9333ea; color:white; }
+  .btn.back { background:#e5e7eb; color:#374151; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>${N} étiquettes prêtes à imprimer</h1>
+    <ul>${rowsHtml}</ul>
+    <div class="actions">
+      <button id="btnPrintPdf" class="btn print" onclick="genererEtImprimerPdf()">🖨 Imprimer les ${N} étiquettes</button>
+      <button class="btn back" onclick="history.back()">← Retour</button>
+    </div>
+  </div>
+  <script>
+    var pdfDataList = ${JSON.stringify(list).replace(/</g, '\\u003c')};
+
+    function loadJsPDF() {
+      if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        s.onload = function () { resolve(); };
+        s.onerror = function () { reject(new Error('jsPDF KO')); };
+        document.head.appendChild(s);
+      });
+    }
+
+    // Dessine une etiquette 89x62mm (paysage) dans le doc fourni — meme layout que le mono.
+    function drawLabel(doc, d) {
+      var W = 89, H = 62, PAD = 3;
+      var ROW1_TOP = PAD, SEP1_Y = 22, ROW2_TOP = 22, SEP2_Y = 40, ROW3_TOP = 40, ROW3_BOT = H - PAD;
+      var badgeW = 30, badgeH = 11, badgeX = PAD;
+      var badgeY = ROW1_TOP + ((SEP1_Y - ROW1_TOP) - badgeH) / 2;
+      if (d.dayClass === 'day-red') {
+        doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.5);
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'S');
+        doc.setTextColor(221, 0, 0);
+      } else {
+        doc.setFillColor(0, 0, 0);
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
+        doc.setTextColor(255, 255, 255);
+      }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2, { align: 'center' });
+      doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 1.8, { align: 'right' });
+      var etabW = doc.getTextWidth(d.etabShort);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
+      var productText = d.produit; var productX = badgeX + badgeW + 2;
+      var productMaxW = (W - PAD - etabW - 2) - productX;
+      while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) productText = productText.slice(0, -1);
+      doc.text(productText, productX, badgeY + badgeH / 2 + 2.5);
+      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5); doc.line(PAD, SEP1_Y, W - PAD, SEP1_Y);
+      var row2BaseY = ROW2_TOP + (SEP2_Y - ROW2_TOP) / 2 + 2;
+      doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      var lotText = 'Lot:' + d.lotNum; doc.text(lotText, PAD, row2BaseY);
+      var lotW = doc.getTextWidth(lotText);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.text('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text(d.producteur, W - PAD, row2BaseY, { align: 'right' });
+      doc.setLineWidth(0.5); doc.line(PAD, SEP2_Y, W - PAD, SEP2_Y);
+      var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 3;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      doc.text('P:' + d.prodDateStr, PAD, row3BaseY);
+      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      var dlcW = doc.getTextWidth(d.dlcStr); var dlcX = W - PAD - dlcW;
+      doc.text(d.dlcStr, dlcX, row3BaseY);
+      doc.setFontSize(8); var dlcLabelW = doc.getTextWidth('DLC');
+      doc.text('DLC', dlcX - dlcLabelW - 1, row3BaseY - 2);
+    }
+
+    function genererPdfBlob(liste) {
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [62, 89] });
+      for (var i = 0; i < liste.length; i++) {
+        if (i > 0) doc.addPage([62, 89], 'landscape');
+        drawLabel(doc, liste[i]);
+      }
+      return doc.output('blob');
+    }
+
+    async function genererEtImprimerPdf() {
+      var btn = document.getElementById('btnPrintPdf');
+      btn.disabled = true;
+      btn.textContent = '⏳ Génération PDF...';
+      try {
+        await loadJsPDF();
+        var blob = genererPdfBlob(pdfDataList);
+        var url = URL.createObjectURL(blob);
+        window.location.href = url;
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '🖨 Imprimer les ${N} étiquettes';
+        alert('Erreur génération PDF : ' + e.message);
+      }
+    }
+  <\/script>
+</body>
+</html>`;
+
+  entries.forEach(e => { if (e.production && e.production.id) DB.markEtiquetteImprimee(e.production.id).catch(() => {}); });
+  document.open();
+  document.write(printDoc);
+  document.close();
+}
+
+// Handler du parametre ?prod_id=X&action=etiquette (retour TAF -> production).
+// Si la production a des filles (sous-produits) -> PDF multi-pages, sinon mono.
+async function handleEtiquetteParam() {
+  let params;
+  try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+  const prodId = params.get('prod_id');
+  if (!prodId || params.get('action') !== 'etiquette') return;
+  // Nettoyer l URL pour eviter un re-declenchement au reload
+  try { history.replaceState({}, '', window.location.pathname + window.location.hash); } catch (e) {}
+  try {
+    const { data: mother, error } = await sb.from('productions').select('*').eq('id', prodId).single();
+    if (error || !mother) { showToast('Production introuvable', 'error'); return; }
+    const { data: filles } = await sb.from('productions')
+      .select('*').eq('parent_production_id', prodId).order('created_at');
+    const all = (filles && filles.length) ? filles : [mother];
+    const lotIds = [...new Set(all.map(p => p.lot_id).filter(Boolean))];
+    const lotsById = {};
+    if (lotIds.length) {
+      const { data: lots } = await sb.from('lots_production').select('*').in('id', lotIds);
+      (lots || []).forEach(l => {
+        lotsById[l.id] = l;
+        if (!allLots.find(x => x.id === l.id)) allLots.push(l);
+      });
+    }
+    if (filles && filles.length) {
+      printEtiquettesMulti(all.map(p => ({ production: p, lot: lotsById[p.lot_id] || null })));
+    } else {
+      showEtiquette(mother);
+    }
+  } catch (e) {
+    console.error('[etiquette param]', e);
+    showToast('Erreur ouverture étiquette', 'error');
+  }
 }
 
 async function markEtiquetteOk(productionId) {
