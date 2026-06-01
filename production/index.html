@@ -4787,6 +4787,12 @@ function printEtiquette(productionId) {
         alert('Erreur génération PDF : ' + e.message);
       }
     }
+    // Retour depuis le PDF (Safari back / bfcache) : reinitialiser le bouton,
+    // sinon il reste fige sur "Generation PDF..." et parait inutile.
+    window.addEventListener('pageshow', function () {
+      var b = document.getElementById('btnPrintPdf');
+      if (b) { b.disabled = false; b.textContent = '🖨 Imprimer l\\'étiquette'; }
+    });
   <\/script>
 </body>
 </html>`;
@@ -4950,6 +4956,12 @@ function printEtiquettesMulti(entries) {
         alert('Erreur génération PDF : ' + e.message);
       }
     }
+    // Retour depuis le PDF (Safari back / bfcache) : reinitialiser le bouton,
+    // sinon il reste fige sur "Generation PDF..." et parait inutile.
+    window.addEventListener('pageshow', function () {
+      var b = document.getElementById('btnPrintPdf');
+      if (b) { b.disabled = false; b.textContent = '🖨 Imprimer les ${N} étiquettes'; }
+    });
   <\/script>
 </body>
 </html>`;

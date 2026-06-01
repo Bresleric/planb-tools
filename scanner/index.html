@@ -104,7 +104,7 @@
     .burst-step { font-size:12px; font-weight:700; color:#92400e; text-transform:uppercase; letter-spacing:.4px; }
     .burst-ing { font-size:19px; font-weight:800; color:#78350f; margin-top:2px; }
     .burst-ing small { font-size:13px; font-weight:600; color:#92400e; }
-    .burst-cam-wrap { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; margin-bottom:8px; }
+    .burst-cam-wrap { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; margin:0 auto 8px; max-width:480px; }
     #burst-video, #sburst-video { width:100%; height:auto; display:block; }
     .burst-frame { position:absolute; left:5%; right:5%; top:22%; bottom:22%; border:3px solid #22d3ee; border-radius:8px; box-shadow:0 0 0 9999px rgba(0,0,0,.38); pointer-events:none; }
     .burst-flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
@@ -114,6 +114,18 @@
     .btn-shoot { background:var(--primary); color:#fff; font-size:20px; font-weight:800; padding:22px; border:none; border-radius:var(--radius); width:100%; min-height:80px; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; }
     .btn-shoot:active { transform:scale(.98); background:var(--primary-dark); }
     .btn-shoot[disabled] { opacity:.5; }
+    /* Barre SHOOT fixe en bas — toujours accessible sans scroller, au-dessus de la barre Safari */
+    .burst-shoot-bar {
+      position:fixed; left:0; right:0; bottom:0; z-index:50;
+      display:flex; gap:10px; align-items:center;
+      padding:10px 16px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+      background:rgba(255,255,255,.97); border-top:1px solid var(--gray-200);
+      box-shadow:0 -4px 14px rgba(0,0,0,.10);
+    }
+    .burst-shoot-bar .btn-shoot { flex:1; width:auto; min-height:60px; padding:16px; margin:0; font-size:18px; }
+    .burst-shoot-bar .burst-shoot-back { flex:0 0 auto; width:auto; margin:0; padding:14px 16px; }
+    /* Espace reserve sous le contenu camera pour que la barre fixe ne masque rien */
+    .burst-cam-spacer { height:104px; }
     .burst-results { display:flex; flex-direction:column; gap:8px; margin:12px 0; }
     .burst-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; }
     .burst-row.ok { background:#dcfce7; border:1px solid #86efac; }
@@ -542,8 +554,12 @@
             <div class="burst-flash" id="burst-flash"></div>
           </div>
           <div class="burst-hint" id="burst-hint">Placez l'étiquette dans le cadre, puis appuyez sur SHOOT</div>
-          <button class="btn-shoot" id="btn-burst-shoot"><span>📸</span><span>SHOOT</span></button>
-          <button class="btn btn-ghost" id="btn-burst-back-list" style="margin-top:8px;">← Retour à la liste</button>
+          <div class="burst-cam-spacer"></div>
+          <!-- Barre fixe en bas : retour liste + SHOOT, toujours visible -->
+          <div class="burst-shoot-bar">
+            <button class="btn btn-ghost burst-shoot-back" id="btn-burst-back-list">← Liste</button>
+            <button class="btn-shoot" id="btn-burst-shoot"><span>📸</span><span>SHOOT</span></button>
+          </div>
         </div>
       </div>
 
