@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v10';   // bump à chaque mise à jour du SW (v10 : etiquettes multi-pages sous-produits + handler prod_id 31/05/2026)
+const CACHE_NAME = 'planb-tools-v11';   // bump à chaque mise à jour du SW (v11 : fix DLC vide etiquette production depuis TAF sans fiche 31/05/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

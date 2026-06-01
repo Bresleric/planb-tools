@@ -1028,6 +1028,12 @@
         <textarea class="form-textarea" id="prod-observation" rows="2" placeholder="Notes..."></textarea>
       </div>
 
+      <div class="form-group">
+        <label>DLC <span style="font-weight:400; color:var(--gray-500); font-size:11px;">(auto si fiche liée — sinon défaut +3 jours)</span></label>
+        <input type="datetime-local" class="form-input" id="prod-dlc-manual">
+        <p style="font-size:11px; color:var(--gray-500); margin-top:4px;">Laisse vide pour une DLC automatique. Renseigne pour forcer une date (utile sans fiche liée).</p>
+      </div>
+
       <!-- MATIÈRES PREMIÈRES (apparaît si la fiche a des ingrédients rattachés) -->
       <div class="form-group" id="prod-matieres-section" style="display:none;">
         <label>📦 Matières premières utilisées</label>
@@ -3863,6 +3869,7 @@
     document.getElementById('prod-quantite').value = '';
     document.getElementById('prod-unite').value = 'kg';
     document.getElementById('prod-observation').value = '';
+    document.getElementById('prod-dlc-manual').value = '';
     document.getElementById('prod-matieres-section').style.display = 'none';
     document.getElementById('prod-matieres-list').innerHTML = '';
     document.getElementById('prod-motif').value = '';
@@ -4590,18 +4597,23 @@
     try {
       const today = dateStr(filterDate);
 
-      // Calculer DLC si fiche liée
+      // DLC : priorite saisie manuelle > fiche (dlc_jours/heures) > defaut +3 jours
+      // (aligne sur la production directe pour ne jamais laisser une DLC vide sur l etiquette)
+      const dlcManualVal = document.getElementById('prod-dlc-manual')?.value;
       let dlc = null;
       let tempStock = null;
-      if (ficheId && productionFiches.length > 0) {
-        const fiche = productionFiches.find(f => f.id === ficheId);
-        if (fiche) {
-          const now2 = new Date();
-          if (fiche.dlc_jours) dlc = new Date(now2.getTime() + fiche.dlc_jours * 86400000).toISOString();
-          else if (fiche.dlc_heures) dlc = new Date(now2.getTime() + fiche.dlc_heures * 3600000).toISOString();
-          tempStock = fiche.temperature_stockage || null;
-        }
+      const now2 = new Date();
+      const ficheDlc = (ficheId && productionFiches.length > 0)
+        ? productionFiches.find(f => f.id === ficheId) : null;
+      if (ficheDlc) tempStock = ficheDlc.temperature_stockage || null;
+      if (dlcManualVal) {
+        dlc = new Date(dlcManualVal).toISOString();
+      } else if (ficheDlc && ficheDlc.dlc_jours) {
+        dlc = new Date(now2.getTime() + ficheDlc.dlc_jours * 86400000).toISOString();
+      } else if (ficheDlc && ficheDlc.dlc_heures) {
+        dlc = new Date(now2.getTime() + ficheDlc.dlc_heures * 3600000).toISOString();
       }
+      if (!dlc) dlc = new Date(now2.getTime() + 3 * 86400000).toISOString();
 
       // Code produit : code_court de la fiche, ou généré depuis le nom
       const ficheForCode = ficheId ? productionFiches.find(f => f.id === ficheId) : null;
