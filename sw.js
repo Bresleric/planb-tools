@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v14';   // bump à chaque mise à jour du SW (v14 : scanner barre SHOOT fixe + cadrage paysage + reset bouton PDF 01/06/2026)
+const CACHE_NAME = 'planb-tools-v15';   // bump à chaque mise à jour du SW (v15 : validation production TAF multi sous-produits 01/06/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

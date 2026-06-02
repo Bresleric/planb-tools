@@ -1002,7 +1002,7 @@
           <button class="chip" data-val="produit_fini" onclick="selectProdCat(this)">✨ Produit fini</button>
         </div>
       </div>
-      <div class="production-form-row">
+      <div class="production-form-row" id="prod-qty-row">
         <div class="form-group">
           <label>Quantité *</label>
           <input type="number" class="form-input" id="prod-quantite" min="0" step="0.1" placeholder="10">
@@ -1028,7 +1028,7 @@
         <textarea class="form-textarea" id="prod-observation" rows="2" placeholder="Notes..."></textarea>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" id="prod-dlc-group">
         <label>DLC <span style="font-weight:400; color:var(--gray-500); font-size:11px;">(auto si fiche liée — sinon défaut +3 jours)</span></label>
         <div id="prod-dlc-auto" style="display:none; padding:6px 10px; background:#f0fdf4; border-radius:6px; font-size:0.82rem; margin-bottom:6px;">
           <span style="color:#16a34a; font-weight:600;">✅ DLC calculée : </span>
@@ -1036,6 +1036,15 @@
         </div>
         <input type="datetime-local" class="form-input" id="prod-dlc-manual">
         <p style="font-size:11px; color:var(--gray-500); margin-top:4px;">Laisse vide pour utiliser la DLC calculée ci-dessus. Renseigne uniquement pour forcer une autre date.</p>
+      </div>
+
+      <!-- Sous-produits a etiqueter (Phase 3c : mode multi si la fiche en declare) -->
+      <div class="form-group" id="prod-sous-produits-section" style="display:none; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:8px; padding:10px;">
+        <label style="color:#065f46;">🍱 Sous-produits à étiqueter</label>
+        <div style="font-size:11px; color:#047857; margin-bottom:8px; line-height:1.4;">
+          Cette fiche produit plusieurs contenants : chacun aura sa propre étiquette. Les poids sont pré-remplis depuis les matières scannées — ajuste si besoin.
+        </div>
+        <div id="prod-sous-produits-list" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
 
       <!-- MATIÈRES PREMIÈRES (apparaît si la fiche a des ingrédients rattachés) -->
@@ -3875,6 +3884,7 @@
     document.getElementById('prod-observation').value = '';
     document.getElementById('prod-dlc-manual').value = '';
     document.getElementById('prod-dlc-auto').style.display = 'none';
+    tafApplyMultiMode([], {}); // reset mode mono (qty/DLC visibles, section sous-produits masquee)
     document.getElementById('prod-matieres-section').style.display = 'none';
     document.getElementById('prod-matieres-list').innerHTML = '';
     document.getElementById('prod-motif').value = '';
@@ -3937,6 +3947,8 @@
       const curFicheId = document.getElementById('prod-fiche-id').value || null;
       const curFiche = curFicheId ? productionFiches.find(f => f.id === curFicheId) : null;
       updateDlcAutoDisplayTaf(curFiche);
+      // Sous-produits (Phase 3c) : bascule multi si la fiche en declare, prefill depuis les scans
+      try { await tafSetupSousProduits(curFicheId); } catch (e) { console.warn('[sous-produits TAF] setup:', e); tafApplyMultiMode([], {}); }
     }
 
     document.getElementById('production-overlay').classList.add('show');
@@ -3963,6 +3975,127 @@
       weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
     }) + (fromDefault ? ' (défaut +3 j)' : '');
     div.style.display = '';
+  }
+
+  // ===== SOUS-PRODUITS (Phase 3c — portage de la prod directe vers le TAF) =====
+  const _tafSousProduitsCache = {};
+  let tafSousProduits = []; // sous-produits de la fiche courante (mode multi)
+
+  async function tafGetSousProduits(ficheId) {
+    if (!ficheId) return [];
+    if (_tafSousProduitsCache[ficheId]) return _tafSousProduitsCache[ficheId];
+    try {
+      const { data, error } = await supabaseClient
+        .from('fiches_techniques_sous_produits')
+        .select('*').eq('fiche_id', ficheId).order('ordre');
+      if (error) throw error;
+      _tafSousProduitsCache[ficheId] = data || [];
+      return _tafSousProduitsCache[ficheId];
+    } catch (e) {
+      console.warn('[sous-produits TAF] lecture:', e);
+      return [];
+    }
+  }
+
+  function tafFormatDateTimeLocal(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${d}T${h}:${min}`;
+  }
+
+  // Map article_id -> Σ poids_net_kg (principal + lots_supplementaires), puis qty
+  // pre-remplie : Σ poids x ratio, sinon fallback quantite_estimee.
+  function tafComputeSousProduitQtys(sousProduits, scansLots) {
+    const poidsByArticle = {};
+    Object.values(scansLots || {}).forEach(sc => {
+      if (!sc) return;
+      const addPoids = (e) => {
+        if (!e || !e.article_id) return;
+        const p = parseFloat(e.poids_net_kg);
+        if (!Number.isFinite(p)) return;
+        poidsByArticle[e.article_id] = (poidsByArticle[e.article_id] || 0) + p;
+      };
+      addPoids(sc);
+      (sc.lots_supplementaires || []).forEach(addPoids);
+    });
+    return (sousProduits || []).map(sp => {
+      let qty;
+      if (sp.source_article_id && poidsByArticle[sp.source_article_id] != null) {
+        qty = poidsByArticle[sp.source_article_id] * (sp.ratio_transformation != null ? sp.ratio_transformation : 1);
+        qty = Math.round(qty * 100) / 100;
+      } else {
+        qty = (sp.quantite_estimee != null ? sp.quantite_estimee : '');
+      }
+      return { ...sp, _qtyPrefill: qty };
+    });
+  }
+
+  function tafRenderSousProduits(sousProduits, scansLots) {
+    const section = document.getElementById('prod-sous-produits-section');
+    const list = document.getElementById('prod-sous-produits-list');
+    if (!section || !list) return;
+    if (!sousProduits || !sousProduits.length) {
+      section.style.display = 'none';
+      list.innerHTML = '';
+      return;
+    }
+    const withQty = tafComputeSousProduitQtys(sousProduits, scansLots);
+    const now = new Date();
+    list.innerHTML = withQty.map(sp => {
+      let dlcDate;
+      if (sp.dlc_jours) dlcDate = new Date(now.getTime() + sp.dlc_jours * 86400000);
+      else if (sp.dlc_heures) dlcDate = new Date(now.getTime() + sp.dlc_heures * 3600000);
+      else dlcDate = new Date(now.getTime() + 3 * 86400000);
+      const dlcLocal = tafFormatDateTimeLocal(dlcDate);
+      const unite = sp.unite || 'kg';
+      return `
+        <div class="taf-sp-row" data-sp-nom="${_esc(sp.nom)}" data-sp-unite="${_esc(unite)}" data-sp-article-id="${sp.article_id || ''}"
+             style="background:white; border:1px solid #a7f3d0; border-radius:6px; padding:8px;">
+          <div style="font-weight:700; font-size:15px; color:#065f46; margin-bottom:6px;">${_esc(sp.nom)}</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="flex:1; min-width:90px;">
+              <label style="font-size:10px; color:#6b7280; display:block;">Quantité</label>
+              <input type="number" class="taf-sp-qty" min="0" step="0.01" value="${sp._qtyPrefill}"
+                     style="width:100%; padding:6px 8px; font-size:14px; border:1px solid #d1d5db; border-radius:4px;">
+            </div>
+            <div style="width:80px;">
+              <label style="font-size:10px; color:#6b7280; display:block;">Unité</label>
+              <input type="text" class="taf-sp-unite-disp" value="${_esc(unite)}" readonly
+                     style="width:100%; padding:6px 8px; font-size:14px; border:1px solid #e5e7eb; border-radius:4px; background:#f9fafb; color:#6b7280;">
+            </div>
+            <div style="flex:1; min-width:150px;">
+              <label style="font-size:10px; color:#6b7280; display:block;">DLC</label>
+              <input type="datetime-local" class="taf-sp-dlc" value="${dlcLocal}"
+                     style="width:100%; padding:6px 8px; font-size:13px; border:1px solid #d1d5db; border-radius:4px;">
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    section.style.display = '';
+  }
+
+  // Bascule mode multi (sous-produits) vs mono. En multi : masque qty/DLC globaux.
+  function tafApplyMultiMode(sousProduits, scansLots) {
+    const multi = !!(sousProduits && sousProduits.length);
+    tafSousProduits = multi ? sousProduits : [];
+    const qtyRow = document.getElementById('prod-qty-row');
+    const dlcGroup = document.getElementById('prod-dlc-group');
+    if (qtyRow) qtyRow.style.display = multi ? 'none' : '';
+    if (dlcGroup) dlcGroup.style.display = multi ? 'none' : '';
+    tafRenderSousProduits(multi ? sousProduits : [], scansLots || {});
+  }
+
+  // Detecte + applique le mode (multi/mono) pour une fiche donnee, avec prefill
+  // depuis les scans de la task courante (tasks.scans_lots).
+  async function tafSetupSousProduits(ficheId) {
+    const taskId = document.getElementById('prod-task-id').value;
+    const task = tasks.find(t => t.id === taskId);
+    const scansLots = (task && task.scans_lots) || {};
+    const sp = ficheId ? await tafGetSousProduits(ficheId) : [];
+    tafApplyMultiMode(sp, scansLots);
   }
 
   // Setup choix produit (clic sur les 2 boutons)
@@ -3996,6 +4129,7 @@
       // Pas de fiche → pas de checklist d'actions post
       loadActionsPostForProd(null);
       updateDlcAutoDisplayTaf(null); // bandeau DLC = defaut +3 jours (pas de fiche)
+      tafApplyMultiMode([], {}); // pas de fiche -> mode mono force
     });
 
     // Autocomplete fiches
@@ -4041,6 +4175,7 @@
               if (f.rendement_unite) document.getElementById('prod-unite').value = f.rendement_unite;
               prodFicheRendement = f.rendement_quantite || null;
               updateDlcAutoDisplayTaf(f); // recalcul du bandeau DLC sur la fiche choisie
+              await tafSetupSousProduits(f.id); // bascule multi si la fiche choisie en declare
               await loadProductionMatieres(f.id);
               await loadActionsPostForProd(f.id);
             });
@@ -4513,6 +4648,7 @@
 
   function closeProductionModal() {
     document.getElementById('production-overlay').classList.remove('show');
+    tafApplyMultiMode([], {}); // nettoyer les sous-produits prerempli a la fermeture
   }
 
   // Valider la tâche SANS saisie production
@@ -4578,7 +4714,10 @@
       }
     }
 
-    if (!nom || !quantite || !categorie) {
+    // Mode multi sous-produits : fiche liee qui declare des sous-produits a etiqueter.
+    // En multi, la quantite globale est portee par chaque sous-produit (champ masque).
+    const isMulti = !!ficheId && tafSousProduits.length > 0;
+    if (!nom || !categorie || (!isMulti && !quantite)) {
       showToast('Remplissez nom, quantité et catégorie', 'error');
       return;
     }
@@ -4655,34 +4794,63 @@
 
       // Code produit : code_court de la fiche, ou généré depuis le nom
       const ficheForCode = ficheId ? productionFiches.find(f => f.id === ficheId) : null;
-      const codeProduct = ficheForCode?.code_court || tafGenerateCode(nom.toUpperCase());
-
-      // Créer un lot par production (format MMJJ-CODE-NNN)
-      const lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
-      productionLots.push(lot);
-
       const now = new Date();
-      const production = {
-        fiche_id: ficheId,
-        a_creer_motif: aCreerMotif,
-        lot_id: lot.id,
-        nom_produit: nom,
-        categorie: categorie,
-        quantite_produite: quantite,
-        unite: unite,
-        date_production: now.toISOString(),
-        dlc: dlc,
-        temperature_stockage: tempStock,
-        producteur_id: currentUser.id,
-        producteur_nom: currentUser.nom,
-        producteur_initiales: currentUser.initiales || null,
-        tache_id: taskId,
-        statut: 'termine',
-        observation: observation || null,
-        etablissement: currentEtablissement
-      };
+      let saved;
 
-      const saved = await DB.createProduction(production);
+      if (isMulti) {
+        // ===== Mode multi : 1 production mere + N productions filles (sous-produits) =====
+        const spData = [];
+        document.querySelectorAll('.taf-sp-row').forEach(r => {
+          const q = parseFloat(r.querySelector('.taf-sp-qty').value);
+          const dlcVal = r.querySelector('.taf-sp-dlc').value;
+          spData.push({
+            nom: r.dataset.spNom,
+            unite: r.dataset.spUnite || 'kg',
+            quantite: Number.isFinite(q) ? q : 0,
+            dlc: dlcVal ? new Date(dlcVal).toISOString() : null,
+          });
+        });
+        // DLC mere = la plus longue des filles, sinon today + 1 jour
+        let motherDlc = null;
+        spData.forEach(sp => { if (sp.dlc && (!motherDlc || sp.dlc > motherDlc)) motherDlc = sp.dlc; });
+        if (!motherDlc) motherDlc = new Date(now.getTime() + 86400000).toISOString();
+        const motherCode = ficheForCode?.code_court || tafGenerateCode(nom.toUpperCase());
+        const motherLot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, motherDlc, motherCode);
+        productionLots.push(motherLot);
+        saved = await DB.createProduction({
+          fiche_id: ficheId, a_creer_motif: null, lot_id: motherLot.id,
+          nom_produit: nom, categorie: categorie, quantite_produite: 1, unite: 'production',
+          date_production: now.toISOString(), dlc: motherDlc, temperature_stockage: tempStock,
+          producteur_id: currentUser.id, producteur_nom: currentUser.nom, producteur_initiales: currentUser.initiales || null,
+          tache_id: taskId, statut: 'termine', observation: observation || null, etablissement: currentEtablissement
+        });
+        // Filles : 1 lot + 1 production par sous-produit, rattachees a la mere
+        for (const sp of spData) {
+          const childCode = tafGenerateCode((sp.nom || 'SP').toUpperCase());
+          const childDlc = sp.dlc || motherDlc;
+          const childLot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, childDlc, childCode);
+          productionLots.push(childLot);
+          await DB.createProduction({
+            fiche_id: ficheId, a_creer_motif: null, lot_id: childLot.id,
+            nom_produit: sp.nom, categorie: categorie, quantite_produite: sp.quantite, unite: sp.unite,
+            date_production: now.toISOString(), dlc: childDlc, temperature_stockage: tempStock,
+            producteur_id: currentUser.id, producteur_nom: currentUser.nom, producteur_initiales: currentUser.initiales || null,
+            tache_id: taskId, statut: 'termine', observation: null, parent_production_id: saved.id, etablissement: currentEtablissement
+          });
+        }
+      } else {
+        // ===== Mode mono (inchange) =====
+        const codeProduct = ficheForCode?.code_court || tafGenerateCode(nom.toUpperCase());
+        const lot = await DB.createLot(today, currentEtablissement, currentUser.id, currentUser.nom, currentUser.initiales, dlc, codeProduct);
+        productionLots.push(lot);
+        saved = await DB.createProduction({
+          fiche_id: ficheId, a_creer_motif: aCreerMotif, lot_id: lot.id,
+          nom_produit: nom, categorie: categorie, quantite_produite: quantite, unite: unite,
+          date_production: now.toISOString(), dlc: dlc, temperature_stockage: tempStock,
+          producteur_id: currentUser.id, producteur_nom: currentUser.nom, producteur_initiales: currentUser.initiales || null,
+          tache_id: taskId, statut: 'termine', observation: observation || null, etablissement: currentEtablissement
+        });
+      }
 
       // Logger la checklist d'actions post-production (fait / sauté + raison)
       if (apLogEntries.length > 0) {
