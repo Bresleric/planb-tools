@@ -4767,24 +4767,45 @@ function printEtiquette(productionId) {
     }
 
     async function genererEtImprimerPdf() {
-      // Génère un PDF 89×62mm et l'ouvre dans Safari pour que l'utilisateur
-      // puisse faire Partager → Brother iPrint&Label → Imprimer (4-5 taps).
-      // On NE passe PAS par window.print() ni iframe.print() car AirPrint
-      // ajoute des marges et un bandeau "Page 1 sur 1 / date" non débrayables.
+      // 3 taps au lieu de 5 : on partage directement le PDF via navigator.share()
+      // (feuille de partage iOS) au lieu d'ouvrir le PDF dans Safari puis Partager.
+      // CONTRAINTE iOS : navigator.share() DOIT etre appele DANS le geste utilisateur.
+      // jsPDF est donc prechargé a l'ouverture de l'apercu (loadJsPDF() en bas du
+      // script), surtout PAS via un await ici qui casserait la chaine de geste.
+      // On NE passe PAS par window.print() ni iframe.print() car AirPrint ajoute
+      // des marges et un bandeau "Page 1 sur 1 / date" non débrayables.
       var btn = document.getElementById('btnPrintPdf');
-      btn.disabled = true;
-      btn.textContent = '⏳ Génération PDF...';
+      // Prechargement pas encore termine (reseau lent) : repli sur le chemin
+      // historique (await + ouverture Safari) — reste a 5 taps mais fonctionne.
+      if (!(window.jspdf && window.jspdf.jsPDF)) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Génération PDF...';
+        try {
+          await loadJsPDF();
+          window.location.href = URL.createObjectURL(genererPdfBlob(pdfData));
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = '🖨 Imprimer l\\'étiquette';
+          alert('Erreur génération PDF : ' + e.message);
+        }
+        return;
+      }
+      // jsPDF pret : generation synchrone DANS le geste, puis partage direct.
       try {
-        await loadJsPDF();
         var blob = genererPdfBlob(pdfData);
-        var url = URL.createObjectURL(blob);
-        // Ouvre le PDF dans la vue Safari courante. La barre d'outils Safari
-        // permet ensuite Partager → Brother iPrint&Label.
-        window.location.href = url;
+        var file = new File([blob], 'etiquette.pdf', { type: 'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+        } else {
+          // FALLBACK appareil sans partage de fichier : ouvrir le PDF dans Safari.
+          window.location.href = URL.createObjectURL(blob);
+        }
       } catch (e) {
-        btn.disabled = false;
-        btn.textContent = '🖨 Imprimer l\\'étiquette';
-        alert('Erreur génération PDF : ' + e.message);
+        // Annulation de la feuille de partage par l'utilisateur : ne rien faire.
+        if (e && e.name === 'AbortError') return;
+        // Autre erreur : repli sur l'ouverture Safari.
+        try { window.location.href = URL.createObjectURL(genererPdfBlob(pdfData)); }
+        catch (e2) { alert('Erreur génération PDF : ' + e.message); }
       }
     }
     // Retour depuis le PDF (Safari back / bfcache) : reinitialiser le bouton,
@@ -4793,6 +4814,9 @@ function printEtiquette(productionId) {
       var b = document.getElementById('btnPrintPdf');
       if (b) { b.disabled = false; b.textContent = '🖨 Imprimer l\\'étiquette'; }
     });
+    // Prechargement jsPDF des l'ouverture de l'apercu (hors geste utilisateur) :
+    // indispensable pour que navigator.share() soit appelable dans le geste au tap.
+    loadJsPDF().catch(function () {});
   <\/script>
 </body>
 </html>`;
@@ -4942,18 +4966,37 @@ function printEtiquettesMulti(entries) {
     }
 
     async function genererEtImprimerPdf() {
+      // 3 taps au lieu de 5 : partage direct du PDF via navigator.share() (feuille
+      // de partage iOS). Meme contrainte que le mono : navigator.share() DOIT etre
+      // appele dans le geste utilisateur, jsPDF est prechargé en bas du script.
       var btn = document.getElementById('btnPrintPdf');
-      btn.disabled = true;
-      btn.textContent = '⏳ Génération PDF...';
+      // Prechargement pas encore termine : repli sur le chemin historique (5 taps).
+      if (!(window.jspdf && window.jspdf.jsPDF)) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Génération PDF...';
+        try {
+          await loadJsPDF();
+          window.location.href = URL.createObjectURL(genererPdfBlob(pdfDataList));
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = '🖨 Imprimer les ${N} étiquettes';
+          alert('Erreur génération PDF : ' + e.message);
+        }
+        return;
+      }
+      // jsPDF pret : generation synchrone DANS le geste, puis partage direct.
       try {
-        await loadJsPDF();
         var blob = genererPdfBlob(pdfDataList);
-        var url = URL.createObjectURL(blob);
-        window.location.href = url;
+        var file = new File([blob], 'etiquettes.pdf', { type: 'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+        } else {
+          window.location.href = URL.createObjectURL(blob);
+        }
       } catch (e) {
-        btn.disabled = false;
-        btn.textContent = '🖨 Imprimer les ${N} étiquettes';
-        alert('Erreur génération PDF : ' + e.message);
+        if (e && e.name === 'AbortError') return;
+        try { window.location.href = URL.createObjectURL(genererPdfBlob(pdfDataList)); }
+        catch (e2) { alert('Erreur génération PDF : ' + e.message); }
       }
     }
     // Retour depuis le PDF (Safari back / bfcache) : reinitialiser le bouton,
@@ -4962,6 +5005,8 @@ function printEtiquettesMulti(entries) {
       var b = document.getElementById('btnPrintPdf');
       if (b) { b.disabled = false; b.textContent = '🖨 Imprimer les ${N} étiquettes'; }
     });
+    // Prechargement jsPDF des l'ouverture de l'apercu (hors geste utilisateur).
+    loadJsPDF().catch(function () {});
   <\/script>
 </body>
 </html>`;
