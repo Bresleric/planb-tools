@@ -642,6 +642,7 @@
     <button class="tab-btn" data-tab="dlc">🔔 DLC</button>
     <button class="tab-btn" data-tab="recap">👥 Par personne</button>
     <button class="tab-btn" data-tab="stock">🧊 Stock PF/PI</button>
+    <button class="tab-btn" data-tab="lots">🏷️ Lots</button>
     <button class="tab-btn" data-tab="fiches" id="tab-btn-fiches" style="margin-left:auto; display:none;">📖 Fiches</button>
     <button class="tab-btn" data-tab="rattachement" id="tab-btn-rattachement" style="display:none;">📌 Rattachement</button>
   </div>
@@ -740,6 +741,9 @@
 
     <!-- TAB: Stock PF/PI (markup injecté depuis stock-pf-pi.html) -->
     <div class="tab-content" id="tab-stock"></div>
+
+    <!-- TAB: Lots & traçabilité (rapprochement étiquettes prod <-> lots réceptionnés) -->
+    <div class="tab-content" id="tab-lots"></div>
 
     <!-- TAB: Rattachement (audit + matching ingrédients <-> articles appro) -->
     <div class="tab-content" id="tab-rattachement">
@@ -1167,6 +1171,18 @@
     </div>
   </div>
 
+  <!-- MODAL : Détail rapprochement étiquettes / stock -->
+  <div class="modal-overlay" id="rap-modal" style="padding:0; z-index:250;">
+    <div style="background:#fff; width:100%; max-width:920px; height:100%; max-height:100vh; display:flex; flex-direction:column; border-radius:0;">
+      <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--gray-200); background:#faf5ff;">
+        <span style="font-size:20px;">🏷️</span>
+        <div id="rap-modal-title" style="font-weight:700; font-size:15px; flex:1; line-height:1.2;">Étiquettes &amp; rapprochement</div>
+        <button onclick="RAP.close()" style="background:var(--gray-100); border:none; border-radius:8px; width:34px; height:34px; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+      <div id="rap-modal-body" style="flex:1; overflow-y:auto; padding:14px 16px; -webkit-overflow-scrolling:touch;"></div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
@@ -1587,6 +1603,8 @@ function switchTab(tab) {
     loadRecapPersonnes();
   } else if (tab === 'stock') {
     if (window.StockPFPI) StockPFPI.init();
+  } else if (tab === 'lots') {
+    if (window.RAP) RAP.loadTab();
   } else if (tab === 'rattachement') {
     loadRattachement();
   } else if (tab === 'fiches') {
@@ -3093,7 +3111,7 @@ function renderProductions() {
         <td class="dlc-cell ${dlcClass}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${dlcTxt}</td>
         <td onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${producteur}</td>
         <td class="obs-cell" title="${obs}" onclick="showEtiquette(allProductions.find(pr=>pr.id==='${p.id}'))">${obs || ''}</td>
-        <td style="text-align:center; padding:0 4px;"><button onclick="event.stopPropagation(); openProductionEdit('${p.id}')" style="padding:4px 8px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; font-size:11px; cursor:pointer;" title="Corriger nom / fiche">✏️</button></td>
+        <td style="text-align:center; padding:0 4px; white-space:nowrap;">${ficheLinked ? `<button onclick="event.stopPropagation(); RAP.openDetail('${p.id}')" style="padding:4px 8px; background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; border-radius:4px; font-size:11px; cursor:pointer; margin-right:2px;" title="Étiquettes et rapprochement stock">🏷️</button>` : ''}<button onclick="event.stopPropagation(); openProductionEdit('${p.id}')" style="padding:4px 8px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; font-size:11px; cursor:pointer;" title="Corriger nom / fiche">✏️</button></td>
       </tr>
     `;
   }).join('');
@@ -7051,6 +7069,653 @@ init();
   } else {
     patchHeader();
   }
+})();
+</script>
+
+<script>
+// ============================================================================
+// SOUS-MODULE : Étiquettes & rapprochement stock (Production)
+// Rapproche les étiquettes scannées en prod (tasks.scans_lots) aux lots
+// réceptionnés (vue stock_par_lot) pour générer les SORTIE de stock.
+// Tables : production_rapprochements, rapprochement_apprentissage
+//          (migration_rapprochement_lots.sql, 05/06/2026)
+// Exposé en window.RAP (inline onclick + switchTab y accèdent).
+// ============================================================================
+window.RAP = (function() {
+
+  const SEUIL_MATCH_FORT = 80;
+  let S = null; // état de la modale courante
+
+  // ---------- Utilitaires ----------
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function isAdmin() {
+    try { return currentUser && currentUser.role === 'admin'; } catch(e) { return false; }
+  }
+  function fmtDate(d) {
+    if (!d) return '—';
+    try {
+      const dt = new Date(String(d).length <= 10 ? d + 'T00:00:00' : d);
+      return dt.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    } catch(e) { return String(d); }
+  }
+  function fmtKg(n) {
+    if (n == null || n === '') return '—';
+    const v = parseFloat(n); if (isNaN(v)) return '—';
+    return (Math.round(v * 1000) / 1000) + ' kg';
+  }
+  function chip(txt, bg, fg) {
+    return `<span style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:${bg}; color:${fg}; white-space:nowrap;">${esc(txt)}</span>`;
+  }
+  // Normalisation lot OCR : majuscules, sans espaces, O->0 I->1 L->1
+  function normLot(lot) {
+    if (!lot) return '';
+    return String(lot).toUpperCase().replace(/\s+/g,'')
+      .replace(/O/g,'0').replace(/I/g,'1').replace(/L/g,'1');
+  }
+  function lotMatch(lotA, lotB) {
+    const a = normLot(lotA), b = normLot(lotB);
+    if (!a || !b) return false;
+    if (a === b) return 'exact';
+    if (a.startsWith(b) || b.startsWith(a)) return 'fuzzy';
+    return false;
+  }
+
+  // ---------- Construction des étiquettes ----------
+  function construireEtiquettes(scansLots, ingredients) {
+    const out = [];
+    const ingById = {};
+    (ingredients || []).forEach(i => ingById[i.id] = i);
+    Object.keys(scansLots || {}).forEach(fiId => {
+      const v = scansLots[fiId];
+      if (!v || typeof v !== 'object') return;
+      const ing = ingById[fiId] || null;
+      out.push(buildEt(fiId, 'principal', v, ing));
+      const supp = Array.isArray(v.lots_supplementaires) ? v.lots_supplementaires : [];
+      supp.forEach((s, idx) => out.push(buildEt(fiId, 'supp:' + idx, s, ing)));
+    });
+    return out;
+  }
+  function buildEt(fiId, cle, data, ing) {
+    data = data || {};
+    return {
+      fiche_ingredient_id: fiId,
+      cle_etiquette: cle,
+      ingredient_nom: (ing && ing.nom) || data.nom_attendu || data.produit || 'Ingrédient',
+      est_principal_ingredient: ing ? !!ing.est_principal : true,
+      article_id_attendu: data.article_id_attendu || (ing && ing.article_id) || null,
+      produit: data.produit || '',
+      lot: data.lot || null,
+      dlc: data.dlc || null,
+      poids: data.poids_net_kg != null ? parseFloat(data.poids_net_kg) : null,
+      fabricant: data.fabricant || '',
+      scan_prod_id: data.scan_tracabilite_id || null,
+      photo_url: null,
+      suggestions: [],
+      rapprochement: null,
+      choix: null
+    };
+  }
+
+  async function resoudrePhotos(etiquettes) {
+    const stIds = [...new Set(etiquettes.map(e => e.scan_prod_id).filter(Boolean))];
+    if (!stIds.length) return;
+    const { data: sts } = await sb.from('scan_tracabilite').select('id, scan_id').in('id', stIds);
+    const stToScan = {}; (sts||[]).forEach(s => stToScan[s.id] = s.scan_id);
+    const scanIds = [...new Set((sts||[]).map(s => s.scan_id).filter(Boolean))];
+    const scanPath = {};
+    if (scanIds.length) {
+      const { data: scans } = await sb.from('scans').select('id, storage_path').in('id', scanIds);
+      (scans||[]).forEach(s => scanPath[s.id] = s.storage_path);
+    }
+    for (const e of etiquettes) {
+      const scanId = stToScan[e.scan_prod_id];
+      const path = scanId ? scanPath[scanId] : null;
+      if (path) {
+        try {
+          const { data: signed } = await sb.storage.from('scans').createSignedUrl(path, 3600);
+          e.photo_url = signed ? signed.signedUrl : null;
+        } catch(err) { e.photo_url = null; }
+      }
+    }
+  }
+
+  // ---------- Moteur de suggestion ----------
+  async function getStockArticle(articleId) {
+    if (!articleId) return [];
+    if (S.stockCache[articleId]) return S.stockCache[articleId];
+    const { data } = await sb.from('stock_par_lot')
+      .select('scan_tracabilite_id, article_id, produit, lot, dlc, quantite_initiale, quantite_restante, article_unite, scan_at')
+      .eq('article_id', articleId).eq('etablissement', S.prod.etablissement);
+    const list = (data || []).filter(r => parseFloat(r.quantite_restante) > 0.0001);
+    S.stockCache[articleId] = list;
+    return list;
+  }
+  async function getApprentissage(articleId, lotNorm) {
+    if (!articleId || !lotNorm) return null;
+    const { data } = await sb.from('rapprochement_apprentissage')
+      .select('*').eq('article_id', articleId)
+      .eq('lot_ocr_normalise', lotNorm).eq('etablissement', S.prod.etablissement)
+      .maybeSingle();
+    return data || null;
+  }
+  function scoreCandidat(et, cand, appr) {
+    let score = 0; const raisons = [];
+    if (et.dlc && cand.dlc && String(et.dlc) === String(cand.dlc)) { score += 50; raisons.push('DLC'); }
+    const pEt = et.poids, pCand = parseFloat(cand.quantite_initiale);
+    if (pEt != null && !isNaN(pCand)) {
+      const tol = Math.max(0.02, pEt * 0.02);
+      if (Math.abs(pEt - pCand) <= tol) { score += 30; raisons.push('Poids'); }
+    }
+    const lm = lotMatch(et.lot, cand.lot);
+    if (lm === 'exact') { score += 20; raisons.push('Lot exact'); }
+    else if (lm === 'fuzzy') { score += 20; raisons.push('Lot ~'); }
+    let appBonus = false;
+    if (appr && appr.derniere_decision === 'valide' && appr.lot_recu_scan_id === cand.scan_tracabilite_id) {
+      score += 20; raisons.push('Appris'); appBonus = true;
+    }
+    if (score > 100) score = 100;
+    let methode = 'manuel';
+    if (appBonus) methode = 'apprentissage';
+    else if (lm === 'exact') methode = 'lot_exact';
+    else if (raisons.indexOf('DLC') >= 0 && raisons.indexOf('Poids') >= 0) methode = 'empreinte_dlc_poids';
+    else if (lm === 'fuzzy') methode = 'lot_fuzzy';
+    return { score, raisons, methode };
+  }
+  async function suggerer(et) {
+    const cands = await getStockArticle(et.article_id_attendu);
+    const appr = await getApprentissage(et.article_id_attendu, normLot(et.lot));
+    const scored = cands.map(c => ({ cand: c, ...scoreCandidat(et, c, appr) }));
+    scored.sort((a,b) => (b.score - a.score)
+      || (new Date(a.cand.dlc||'2999-01-01') - new Date(b.cand.dlc||'2999-01-01')));
+    return scored;
+  }
+
+  // ---------- Chargement complet ----------
+  async function charger(productionId) {
+    const { data: prod, error: ep } = await sb.from('productions').select('*').eq('id', productionId).single();
+    if (ep) throw ep;
+    let lot = null;
+    if (prod.lot_id) {
+      const { data: l } = await sb.from('lots_production')
+        .select('numero_lot, statut, responsable_nom, responsable_initiales').eq('id', prod.lot_id).single();
+      lot = l;
+    }
+    let scansLots = {};
+    if (prod.tache_id) {
+      const { data: t } = await sb.from('tasks').select('id, scans_lots').eq('id', prod.tache_id).single();
+      scansLots = (t && t.scans_lots) || {};
+    }
+    let ingredients = [];
+    if (prod.fiche_id) {
+      const { data: ings } = await sb.from('fiche_ingredients')
+        .select('id, nom, est_principal, article_id, ordre').eq('fiche_id', prod.fiche_id).order('ordre');
+      ingredients = ings || [];
+    }
+    const { data: rappr } = await sb.from('production_rapprochements').select('*').eq('production_id', productionId);
+    const etiquettes = construireEtiquettes(scansLots, ingredients);
+    await resoudrePhotos(etiquettes);
+
+    S = { prod, lot, scansLots, ingredients, etiquettes, rapprochements: rappr || [], stockCache: {}, lotRecuInfo: {}, editable: false };
+
+    // infos des lots reçus déjà validés (pour affichage, car sortis du stock dispo)
+    const valIds = (rappr||[]).filter(r => r.statut==='valide' && r.lot_recu_scan_id).map(r => r.lot_recu_scan_id);
+    if (valIds.length) {
+      const { data: infos } = await sb.from('scan_tracabilite').select('id, produit, lot, dlc, poids_net_kg').in('id', valIds);
+      (infos||[]).forEach(d => S.lotRecuInfo[d.id] = d);
+    }
+    // suggestions + rapprochements liés
+    for (const et of S.etiquettes) {
+      et.rapprochement = (S.rapprochements || []).find(r =>
+        r.cle_etiquette === et.cle_etiquette && r.fiche_ingredient_id === et.fiche_ingredient_id) || null;
+      et.suggestions = await suggerer(et);
+    }
+  }
+
+  // ---------- Rendu ----------
+  function render() {
+    if (!S) return;
+    const p = S.prod;
+    const lotNum = (S.lot && S.lot.numero_lot) || '—';
+    document.getElementById('rap-modal-title').textContent = (p.nom_produit || 'Production') + ' · ' + lotNum;
+
+    const total = S.etiquettes.length;
+    const nbVal = S.etiquettes.filter(e => e.rapprochement && e.rapprochement.statut === 'valide').length;
+    const kgSortis = (S.rapprochements||[]).filter(r => r.statut==='valide')
+      .reduce((s,r) => s + (parseFloat(r.quantite_sortie)||0), 0);
+    const resp = (S.lot && (S.lot.responsable_initiales || S.lot.responsable_nom)) || p.producteur_nom || '—';
+
+    let header = `<div style="background:#f9fafb; border:1px solid var(--gray-200); border-radius:10px; padding:10px 12px; margin-bottom:12px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--gray-600);">
+          <span>📦 <b>${esc(p.nom_produit||'')}</b></span><span>Lot ${esc(lotNum)}</span><span>${esc(resp)}</span><span>statut ${esc(p.statut||'')}</span>
+        </div>
+        <div style="margin-top:8px; font-weight:700; font-size:13px;">${nbVal}/${total} étiquette${total>1?'s':''} rapprochée${nbVal>1?'s':''} · ${fmtKg(kgSortis)} sortis du stock</div>`;
+    if (p.nb_reouvertures) header += `<div style="margin-top:4px; font-size:11px; color:#9a3412;">⚠ Production rouverte ${p.nb_reouvertures}× — dernier motif : ${esc(p.rouverture_motif||'—')}</div>`;
+    header += `</div>`;
+
+    let editBanner = '';
+    if (S.editable) editBanner = `<div style="background:#fff7ed; border:1px solid #f59e0b; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:12px; color:#92400e;">
+        ✏️ <b>Mode correction (réouverture)</b> — ajoute l'étiquette manquante ou supprime un doublon, puis re-valide. Les sorties précédentes ont été annulées (mouvement inverse ENTREE).
+      </div>`;
+
+    const groupes = {};
+    S.etiquettes.forEach((et, i) => {
+      const k = et.fiche_ingredient_id || 'autre';
+      if (!groupes[k]) groupes[k] = { nom: et.ingredient_nom, items: [] };
+      groupes[k].items.push({ et, i });
+    });
+    let groupesHtml = '';
+    Object.keys(groupes).forEach(k => {
+      const g = groupes[k];
+      groupesHtml += `<div style="margin-bottom:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <div style="font-weight:700; font-size:13px; color:#6d28d9;">🥩 ${esc(g.nom)}</div>
+            ${S.editable ? `<button onclick="RAP.ajouterEtiquette('${esc(k)}')" style="padding:5px 10px; background:#ede9fe; color:#6d28d9; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;">+ Étiquette</button>` : ''}
+          </div>
+          ${g.items.map(it => renderEtiquette(it.et, it.i)).join('')}
+        </div>`;
+    });
+    if (!S.etiquettes.length) groupesHtml = `<div style="text-align:center; color:var(--gray-500); padding:20px;">Aucune étiquette scannée sur cette production.</div>`;
+
+    let footer = '';
+    const peutRouvrir = isAdmin() && (p.statut === 'etiquete' || p.statut === 'termine');
+    if (!S.editable && peutRouvrir) footer += `<button onclick="RAP.demanderReouverture()" style="width:100%; padding:11px; margin-top:6px; background:#fff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer;">🔓 Rouvrir pour corriger (Admin — exception)</button>`;
+    if (!S.editable && total > 0 && nbVal === total && p.statut !== 'termine') footer += `<button onclick="RAP.terminerProd()" style="width:100%; padding:11px; margin-top:6px; background:#16a34a; color:#fff; border:none; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer;">✓ Toutes rapprochées — passer en terminé</button>`;
+    if (S.editable) footer += `<button onclick="RAP.finCorrection()" style="width:100%; padding:11px; margin-top:6px; background:#6d28d9; color:#fff; border:none; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer;">Terminer la correction</button>`;
+
+    document.getElementById('rap-modal-body').innerHTML = header + editBanner + groupesHtml + footer;
+  }
+
+  function renderEtiquette(et, i) {
+    const r = et.rapprochement;
+    const valide = r && r.statut === 'valide';
+    const sel = et.choix || (et.suggestions[0] && et.suggestions[0].score >= SEUIL_MATCH_FORT ? et.suggestions[0] : null);
+    const borderCol = valide ? '#16a34a' : (sel ? '#7c3aed' : '#e5e7eb');
+
+    const photo = et.photo_url
+      ? `<img src="${esc(et.photo_url)}" style="width:54px; height:54px; object-fit:cover; border-radius:8px; flex-shrink:0;" />`
+      : `<div style="width:54px; height:54px; border-radius:8px; background:#f3f4f6; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:22px;">🏷️</div>`;
+    const meta = `<div style="flex:1; min-width:0;">
+        <div style="font-weight:600; font-size:13px;">${esc(et.produit || et.ingredient_nom)}</div>
+        <div style="font-size:11px; color:var(--gray-500); line-height:1.5;">Lot OCR <b>${esc(et.lot || '—')}</b> · DLC ${fmtDate(et.dlc)} · ${fmtKg(et.poids)}${et.fabricant ? ' · ' + esc(et.fabricant) : ''}</div>
+      </div>`;
+
+    let statutChip;
+    if (valide) statutChip = chip('✓ Validé', '#dcfce7', '#15803d');
+    else if (et.choix) statutChip = chip('Sélectionné', '#ede9fe', '#6d28d9');
+    else if (et.suggestions[0] && et.suggestions[0].score >= SEUIL_MATCH_FORT) statutChip = chip('Suggéré ' + et.suggestions[0].score, '#fef9c3', '#a16207');
+    else statutChip = chip('Non rapproché', '#fee2e2', '#b91c1c');
+
+    let bloc = '';
+    if (valide) {
+      const info = S.lotRecuInfo[r.lot_recu_scan_id] || {};
+      bloc = `<div style="margin-top:8px; padding:8px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:12px;">
+          Sorti du stock : <b>${esc(info.produit||'lot')}</b> · lot ${esc(info.lot||'—')} · DLC ${fmtDate(info.dlc)} · ${fmtKg(r.quantite_sortie)}
+          <div style="font-size:10px; color:var(--gray-500); margin-top:2px;">par ${esc(r.valide_par_initiales||r.valide_par_nom||'?')} · ${esc(r.methode_match||'')}</div>
+        </div>`;
+    } else {
+      if (sel) {
+        const c = sel.cand;
+        bloc += `<div style="margin-top:8px; padding:8px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; font-size:12px;">
+            Lot réceptionné proposé : <b>${esc(c.produit||'lot')}</b> · lot ${esc(c.lot||'—')} · DLC ${fmtDate(c.dlc)} · reste ${fmtKg(c.quantite_restante)}
+            <div style="font-size:10px; color:var(--gray-500); margin-top:2px;">score ${sel.score} · ${esc(sel.raisons.join(', ')||'—')}</div>
+          </div>`;
+      } else {
+        bloc += `<div style="margin-top:8px; padding:8px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; font-size:12px; color:#9a3412;">Aucun match fort. Choisis le lot réceptionné manuellement.</div>`;
+      }
+      bloc += `<div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">`;
+      if (sel) bloc += `<button onclick="RAP.valider(${i})" style="flex:1; min-width:130px; padding:9px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">✓ Valider la sortie</button>`;
+      bloc += `<button onclick="RAP.choisir(${i})" style="padding:9px 12px; background:#ede9fe; color:#6d28d9; border:none; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">Choisir un lot…</button>`;
+      if (et.choix) bloc += `<button onclick="RAP.detacher(${i})" style="padding:9px 12px; background:#f3f4f6; color:#374151; border:none; border-radius:8px; font-size:13px; cursor:pointer;">Détacher</button>`;
+      if (S.editable && et.cle_etiquette !== 'principal') bloc += `<button onclick="RAP.supprimerEtiquette(${i})" style="padding:9px 12px; background:#fee2e2; color:#b91c1c; border:none; border-radius:8px; font-size:13px; cursor:pointer;">🗑 Supprimer</button>`;
+      bloc += `</div>`;
+    }
+
+    return `<div style="border:1px solid ${borderCol}; border-radius:10px; padding:10px; margin-bottom:8px;">
+        <div style="display:flex; gap:10px; align-items:flex-start;">${photo}${meta}<div style="flex-shrink:0;">${statutChip}</div></div>${bloc}
+      </div>`;
+  }
+
+  // ---------- Actions ----------
+  async function valider(i) {
+    const et = S.etiquettes[i];
+    const sel = et.choix || (et.suggestions[0] && et.suggestions[0].score >= SEUIL_MATCH_FORT ? et.suggestions[0] : null);
+    if (!sel) { showToast('Choisis un lot réceptionné d abord', 'error'); return; }
+    if (et.rapprochement && et.rapprochement.statut === 'valide') { showToast('Étiquette déjà validée', 'error'); return; }
+    showLoading(true);
+    try {
+      const c = sel.cand;
+      const { data: fresh } = await sb.from('stock_par_lot')
+        .select('quantite_restante, article_unite, article_id').eq('scan_tracabilite_id', c.scan_tracabilite_id).maybeSingle();
+      const reste = fresh ? parseFloat(fresh.quantite_restante) : parseFloat(c.quantite_restante);
+      if (!(reste > 0.0001)) { showToast('Ce lot réceptionné est épuisé (stock 0)', 'error'); showLoading(false); return; }
+      const unite = (fresh && fresh.article_unite) || c.article_unite || 'kg';
+      const articleId = (fresh && fresh.article_id) || c.article_id || et.article_id_attendu;
+
+      const { data: mov, error: em } = await sb.from('stock_mouvements').insert({
+        type: 'SORTIE', article_id: articleId, scan_tracabilite_id: c.scan_tracabilite_id,
+        quantite: reste, unite: unite, etablissement: S.prod.etablissement,
+        motif: `Rapprochement production : ${S.prod.nom_produit} (lot ${(S.lot&&S.lot.numero_lot)||'?'})`,
+        source_table: 'production', source_id: S.prod.id,
+        created_by_id: currentUser.id, created_by_nom: currentUser.nom, created_by_initiales: currentUser.initiales || null,
+      }).select().single();
+      if (em) throw em;
+
+      const payload = {
+        production_id: S.prod.id, tache_id: S.prod.tache_id, fiche_ingredient_id: et.fiche_ingredient_id,
+        cle_etiquette: et.cle_etiquette, scan_prod_id: et.scan_prod_id, lot_recu_scan_id: c.scan_tracabilite_id,
+        statut: 'valide', score_match: sel.score, methode_match: sel.methode,
+        quantite_sortie: reste, unite: unite, stock_mouvement_id: mov.id, etablissement: S.prod.etablissement,
+        valide_par_id: currentUser.id, valide_par_nom: currentUser.nom, valide_par_initiales: currentUser.initiales || null,
+        valide_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      };
+      if (et.rapprochement && et.rapprochement.id) await sb.from('production_rapprochements').update(payload).eq('id', et.rapprochement.id);
+      else await sb.from('production_rapprochements').insert(payload);
+
+      await majApprentissage(et, c, 'valide');
+      showToast('Sortie de stock validée ✓', 'success');
+      const wasEditable = S.editable;
+      await charger(S.prod.id); S.editable = wasEditable; render();
+    } catch (e) {
+      console.error('[RAP] valider', e);
+      showToast('Erreur validation : ' + e.message, 'error');
+    }
+    showLoading(false);
+  }
+
+  async function majApprentissage(et, cand, decision) {
+    const lotNorm = normLot(et.lot);
+    if (!et.article_id_attendu || !lotNorm) return;
+    try {
+      const { data: existing } = await sb.from('rapprochement_apprentissage')
+        .select('*').eq('article_id', et.article_id_attendu).eq('lot_ocr_normalise', lotNorm)
+        .eq('etablissement', S.prod.etablissement).maybeSingle();
+      if (existing) {
+        const patch = { derniere_decision: decision, updated_at: new Date().toISOString() };
+        if (decision === 'valide') { patch.nb_confirmations = (existing.nb_confirmations||0)+1; patch.lot_recu = cand.lot; patch.lot_recu_scan_id = cand.scan_tracabilite_id; }
+        else patch.nb_rejets = (existing.nb_rejets||0)+1;
+        await sb.from('rapprochement_apprentissage').update(patch).eq('id', existing.id);
+      } else {
+        await sb.from('rapprochement_apprentissage').insert({
+          article_id: et.article_id_attendu, lot_ocr_normalise: lotNorm,
+          lot_recu: decision==='valide'?cand.lot:null, lot_recu_scan_id: decision==='valide'?cand.scan_tracabilite_id:null,
+          nb_confirmations: decision==='valide'?1:0, nb_rejets: decision==='rejete'?1:0,
+          derniere_decision: decision, etablissement: S.prod.etablissement,
+          created_by_id: currentUser.id, created_by_nom: currentUser.nom,
+        });
+      }
+    } catch(e) { console.warn('[RAP] apprentissage', e); }
+  }
+
+  async function choisir(i) {
+    const et = S.etiquettes[i];
+    showLoading(true);
+    let cands = [];
+    try { cands = await getStockArticle(et.article_id_attendu); } catch(e){}
+    const appr = await getApprentissage(et.article_id_attendu, normLot(et.lot));
+    showLoading(false);
+    const body = document.getElementById('rap-modal-body');
+    const back = `<button onclick="RAP.render()" style="margin-bottom:10px; padding:8px 12px; background:#f3f4f6; border:none; border-radius:8px; cursor:pointer; font-size:13px;">← Retour</button>`;
+    if (!cands.length) {
+      body.innerHTML = back + `<div style="padding:20px; text-align:center; color:#b91c1c;">Aucun lot réceptionné en stock pour « ${esc(et.ingredient_nom)} ».</div>`;
+      return;
+    }
+    const scored = cands.map(c => ({ cand: c, ...scoreCandidat(et, c, appr) }))
+      .sort((a,b) => new Date(a.cand.dlc||'2999-01-01') - new Date(b.cand.dlc||'2999-01-01'));
+    const list = scored.map(s => {
+      const c = s.cand;
+      return `<button onclick="RAP.choisirLot(${i}, '${esc(c.scan_tracabilite_id)}')" style="display:block; width:100%; text-align:left; margin-bottom:6px; padding:10px; background:#fff; border:1px solid ${s.score>=SEUIL_MATCH_FORT?'#7c3aed':'#e5e7eb'}; border-radius:8px; cursor:pointer;">
+          <div style="font-weight:600; font-size:13px;">${esc(c.produit||'lot')} ${s.score?`<span style="font-size:11px; color:#6d28d9;">(${s.score})</span>`:''}</div>
+          <div style="font-size:11px; color:var(--gray-500);">lot ${esc(c.lot||'—')} · DLC ${fmtDate(c.dlc)} · reste ${fmtKg(c.quantite_restante)}${s.raisons.length?' · '+esc(s.raisons.join(', ')):''}</div>
+        </button>`;
+    }).join('');
+    body.innerHTML = back + `<div style="font-weight:700; margin-bottom:8px;">Lots réceptionnés — ${esc(et.ingredient_nom)} <span style="font-size:11px; color:var(--gray-500);">(FEFO)</span></div>` + list;
+  }
+
+  function choisirLot(i, scanId) {
+    const et = S.etiquettes[i];
+    const cands = (S.stockCache[et.article_id_attendu]) || [];
+    const c = cands.find(x => x.scan_tracabilite_id === scanId);
+    if (!c) { showToast('Lot introuvable', 'error'); return; }
+    et.choix = { cand: c, ...scoreCandidat(et, c, null) };
+    const sugg = et.suggestions[0];
+    if (sugg && sugg.score >= SEUIL_MATCH_FORT && sugg.cand.scan_tracabilite_id !== scanId) {
+      majApprentissage(et, sugg.cand, 'rejete');
+    }
+    render();
+  }
+
+  function detacher(i) { S.etiquettes[i].choix = null; render(); }
+
+  // ---------- Réouverture (Admin) ----------
+  function demanderReouverture() {
+    if (!isAdmin()) { showToast('Réservé aux administrateurs', 'error'); return; }
+    const motif = prompt('Réouverture (exception Admin)\n\nMotif de la correction :', '');
+    if (motif === null) return;
+    if (!confirm('Confirmer la réouverture ?\n\nLes sorties de stock déjà générées pour cette production seront ANNULÉES (mouvement inverse ENTREE), et la prod repassera en « étiqueté » pour correction.')) return;
+    rouvrir(motif);
+  }
+
+  async function rouvrir(motif) {
+    showLoading(true);
+    try {
+      const valides = (S.rapprochements||[]).filter(r => r.statut === 'valide');
+      for (const r of valides) {
+        let articleId = null;
+        if (r.stock_mouvement_id) {
+          const { data: om } = await sb.from('stock_mouvements').select('article_id').eq('id', r.stock_mouvement_id).maybeSingle();
+          articleId = om ? om.article_id : null;
+        }
+        if (r.lot_recu_scan_id && r.quantite_sortie) {
+          await sb.from('stock_mouvements').insert({
+            type: 'ENTREE', article_id: articleId, scan_tracabilite_id: r.lot_recu_scan_id,
+            quantite: r.quantite_sortie, unite: r.unite || 'kg', etablissement: S.prod.etablissement,
+            motif: `Annulation rapprochement (réouverture) : ${S.prod.nom_produit}`,
+            source_table: 'production', source_id: S.prod.id,
+            created_by_id: currentUser.id, created_by_nom: currentUser.nom, created_by_initiales: currentUser.initiales || null,
+          });
+        }
+        await sb.from('production_rapprochements').update({ statut: 'annule', updated_at: new Date().toISOString() }).eq('id', r.id);
+      }
+      const nbR = (S.prod.nb_reouvertures || 0) + 1;
+      await sb.from('productions').update({
+        statut: 'etiquete', rouvert_par_id: currentUser.id, rouvert_par_nom: currentUser.nom,
+        rouvert_at: new Date().toISOString(), rouverture_motif: motif, nb_reouvertures: nbR,
+      }).eq('id', S.prod.id);
+      if (S.prod.lot_id) await sb.from('lots_production').update({ statut: 'ouvert' }).eq('id', S.prod.lot_id);
+      showToast('Production rouverte pour correction ✓', 'success');
+      await charger(S.prod.id); S.editable = true; render();
+    } catch (e) {
+      console.error('[RAP] rouvrir', e);
+      showToast('Erreur réouverture : ' + e.message, 'error');
+    }
+    showLoading(false);
+  }
+
+  function finCorrection() { S.editable = false; render(); }
+
+  async function terminerProd() {
+    showLoading(true);
+    try {
+      await sb.from('productions').update({ statut: 'termine' }).eq('id', S.prod.id);
+      if (S.prod.lot_id) await sb.from('lots_production').update({ statut: 'cloture' }).eq('id', S.prod.lot_id);
+      showToast('Production terminée ✓', 'success');
+      await charger(S.prod.id); render();
+    } catch(e) { console.error('[RAP] terminer', e); showToast('Erreur : ' + e.message, 'error'); }
+    showLoading(false);
+  }
+
+  // ---------- Ajout / suppression d'étiquette (mode correction) ----------
+  async function ajouterEtiquette(fiId) {
+    if (!S.editable) return;
+    const et0 = S.etiquettes.find(e => e.fiche_ingredient_id === fiId);
+    const ing = S.ingredients.find(x => x.id === fiId);
+    const articleId = (et0 && et0.article_id_attendu) || (ing && ing.article_id);
+    if (!articleId) { showToast('Article inconnu pour cet ingrédient', 'error'); return; }
+    showLoading(true);
+    const { data } = await sb.from('stock_par_lot')
+      .select('scan_tracabilite_id, produit, lot, dlc, quantite_initiale, quantite_restante, article_unite')
+      .eq('article_id', articleId).eq('etablissement', S.prod.etablissement);
+    showLoading(false);
+    const cands = (data||[]).filter(r => parseFloat(r.quantite_restante) > 0.0001)
+      .sort((a,b) => new Date(a.dlc||'2999-01-01') - new Date(b.dlc||'2999-01-01'));
+    const body = document.getElementById('rap-modal-body');
+    const back = `<button onclick="RAP.render()" style="margin-bottom:10px; padding:8px 12px; background:#f3f4f6; border:none; border-radius:8px; cursor:pointer; font-size:13px;">← Retour</button>`;
+    if (!cands.length) { showToast('Aucun lot réceptionné disponible', 'error'); return; }
+    const list = cands.map(c => `<button onclick="RAP.ajouterEtiquetteLot('${esc(fiId)}','${esc(c.scan_tracabilite_id)}')" style="display:block; width:100%; text-align:left; margin-bottom:6px; padding:10px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer;">
+        <div style="font-weight:600; font-size:13px;">${esc(c.produit||'lot')}</div>
+        <div style="font-size:11px; color:var(--gray-500);">lot ${esc(c.lot||'—')} · DLC ${fmtDate(c.dlc)} · reste ${fmtKg(c.quantite_restante)}</div>
+      </button>`).join('');
+    body.innerHTML = back + `<div style="font-weight:700; margin-bottom:4px;">Ajouter l'étiquette manquante</div>
+      <div style="font-size:12px; color:var(--gray-500); margin-bottom:8px;">Sélectionne le lot réceptionné réellement utilisé (FEFO).</div>` + list;
+  }
+
+  async function ajouterEtiquetteLot(fiId, scanId) {
+    showLoading(true);
+    try {
+      const { data: c } = await sb.from('stock_par_lot')
+        .select('scan_tracabilite_id, produit, lot, dlc, quantite_initiale, article_unite')
+        .eq('scan_tracabilite_id', scanId).maybeSingle();
+      if (!c) throw new Error('Lot introuvable');
+      const sl = JSON.parse(JSON.stringify(S.scansLots || {}));
+      if (!sl[fiId] || typeof sl[fiId] !== 'object') sl[fiId] = {};
+      if (!Array.isArray(sl[fiId].lots_supplementaires)) sl[fiId].lots_supplementaires = [];
+      const et0 = S.etiquettes.find(e => e.fiche_ingredient_id === fiId);
+      sl[fiId].lots_supplementaires.push({
+        produit: c.produit, lot: c.lot, dlc: c.dlc,
+        poids_net_kg: c.quantite_initiale != null ? parseFloat(c.quantite_initiale) : null,
+        article_id_attendu: (et0 && et0.article_id_attendu) || null,
+        scan_tracabilite_id: c.scan_tracabilite_id, ajout_manuel: true, timestamp: Date.now()
+      });
+      await sb.from('tasks').update({ scans_lots: sl }).eq('id', S.prod.tache_id);
+      showToast('Étiquette ajoutée ✓', 'success');
+      await charger(S.prod.id); S.editable = true; render();
+    } catch(e) { console.error('[RAP] ajouterEtiquetteLot', e); showToast('Erreur : ' + e.message, 'error'); }
+    showLoading(false);
+  }
+
+  async function supprimerEtiquette(i) {
+    const et = S.etiquettes[i];
+    if (!S.editable) return;
+    if (et.cle_etiquette === 'principal') { showToast('Supprime plutôt une étiquette supplémentaire (doublon)', 'error'); return; }
+    if (!confirm('Supprimer cette étiquette en double ?')) return;
+    showLoading(true);
+    try {
+      const r = et.rapprochement;
+      if (r && r.statut === 'valide' && r.stock_mouvement_id) {
+        const { data: om } = await sb.from('stock_mouvements').select('article_id').eq('id', r.stock_mouvement_id).maybeSingle();
+        await sb.from('stock_mouvements').insert({
+          type: 'ENTREE', article_id: om ? om.article_id : null, scan_tracabilite_id: r.lot_recu_scan_id,
+          quantite: r.quantite_sortie, unite: r.unite || 'kg', etablissement: S.prod.etablissement,
+          motif: `Annulation rapprochement (suppression étiquette) : ${S.prod.nom_produit}`,
+          source_table: 'production', source_id: S.prod.id,
+          created_by_id: currentUser.id, created_by_nom: currentUser.nom, created_by_initiales: currentUser.initiales || null,
+        });
+        await sb.from('production_rapprochements').update({ statut: 'annule', updated_at: new Date().toISOString() }).eq('id', r.id);
+      }
+      const idx = parseInt(et.cle_etiquette.split(':')[1], 10);
+      const sl = JSON.parse(JSON.stringify(S.scansLots || {}));
+      if (sl[et.fiche_ingredient_id] && Array.isArray(sl[et.fiche_ingredient_id].lots_supplementaires)) {
+        sl[et.fiche_ingredient_id].lots_supplementaires.splice(idx, 1);
+      }
+      await sb.from('tasks').update({ scans_lots: sl }).eq('id', S.prod.tache_id);
+      showToast('Étiquette supprimée', 'success');
+      await charger(S.prod.id); S.editable = true; render();
+    } catch(e) { console.error('[RAP] supprimer', e); showToast('Erreur : ' + e.message, 'error'); }
+    showLoading(false);
+  }
+
+  // ---------- Point d'entrée modale ----------
+  async function openDetail(productionId) {
+    showLoading(true);
+    try {
+      await charger(productionId);
+      render();
+      document.getElementById('rap-modal').classList.add('active');
+    } catch (e) {
+      console.error('[RAP] openDetail', e);
+      showToast('Erreur chargement : ' + e.message, 'error');
+    }
+    showLoading(false);
+  }
+  function close() {
+    document.getElementById('rap-modal').classList.remove('active');
+    S = null;
+    try { loadProductions(); } catch(e){}
+    try { if (document.querySelector('.tab-btn.active') && document.querySelector('.tab-btn.active').dataset.tab === 'lots') loadTab(); } catch(e){}
+  }
+
+  // ---------- Onglet "Lots & traçabilité" ----------
+  function compterEtiquettes(scansLots) {
+    if (!scansLots || typeof scansLots !== 'object') return 0;
+    let n = 0;
+    Object.keys(scansLots).forEach(k => {
+      const v = scansLots[k];
+      if (!v || typeof v !== 'object') return;
+      n += 1;
+      if (Array.isArray(v.lots_supplementaires)) n += v.lots_supplementaires.length;
+    });
+    return n;
+  }
+  async function loadTab() {
+    const cont = document.getElementById('tab-lots');
+    if (!cont) return;
+    cont.innerHTML = '<div style="padding:24px; text-align:center; color:var(--gray-500);">Chargement…</div>';
+    try {
+      let dateStr;
+      try { dateStr = selectedProductionDate; } catch(e) {}
+      if (!dateStr) dateStr = new Date().toISOString().slice(0,10);
+      const { data: prods } = await sb.from('productions')
+        .select('id, nom_produit, lot_id, fiche_id, tache_id, statut, quantite_produite, unite, etablissement, date_production')
+        .eq('etablissement', currentEtablissement)
+        .gte('date_production', dateStr + 'T00:00:00')
+        .lte('date_production', dateStr + 'T23:59:59')
+        .not('fiche_id', 'is', null)
+        .order('date_production', { ascending: false });
+      const list = prods || [];
+      const intro = `<div style="padding:4px 0 12px;"><div style="font-weight:700; font-size:15px; margin-bottom:2px;">🏷️ Lots &amp; traçabilité</div><div style="font-size:12px; color:var(--gray-500);">Rapproche les étiquettes scannées en production aux lots réceptionnés pour sortir les lots du stock. (${fmtDate(dateStr)})</div></div>`;
+      if (!list.length) {
+        cont.innerHTML = intro + `<div class="empty-state"><div class="emoji">🏷️</div><h3>Aucune production étiquetée</h3><p>Les productions rattachées à une fiche apparaîtront ici.</p></div>`;
+        return;
+      }
+      const ids = list.map(p => p.id);
+      const lotIds = list.map(p => p.lot_id).filter(Boolean);
+      const tacheIds = list.map(p => p.tache_id).filter(Boolean);
+      const { data: rappr } = await sb.from('production_rapprochements').select('production_id, statut').in('production_id', ids);
+      const valByProd = {}; (rappr||[]).forEach(r => { if (r.statut === 'valide') valByProd[r.production_id] = (valByProd[r.production_id]||0)+1; });
+      let lotsById = {};
+      if (lotIds.length) { const { data: lots } = await sb.from('lots_production').select('id, numero_lot').in('id', lotIds); (lots||[]).forEach(l => lotsById[l.id] = l); }
+      let etByTache = {};
+      if (tacheIds.length) { const { data: tk } = await sb.from('tasks').select('id, scans_lots').in('id', tacheIds); (tk||[]).forEach(t => etByTache[t.id] = compterEtiquettes(t.scans_lots)); }
+      const cards = list.map(p => {
+        const lotNum = (p.lot_id && lotsById[p.lot_id] && lotsById[p.lot_id].numero_lot) || '—';
+        const totalEt = (p.tache_id && etByTache[p.tache_id]) || 0;
+        const nbVal = valByProd[p.id] || 0;
+        const done = totalEt > 0 && nbVal >= totalEt;
+        const badge = totalEt === 0 ? chip('0 étiquette', '#f3f4f6', '#6b7280')
+          : done ? chip('✓ ' + nbVal + '/' + totalEt, '#dcfce7', '#15803d')
+          : chip(nbVal + '/' + totalEt + ' rapprochées', '#fef9c3', '#a16207');
+        return `<button onclick="RAP.openDetail('${esc(p.id)}')" style="display:block; width:100%; text-align:left; margin-bottom:8px; padding:12px; background:#fff; border:1px solid var(--gray-200); border-radius:10px; cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;"><div style="font-weight:600; font-size:14px;">${esc(p.nom_produit||'')}</div>${badge}</div>
+            <div style="font-size:12px; color:var(--gray-500); margin-top:4px;">Lot ${esc(lotNum)} · ${esc(String(p.quantite_produite||''))} ${esc(p.unite||'')} · statut ${esc(p.statut||'')}</div>
+          </button>`;
+      }).join('');
+      cont.innerHTML = intro + cards;
+    } catch(e) {
+      console.error('[RAP] loadTab', e);
+      cont.innerHTML = `<div style="padding:24px; text-align:center; color:#b91c1c;">Erreur : ${esc(e.message)}</div>`;
+    }
+  }
+
+  return {
+    openDetail, close, render, loadTab,
+    valider, choisir, choisirLot, detacher,
+    demanderReouverture, finCorrection, terminerProd,
+    ajouterEtiquette, ajouterEtiquetteLot, supprimerEtiquette
+  };
 })();
 </script>
 
