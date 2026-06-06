@@ -989,6 +989,7 @@
                 <div class="tab active" data-tab="besoins" onclick="switchTab('besoins')">📋 Besoins</div>
                 <div class="tab" data-tab="commandes" onclick="switchTab('commandes')">📦 Commandes</div>
                 <div class="tab" data-tab="inventaire" onclick="switchTab('inventaire')">🔍 Inventaire</div>
+                <div class="tab" data-tab="receptions" onclick="switchTab('receptions')">🚚 Réceptions</div>
                 <div class="tab hidden" id="tab-btn-catalogue" data-tab="catalogue" onclick="switchTab('catalogue')">📚 Catalogue</div>
                 <div class="tab hidden" id="tab-btn-ingredients" data-tab="ingredients" onclick="switchTab('ingredients')">🥘 Ingrédients</div>
             </div>
@@ -1054,6 +1055,63 @@
                     <button class="btn-main secondary" onclick="openInvAddModal()">➕ Ajouter un article</button>
                     <button class="btn-main primary hidden" id="inv-validate-btn" onclick="validateInventaire()">✓ Valider l'inventaire</button>
                 </div>
+            </div>
+
+            <!-- TAB: Réceptions -->
+            <div class="tab-content" id="tab-receptions">
+                <h2 class="rec-h2">🚚 Recevoir une livraison</h2>
+
+                <!-- Saisie en-tête réception -->
+                <div class="rec-header">
+                    <div class="rec-field">
+                        <label>Fournisseur</label>
+                        <select id="rec-fournisseur"></select>
+                    </div>
+                    <div class="rec-field">
+                        <label>BL N°</label>
+                        <input type="text" id="rec-bl" placeholder="N° bon de livraison">
+                    </div>
+                    <div class="rec-field">
+                        <label>Date</label>
+                        <input type="date" id="rec-date">
+                    </div>
+                    <button class="btn-main secondary" onclick="searchCommande()">🔍 Chercher commande</button>
+                </div>
+
+                <!-- Ajout d'article ad-hoc -->
+                <div class="search-section rec-search-section">
+                    <div class="search-container">
+                        <input type="text" id="rec-search-input" class="search-input" placeholder="Ajouter un article à réceptionner (3 car. min)..." autocomplete="off">
+                        <div class="search-dropdown" id="rec-search-dropdown"></div>
+                    </div>
+                </div>
+
+                <!-- Sections articles -->
+                <div class="reception-articles">
+                    <div class="reception-section" id="rec-section-scan">
+                        <h3>🥩 À scanner — Viande / Charcuterie / Crémerie</h3>
+                        <div class="rec-phase2-note">⏳ Le scan d'étiquette (lot + DLC) arrive en Phase 2. Ces articles sont listés pour mémoire et ne bloquent pas la validation.</div>
+                        <div id="rec-scan-articles"></div>
+                    </div>
+                    <div class="reception-section" id="rec-section-validation">
+                        <h3>🥬 À valider — F&amp;L / Épicerie / Boissons / Œufs</h3>
+                        <div id="rec-validation-articles"></div>
+                    </div>
+                </div>
+
+                <!-- Résumé -->
+                <div class="reception-resume">
+                    <p>À scanner : <span id="count-scan-done">0</span>/<span id="count-scan-total">0</span></p>
+                    <p>À valider : <span id="count-val-done">0</span>/<span id="count-val-total">0</span></p>
+                </div>
+
+                <div id="rec-empty" class="empty-state">
+                    <div class="empty-state-icon">🚚</div>
+                    <div class="empty-state-text">Aucun article à réceptionner</div>
+                    <div class="empty-state-subtext">Choisissez un fournisseur puis ajoutez des articles, ou cliquez sur Chercher commande</div>
+                </div>
+
+                <button onclick="validerReceptionComplete()" class="btn-main primary" id="rec-validate-btn">✓ Valider la réception</button>
             </div>
 
             <!-- TAB: Catalogue -->
@@ -1545,6 +1603,7 @@
             document.getElementById('articles-search').addEventListener('input', filterArticles);
             document.getElementById('prix-search').addEventListener('input', debounceSearchPrix);
             document.getElementById('inv-add-search').addEventListener('input', invAddSearchHandler);
+            document.getElementById('rec-search-input').addEventListener('input', debounceRecSearch);
         }
 
         function debounceSearch(e) {
@@ -2482,6 +2541,9 @@
             if (tabName === 'inventaire') {
                 loadInventaireJour();
             }
+            if (tabName === 'receptions') {
+                loadReception();
+            }
             if (tabName === 'ingredients') {
                 renderIngredientsList();
             }
@@ -3149,6 +3211,271 @@
             document.getElementById('modal-generate-orders').classList.remove('show');
         }
 
+        // ===========================================================
+        // Réceptions (Phase 1 — validation manuelle ; scan en Phase 2)
+        // ===========================================================
+        let recState = { articles: [], commande: null, inited: false };
+        let recSearchDebounce = null;
+
+        function escapeHtmlRec(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function makeRecArticle(o) {
+            return {
+                ingredient_id: o.ingredient_id || null,
+                nom: o.nom || 'Article',
+                unite: o.unite || 'kg',
+                categorie_flux: o.categorie_flux || 'validation',
+                qte_commandee: (o.qte_commandee != null ? o.qte_commandee : null),
+                qte_livree: (o.qte_livree != null ? o.qte_livree : null),
+                dlc: o.dlc || '',
+                aspect_ok: o.aspect_ok || false,
+                notes: o.notes || '',
+                scan_done: false,
+                scan_tracabilite_id: null,
+                lot: null,
+            };
+        }
+
+        function loadReception() {
+            // Select fournisseur
+            const sel = document.getElementById('rec-fournisseur');
+            const sorted = (fournisseurs || []).slice().sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+            sel.innerHTML = ['<option value="">— Choisir un fournisseur —</option>']
+                .concat(sorted.map(f => `<option value="${f.id}">${escapeHtmlRec(f.nom)}</option>`)).join('');
+
+            // Date du jour
+            const dateInput = document.getElementById('rec-date');
+            if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+
+            // Pré-remplissage depuis la commande non reçue la plus récente (si elle existe)
+            if (!recState.inited) {
+                recState.inited = true;
+                const cmd = (commandes || [])
+                    .filter(c => c.etablissement === currentEstablishment && c.statut !== 'recue' && c.statut !== 'annulee')
+                    .sort((a, b) => new Date(b.date_creation || 0) - new Date(a.date_creation || 0))[0];
+                if (cmd) prefillFromCommande(cmd);
+            }
+            renderReception();
+        }
+
+        function prefillFromCommande(cmd) {
+            recState.commande = cmd;
+            recState.articles = [];
+            const sel = document.getElementById('rec-fournisseur');
+            if (sel) sel.value = cmd.fournisseur_id || '';
+            (cmd.lignes || []).forEach(l => {
+                // ligne commande -> catalogue (article_id) -> ingredient -> categorie_flux
+                const cat = (articles || []).find(a => a.id === l.article_id);
+                const ing = cat ? (ingredients || []).find(i => i.id === cat.ingredient_id) : null;
+                recState.articles.push(makeRecArticle({
+                    ingredient_id: ing ? ing.id : null,
+                    nom: l.designation || (ing && ing.nom) || (cat && cat.nom) || 'Article',
+                    unite: l.unite || (ing && ing.unite) || 'kg',
+                    categorie_flux: ing ? (ing.categorie_flux || 'validation') : 'validation',
+                    qte_commandee: (l.quantite != null ? Number(l.quantite) : null),
+                }));
+            });
+        }
+
+        function searchCommande() {
+            const fid = document.getElementById('rec-fournisseur').value;
+            let pool = (commandes || []).filter(c => c.etablissement === currentEstablishment && c.statut !== 'recue' && c.statut !== 'annulee');
+            if (fid) pool = pool.filter(c => c.fournisseur_id === fid);
+            const cmd = pool.sort((a, b) => new Date(b.date_creation || 0) - new Date(a.date_creation || 0))[0];
+            if (!cmd) { showToast('Aucune commande non reçue — mode réception libre', 'info'); return; }
+            prefillFromCommande(cmd);
+            renderReception();
+            showToast('Commande chargée (' + ((cmd.lignes || []).length) + ' lignes)', 'success');
+        }
+
+        function debounceRecSearch(e) {
+            clearTimeout(recSearchDebounce);
+            const term = e.target.value.trim();
+            if (term.length < 3) { document.getElementById('rec-search-dropdown').classList.remove('show'); return; }
+            recSearchDebounce = setTimeout(() => recSearch(term), 250);
+        }
+
+        function recSearch(term) {
+            const normalized = normalizeSearch(term);
+            let results = (ingredients || []).filter(i => i.actif !== false && i.nom_recherche && i.nom_recherche.includes(normalized));
+            if (results.length > 15) results = results.slice(0, 15);
+            const dd = document.getElementById('rec-search-dropdown');
+            if (!results.length) {
+                dd.innerHTML = '<div class="dropdown-item" style="color:#999;font-style:italic;">Aucun ingrédient trouvé</div>';
+            } else {
+                dd.innerHTML = results.map(i => {
+                    const flux = i.categorie_flux || 'validation';
+                    const tag = flux === 'scan' ? '🥩 scan' : '🥬 validation';
+                    return `<div class="dropdown-item" onclick="addRecArticle('${i.id}')">
+                        <div class="dropdown-item-title">${escapeHtmlRec(i.nom)}</div>
+                        <div class="dropdown-item-subtitle">${escapeHtmlRec(i.categorie || '')} • ${escapeHtmlRec(i.unite || 'kg')} • ${tag}</div>
+                    </div>`;
+                }).join('');
+            }
+            dd.classList.add('show');
+        }
+
+        function addRecArticle(ingredientId) {
+            const ing = (ingredients || []).find(i => i.id === ingredientId);
+            if (!ing) return;
+            if (recState.articles.some(a => a.ingredient_id === ingredientId)) {
+                showToast('Article déjà dans la liste', 'info');
+            } else {
+                recState.articles.push(makeRecArticle({
+                    ingredient_id: ing.id, nom: ing.nom, unite: ing.unite || 'kg',
+                    categorie_flux: ing.categorie_flux || 'validation',
+                }));
+            }
+            document.getElementById('rec-search-input').value = '';
+            document.getElementById('rec-search-dropdown').classList.remove('show');
+            renderReception();
+        }
+
+        function removeRecArticle(idx) {
+            recState.articles.splice(idx, 1);
+            renderReception();
+        }
+
+        function updateRecField(idx, field, value) {
+            const a = recState.articles[idx];
+            if (!a) return;
+            if (field === 'qte_livree') a.qte_livree = (value === '' ? null : Number(value));
+            else if (field === 'aspect_ok') a.aspect_ok = value;
+            else a[field] = value;
+            updateRecCounts();
+        }
+
+        function recDone(a) {
+            return a.qte_livree != null && !isNaN(a.qte_livree);
+        }
+
+        function updateRecCounts() {
+            const scan = recState.articles.filter(a => a.categorie_flux === 'scan');
+            const val = recState.articles.filter(a => a.categorie_flux !== 'scan');
+            document.getElementById('count-scan-total').textContent = scan.length;
+            document.getElementById('count-scan-done').textContent = scan.filter(a => a.scan_done).length;
+            document.getElementById('count-val-total').textContent = val.length;
+            document.getElementById('count-val-done').textContent = val.filter(recDone).length;
+        }
+
+        function renderReception() {
+            const scan = recState.articles.filter(a => a.categorie_flux === 'scan');
+            const val = recState.articles.filter(a => a.categorie_flux !== 'scan');
+            document.getElementById('rec-empty').style.display = recState.articles.length ? 'none' : '';
+
+            document.getElementById('rec-scan-articles').innerHTML = scan.map(a => {
+                const idx = recState.articles.indexOf(a);
+                return `<div class="rec-item">
+                    <span class="rec-nom">${escapeHtmlRec(a.nom)}</span>
+                    <button class="rec-scan-btn" disabled title="Disponible en Phase 2">🔒 Scanner (Phase 2)</button>
+                    <span class="rec-status">ℹ️ noté</span>
+                    <button class="rec-remove" onclick="removeRecArticle(${idx})" title="Retirer">✕</button>
+                </div>`;
+            }).join('');
+
+            document.getElementById('rec-validation-articles').innerHTML = val.map(a => {
+                const idx = recState.articles.indexOf(a);
+                const ecart = (a.qte_commandee != null && recDone(a) && a.qte_commandee > 0)
+                    ? Math.round(Math.abs(a.qte_livree - a.qte_commandee) / a.qte_commandee * 100) : null;
+                const ecartHtml = (ecart != null && ecart > 5) ? `<span class="rec-ecart">⚠️ écart ${ecart}%</span>` : '';
+                return `<div class="rec-item">
+                    <span class="rec-nom">${escapeHtmlRec(a.nom)}</span>
+                    <span class="rec-input-group">
+                        <input type="number" min="0" step="any" value="${a.qte_livree != null ? a.qte_livree : ''}" placeholder="Qté" oninput="updateRecField(${idx},'qte_livree',this.value)">
+                        <span class="rec-unit">${escapeHtmlRec(a.unite)}</span>
+                    </span>
+                    <span class="rec-input-group">
+                        <span class="rec-unit">DLC</span>
+                        <input type="date" value="${a.dlc || ''}" oninput="updateRecField(${idx},'dlc',this.value)">
+                    </span>
+                    <label class="rec-unit"><input type="checkbox" ${a.aspect_ok ? 'checked' : ''} onchange="updateRecField(${idx},'aspect_ok',this.checked)"> visuel OK</label>
+                    <input type="text" value="${escapeHtmlRec(a.notes)}" placeholder="Notes..." oninput="updateRecField(${idx},'notes',this.value)">
+                    ${ecartHtml}
+                    <button class="rec-remove" onclick="removeRecArticle(${idx})" title="Retirer">✕</button>
+                </div>`;
+            }).join('');
+
+            updateRecCounts();
+        }
+
+        async function validerReceptionComplete() {
+            if (!recState.articles.length) { showToast('Ajoutez au moins un article', 'error'); return; }
+            const fid = document.getElementById('rec-fournisseur').value;
+            const fournisseur = (fournisseurs || []).find(f => f.id === fid);
+
+            const val = recState.articles.filter(a => a.categorie_flux !== 'scan');
+            const manquants = val.filter(a => !recDone(a));
+            if (manquants.length) {
+                showToast('Qté livrée manquante : ' + manquants.map(a => a.nom).slice(0, 3).join(', ') + (manquants.length > 3 ? '…' : ''), 'error');
+                return;
+            }
+            const ecarts = val.filter(a => a.qte_commandee != null && a.qte_commandee > 0 && Math.abs(a.qte_livree - a.qte_commandee) / a.qte_commandee > 0.05);
+
+            if (isDemo) {
+                showToast('Mode démo : réception simulée (' + val.length + ' articles)', 'success');
+                resetReception();
+                return;
+            }
+
+            try {
+                const recPayload = {
+                    commande_id: recState.commande ? recState.commande.id : null,
+                    fournisseur_id: fid || null,
+                    fournisseur_nom: fournisseur ? fournisseur.nom : null,
+                    bl_numero: document.getElementById('rec-bl').value.trim() || null,
+                    date_reception: document.getElementById('rec-date').value || new Date().toISOString().slice(0, 10),
+                    etablissement: currentEstablishment,
+                    recu_par_id: currentUser.id || null,
+                    recu_par_nom: currentUser.nom || null,
+                    statut: 'acceptee',
+                    notes: null,
+                };
+                const recRes = await supabase.from('appro_receptions').insert([recPayload]).select().single();
+                if (recRes.error) throw recRes.error;
+                const recId = recRes.data.id;
+
+                const lignes = recState.articles.map(a => ({
+                    reception_id: recId,
+                    ingredient_id: a.ingredient_id,
+                    ingredient_nom: a.nom,
+                    categorie_flux: a.categorie_flux,
+                    qte_commandee: a.qte_commandee,
+                    qte_livree: a.categorie_flux === 'scan' ? null : a.qte_livree,
+                    unite: a.unite,
+                    dlc: a.dlc || null,
+                    aspect_ok: a.categorie_flux === 'scan' ? null : a.aspect_ok,
+                    scan_tracabilite_id: a.scan_tracabilite_id,
+                    lot: a.lot,
+                    notes: a.notes || null,
+                }));
+                const ligRes = await supabase.from('appro_reception_articles').insert(lignes);
+                if (ligRes.error) throw ligRes.error;
+
+                if (recState.commande) {
+                    await supabase.from('appro_commandes').update({ statut: 'recue' }).eq('id', recState.commande.id);
+                }
+
+                let msg = '✅ Réception validée — ' + val.length + ' article(s) enregistré(s)';
+                const scanCount = recState.articles.length - val.length;
+                if (scanCount) msg += ' (' + scanCount + ' à scanner en Phase 2)';
+                showToast(msg, 'success');
+                if (ecarts.length) setTimeout(() => showToast('⚠️ ' + ecarts.length + ' écart(s) qté > 5% (accepté)', 'info'), 1200);
+                resetReception();
+            } catch (e) {
+                console.error('validerReceptionComplete error:', e);
+                showToast('Erreur : ' + (e.message || e), 'error');
+            }
+        }
+
+        function resetReception() {
+            recState = { articles: [], commande: null, inited: true };
+            const bl = document.getElementById('rec-bl'); if (bl) bl.value = '';
+            renderReception();
+        }
+
         function showToast(msg, type = 'info') {
             const toast = document.getElementById('toast');
             toast.textContent = msg;
@@ -3159,6 +3486,33 @@
 
         window.addEventListener('DOMContentLoaded', initApp);
     </script>
+<!-- RÉCEPTIONS (Phase 1) -->
+<style id="rec-style">
+.rec-h2 { font-size: 1.1rem; color: #f97316; margin: 4px 0 12px; }
+.rec-header { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+.rec-field { display: flex; flex-direction: column; gap: 4px; }
+.rec-field label { font-size: 0.72rem; color: #6b7280; font-weight: 600; }
+.rec-field select, .rec-field input { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; background: #fff; }
+.rec-search-section { margin-bottom: 14px; }
+.reception-section { margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+.reception-section h3 { font-size: 0.95rem; margin: 0 0 8px; }
+#rec-section-scan { border-left: 4px solid #dc2626; }
+#rec-section-validation { border-left: 4px solid #16a34a; }
+.rec-phase2-note { font-size: 0.78rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; }
+.rec-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background: #f9fafb; margin-bottom: 6px; }
+.rec-item .rec-nom { font-weight: 600; flex: 1 1 140px; min-width: 120px; }
+.rec-item .rec-input-group { display: flex; align-items: center; gap: 4px; }
+.rec-item input[type="number"] { width: 80px; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
+.rec-item input[type="date"] { padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
+.rec-item input[type="text"] { flex: 1 1 120px; min-width: 100px; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
+.rec-item .rec-unit { color: #6b7280; font-size: 0.82rem; }
+.rec-item .rec-remove { background: none; border: none; color: #dc2626; font-size: 1rem; cursor: pointer; padding: 2px 6px; }
+.rec-item .rec-status { font-size: 0.78rem; color: #6b7280; }
+.rec-item .rec-scan-btn { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f3f4f6; color: #9ca3af; cursor: not-allowed; font-size: 0.82rem; }
+.reception-resume { display: flex; gap: 18px; font-size: 0.85rem; color: #374151; margin: 8px 0 14px; }
+.reception-resume p { margin: 0; }
+.rec-ecart { color: #b45309; font-size: 0.74rem; }
+</style>
 <!-- TAF-STYLE HEADER + INACTIVITY LOGOUT -->
 <style id="taf-header-style">
 .header { background: white !important; border-bottom: 2px solid #f97316 !important; padding: 10px 16px !important; display: flex !important; align-items: center !important; justify-content: space-between !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }
