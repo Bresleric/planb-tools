@@ -1703,6 +1703,9 @@
                 return num.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '€';
             };
             const esc = (s) => { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+            // Texte gris pour une section vide : le collaborateur voit la rubrique
+            // et constate qu il n y a rien a signaler (pas un oubli du redacteur)
+            const emptyTxt = (msg) => `<div style="font-size:13px; color:#9ca3af; font-style:italic;">${msg}</div>`;
 
             // Chiffres cles
             if (b.chiffres && Object.keys(b.chiffres).length > 0) {
@@ -1747,72 +1750,82 @@
             }
 
             // Evenements VIP
-            if (b.evenements && b.evenements.length > 0) {
+            {
                 let evHtml = '';
-                b.evenements.forEach(ev => {
+                (b.evenements || []).forEach(ev => {
                     evHtml += `<div class="bo-item"><div class="bo-item-icon">⭐</div><div class="bo-item-text"><strong>${esc(ev.description)}</strong><br><span style="font-size:11px; color:#9ca3af;">${esc(ev.heure||'')} — ${ev.couverts||'?'} couv.${ev.allergies ? ' — Allergies: '+esc(ev.allergies) : ''}</span></div></div>`;
                 });
+                if (!evHtml) evHtml = emptyTxt('Aucun evenement ni VIP');
                 html += `<div class="bo-section"><div class="bo-section-header">⭐ Evenements / VIP</div><div class="bo-section-body">${evHtml}</div></div>`;
             }
 
             // Plats / Suggestions
-            if (b.plats_suggestions && b.plats_suggestions.length > 0) {
+            {
                 let plHtml = '';
-                b.plats_suggestions.forEach(p => {
+                (b.plats_suggestions || []).forEach(p => {
                     plHtml += `<div class="bo-item"><div class="bo-item-icon">🍽️</div><div class="bo-item-text"><strong>${esc(p.plat)}</strong>${p.prix ? ' — '+fmtMoney(p.prix) : ''}${p.commentaire ? '<br><span style="font-size:11px; color:#9ca3af;">'+esc(p.commentaire)+'</span>' : ''}</div></div>`;
                 });
+                if (!plHtml) plHtml = emptyTxt('Aucun plat ni suggestion');
                 html += `<div class="bo-section"><div class="bo-section-header">🍽️ Plats / Suggestions</div><div class="bo-section-body">${plHtml}</div></div>`;
             }
 
             // Produits limites
-            if (b.produits_limites && b.produits_limites.length > 0) {
+            {
                 let limHtml = '';
-                b.produits_limites.forEach(p => {
+                (b.produits_limites || []).forEach(p => {
                     limHtml += `<div class="bo-item"><div class="bo-item-icon">⚠️</div><div class="bo-item-text">${esc(p.produit)} — <strong>${p.quantite} ${esc(p.unite||'pcs')}</strong>${p.observation ? ' — '+esc(p.observation) : ''}</div></div>`;
                 });
+                if (!limHtml) limHtml = emptyTxt('Aucun produit limite');
                 html += `<div class="bo-section"><div class="bo-section-header">⚠️ Produits limites</div><div class="bo-section-body">${limHtml}</div></div>`;
             }
 
             // Dates courtes
-            if (b.produits_dates_courtes && b.produits_dates_courtes.length > 0) {
+            {
                 let dcHtml = '';
-                b.produits_dates_courtes.forEach(p => {
+                (b.produits_dates_courtes || []).forEach(p => {
                     dcHtml += `<div class="bo-item"><div class="bo-item-icon">📅</div><div class="bo-item-text">${esc(p.produit)} — DLC: ${esc(p.date_limite||'')} — ${esc(p.action||'')}</div></div>`;
                 });
+                if (!dcHtml) dcHtml = emptyTxt('Aucune date courte');
                 html += `<div class="bo-section"><div class="bo-section-header">📅 Dates courtes</div><div class="bo-section-body">${dcHtml}</div></div>`;
             }
 
             // Incidents
-            if (b.incidents && b.incidents.length > 0) {
+            {
                 let incHtml = '';
-                b.incidents.forEach(inc => {
+                (b.incidents || []).forEach(inc => {
                     const prioColor = inc.priorite === 'haute' ? '#ef4444' : (inc.priorite === 'moyenne' ? '#f59e0b' : '#3b82f6');
                     incHtml += `<div class="bo-item"><div class="bo-item-icon">🚨</div><div class="bo-item-text"><strong>${esc(inc.description)}</strong>${inc.mesure_corrective ? '<br><span style="color:#22c55e; font-size:11px;">➡ '+esc(inc.mesure_corrective)+'</span>' : ''}</div><span class="bo-badge" style="background:${prioColor}15; color:${prioColor};">${esc(inc.priorite||'')}</span></div>`;
                 });
+                if (!incHtml) incHtml = emptyTxt('Aucun incident — RAS');
                 html += `<div class="bo-section"><div class="bo-section-header">🚨 Incidents</div><div class="bo-section-body">${incHtml}</div></div>`;
             }
 
             // Objectifs
-            if (b.objectifs && b.objectifs.length > 0) {
+            {
                 let objHtml = '';
-                b.objectifs.forEach(o => {
+                (b.objectifs || []).forEach(o => {
                     objHtml += `<div class="bo-item"><div class="bo-item-icon">🎯</div><div class="bo-item-text">${esc(o.objectif)}</div></div>`;
                 });
+                if (!objHtml) objHtml = emptyTxt('Aucun objectif particulier');
                 html += `<div class="bo-section"><div class="bo-section-header">🎯 Objectifs</div><div class="bo-section-body">${objHtml}</div></div>`;
             }
 
             // Rappels
-            if (b.rappels && b.rappels.length > 0) {
+            {
                 let rapHtml = '';
-                b.rappels.forEach(r => {
+                (b.rappels || []).forEach(r => {
                     rapHtml += `<div class="bo-item"><div class="bo-item-icon">💬</div><div class="bo-item-text">${esc(r.message)}</div></div>`;
                 });
+                if (!rapHtml) rapHtml = emptyTxt('Aucun rappel');
                 html += `<div class="bo-section"><div class="bo-section-header">💬 Rappels</div><div class="bo-section-body">${rapHtml}</div></div>`;
             }
 
             // Notes libres
-            if (b.notes_libres) {
-                html += `<div class="bo-section"><div class="bo-section-header">📝 Notes</div><div class="bo-section-body"><div style="font-size:13px; color:#374151; white-space:pre-wrap;">${esc(b.notes_libres)}</div></div></div>`;
+            {
+                const notesHtml = b.notes_libres
+                    ? `<div style="font-size:13px; color:#374151; white-space:pre-wrap;">${esc(b.notes_libres)}</div>`
+                    : emptyTxt('Aucune note');
+                html += `<div class="bo-section"><div class="bo-section-header">📝 Notes</div><div class="bo-section-body">${notesHtml}</div></div>`;
             }
 
             if (!html) {

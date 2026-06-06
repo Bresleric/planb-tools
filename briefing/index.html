@@ -1136,6 +1136,10 @@
         function renderBriefing(container, b) {
             let html = '';
 
+            // Helper: texte gris pour une section vide (pour que le collaborateur voie
+            // que la rubrique existe et qu il n y a rien a signaler, plutot qu un oubli)
+            const emptyTxt = (msg) => `<div style="font-size:13px; color:var(--gray-400); font-style:italic;">${msg}</div>`;
+
             // Status header
             const typeLabel = b.type === 'jour' ? 'Journee' : (b.service === 'midi' ? 'Midi' : 'Soir');
             html += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
@@ -1221,9 +1225,9 @@
             }
 
             // Section: Evenements / VIP
-            if (b.evenements && b.evenements.length > 0) {
+            {
                 let evHtml = '';
-                b.evenements.forEach(ev => {
+                (b.evenements || []).forEach(ev => {
                     evHtml += `
                         <div class="brief-item">
                             <div class="brief-item-icon">&#11088;</div>
@@ -1234,13 +1238,14 @@
                             <span class="brief-item-badge badge-vip">VIP</span>
                         </div>`;
                 });
-                html += renderSection('&#11088;', 'Evenements / VIP', b.evenements.length, evHtml, true);
+                if (!evHtml) evHtml = emptyTxt('Aucun evenement ni VIP');
+                html += renderSection('&#11088;', 'Evenements / VIP', (b.evenements || []).length, evHtml, true);
             }
 
             // Section: Plats du jour / Suggestions
-            if (b.plats_suggestions && b.plats_suggestions.length > 0) {
+            {
                 let platsHtml = '';
-                b.plats_suggestions.forEach(p => {
+                (b.plats_suggestions || []).forEach(p => {
                     platsHtml += `
                         <div class="brief-item">
                             <div class="brief-item-icon">&#127869;</div>
@@ -1250,13 +1255,14 @@
                             </div>
                         </div>`;
                 });
-                html += renderSection('&#127869;', 'Plats / Suggestions', b.plats_suggestions.length, platsHtml, true);
+                if (!platsHtml) platsHtml = emptyTxt('Aucun plat ni suggestion');
+                html += renderSection('&#127869;', 'Plats / Suggestions', (b.plats_suggestions || []).length, platsHtml, true);
             }
 
             // Section: Produits limites
-            if (b.produits_limites && b.produits_limites.length > 0) {
+            {
                 let plHtml = '';
-                b.produits_limites.forEach(p => {
+                (b.produits_limites || []).forEach(p => {
                     plHtml += `
                         <div class="brief-item">
                             <div class="brief-item-icon">&#9888;&#65039;</div>
@@ -1267,13 +1273,14 @@
                             <span class="brief-item-badge badge-warning">${p.quantite}</span>
                         </div>`;
                 });
-                html += renderSection('&#9888;&#65039;', 'Produits limites', b.produits_limites.length, plHtml, true);
+                if (!plHtml) plHtml = emptyTxt('Aucun produit limite');
+                html += renderSection('&#9888;&#65039;', 'Produits limites', (b.produits_limites || []).length, plHtml, true);
             }
 
             // Section: Dates courtes
-            if (b.produits_dates_courtes && b.produits_dates_courtes.length > 0) {
+            {
                 let dcHtml = '';
-                b.produits_dates_courtes.forEach(p => {
+                (b.produits_dates_courtes || []).forEach(p => {
                     dcHtml += `
                         <div class="brief-item">
                             <div class="brief-item-icon">&#128197;</div>
@@ -1284,13 +1291,14 @@
                             <span class="brief-item-badge badge-urgent">DLC</span>
                         </div>`;
                 });
-                html += renderSection('&#128197;', 'Dates courtes', b.produits_dates_courtes.length, dcHtml, true);
+                if (!dcHtml) dcHtml = emptyTxt('Aucune date courte');
+                html += renderSection('&#128197;', 'Dates courtes', (b.produits_dates_courtes || []).length, dcHtml, true);
             }
 
             // Section: Incidents
-            if (b.incidents && b.incidents.length > 0) {
+            {
                 let incHtml = '';
-                b.incidents.forEach(inc => {
+                (b.incidents || []).forEach(inc => {
                     const prioClass = inc.priorite === 'haute' ? 'badge-urgent' : (inc.priorite === 'moyenne' ? 'badge-warning' : 'badge-info');
                     incHtml += `
                         <div class="brief-item">
@@ -1302,13 +1310,14 @@
                             <span class="brief-item-badge ${prioClass}">${escapeHtml(inc.priorite || '—')}</span>
                         </div>`;
                 });
-                html += renderSection('&#128680;', 'Incidents', b.incidents.length, incHtml, true);
+                if (!incHtml) incHtml = emptyTxt('Aucun incident — RAS');
+                html += renderSection('&#128680;', 'Incidents', (b.incidents || []).length, incHtml, true);
             }
 
             // Section: Objectifs
-            if (b.objectifs && b.objectifs.length > 0) {
+            {
                 let objHtml = '';
-                b.objectifs.forEach(obj => {
+                (b.objectifs || []).forEach(obj => {
                     const prioClass = obj.priorite === 'haute' ? 'badge-urgent' : 'badge-info';
                     objHtml += `
                         <div class="brief-item">
@@ -1319,13 +1328,14 @@
                             <span class="brief-item-badge ${prioClass}">${escapeHtml(obj.priorite || '—')}</span>
                         </div>`;
                 });
-                html += renderSection('&#127919;', 'Objectifs du service', b.objectifs.length, objHtml, true);
+                if (!objHtml) objHtml = emptyTxt('Aucun objectif particulier');
+                html += renderSection('&#127919;', 'Objectifs du service', (b.objectifs || []).length, objHtml, true);
             }
 
             // Section: Rappels
-            if (b.rappels && b.rappels.length > 0) {
+            {
                 let rapHtml = '';
-                b.rappels.forEach(r => {
+                (b.rappels || []).forEach(r => {
                     const catIcons = { service: '&#127860;', hygiene: '&#129532;', securite: '&#128274;', pratique: '&#128161;', autre: '&#128172;' };
                     rapHtml += `
                         <div class="brief-item">
@@ -1336,12 +1346,16 @@
                             </div>
                         </div>`;
                 });
-                html += renderSection('&#128172;', 'Rappels', b.rappels.length, rapHtml, true);
+                if (!rapHtml) rapHtml = emptyTxt('Aucun rappel');
+                html += renderSection('&#128172;', 'Rappels', (b.rappels || []).length, rapHtml, true);
             }
 
             // Section: Notes libres
-            if (b.notes_libres) {
-                html += renderSection('&#128221;', 'Notes', '', `<div style="font-size:14px; color:var(--gray-700); white-space:pre-wrap;">${escapeHtml(b.notes_libres)}</div>`, true);
+            {
+                const notesHtml = b.notes_libres
+                    ? `<div style="font-size:14px; color:var(--gray-700); white-space:pre-wrap;">${escapeHtml(b.notes_libres)}</div>`
+                    : emptyTxt('Aucune note');
+                html += renderSection('&#128221;', 'Notes', '', notesHtml, true);
             }
 
             container.innerHTML = html;
