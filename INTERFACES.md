@@ -7,7 +7,7 @@ les consomme en lecture seule via des vues `pilote.v_*` (cf. document miroir
 [INTERFACES.md du repo planb-pilote](https://github.com/Bresleric/planb-pilote/blob/main/INTERFACES.md)).
 
 Document tenu à jour à chaque évolution structurelle. Version contrat :
-**1.0 (28 avril 2026)**.
+**1.1 (6 juin 2026)** — ajout des tables `combo_pointages`, `combo_user_mapping` et de la vue `pointages_unifies` suite à la migration v4 (import historique Combo).
 
 ---
 
@@ -26,8 +26,16 @@ Tables dont PlanB-Tools garantit la stabilité des colonnes listées. Toute
 | `pointage_periodes_travail` | `id`, `user_id`, `user_nom`, `date_service`, `etablissement`, `debut_service`, `fin_service` (nullable), `duree_pauses_minutes` (int), `duree_travail_minutes` (int generé), `statut` (text), `heures_normales_minutes`, `heures_sup_minutes`, `majoration_nuit_minutes`, `majoration_dimanche_minutes`, `majoration_ferie_minutes` (NULL aujourd'hui, remplis Phase 4) | Workflow validation 6 statuts : `saisi` → `en_attente_manager` → `valide_manager` → `en_attente_salarie` → `valide_salarie` (ou `conteste`). |
 | `ventes_journalieres` | `date`, `service` (`midi`/`soir`/`journee`), `etablissement`, `ca_ttc`, `ca_ht`, `couverts`, `ticket_moyen` (généré) | Import L'Addition (Liesel OK 97j, Freddy bloqué API). |
 | `devices` | `id`, `nom`, `etablissement`, `code_activation`, `device_token`, `actif` | Si Pilote veut tracer activation tablettes. |
+| `combo_pointages` | `id`, `date_service`, `etablissement_combo`, `etablissement`, `equipe_combo`, `equipe`, `collaborateur_nom_combo`, `user_id` (uuid, nullable), `debut_planifie`/`fin_planifiee`/`pauses_planifiees_minutes`, `debut_pointe`/`fin_pointee`/`pauses_pointees_minutes`, `debut_valide`/`fin_validee`/`pauses_validees_minutes`, `duree_travail_minutes` (généré), `valide_par_nom`, commentaires (3), import_fichier_nom | **Migration v4 (06/06/2026)**. Importé depuis exports Combo XLSX. 3 niveaux : planifié/pointé/validé (le validé = source de vérité paie). Idempotent via UNIQUE(date, collaborateur, etab, debut_planifie). 1994 lignes au 06/06 (jan→juin). |
+| `combo_user_mapping` | `id`, `combo_collaborateur_nom` (unique), `user_id` (uuid, nullable), `match_method`, `match_confidence`, `notes` | **Migration v4**. Lookup table nom Combo ↔ user PBT. 29 mappings pré-remplis. `user_id NULL` = extra refusé à la création (5 cas connus). |
 
-**Total : 7 tables sources sous contrat.**
+### Vues exposées
+
+| Vue (schéma `public`) | Colonnes garanties | Notes |
+|---|---|---|
+| `pointages_unifies` | `source` (`planb-tools`/`combo`), `source_id`, `user_id`, `user_nom`, `date_service`, `etablissement`, `equipe` (nullable), `debut`, `fin`, `duree_pauses_minutes`, `duree_travail_minutes`, `statut`, `valide_par_nom` (nullable), `commentaire` | **Migration v4**. UNION de `pointage_periodes_travail` (fin_service IS NOT NULL) + `combo_pointages` (debut_valide+fin_validee IS NOT NULL). Source de vérité unifiée pour Pilote pendant la cohabitation des 2 systèmes (jusqu'à bascule 01/07/2026). |
+
+**Total : 9 tables sources + 1 vue sous contrat.**
 
 ---
 
@@ -47,11 +55,14 @@ Pour préserver la vélocité de PlanB-Tools et clarifier le périmètre :
 
 | Date | Migration appliquée | Commit hash PlanB-Tools | Notes |
 |---|---|---|---|
-| 2026-04-20 | `pointages/schema.sql` initial | (à compléter) | Création des 4 tables Pointages + 10 postes seedés. |
-| 2026-04-23 | `pointages/migration_v2.sql` | (à compléter par le hash du commit `refactor(pointages): refonte selon vision Eric ...`) | DROP `pointage_salaries`. Renommage `salarie_id` → `user_id`. Index unique fixé sur `(user_id, date_service)`. |
+| 2026-04-20 | `pointages/schema.sql` initial | (historique non traçable) | Création des 4 tables Pointages + 10 postes seedés. |
+| 2026-04-23 | `pointages/migration_v2.sql` | (historique non traçable) | DROP `pointage_salaries`. Renommage `salarie_id` → `user_id`. Index unique fixé sur `(user_id, date_service)`. |
 | 2026-04-26 | Hotfix SQL ad hoc dans Supabase SQL Editor | n/a (pas de fichier versionné) | Fermeture auto des périodes orphelines des jours passés + correction index unique. |
+| 2026-05-14 | `pointages/migration_v3_auto_close.sql` | (historique non traçable) | Job pg_cron quotidien 23:59 UTC qui ferme auto les périodes orphelines avec fin_service=23:59:59. Élimine l'héritage des oublis fin de service. |
+| 2026-06-06 | `pointages/setup_combo_users.sql` | `37389b9` | Création de 8 users + correction 2 typos (Anne-Sophie, Eric Bresler) pour matching Combo. |
+| **2026-06-06** | **`pointages/migration_v4_combo_pointages.sql`** | **`a8557c2`** | **PIN ACTUEL** : tables `combo_pointages` + `combo_user_mapping` + vue `pointages_unifies`. Pré-remplit 29 mappings. **Bloc RLS ajouté par Claude Code au moment du déploiement** (oubli côté Cowork — voir feedback mémoire `feedback_rls_oblig_nouvelle_table`). |
 
-⚠️ **Le hotfix du 26/04 n'est pas dans un fichier `migration_v3.sql`**. À régulariser : créer le fichier post-fait pour traçabilité, ou à minima ajouter une note ici.
+⚠️ **Régularisation à faire** : le hotfix du 26/04 n'est pas dans un fichier versionné. Les hash des commits antérieurs au 2026-06-06 ne sont pas traçables (non capturés à l'époque) — la pratique est désormais de capturer systématiquement le hash à chaque déploiement.
 
 ---
 
@@ -63,8 +74,10 @@ Pour préserver la vélocité de PlanB-Tools et clarifier le périmètre :
 | **Phase 3 — Congés** | juin 2026 | nouvelles : `pointage_conges_demandes`, `pointage_conges_soldes` | Additif. |
 | **Phase 4 — Export paie** | juin 2026 | `pointage_periodes_travail` : remplit `heures_normales_minutes`, `heures_sup_minutes`, `majoration_*_minutes` (actuellement NULL) | **Bonne nouvelle** : Pilote pourra arrêter le workaround `NOW() - debut_service` dans `v_pointages_en_cours`. |
 | **Phase 5 — RLS** | post-juin 2026 | `pointage_*` et `users` : activation Row Level Security | **Risque élevé.** Pilote devra basculer sur `service_role` key ou ajouter des policies dédiées au rôle de lecture admin. Issue de pré-avis obligatoire avant activation. |
-| **Auto-fermeture nocturne** des périodes orphelines | mai 2026 | INSERTs/UPDATEs sur `pointage_periodes_travail` (job cron Supabase) | Pas d'impact schéma. Améliore la fiabilité des données lues par Pilote. |
-| **Correction `duree_travail_minutes`** | en parallèle | Nouvelles fermetures auto utiliseront une heure estimée (pas `fin_service = debut_service`) | Pilote pourra simplifier son workaround. |
+| **Auto-fermeture nocturne** ✅ déployée 14/05 | livré | pg_cron 23:59 UTC sur `pointage_periodes_travail` | fin_service auto-rempli à 23:59:59. Pilote peut compter dessus. |
+| **Import Combo backfill** ✅ déployé 06/06 | livré | `combo_pointages` + vue `pointages_unifies` | 1994 lignes jan→juin 2026 importées. Pilote peut consommer la vue. |
+| **Import Combo routine quotidienne** | juin 2026 | Scheduled task Cowork → `combo_import.py` | Importe automatiquement chaque export quotidien Combo. Pas d'impact schéma. |
+| **Bascule officielle Combo → PlanB-Tools natif** | 01/07/2026 | Plus aucune nouvelle ligne dans `combo_pointages` après cette date | Pilote bascule sa source de vérité sur `pointage_periodes_travail` uniquement (ou continue d'utiliser `pointages_unifies` qui couvrira automatiquement). |
 
 ---
 
