@@ -7077,8 +7077,8 @@ init();
 // SOUS-MODULE : Étiquettes & rapprochement stock (Production)
 // Rapproche les étiquettes scannées en prod (tasks.scans_lots) aux lots
 // réceptionnés (vue stock_par_lot) pour générer les SORTIE de stock.
-// Tables : production_rapprochements, rapprochement_apprentissage
-//          (migration_rapprochement_lots.sql, 05/06/2026)
+// Tables : prelevements (motif_type=production), rapprochement_apprentissage
+//          (migration_prelevement_stock.sql, 05/06/2026)
 // Exposé en window.RAP (inline onclick + switchTab y accèdent).
 // ============================================================================
 window.RAP = (function() {
@@ -7255,7 +7255,8 @@ window.RAP = (function() {
         .select('id, nom, est_principal, article_id, ordre').eq('fiche_id', prod.fiche_id).order('ordre');
       ingredients = ings || [];
     }
-    const { data: rappr } = await sb.from('production_rapprochements').select('*').eq('production_id', productionId);
+    const { data: rappr } = await sb.from('prelevements').select('*')
+      .eq('motif_type', 'production').eq('motif_ref', productionId);
     const etiquettes = construireEtiquettes(scansLots, ingredients);
     await resoudrePhotos(etiquettes);
 
@@ -7285,7 +7286,7 @@ window.RAP = (function() {
     const total = S.etiquettes.length;
     const nbVal = S.etiquettes.filter(e => e.rapprochement && e.rapprochement.statut === 'valide').length;
     const kgSortis = (S.rapprochements||[]).filter(r => r.statut==='valide')
-      .reduce((s,r) => s + (parseFloat(r.quantite_sortie)||0), 0);
+      .reduce((s,r) => s + (parseFloat(r.quantite)||0), 0);
     const resp = (S.lot && (S.lot.responsable_initiales || S.lot.responsable_nom)) || p.producteur_nom || '—';
 
     let header = `<div style="background:#f9fafb; border:1px solid var(--gray-200); border-radius:10px; padding:10px 12px; margin-bottom:12px;">
@@ -7353,7 +7354,7 @@ window.RAP = (function() {
     if (valide) {
       const info = S.lotRecuInfo[r.lot_recu_scan_id] || {};
       bloc = `<div style="margin-top:8px; padding:8px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:12px;">
-          Sorti du stock : <b>${esc(info.produit||'lot')}</b> · lot ${esc(info.lot||'—')} · DLC ${fmtDate(info.dlc)} · ${fmtKg(r.quantite_sortie)}
+          Sorti du stock : <b>${esc(info.produit||'lot')}</b> · lot ${esc(info.lot||'—')} · DLC ${fmtDate(info.dlc)} · ${fmtKg(r.quantite)}
           <div style="font-size:10px; color:var(--gray-500); margin-top:2px;">par ${esc(r.valide_par_initiales||r.valide_par_nom||'?')} · ${esc(r.methode_match||'')}</div>
         </div>`;
     } else {
@@ -7405,15 +7406,17 @@ window.RAP = (function() {
       if (em) throw em;
 
       const payload = {
-        production_id: S.prod.id, tache_id: S.prod.tache_id, fiche_ingredient_id: et.fiche_ingredient_id,
-        cle_etiquette: et.cle_etiquette, scan_prod_id: et.scan_prod_id, lot_recu_scan_id: c.scan_tracabilite_id,
-        statut: 'valide', score_match: sel.score, methode_match: sel.methode,
-        quantite_sortie: reste, unite: unite, stock_mouvement_id: mov.id, etablissement: S.prod.etablissement,
+        motif_type: 'production', motif_ref: S.prod.id,
+        motif_libelle: `Rapprochement production : ${S.prod.nom_produit} (lot ${(S.lot&&S.lot.numero_lot)||'?'})`,
+        article_id: articleId, fiche_ingredient_id: et.fiche_ingredient_id, cle_etiquette: et.cle_etiquette,
+        scan_prod_id: et.scan_prod_id, lot_recu_scan_id: c.scan_tracabilite_id,
+        statut: 'valide', score_match: sel.score, methode_match: sel.methode, prend_tout: true,
+        quantite: reste, unite: unite, stock_mouvement_id: mov.id, etablissement: S.prod.etablissement,
         valide_par_id: currentUser.id, valide_par_nom: currentUser.nom, valide_par_initiales: currentUser.initiales || null,
         valide_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       };
-      if (et.rapprochement && et.rapprochement.id) await sb.from('production_rapprochements').update(payload).eq('id', et.rapprochement.id);
-      else await sb.from('production_rapprochements').insert(payload);
+      if (et.rapprochement && et.rapprochement.id) await sb.from('prelevements').update(payload).eq('id', et.rapprochement.id);
+      else await sb.from('prelevements').insert(payload);
 
       await majApprentissage(et, c, 'valide');
       showToast('Sortie de stock validée ✓', 'success');
@@ -7504,21 +7507,21 @@ window.RAP = (function() {
     try {
       const valides = (S.rapprochements||[]).filter(r => r.statut === 'valide');
       for (const r of valides) {
-        let articleId = null;
-        if (r.stock_mouvement_id) {
+        let articleId = r.article_id || null;
+        if (!articleId && r.stock_mouvement_id) {
           const { data: om } = await sb.from('stock_mouvements').select('article_id').eq('id', r.stock_mouvement_id).maybeSingle();
           articleId = om ? om.article_id : null;
         }
-        if (r.lot_recu_scan_id && r.quantite_sortie) {
+        if (r.lot_recu_scan_id && r.quantite) {
           await sb.from('stock_mouvements').insert({
             type: 'ENTREE', article_id: articleId, scan_tracabilite_id: r.lot_recu_scan_id,
-            quantite: r.quantite_sortie, unite: r.unite || 'kg', etablissement: S.prod.etablissement,
-            motif: `Annulation rapprochement (réouverture) : ${S.prod.nom_produit}`,
+            quantite: r.quantite, unite: r.unite || 'kg', etablissement: S.prod.etablissement,
+            motif: `Annulation prelevement (reouverture) : ${S.prod.nom_produit}`,
             source_table: 'production', source_id: S.prod.id,
             created_by_id: currentUser.id, created_by_nom: currentUser.nom, created_by_initiales: currentUser.initiales || null,
           });
         }
-        await sb.from('production_rapprochements').update({ statut: 'annule', updated_at: new Date().toISOString() }).eq('id', r.id);
+        await sb.from('prelevements').update({ statut: 'annule', updated_at: new Date().toISOString() }).eq('id', r.id);
       }
       const nbR = (S.prod.nb_reouvertures || 0) + 1;
       await sb.from('productions').update({
@@ -7605,16 +7608,20 @@ window.RAP = (function() {
     showLoading(true);
     try {
       const r = et.rapprochement;
-      if (r && r.statut === 'valide' && r.stock_mouvement_id) {
-        const { data: om } = await sb.from('stock_mouvements').select('article_id').eq('id', r.stock_mouvement_id).maybeSingle();
+      if (r && r.statut === 'valide') {
+        let artId = r.article_id || null;
+        if (!artId && r.stock_mouvement_id) {
+          const { data: om } = await sb.from('stock_mouvements').select('article_id').eq('id', r.stock_mouvement_id).maybeSingle();
+          artId = om ? om.article_id : null;
+        }
         await sb.from('stock_mouvements').insert({
-          type: 'ENTREE', article_id: om ? om.article_id : null, scan_tracabilite_id: r.lot_recu_scan_id,
-          quantite: r.quantite_sortie, unite: r.unite || 'kg', etablissement: S.prod.etablissement,
-          motif: `Annulation rapprochement (suppression étiquette) : ${S.prod.nom_produit}`,
+          type: 'ENTREE', article_id: artId, scan_tracabilite_id: r.lot_recu_scan_id,
+          quantite: r.quantite, unite: r.unite || 'kg', etablissement: S.prod.etablissement,
+          motif: `Annulation prelevement (suppression etiquette) : ${S.prod.nom_produit}`,
           source_table: 'production', source_id: S.prod.id,
           created_by_id: currentUser.id, created_by_nom: currentUser.nom, created_by_initiales: currentUser.initiales || null,
         });
-        await sb.from('production_rapprochements').update({ statut: 'annule', updated_at: new Date().toISOString() }).eq('id', r.id);
+        await sb.from('prelevements').update({ statut: 'annule', updated_at: new Date().toISOString() }).eq('id', r.id);
       }
       const idx = parseInt(et.cle_etiquette.split(':')[1], 10);
       const sl = JSON.parse(JSON.stringify(S.scansLots || {}));
@@ -7684,8 +7691,9 @@ window.RAP = (function() {
       const ids = list.map(p => p.id);
       const lotIds = list.map(p => p.lot_id).filter(Boolean);
       const tacheIds = list.map(p => p.tache_id).filter(Boolean);
-      const { data: rappr } = await sb.from('production_rapprochements').select('production_id, statut').in('production_id', ids);
-      const valByProd = {}; (rappr||[]).forEach(r => { if (r.statut === 'valide') valByProd[r.production_id] = (valByProd[r.production_id]||0)+1; });
+      const { data: rappr } = await sb.from('prelevements').select('motif_ref, statut')
+        .eq('motif_type', 'production').in('motif_ref', ids);
+      const valByProd = {}; (rappr||[]).forEach(r => { if (r.statut === 'valide') valByProd[r.motif_ref] = (valByProd[r.motif_ref]||0)+1; });
       let lotsById = {};
       if (lotIds.length) { const { data: lots } = await sb.from('lots_production').select('id, numero_lot').in('id', lotIds); (lots||[]).forEach(l => lotsById[l.id] = l); }
       let etByTache = {};
