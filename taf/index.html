@@ -842,6 +842,43 @@
       .task-name { font-size: 0.8rem; }
       .header h1 { font-size: 1rem; }
     }
+
+    /* ====== BRIEFING TAB ====== */
+    .briefing-container { padding: 16px; }
+    .briefing-section {
+      background: white; border-radius: var(--radius); margin-bottom: 12px;
+      padding: 12px; box-shadow: var(--shadow);
+    }
+    .briefing-section h3 { font-size: 0.9rem; font-weight: 600; color: var(--gray-800); margin-bottom: 8px; }
+    .briefing-section p { font-size: 0.85rem; color: var(--gray-600); line-height: 1.4; margin: 0; }
+    .briefing-status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 0.7rem; font-weight: 600; margin-bottom: 8px;
+      background: var(--gray-100); color: var(--gray-600);
+    }
+    .briefing-status-badge.finalized { background: var(--green-bg); color: var(--green); }
+    .briefing-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-briefing { padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+      background: white; font-size: 0.85rem; cursor: pointer; font-weight: 500; }
+    .btn-briefing.primary { background: var(--orange); color: white; border-color: var(--orange); }
+    .btn-briefing.secondary { background: var(--gray-100); color: var(--gray-700); }
+    .btn-briefing:active { transform: scale(0.97); }
+
+    .briefing-form-row { margin-bottom: 12px; }
+    .briefing-form-row label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--gray-600);
+      margin-bottom: 4px; text-transform: uppercase; }
+    .briefing-form-row textarea { width: 100%; padding: 8px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); font-size: 0.85rem; font-family: inherit; min-height: 80px; }
+    .briefing-form-row input[type="checkbox"] { margin-right: 6px; accent-color: var(--orange); }
+    .briefing-checkbox { display: flex; align-items: center; font-size: 0.85rem; margin-bottom: 4px; cursor: pointer; }
+
+    /* Photo input */
+    .photo-capture-btn { padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      background: white; cursor: pointer; font-size: 0.85rem; }
+    .photo-preview { width: 100%; max-width: 200px; border-radius: var(--radius-sm); margin-top: 8px; }
+    .briefing-history { margin-top: 16px; max-height: 300px; overflow-y: auto; }
+    .history-item { background: var(--gray-50); padding: 8px 12px; border-radius: var(--radius-sm);
+      margin-bottom: 6px; font-size: 0.8rem; color: var(--gray-600); }
   </style>
 </head>
 <body>
@@ -917,6 +954,7 @@
   <!-- TABS -->
   <div class="tabs-bar" id="tabs-bar">
     <button class="tab-btn active" data-tab="taches" onclick="switchTab('taches')">Tâches<span class="tab-badge" id="tab-badge-mine">0</span></button>
+    <button class="tab-btn" data-tab="briefing" onclick="switchTab('briefing')">Briefing</button>
     <button class="tab-btn" data-tab="creer" onclick="switchTab('creer')" style="display:none">+ Créer</button>
     <button class="tab-btn" data-tab="recurrences" onclick="switchTab('recurrences')" id="tab-recurrences" style="display:none">Récurrences</button>
     <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="tab-admin" style="display:none">Admin</button>
@@ -1851,6 +1889,7 @@
     updateMineBadge();
     switch (currentTab) {
       case 'taches': renderTasksTab(); break;
+      case 'briefing': renderBriefingTab(); break;
       case 'creer': renderCreateTab(); break;
       case 'recurrences': renderRecurrencesTab(); break;
       case 'admin': renderAdminTab(); break;
@@ -5757,6 +5796,282 @@
       toast.classList.remove('show');
       setTimeout(() => toast.remove(), 300);
     }, duration || 8000);
+  }
+
+  // ====== BRIEFING TAB ======
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function renderBriefingTab() {
+    document.getElementById('main-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400);">Chargement du briefing...</div>';
+    try {
+      await loadBriefing();
+    } catch (e) {
+      console.error('Erreur briefing:', e);
+      showToast('Erreur chargement briefing', 'error');
+    }
+  }
+
+  async function loadBriefing() {
+    const today = dateStr(filterDate);
+    // Determine current service time : 00:00-12:00 = soir (from yesterday), 12:00-15:30 = soir (today), 15:30+ = soir (today)
+    // But display: "apres-midi" written as "apres-midi" in service_type
+    const hour = new Date().getHours();
+    let currentService = 'soir';
+    let displayService = 'Soir';
+    if (hour >= 12 && hour < 15.5) {
+      currentService = 'apres-midi';
+      displayService = 'Apres-midi';
+    } else if (hour < 12) {
+      currentService = 'soir';
+      displayService = 'Soir (veille)';
+    }
+
+    // Load current briefing
+    const { data: briefing, error } = await supabaseClient
+      .from('service_briefings')
+      .select('*')
+      .eq('etablissement', currentEtablissement)
+      .eq('date_briefing', today)
+      .eq('service_type', currentService)
+      .single()
+      .catch(() => ({ data: null, error: null })); // Not found is OK
+
+    let html = `<div class="briefing-container">
+      <div style="margin-bottom:16px;">
+        <h2 style="margin-bottom:8px;">Briefing ${displayService}</h2>
+        <p style="font-size:0.85rem;color:var(--gray-500);">Cooperez pour transmettre les infos a l'equipe suivante</p>
+      </div>`;
+
+    if (!briefing) {
+      // Nouveau briefing vide
+      html += `<div class="briefing-section">
+        <p style="color:var(--gray-400);margin-bottom:12px;">Aucun briefing encore. Cliquez sur "Editer" pour remplir.</p>
+        <div class="briefing-actions">
+          <button class="btn-briefing primary" onclick="openBriefingEditModal()">✏ Editer</button>
+        </div>
+      </div>`;
+    } else {
+      // Afficher le briefing existant
+      const sections = [
+        { key: 'livraisons_attendues', label: 'Livraisons attendues', icon: '📦' },
+        { key: 'produits_dlc', label: 'Produits a dates courtes', icon: '⏰' },
+        { key: 'cuissons_nuit', label: 'Cuissons de nuit a debarrasser', icon: '🔥' },
+        { key: 'difficultes', label: 'Difficultes rencontrees', icon: '⚠' },
+        { key: 'points_discuter', label: 'Points a discuter de vive voix', icon: '💬' },
+        { key: 'equipements_defectueux', label: 'Equipements defectueux', icon: '🔧' },
+        { key: 'actions_commencer', label: 'Actions a commencer', icon: '➜' }
+      ];
+
+      const status = briefing.is_finalized ? 'Finalise' : 'En cours';
+      html += `<div style="margin-bottom:12px;">
+        <span class="briefing-status-badge ${briefing.is_finalized ? 'finalized' : ''}">Status: ${status}</span>
+      </div>`;
+
+      sections.forEach(sec => {
+        const value = briefing[sec.key];
+        if (value) {
+          html += `<div class="briefing-section">
+            <h3>${sec.icon} ${sec.label}</h3>
+            <p>${escapeHtml(value)}</p>`;
+          if (sec.key === 'equipements_defectueux' && briefing.equipements_defectueux_photo_base64) {
+            html += `<img src="data:image/jpeg;base64,${briefing.equipements_defectueux_photo_base64}" class="photo-preview" alt="Photo equip">`;
+          }
+          html += `</div>`;
+        }
+      });
+
+      html += `<div class="briefing-section">
+        <p style="font-size:0.75rem;color:var(--gray-400);">Mis a jour par: ${escapeHtml(briefing.created_by || '?')} le ${new Date(briefing.updated_at).toLocaleString('fr-FR')}</p>
+      </div>`;
+
+      html += `<div class="briefing-actions">
+        <button class="btn-briefing primary" onclick="openBriefingEditModal()" ${briefing.is_finalized ? 'disabled' : ''}>✏ Editer</button>
+        ${!briefing.is_finalized ? `<button class="btn-briefing secondary" onclick="finalizeBriefing()">✓ Finaliser pour l'equipe suivante</button>` : ''}
+      </div>`;
+
+      // Historique (derniers briefings)
+      const { data: history } = await supabaseClient
+        .from('service_briefings')
+        .select('*')
+        .eq('etablissement', currentEtablissement)
+        .order('date_briefing', { ascending: false })
+        .limit(5)
+        .catch(() => ({ data: [] }));
+
+      if (history && history.length > 1) {
+        html += `<div class="briefing-history">
+          <h4 style="font-size:0.85rem;color:var(--gray-600);margin-bottom:8px;">Historique recent</h4>`;
+        history.slice(1).forEach(h => {
+          const dateStr = new Date(h.date_briefing).toLocaleDateString('fr-FR');
+          html += `<div class="history-item">${dateStr} — ${h.service_type} — ${h.is_finalized ? '✓ Finalise' : 'En cours'}</div>`;
+        });
+        html += `</div>`;
+      }
+    }
+
+    html += `</div>`;
+    document.getElementById('main-content').innerHTML = html;
+    window.__currentBriefing = briefing;
+  }
+
+  async function openBriefingEditModal() {
+    const briefing = window.__currentBriefing || {};
+    const sections = [
+      { key: 'livraisons_attendues', label: 'Livraisons attendues', placeholder: 'Ex: farine 25kg, oeufs 10 boites' },
+      { key: 'produits_dlc', label: 'Produits a dates courtes', placeholder: 'Ex: creme fraiche fin seance, lait vendredi' },
+      { key: 'cuissons_nuit', label: 'Cuissons de nuit a debarrasser', placeholder: 'Ex: pates au frigo, volailles chambre 1' },
+      { key: 'difficultes', label: 'Difficultes rencontrees', placeholder: 'Ex: fournisseur en retard, probleme congelateur' },
+      { key: 'points_discuter', label: 'Points a discuter de vive voix', placeholder: 'Ex: formation nouvel employe, reunion manager' },
+      { key: 'equipements_defectueux', label: 'Equipements defectueux', placeholder: 'Ex: frigo entree 2 bruite, plaque 3 en panne', caption: 'photo obligatoire' },
+      { key: 'actions_commencer', label: 'Actions a commencer (marinades, prepp...)', placeholder: 'Ex: marinade choucroute demain, prep fonds' }
+    ];
+
+    let html = `<div style="padding:12px;">`;
+    sections.forEach(sec => {
+      const value = briefing[sec.key] || '';
+      const hasValue = !!value;
+      html += `<div class="briefing-form-row">
+        <label>
+          <input type="checkbox" ${hasValue ? 'checked' : ''} onchange="document.getElementById('${sec.key}-field').style.display = this.checked ? 'block' : 'none'">
+          ${sec.label}
+          ${sec.caption ? ` <span style="color:var(--gray-400);font-weight:400;">(${sec.caption})</span>` : ''}
+        </label>
+        <textarea id="${sec.key}-field" placeholder="${sec.placeholder}" style="display:${hasValue ? 'block' : 'none'}">${escapeHtml(value)}</textarea>`;
+
+      if (sec.key === 'equipements_defectueux') {
+        const photoBase64 = briefing.equipements_defectueux_photo_base64 || '';
+        html += `<div style="margin-top:8px;">
+          <button class="photo-capture-btn" type="button" onclick="capturePhotoForBriefing()">📷 Photo (obligatoire si rempli)</button>`;
+        if (photoBase64) {
+          html += `<img src="data:image/jpeg;base64,${photoBase64}" class="photo-preview" alt="Photo equipement" id="photo-preview-briefing">`;
+        } else {
+          html += `<div id="photo-preview-briefing"></div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+    });
+
+    html += `<div style="margin-top:16px;display:flex;gap:8px;">
+      <button class="btn-briefing primary" onclick="saveBriefingFromModal()">Enregistrer</button>
+      <button class="btn-briefing secondary" onclick="closeModal()">Annuler</button>
+    </div></div>`;
+
+    openModal('Editer le briefing', html, []);
+  }
+
+  async function saveBriefingFromModal() {
+    try {
+      const sections = ['livraisons_attendues', 'produits_dlc', 'cuissons_nuit', 'difficultes', 'points_discuter', 'equipements_defectueux', 'actions_commencer'];
+      const today = dateStr(filterDate);
+      const hour = new Date().getHours();
+      const serviceType = (hour >= 12 && hour < 15.5) ? 'apres-midi' : 'soir';
+
+      const payload = {
+        etablissement: currentEtablissement,
+        date_briefing: today,
+        service_type: serviceType,
+        created_by: currentUser?.email || currentUser?.nom || 'unknown',
+        updated_at: new Date().toISOString()
+      };
+
+      let hasValue = false;
+      sections.forEach(sec => {
+        const val = (document.getElementById(sec + '-field')?.value || '').trim();
+        if (val) {
+          payload[sec] = val;
+          hasValue = true;
+        }
+      });
+
+      if (!hasValue) {
+        showToast('Remplissez au moins une section', 'error');
+        return;
+      }
+
+      // Check equipements_defectueux : si rempli, photo obligatoire
+      if (payload.equipements_defectueux && !window.__briefingPhotoBase64) {
+        showToast('Photo obligatoire pour les equipements defectueux', 'error');
+        return;
+      }
+
+      if (window.__briefingPhotoBase64) {
+        payload.equipements_defectueux_photo_base64 = window.__briefingPhotoBase64;
+      }
+
+      // Upsert
+      const { error } = await supabaseClient
+        .from('service_briefings')
+        .upsert(payload, { onConflict: 'etablissement,date_briefing,service_type' });
+
+      if (error) throw error;
+      closeModal();
+      window.__briefingPhotoBase64 = null;
+      loadBriefing();
+      showToast('Briefing enregistre', 'success');
+    } catch (e) {
+      console.error('Erreur save briefing:', e);
+      showToast('Erreur enregistrement', 'error');
+    }
+  }
+
+  async function finalizeBriefing() {
+    const briefing = window.__currentBriefing;
+    if (!briefing) { showToast('Aucun briefing a finaliser', 'error'); return; }
+
+    openModal('Finaliser le briefing ?', `
+      <p>Ceci marque le briefing comme finalise et transmis a l'equipe suivante.</p>
+      <p>Vous pourrez toujours le consulter, mais pas le modifier.</p>
+    `, [
+      { label: 'Annuler', action: 'closeModal()' },
+      { label: 'Oui, finaliser', cls: 'danger', action: 'doFinalizeBriefing()' }
+    ]);
+  }
+
+  async function doFinalizeBriefing() {
+    try {
+      const briefing = window.__currentBriefing;
+      const { error } = await supabaseClient
+        .from('service_briefings')
+        .update({ is_finalized: true })
+        .eq('id', briefing.id);
+      if (error) throw error;
+      closeModal();
+      loadBriefing();
+      showToast('Briefing finalise et transmis', 'success');
+    } catch (e) {
+      console.error('Erreur finalize:', e);
+      showToast('Erreur finalisation', 'error');
+    }
+  }
+
+  async function capturePhotoForBriefing() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const base64 = evt.target.result.split(',')[1];
+        window.__briefingPhotoBase64 = base64;
+        const preview = document.getElementById('photo-preview-briefing');
+        preview.innerHTML = `<img src="data:image/jpeg;base64,${base64}" class="photo-preview" alt="Photo">`;
+        showToast('Photo capturee', 'success');
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   }
 
   // ====== INIT ======

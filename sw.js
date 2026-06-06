@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v21';   // bump à chaque mise à jour du SW (v21 : appro onglet Receptions Phase 1 validation manuelle 06/06/2026)
+const CACHE_NAME = 'planb-tools-v22';   // bump à chaque mise à jour du SW (v22 : TAF onglet Briefing cuisine + table service_briefings 06/06/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
