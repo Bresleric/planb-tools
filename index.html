@@ -571,6 +571,25 @@
             opacity: 0.6;
             pointer-events: none;
         }
+
+        /* Briefing Overlay Sections */
+        .bo-section { background:white; border-radius:12px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow:hidden; }
+        .bo-section-header { padding:12px 14px; font-size:14px; font-weight:700; color:#374151; display:flex; align-items:center; gap:8px; }
+        .bo-section-body { padding:0 14px 12px; }
+        .bo-kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+        .bo-kpi { background:#f9fafb; border-radius:8px; padding:8px; text-align:center; }
+        .bo-kpi-label { font-size:10px; font-weight:600; color:#9ca3af; text-transform:uppercase; }
+        .bo-kpi-value { font-size:16px; font-weight:800; color:#1f2937; margin-top:2px; }
+        .bo-kpi.highlight { background:#fff7ed; }
+        .bo-kpi.highlight .bo-kpi-value { color:#ea580c; }
+        .bo-item { display:flex; gap:8px; padding:6px 0; border-bottom:1px solid #f3f4f6; font-size:13px; }
+        .bo-item:last-child { border-bottom:none; }
+        .bo-item-icon { flex-shrink:0; }
+        .bo-item-text { flex:1; color:#374151; }
+        .bo-badge { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+        .bo-equipe-group { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin:6px 0 2px; }
+        .bo-equipe-member { font-size:12px; color:#4b5563; padding:2px 0; display:flex; gap:6px; }
+        .bo-equipe-initiales { font-weight:700; width:22px; }
     </style>
 </head>
 <body>
@@ -669,6 +688,39 @@
         </div>
         <div class="dashboard-content">
             <div class="modules-grid" id="modules-grid"></div>
+        </div>
+    </div>
+
+
+    <!-- Briefing Obligatoire Overlay -->
+    <div id="briefing-overlay" class="screen" style="display:none;">
+        <div style="background:var(--bg); min-height:100vh; display:flex; flex-direction:column;">
+            <!-- Header -->
+            <div style="background:var(--orange); color:white; padding:16px 20px; text-align:center; flex-shrink:0;">
+                <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Briefing du jour</div>
+                <div id="briefing-overlay-title" style="font-size:18px; font-weight:800; margin-top:4px;">Chargement...</div>
+            </div>
+            <!-- Briefing Content (scrollable) -->
+            <div id="briefing-overlay-content" style="flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px;">
+                <div style="text-align:center; padding:40px; color:var(--text-secondary);">Chargement du briefing...</div>
+            </div>
+            <!-- Signature Footer (fixed bottom) -->
+            <div id="briefing-overlay-footer" style="background:white; border-top:2px solid var(--orange); padding:16px 20px; flex-shrink:0;">
+                <div style="font-size:13px; font-weight:600; color:var(--text); text-align:center; margin-bottom:12px;">
+                    Pour confirmer votre lecture, saisissez votre code PIN :
+                </div>
+                <div style="display:flex; gap:10px; align-items:center; justify-content:center;">
+                    <input type="password" id="briefing-pin-input" inputmode="numeric" maxlength="6" placeholder="PIN"
+                        style="width:120px; text-align:center; font-size:24px; font-weight:800; letter-spacing:8px; padding:12px;
+                        border:2px solid var(--border); border-radius:12px; background:var(--bg);">
+                    <button id="briefing-confirm-btn" disabled
+                        style="background:var(--orange); color:white; border:none; padding:14px 24px; border-radius:12px;
+                        font-size:15px; font-weight:700; cursor:pointer; white-space:nowrap; opacity:0.5;">
+                        &#10003; J'ai lu
+                    </button>
+                </div>
+                <div id="briefing-pin-error" style="color:#ef4444; font-size:12px; text-align:center; margin-top:8px; min-height:16px;"></div>
+            </div>
         </div>
     </div>
 
@@ -1376,9 +1428,7 @@
                 if (currentUser.etablissements.length === 1) {
                     currentEstablishment = currentUser.etablissements[0];
                     storeSession(currentUser, currentEstablishment);
-                    updateHeader();
-                    renderModules();
-                    showScreen(dashboardScreen);
+                    showDashboardOrBriefing();
                 } else {
                     establishmentSubtitle.textContent = `Bienvenue, ${currentUser.nom}`;
                     showScreen(establishmentScreen);
@@ -1470,12 +1520,11 @@
                         // Auto-select single establishment
                         currentEstablishment = user.etablissements[0];
                         storeSession(user, currentEstablishment);
-                        // Check si premier login du jour → redirect Pointages
+                        // Check si premier login du jour → redirect Pointages (prioritaire)
                         const redirected = await checkAndRedirectIfFirstPointage(user, currentEstablishment);
                         if (!redirected) {
-                            updateHeader();
-                            renderModules();
-                            showScreen(dashboardScreen);
+                            // Sinon : dashboard, ou overlay briefing obligatoire si non lu
+                            await showDashboardOrBriefing();
                         }
                     } else {
                         // Show establishment selector
@@ -1515,18 +1564,295 @@
             return false;
         }
 
+
+        // ============= Briefing Obligatoire =============
+        async function checkMandatoryBriefingOnLogin() {
+            if (DEMO_MODE || !supabaseClient || !currentUser || !currentEstablishment) {
+                return false; // pas de blocage
+            }
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                // Determiner le service selon l'heure
+                const hour = new Date().getHours();
+                const currentService = hour < 16 ? 'midi' : 'soir';
+
+                // Chercher un briefing publie pour aujourd'hui
+                const { data: briefs } = await supabaseClient
+                    .from('briefings')
+                    .select('*')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('date', today)
+                    .eq('statut', 'publie')
+                    .or(`and(type.eq.service,service.eq.${currentService}),type.eq.jour`)
+                    .order('type')
+                    .limit(1);
+
+                if (!briefs || briefs.length === 0) return false;
+                const briefing = briefs[0];
+
+                // Verifier si l'utilisateur a deja lu ce briefing
+                const { data: lectures } = await supabaseClient
+                    .from('briefing_lectures')
+                    .select('id')
+                    .eq('briefing_id', briefing.id)
+                    .eq('user_id', currentUser.id)
+                    .limit(1);
+
+                if (lectures && lectures.length > 0) return false; // deja lu
+
+                // Briefing non lu => afficher l'overlay
+                showBriefingOverlay(briefing, currentService);
+                return true; // blocage actif
+            } catch (err) {
+                console.warn('Briefing check error:', err);
+                return false;
+            }
+        }
+
+        function showBriefingOverlay(briefing, service) {
+            const overlay = document.getElementById('briefing-overlay');
+            const titleEl = document.getElementById('briefing-overlay-title');
+            const contentEl = document.getElementById('briefing-overlay-content');
+            const pinInput = document.getElementById('briefing-pin-input');
+            const confirmBtn = document.getElementById('briefing-confirm-btn');
+            const pinError = document.getElementById('briefing-pin-error');
+
+            // Titre
+            const serviceLabel = briefing.type === 'jour' ? 'Journee' : (briefing.service === 'midi' ? 'Midi' : 'Soir');
+            const etabLabel = currentEstablishment === 'freddy' ? 'Freddy' : 'Liesel';
+            titleEl.textContent = `${etabLabel} — ${serviceLabel} — ${formatDateBriefing(briefing.date)}`;
+
+            // Contenu du briefing
+            contentEl.innerHTML = renderBriefingOverlayContent(briefing);
+
+            // PIN input
+            pinInput.value = '';
+            pinError.textContent = '';
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = '0.5';
+
+            pinInput.addEventListener('input', function() {
+                const val = this.value.replace(/[^0-9]/g, '');
+                this.value = val;
+                const valid = val.length >= 4;
+                confirmBtn.disabled = !valid;
+                confirmBtn.style.opacity = valid ? '1' : '0.5';
+                pinError.textContent = '';
+            });
+
+            confirmBtn.onclick = async function() {
+                const pin = pinInput.value;
+                // Verifier que le PIN correspond a l'utilisateur connecte
+                if (pin !== currentUser.code && pin !== currentUser.id?.toString()) {
+                    // Verifier via la base
+                    try {
+                        const { data: checkUser } = await supabaseClient
+                            .from('users')
+                            .select('id')
+                            .eq('code', pin)
+                            .eq('id', currentUser.id)
+                            .limit(1);
+                        if (!checkUser || checkUser.length === 0) {
+                            pinError.textContent = 'Code PIN incorrect. Saisissez votre propre code.';
+                            pinInput.value = '';
+                            confirmBtn.disabled = true;
+                            confirmBtn.style.opacity = '0.5';
+                            return;
+                        }
+                    } catch(e) {
+                        pinError.textContent = 'Erreur de verification.';
+                        return;
+                    }
+                }
+
+                // PIN valide => enregistrer la lecture
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Enregistrement...';
+
+                try {
+                    await supabaseClient.from('briefing_lectures').upsert({
+                        briefing_id: briefing.id,
+                        user_id: currentUser.id,
+                        user_nom: currentUser.nom,
+                        user_initiales: currentUser.initiales,
+                        lu_at: new Date().toISOString()
+                    }, { onConflict: 'briefing_id,user_id' });
+
+                    showToast('Briefing lu et signe !', 'success');
+                    overlay.style.display = 'none';
+                    // Maintenant afficher le dashboard
+                    renderModules();
+                    showScreen(dashboardScreen);
+                } catch (err) {
+                    console.error('Lecture save error:', err);
+                    pinError.textContent = 'Erreur. Reessayez.';
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '✓ J\'ai lu';
+                }
+            };
+
+            // Afficher l'overlay
+            overlay.style.display = 'block';
+        }
+
+        function renderBriefingOverlayContent(b) {
+            let html = '';
+            const fmtMoney = (v) => {
+                const num = parseFloat(v);
+                if (!num && num !== 0) return '—';
+                return num.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '€';
+            };
+            const esc = (s) => { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+            // Chiffres cles
+            if (b.chiffres && Object.keys(b.chiffres).length > 0) {
+                const c = b.chiffres;
+                html += `<div class="bo-section">
+                    <div class="bo-section-header">📊 Chiffres cles</div>
+                    <div class="bo-section-body">
+                        <div class="bo-kpi-grid">
+                            <div class="bo-kpi"><div class="bo-kpi-label">CA Veille</div><div class="bo-kpi-value">${fmtMoney(c.ca_veille)}</div></div>
+                            <div class="bo-kpi"><div class="bo-kpi-label">Couverts</div><div class="bo-kpi-value">${c.couverts_veille || '—'}</div></div>
+                            <div class="bo-kpi"><div class="bo-kpi-label">Ticket moy.</div><div class="bo-kpi-value">${fmtMoney(c.ticket_moyen_veille)}</div></div>
+                        </div>
+                        <div class="bo-kpi-grid" style="margin-top:6px;">
+                            <div class="bo-kpi highlight"><div class="bo-kpi-label">Reserv.</div><div class="bo-kpi-value">${c.reservations || '—'}</div></div>
+                            <div class="bo-kpi highlight"><div class="bo-kpi-label">Couv. attendus</div><div class="bo-kpi-value">${c.couverts_attendus || '—'}</div></div>
+                            <div class="bo-kpi highlight"><div class="bo-kpi-label">CA Prevu</div><div class="bo-kpi-value">${fmtMoney(c.ca_prevu)}</div></div>
+                        </div>
+                        <div class="bo-kpi-grid" style="margin-top:6px;">
+                            <div class="bo-kpi" style="grid-column:span 3; background:#eff6ff;">
+                                <div class="bo-kpi-label">CA N-1</div>
+                                <div class="bo-kpi-value" style="color:#3b82f6;">${fmtMoney(c.ca_n1)} — ${c.couverts_n1 || '—'} couv.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            // Equipes
+            if (b.equipes && b.equipes.length > 0) {
+                const groups = {};
+                b.equipes.forEach(e => { const g = e.equipe || 'autre'; if (!groups[g]) groups[g] = []; groups[g].push(e); });
+                const colors = { cuisine:'#ef4444', salle:'#f97316', plonge:'#8b5cf6', autre:'#6b7280' };
+                const labels = { cuisine:'Cuisine', salle:'Salle', plonge:'Plonge', autre:'Autre' };
+                let eqHtml = '';
+                for (const [grp, members] of Object.entries(groups)) {
+                    eqHtml += `<div class="bo-equipe-group" style="color:${colors[grp]||'#6b7280'};">${labels[grp]||grp} (${members.length})</div>`;
+                    members.forEach(m => {
+                        eqHtml += `<div class="bo-equipe-member"><span class="bo-equipe-initiales" style="color:${colors[grp]||'#6b7280'};">${esc(m.initiales||'?')}</span> ${esc(m.nom)} <span style="color:#9ca3af; margin-left:auto; font-size:10px;">${esc(m.horaire||'')}</span></div>`;
+                    });
+                }
+                html += `<div class="bo-section"><div class="bo-section-header">👥 Equipes (${b.equipes.length})</div><div class="bo-section-body">${eqHtml}</div></div>`;
+            }
+
+            // Evenements VIP
+            if (b.evenements && b.evenements.length > 0) {
+                let evHtml = '';
+                b.evenements.forEach(ev => {
+                    evHtml += `<div class="bo-item"><div class="bo-item-icon">⭐</div><div class="bo-item-text"><strong>${esc(ev.description)}</strong><br><span style="font-size:11px; color:#9ca3af;">${esc(ev.heure||'')} — ${ev.couverts||'?'} couv.${ev.allergies ? ' — Allergies: '+esc(ev.allergies) : ''}</span></div></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">⭐ Evenements / VIP</div><div class="bo-section-body">${evHtml}</div></div>`;
+            }
+
+            // Plats / Suggestions
+            if (b.plats_suggestions && b.plats_suggestions.length > 0) {
+                let plHtml = '';
+                b.plats_suggestions.forEach(p => {
+                    plHtml += `<div class="bo-item"><div class="bo-item-icon">🍽️</div><div class="bo-item-text"><strong>${esc(p.plat)}</strong>${p.prix ? ' — '+fmtMoney(p.prix) : ''}${p.commentaire ? '<br><span style="font-size:11px; color:#9ca3af;">'+esc(p.commentaire)+'</span>' : ''}</div></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">🍽️ Plats / Suggestions</div><div class="bo-section-body">${plHtml}</div></div>`;
+            }
+
+            // Produits limites
+            if (b.produits_limites && b.produits_limites.length > 0) {
+                let limHtml = '';
+                b.produits_limites.forEach(p => {
+                    limHtml += `<div class="bo-item"><div class="bo-item-icon">⚠️</div><div class="bo-item-text">${esc(p.produit)} — <strong>${p.quantite} ${esc(p.unite||'pcs')}</strong>${p.observation ? ' — '+esc(p.observation) : ''}</div></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">⚠️ Produits limites</div><div class="bo-section-body">${limHtml}</div></div>`;
+            }
+
+            // Dates courtes
+            if (b.produits_dates_courtes && b.produits_dates_courtes.length > 0) {
+                let dcHtml = '';
+                b.produits_dates_courtes.forEach(p => {
+                    dcHtml += `<div class="bo-item"><div class="bo-item-icon">📅</div><div class="bo-item-text">${esc(p.produit)} — DLC: ${esc(p.date_limite||'')} — ${esc(p.action||'')}</div></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">📅 Dates courtes</div><div class="bo-section-body">${dcHtml}</div></div>`;
+            }
+
+            // Incidents
+            if (b.incidents && b.incidents.length > 0) {
+                let incHtml = '';
+                b.incidents.forEach(inc => {
+                    const prioColor = inc.priorite === 'haute' ? '#ef4444' : (inc.priorite === 'moyenne' ? '#f59e0b' : '#3b82f6');
+                    incHtml += `<div class="bo-item"><div class="bo-item-icon">🚨</div><div class="bo-item-text"><strong>${esc(inc.description)}</strong>${inc.mesure_corrective ? '<br><span style="color:#22c55e; font-size:11px;">➡ '+esc(inc.mesure_corrective)+'</span>' : ''}</div><span class="bo-badge" style="background:${prioColor}15; color:${prioColor};">${esc(inc.priorite||'')}</span></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">🚨 Incidents</div><div class="bo-section-body">${incHtml}</div></div>`;
+            }
+
+            // Objectifs
+            if (b.objectifs && b.objectifs.length > 0) {
+                let objHtml = '';
+                b.objectifs.forEach(o => {
+                    objHtml += `<div class="bo-item"><div class="bo-item-icon">🎯</div><div class="bo-item-text">${esc(o.objectif)}</div></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">🎯 Objectifs</div><div class="bo-section-body">${objHtml}</div></div>`;
+            }
+
+            // Rappels
+            if (b.rappels && b.rappels.length > 0) {
+                let rapHtml = '';
+                b.rappels.forEach(r => {
+                    rapHtml += `<div class="bo-item"><div class="bo-item-icon">💬</div><div class="bo-item-text">${esc(r.message)}</div></div>`;
+                });
+                html += `<div class="bo-section"><div class="bo-section-header">💬 Rappels</div><div class="bo-section-body">${rapHtml}</div></div>`;
+            }
+
+            // Notes libres
+            if (b.notes_libres) {
+                html += `<div class="bo-section"><div class="bo-section-header">📝 Notes</div><div class="bo-section-body"><div style="font-size:13px; color:#374151; white-space:pre-wrap;">${esc(b.notes_libres)}</div></div></div>`;
+            }
+
+            if (!html) {
+                html = '<div style="text-align:center; padding:40px; color:#9ca3af;">Briefing publie sans contenu detaille.</div>';
+            }
+
+            return html;
+        }
+
+        function formatDateBriefing(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr + 'T12:00:00');
+            const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+            const mois = ['jan','fev','mar','avr','mai','juin','juil','aout','sep','oct','nov','dec'];
+            return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]}`;
+        }
+
+        // Fonction wrapper : affiche le dashboard OU l'overlay briefing
+        async function showDashboardOrBriefing() {
+            updateHeader();
+            showScreen(dashboardScreen);
+            const blocked = await checkMandatoryBriefingOnLogin();
+            if (!blocked) {
+                renderModules();
+            }
+            // Si blocked, le dashboard ne montre pas les modules tant que le briefing n'est pas signe
+            // loadModuleBadges sera appele apres signature
+        }
+
         // ============= Event Listeners: Establishment =============
         document.querySelectorAll('.establishment-card').forEach(card => {
             card.addEventListener('click', async () => {
                 const establishment = card.dataset.establishment;
                 currentEstablishment = establishment;
                 storeSession(currentUser, establishment);
-                // Check si premier login du jour → redirect Pointages
+                // Check si premier login du jour → redirect Pointages (prioritaire)
                 const redirected = await checkAndRedirectIfFirstPointage(currentUser, establishment);
                 if (!redirected) {
-                    updateHeader();
-                    renderModules();
-                    showScreen(dashboardScreen);
+                    // Sinon : dashboard, ou overlay briefing obligatoire si non lu
+                    await showDashboardOrBriefing();
                 }
             });
         });
@@ -1560,9 +1886,7 @@
                 if (session.device_id) {
                     currentDevice = { id: session.device_id, nom: session.device_nom };
                 }
-                updateHeader();
-                renderModules();
-                showScreen(dashboardScreen);
+                await showDashboardOrBriefing();
             } else {
                 showScreen(loginScreen);
             }
