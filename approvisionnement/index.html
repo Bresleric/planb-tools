@@ -1634,6 +1634,15 @@
                         // Compter combien d'articles fournisseurs sont rattachés
                         const nbFourn = articles.filter(a => a.ingredient_id === i.id).length;
                         const nomEsc = (i.nom || '').replace(/'/g, "\\'");
+                        // Doublon : deja present dans les besoins actifs de cet etablissement
+                        if (findBesoinActif(i.id, i.nom)) {
+                            return `
+                                <div class="dropdown-item" style="opacity:0.5;cursor:not-allowed;">
+                                    <div class="dropdown-item-title">${i.nom} ✓</div>
+                                    <div class="dropdown-item-subtitle">Déjà dans les besoins</div>
+                                </div>
+                            `;
+                        }
                         return `
                             <div class="dropdown-item" onclick="addBesoin('${i.id}', '${nomEsc}', '${i.unite || 'kg'}')">
                                 <div class="dropdown-item-title">${i.nom}</div>
@@ -1649,8 +1658,28 @@
             }
         }
 
+        // Retourne le besoin actif (demande/valide) deja present pour cet ingredient, sinon undefined
+        function findBesoinActif(ingredientId, ingredientName) {
+            return besoins.find(b =>
+                b.etablissement === currentEstablishment &&
+                (b.statut === 'demande' || b.statut === 'valide') &&
+                (
+                    (ingredientId && b.ingredient_id === ingredientId) ||
+                    (!b.ingredient_id && ingredientName && (b.ingredient_nom || b.article_nom) === ingredientName)
+                )
+            );
+        }
+
         async function addBesoin(ingredientId, ingredientName, unite) {
             try {
+                // Garde-fou anti-doublon : un meme produit ne peut etre saisi qu une fois
+                if (findBesoinActif(ingredientId, ingredientName)) {
+                    document.getElementById('search-input').value = '';
+                    document.getElementById('search-dropdown').classList.remove('show');
+                    showToast('« ' + ingredientName + ' » est déjà dans les besoins', 'info');
+                    return;
+                }
+
                 const newBesoin = {
                     ingredient_id: ingredientId,
                     ingredient_nom: ingredientName,
