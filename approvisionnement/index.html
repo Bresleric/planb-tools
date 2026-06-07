@@ -1178,6 +1178,7 @@
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
                     <button class="btn-main primary" onclick="openIngredientModal()">➕ Nouvel ingrédient</button>
                     <button class="btn-main secondary" onclick="openArticlesOrphelinsModal()">🔗 Articles non rattachés</button>
+                    <button class="btn-main secondary" onclick="openItemsSansFournisseurModal()">🏷 Items sans fournisseur</button>
                 </div>
                 <div class="search-section">
                     <input type="text" id="ingredients-search" class="search-input" placeholder="Rechercher un ingrédient..." oninput="renderIngredientsList()">
@@ -1456,6 +1457,31 @@
 
     <div id="toast" class="toast"></div>
 
+    <!-- Modal: rattacher des items sans fournisseur -->
+    <div class="modal-overlay" id="modal-link-fournisseur">
+        <div class="modal" style="max-width: 640px;">
+            <div class="modal-header">
+                <div class="modal-title">🏷 Items sans fournisseur (<span id="lf-count">0</span>)</div>
+                <button class="modal-close" onclick="closeItemsSansFournisseurModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:13px;color:var(--gray-600);margin-bottom:10px;">
+                    Ces articles ne sont rattachés à aucun fournisseur : ils sont <strong>ignorés à la génération de commande</strong>.
+                    Rattache-les en choisissant un fournisseur (le prix HT est indicatif, modifiable ensuite dans Catalogue → Prix).
+                </p>
+                <input type="text" id="lf-search" class="search-input" placeholder="Filtrer un item..." autocomplete="off" style="margin-bottom:10px;">
+                <div id="lf-list"></div>
+                <div id="lf-empty" class="empty-state hidden">
+                    <div class="empty-state-icon">🎉</div>
+                    <div class="empty-state-text">Tous les items ont un fournisseur</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-small btn-secondary" onclick="closeItemsSansFournisseurModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
@@ -1611,6 +1637,7 @@
             document.getElementById('prix-search').addEventListener('input', debounceSearchPrix);
             document.getElementById('inv-add-search').addEventListener('input', invAddSearchHandler);
             document.getElementById('rec-search-input').addEventListener('input', debounceRecSearch);
+            document.getElementById('lf-search').addEventListener('input', e => renderItemsSansFournisseur(e.target.value));
         }
 
         function debounceSearch(e) {
@@ -1703,6 +1730,31 @@
             }
         }
 
+        // Valider un besoin (demande -> valide). La quantite se saisit ENSUITE via la roulette.
+        async function validateBesoin(id) {
+            const b = besoins.find(x => x.id === id);
+            if (!b) return;
+            const upd = { statut: 'valide', valide_par_id: currentUser.id, valide_par_nom: currentUser.nom, date_validation: new Date().toISOString() };
+            try {
+                if (!isDemo) { const { error } = await supabase.from('appro_besoins').update(upd).eq('id', id); if (error) throw error; }
+                Object.assign(b, upd);
+                renderBesoins();
+                showToast('Besoin validé', 'success');
+            } catch (e) { console.error('validateBesoin', e); showToast('Erreur validation', 'error'); }
+        }
+
+        async function validateAllDemandes() {
+            const dem = besoins.filter(b => b.statut === 'demande' && b.etablissement === currentEstablishment);
+            if (!dem.length) return;
+            const upd = { statut: 'valide', valide_par_id: currentUser.id, valide_par_nom: currentUser.nom, date_validation: new Date().toISOString() };
+            try {
+                if (!isDemo) { await Promise.all(dem.map(b => supabase.from('appro_besoins').update(upd).eq('id', b.id))); }
+                dem.forEach(b => Object.assign(b, upd));
+                renderBesoins();
+                showToast(`${dem.length} besoin(s) validé(s)`, 'success');
+            } catch (e) { console.error('validateAllDemandes', e); showToast('Erreur validation', 'error'); }
+        }
+
         // Retourne le besoin actif (demande/valide) deja present pour cet ingredient, sinon undefined
         function findBesoinActif(ingredientId, ingredientName) {
             return besoins.find(b =>
@@ -1765,10 +1817,27 @@
             }
         }
 
+        // Options de la roulette quantite (1 a 40). iOS rend un <select> comme une molette.
+        function qtyRouletteOptions(selected) {
+            let o = `<option value="">—</option>`;
+            for (let n = 1; n <= 40; n++) {
+                o += `<option value="${n}"${String(selected) === String(n) ? ' selected' : ''}>${n}</option>`;
+            }
+            return o;
+        }
+
+        function categorieOf(b) {
+            const ing = ingredients.find(i => i.id === b.ingredient_id);
+            return ing ? (ing.categorie || '') : '';
+        }
+
         function renderBesoins() {
             const container = document.getElementById('besoins-list');
             const empty = document.getElementById('besoins-empty');
             const validationContainer = document.getElementById('validation-section-container');
+
+            // Le panneau de validation separe est remplace par le bouton Valider de chaque ligne
+            if (validationContainer) validationContainer.classList.add('hidden');
 
             const demandeBesoin = besoins.filter(b => b.statut === 'demande' && b.etablissement === currentEstablishment);
             const valideBesoin = besoins.filter(b => b.statut === 'valide' && b.etablissement === currentEstablishment);
@@ -1781,81 +1850,83 @@
             if (demandeBesoin.length === 0 && valideBesoin.length === 0) {
                 container.innerHTML = '';
                 empty.classList.remove('hidden');
-            } else {
-                empty.classList.add('hidden');
-                let html = '';
+                return;
+            }
+            empty.classList.add('hidden');
 
-                // Barre d'actions groupées (managers uniquement)
-                if (isManager) {
-                    html += `
-                        <div class="bulk-bar" id="bulk-bar">
-                            <label><input type="checkbox" id="bulk-select-all" onchange="toggleSelectAll(this.checked)"> Tout sélectionner</label>
+            // Demandes d'abord, puis validés
+            const rows = [...demandeBesoin, ...valideBesoin];
+
+            let html = '';
+
+            // Barre d'outils (managers)
+            if (isManager) {
+                html += `
+                    <div class="besoins-toolbar">
+                        ${demandeBesoin.length ? `<button class="btn-small btn-primary" onclick="validateAllDemandes()">✓ Valider les ${demandeBesoin.length} demande(s)</button>` : ''}
+                        <div class="bulk-bar" id="bulk-bar" style="margin:0;">
+                            <label><input type="checkbox" id="bulk-select-all" onchange="toggleSelectAll(this.checked)"> Tout</label>
                             <span class="bulk-count" id="bulk-count">0 sélectionné</span>
-                            <button class="btn-small btn-danger" id="bulk-remove-btn" onclick="bulkRemoveBesoins()" disabled>🗑 Retirer la sélection</button>
+                            <button class="btn-small btn-danger" id="bulk-remove-btn" onclick="bulkRemoveBesoins()" disabled>🗑 Retirer</button>
                         </div>
-                    `;
-                }
+                    </div>
+                `;
+            }
 
-                const checkbox = (b) => isManager
-                    ? `<input type="checkbox" class="besoin-check" data-id="${b.id}" onchange="toggleBesoinSelect('${b.id}', this.checked)" ${selectedBesoins.has(b.id) ? 'checked' : ''}>`
+            html += `<div class="besoins-table-wrap"><table class="besoins-table"><thead><tr>`;
+            if (isManager) html += `<th></th>`;
+            html += `<th>Article</th><th>Catégorie</th><th>Dem.</th><th>Date</th><th>Urg.</th><th>Statut</th><th>Quantité</th><th>Obs.</th><th>Actions</th>`;
+            html += `</tr></thead><tbody>`;
+
+            html += rows.map(b => {
+                const isOwner = b.demandeur_id === currentUser.id;
+                const isValide = b.statut === 'valide';
+                const nom = b.ingredient_nom || b.article_nom || '';
+                const dateTxt = b.date_demande ? new Date(b.date_demande).toLocaleDateString('fr-FR') : '—';
+
+                const chk = isManager
+                    ? `<td><input type="checkbox" class="besoin-check" data-id="${b.id}" onchange="toggleBesoinSelect('${b.id}', this.checked)" ${selectedBesoins.has(b.id) ? 'checked' : ''}></td>`
                     : '';
 
-                // Section besoins en attente de validation
-                if (demandeBesoin.length > 0) {
-                    html += `<div style="margin-bottom:12px;font-weight:600;font-size:14px;color:var(--gray-700)">En attente (${demandeBesoin.length})</div>`;
-                    html += demandeBesoin.map(b => {
-                        const isOwner = b.demandeur_id === currentUser.id;
-                        return `
-                            <div class="item-card">
-                                ${checkbox(b)}
-                                <div class="item-info">
-                                    <div class="item-name">${b.ingredient_nom || b.article_nom}</div>
-                                    <div class="item-meta">
-                                        ${b.urgence ? '<span class="badge badge-urgent">🔴 Urgent</span>' : ''}
-                                        Demandé par ${b.demandeur_initiales || '?'} le ${b.date_demande ? new Date(b.date_demande).toLocaleDateString('fr-FR') : 'aujourd\'hui'}
-                                        ${b.observation ? ' — ' + b.observation : ''}
-                                    </div>
-                                </div>
-                                <div class="item-actions">
-                                    ${isOwner ? `<button class="btn-small btn-secondary" onclick="toggleUrgence('${b.id}', ${!b.urgence})">${b.urgence ? '🟢 Normal' : '🔴 Urgent'}</button>` : ''}
-                                    ${isOwner || isManager ? `<button class="btn-small btn-danger" onclick="deleteBesoin('${b.id}')">✕</button>` : ''}
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
+                // Quantité : roulette 1-40 uniquement apres validation (et pour managers)
+                let qtyCell;
+                if (isValide && isManager) {
+                    qtyCell = `<select class="qty-roulette" onchange="updateBesoinQuantite('${b.id}', this.value)">${qtyRouletteOptions(b.quantite)}</select> <span class="muted">${b.unite || ''}</span>`;
+                } else if (isValide) {
+                    qtyCell = `${b.quantite ?? '—'} ${b.unite || ''}`;
+                } else {
+                    qtyCell = `<span class="muted" title="Saisissable après validation">—</span>`;
                 }
 
-                // Section besoins validés (en attente de commande)
-                if (valideBesoin.length > 0) {
-                    html += `<div style="margin:16px 0 12px;font-weight:600;font-size:14px;color:var(--green)">✓ Validés — prêts à commander (${valideBesoin.length})</div>`;
-                    html += valideBesoin.map(b => `
-                        <div class="item-card" style="border-left:3px solid var(--green)">
-                            ${checkbox(b)}
-                            <div class="item-info">
-                                <div class="item-name">${b.ingredient_nom || b.article_nom}</div>
-                                <div class="item-meta">
-                                    ${isManager
-                                        ? `<input type="number" class="qty-input" style="width:78px" min="0" step="any" value="${b.quantite ?? ''}" placeholder="Qté" onchange="updateBesoinQuantite('${b.id}', this.value)"> ${b.unite || ''}`
-                                        : `${b.quantite ?? '—'} ${b.unite || ''}`}
-                                    — validé par ${b.valide_par_nom || '—'}
-                                </div>
-                            </div>
-                            ${isManager ? `<div class="item-actions"><button class="btn-small btn-danger" onclick="cancelBesoin('${b.id}')">Retirer</button></div>` : ''}
-                        </div>
-                    `).join('');
-                }
+                const urgCell = `${b.urgence ? '🔴' : ''}${(isOwner && !isValide) ? ` <button class="btn-tiny" title="Basculer urgence" onclick="toggleUrgence('${b.id}', ${!b.urgence})">${b.urgence ? '🟢' : '🔴'}</button>` : ''}`;
 
-                container.innerHTML = html;
-                updateBulkBar();
-            }
+                const statutCell = isValide
+                    ? `<span class="badge-ok">Validé</span>`
+                    : `<span class="badge-wait">En attente</span>`;
 
-            // Section de validation pour managers: visible quand il y a des demandes
-            if (isManager && demandeBesoin.length > 0) {
-                validationContainer.classList.remove('hidden');
-                renderValidationSection();
-            } else {
-                validationContainer.classList.add('hidden');
-            }
+                let actions = '';
+                if (!isValide && isManager) actions += `<button class="btn-small btn-primary" onclick="validateBesoin('${b.id}')">✓</button> `;
+                if (!isValide && (isOwner || isManager)) actions += `<button class="btn-small btn-danger" onclick="deleteBesoin('${b.id}')">✕</button>`;
+                if (isValide && isManager) actions += `<button class="btn-small btn-danger" onclick="cancelBesoin('${b.id}')">Retirer</button>`;
+
+                return `<tr class="${isValide ? 'row-valide' : 'row-demande'}">
+                    ${chk}
+                    <td class="td-nom">${nom}</td>
+                    <td>${categorieOf(b)}</td>
+                    <td>${b.demandeur_initiales || '?'}</td>
+                    <td>${dateTxt}</td>
+                    <td>${urgCell}</td>
+                    <td>${statutCell}</td>
+                    <td class="td-qty">${qtyCell}</td>
+                    <td class="muted">${b.observation || ''}</td>
+                    <td class="td-act">${actions || '—'}</td>
+                </tr>`;
+            }).join('');
+
+            html += `</tbody></table></div>`;
+
+            container.innerHTML = html;
+            updateBulkBar();
         }
 
         function renderValidationSection() {
@@ -2602,6 +2673,107 @@
             // Ouvre la modale articles-rattachés mais sans ingrédient cible ; on offre de créer un ingrédient
             const sample = orphans.slice(0, 30).map(a => `  • ${a.nom}`).join('\n');
             alert(`${orphans.length} article(s) non rattaché(s) à un ingrédient.\n\nExemples:\n${sample}\n\nPour les rattacher, créez un ingrédient puis cliquez sur 🔗 dans la liste.`);
+        }
+
+        // --- Items (ingredients) sans fournisseur : outil de rattachement ---
+        // Un item est "rattache a un fournisseur" s il a un article catalogue + un prix actif.
+        function itemHasFournisseur(ing) {
+            const artIds = articles.filter(a => a.ingredient_id === ing.id).map(a => a.id);
+            if (!artIds.length) return false;
+            return prix.some(p => p.actif !== false && artIds.includes(p.article_id));
+        }
+
+        function itemsSansFournisseur() {
+            return ingredients
+                .filter(i => i.actif !== false && !itemHasFournisseur(i))
+                .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        }
+
+        function openItemsSansFournisseurModal() {
+            if (!isAdminAppro()) { showToast('Réservé aux administrateurs', 'error'); return; }
+            document.getElementById('lf-search').value = '';
+            renderItemsSansFournisseur('');
+            document.getElementById('modal-link-fournisseur').classList.add('show');
+        }
+
+        function closeItemsSansFournisseurModal() {
+            document.getElementById('modal-link-fournisseur').classList.remove('show');
+        }
+
+        function renderItemsSansFournisseur(filter) {
+            const norm = normalizeSearch(filter || '');
+            let items = itemsSansFournisseur();
+            if (norm) items = items.filter(i => (i.nom_recherche || normalizeSearch(i.nom || '')).includes(norm));
+            const list = document.getElementById('lf-list');
+            const empty = document.getElementById('lf-empty');
+            document.getElementById('lf-count').textContent = itemsSansFournisseur().length;
+            if (!items.length) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+            const fournOpts = (fournisseurs || []).slice().sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
+                .map(f => `<option value="${f.id}">${escapeHtmlRec(f.nom)}</option>`).join('');
+            list.innerHTML = items.map(i => `
+                <div class="lf-row" data-id="${i.id}">
+                    <div class="lf-row-head">
+                        <div><strong>${escapeHtmlRec(i.nom)}</strong> <span class="muted">${escapeHtmlRec(i.categorie || '')} • ${escapeHtmlRec(i.unite || 'kg')}</span></div>
+                        <button class="btn-small btn-primary" onclick="toggleLinkForm('${i.id}')">Rattacher</button>
+                    </div>
+                    <div class="lf-form hidden" id="lf-form-${i.id}">
+                        <select id="lf-fourn-${i.id}"><option value="">— Fournisseur —</option>${fournOpts}</select>
+                        <input type="number" id="lf-prix-${i.id}" step="0.01" min="0" placeholder="Prix HT €">
+                        <input type="text" id="lf-cond-${i.id}" placeholder="Conditionnement (optionnel)">
+                        <button class="btn-small btn-primary" onclick="linkItemToFournisseur('${i.id}')">✓ Valider</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleLinkForm(id) {
+            const f = document.getElementById('lf-form-' + id);
+            if (f) f.classList.toggle('hidden');
+        }
+
+        async function linkItemToFournisseur(ingredientId) {
+            const ing = ingredients.find(i => i.id === ingredientId);
+            if (!ing) return;
+            const fournId = document.getElementById('lf-fourn-' + ingredientId).value;
+            if (!fournId) { showToast('Choisis un fournisseur', 'error'); return; }
+            const puVal = parseFloat(document.getElementById('lf-prix-' + ingredientId).value);
+            const pu_ht = isNaN(puVal) ? 0 : puVal;
+            const cond = (document.getElementById('lf-cond-' + ingredientId).value || '').trim() || null;
+            try {
+                // 1. Article catalogue (creer si l item n en a aucun)
+                let art = articles.find(a => a.ingredient_id === ingredientId);
+                if (!art) {
+                    const payload = {
+                        nom: ing.nom, nom_recherche: normalizeSearch(ing.nom || ''),
+                        categorie: ing.categorie || null, unite: ing.unite || 'kg',
+                        ingredient_id: ingredientId, actif: true
+                    };
+                    if (isDemo) { art = { id: 'a' + Date.now(), ...payload }; articles.push(art); }
+                    else {
+                        const { data, error } = await supabase.from('appro_catalogue').insert([payload]).select().single();
+                        if (error) throw error;
+                        art = data; articles.push(art);
+                    }
+                }
+                // 2. Prix = rattachement au fournisseur
+                const prixPayload = {
+                    article_id: art.id, fournisseur_id: fournId, designation: ing.nom,
+                    conditionnement: cond, pu_ht, unite: ing.unite || 'kg', source: 'manuel', actif: true
+                };
+                if (isDemo) { prix.push({ id: 'p' + Date.now(), ...prixPayload }); }
+                else {
+                    const { data, error } = await supabase.from('appro_prix').insert([prixPayload]).select().single();
+                    if (error) throw error;
+                    prix.push(data);
+                }
+                const fn = (fournisseurs.find(f => f.id === fournId) || {}).nom || 'fournisseur';
+                showToast(`« ${ing.nom} » rattaché à ${fn}`, 'success');
+                renderItemsSansFournisseur(document.getElementById('lf-search').value);
+            } catch (e) {
+                console.error('linkItemToFournisseur', e);
+                showToast('Erreur: ' + (e.message || e), 'error');
+            }
         }
 
         function switchTab(tabName) {
@@ -3565,6 +3737,28 @@
 
         window.addEventListener('DOMContentLoaded', initApp);
     </script>
+<!-- BESOINS (tableau) + RATTACHEMENT FOURNISSEUR -->
+<style id="besoins-style">
+.besoins-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.besoins-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--gray-200); border-radius:10px; }
+table.besoins-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+.besoins-table th, .besoins-table td { padding:7px 9px; text-align:left; border-bottom:1px solid var(--gray-200); white-space:nowrap; vertical-align:middle; }
+.besoins-table th { font-size:0.7rem; text-transform:uppercase; color:#6b7280; font-weight:700; background:#f9fafb; }
+.besoins-table tr:last-child td { border-bottom:none; }
+.besoins-table .td-nom { font-weight:600; white-space:normal; min-width:140px; }
+.besoins-table tr.row-valide { background:#f6fef9; }
+.besoins-table .muted { color:#9ca3af; }
+.besoins-table .td-act { white-space:nowrap; }
+.besoins-table .badge-ok { background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:600; }
+.besoins-table .badge-wait { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:600; }
+.qty-roulette { padding:6px 6px; border:1px solid #e5e7eb; border-radius:6px; font-size:0.95rem; min-width:60px; background:#fff; }
+.btn-tiny { border:none; background:none; cursor:pointer; font-size:0.9rem; padding:0 2px; }
+.lf-row { border-bottom:1px solid var(--gray-200); padding:9px 2px; }
+.lf-row-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.lf-form { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.lf-form select, .lf-form input { padding:6px 8px; border:1px solid #e5e7eb; border-radius:6px; font-size:0.85rem; }
+.lf-form input[type=number] { width:110px; }
+</style>
 <!-- RÉCEPTIONS (Phase 1) -->
 <style id="rec-style">
 .rec-h2 { font-size: 1.1rem; color: #f97316; margin: 4px 0 12px; }
