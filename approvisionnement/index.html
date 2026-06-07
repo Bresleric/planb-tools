@@ -1409,6 +1409,13 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label class="form-label">Flux de réception</label>
+                    <select id="ing-flux" class="form-select">
+                        <option value="validation">🥬 Validation manuelle (qté + visuel)</option>
+                        <option value="scan">🥩 Scan étiquette (viande / charcuterie / crémerie)</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label class="form-label">
                         <input type="checkbox" id="ing-actif" checked> Actif (visible dans la recherche Besoins)
                     </label>
@@ -1627,10 +1634,11 @@
                 if (results.length > 15) results = results.slice(0, 15);
 
                 const dropdown = document.getElementById('search-dropdown');
+                let ddHtml = '';
                 if (results.length === 0) {
-                    dropdown.innerHTML = '<div class="dropdown-item" style="color:#999;font-style:italic;">Aucun ingrédient trouvé</div>';
+                    ddHtml = '<div class="dropdown-item" style="color:#999;font-style:italic;">Aucun ingrédient trouvé</div>';
                 } else {
-                    dropdown.innerHTML = results.map(i => {
+                    ddHtml = results.map(i => {
                         // Compter combien d'articles fournisseurs sont rattachés
                         const nbFourn = articles.filter(a => a.ingredient_id === i.id).length;
                         const nomEsc = (i.nom || '').replace(/'/g, "\\'");
@@ -1652,9 +1660,46 @@
                     }).join('');
                 }
 
+                // Admin : creation rapide d un nouvel item directement depuis la recherche
+                if (isAdminAppro() && term && term.trim().length >= 3) {
+                    const termEsc = term.trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const termAff = term.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    ddHtml += `
+                        <div class="dropdown-item" style="border-top:1px solid var(--gray-200);color:var(--orange);font-weight:600;" onclick="quickCreateItem('${termEsc}')">
+                            ➕ Créer l'article « ${termAff} »
+                        </div>
+                    `;
+                }
+
+                dropdown.innerHTML = ddHtml;
                 dropdown.classList.add('show');
             } catch (e) {
                 console.error('Search error:', e);
+            }
+        }
+
+        // Admin : creation rapide d un item depuis la recherche Besoins (ouvre la modale ingredient pre-remplie)
+        function quickCreateItem(term) {
+            if (!isAdminAppro()) { showToast('Réservé aux administrateurs', 'error'); return; }
+            document.getElementById('search-dropdown').classList.remove('show');
+            openIngredientModal();
+            document.getElementById('ing-nom').value = term || '';
+        }
+
+        // Edition de la quantite d un besoin DEJA valide (la qte n est saisissable qu apres validation)
+        async function updateBesoinQuantite(id, val) {
+            const q = (val === '' || val == null) ? null : parseFloat(val);
+            const besoin = besoins.find(b => b.id === id);
+            if (besoin) besoin.quantite = q;
+            try {
+                if (!isDemo) {
+                    const { error } = await supabase.from('appro_besoins').update({ quantite: q }).eq('id', id);
+                    if (error) throw error;
+                }
+                showToast('Quantité enregistrée', 'success');
+            } catch (e) {
+                console.error('updateBesoinQuantite', e);
+                showToast('Erreur sauvegarde quantité', 'error');
             }
         }
 
@@ -1788,7 +1833,12 @@
                             ${checkbox(b)}
                             <div class="item-info">
                                 <div class="item-name">${b.ingredient_nom || b.article_nom}</div>
-                                <div class="item-meta">${b.quantite || '?'} ${b.unite || ''} — validé par ${b.valide_par_nom || '—'}</div>
+                                <div class="item-meta">
+                                    ${isManager
+                                        ? `<input type="number" class="qty-input" style="width:78px" min="0" step="any" value="${b.quantite ?? ''}" placeholder="Qté" onchange="updateBesoinQuantite('${b.id}', this.value)"> ${b.unite || ''}`
+                                        : `${b.quantite ?? '—'} ${b.unite || ''}`}
+                                    — validé par ${b.valide_par_nom || '—'}
+                                </div>
                             </div>
                             ${isManager ? `<div class="item-actions"><button class="btn-small btn-danger" onclick="cancelBesoin('${b.id}')">Retirer</button></div>` : ''}
                         </div>
@@ -1812,16 +1862,14 @@
             const demandes = besoins.filter(b => b.statut === 'demande' && b.etablissement === currentEstablishment);
             const container = document.getElementById('validation-items');
 
+            // La validation ne fait qu APPROUVER : la quantite se saisit apres, dans la section Valides.
             container.innerHTML = demandes.map(b => `
                 <div class="validation-item" data-besoin-id="${b.id}">
                     <div class="validation-item-name">
                         ${b.ingredient_nom || b.article_nom}
                         ${b.urgence ? '<span class="badge badge-urgent" style="font-size:10px">🔴</span>' : ''}
                     </div>
-                    <div class="validation-item-inputs">
-                        <input type="number" class="qty-input" data-besoin-id="${b.id}" value="${b.quantite || 1}" min="1" step="1" placeholder="Qté">
-                        <div class="validation-item-unit">${b.unite || 'kg'}</div>
-                    </div>
+                    <div class="validation-item-unit" style="color:var(--gray-500)">${b.unite || 'kg'}</div>
                 </div>
             `).join('');
         }
@@ -1834,13 +1882,12 @@
         async function submitValidation() {
             try {
                 const updates = [];
-                const qtyInputs = document.querySelectorAll('.qty-input');
+                // On approuve les demandes listees (la quantite sera saisie ensuite dans Valides)
+                const items = document.querySelectorAll('#validation-items .validation-item');
 
-                for (const input of qtyInputs) {
-                    const besoinId = input.getAttribute('data-besoin-id');
-                    const qty = parseFloat(input.value) || 1;
+                for (const item of items) {
+                    const besoinId = item.getAttribute('data-besoin-id');
                     const updateData = {
-                        quantite: qty,
                         statut: 'valide',
                         valide_par_id: currentUser.id,
                         valide_par_nom: currentUser.nom,
@@ -1864,7 +1911,7 @@
                 }
 
                 renderBesoins();
-                showToast(`${qtyInputs.length} besoin(s) validé(s)`, 'success');
+                showToast(`${items.length} besoin(s) validé(s)`, 'success');
             } catch (e) {
                 console.error('Validation error:', e);
                 showToast('Erreur lors de la validation', 'error');
@@ -2357,6 +2404,7 @@
                 document.getElementById('ing-nom').value = ing.nom || '';
                 document.getElementById('ing-categorie').value = ing.categorie || '';
                 document.getElementById('ing-unite').value = ing.unite || 'kg';
+                document.getElementById('ing-flux').value = ing.categorie_flux || 'validation';
                 document.getElementById('ing-actif').checked = ing.actif !== false;
                 btnDel.classList.remove('hidden');
             } else {
@@ -2364,6 +2412,7 @@
                 document.getElementById('ing-nom').value = '';
                 document.getElementById('ing-categorie').value = '';
                 document.getElementById('ing-unite').value = 'kg';
+                document.getElementById('ing-flux').value = 'validation';
                 document.getElementById('ing-actif').checked = true;
                 btnDel.classList.add('hidden');
             }
@@ -2379,6 +2428,7 @@
             const nom = document.getElementById('ing-nom').value.trim();
             const categorie = document.getElementById('ing-categorie').value;
             const unite = document.getElementById('ing-unite').value;
+            const categorie_flux = document.getElementById('ing-flux').value;
             const actif = document.getElementById('ing-actif').checked;
 
             if (!nom) { showToast('Nom requis', 'error'); return; }
@@ -2389,15 +2439,15 @@
             try {
                 if (currentEditIngredient) {
                     const { error } = await supabase.from('appro_ingredients').update({
-                        nom, nom_recherche, categorie, unite, actif, updated_at: new Date().toISOString()
+                        nom, nom_recherche, categorie, unite, categorie_flux, actif, updated_at: new Date().toISOString()
                     }).eq('id', currentEditIngredient);
                     if (error) throw error;
                     const idx = ingredients.findIndex(i => i.id === currentEditIngredient);
-                    if (idx >= 0) ingredients[idx] = { ...ingredients[idx], nom, nom_recherche, categorie, unite, actif };
+                    if (idx >= 0) ingredients[idx] = { ...ingredients[idx], nom, nom_recherche, categorie, unite, categorie_flux, actif };
                     showToast('Ingrédient mis à jour', 'success');
                 } else {
                     const { data, error } = await supabase.from('appro_ingredients').insert([{
-                        nom, nom_recherche, categorie, unite, actif
+                        nom, nom_recherche, categorie, unite, categorie_flux, actif
                     }]).select();
                     if (error) throw error;
                     if (data && data.length > 0) ingredients.push(data[0]);
