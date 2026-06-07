@@ -1561,7 +1561,7 @@
                 if (!isDemo) {
                     const [besoinsRes, commandesRes, articlesRes, ingredientsRes, fournisseursRes, prixRes, lignesRes] = await Promise.all([
                         supabase.from('appro_besoins').select('*').eq('etablissement', currentEstablishment).in('statut', ['demande', 'valide']).order('date_demande', { ascending: false }),
-                        supabase.from('appro_commandes').select('*').eq('etablissement', currentEstablishment).in('statut', ['brouillon', 'validee', 'envoyee']).order('date_creation', { ascending: false }),
+                        supabase.from('appro_commandes').select('*').eq('etablissement', currentEstablishment).order('date_creation', { ascending: false }),
                         supabase.from('appro_catalogue').select('*'),
                         supabase.from('appro_ingredients').select('*').order('nom'),
                         supabase.from('appro_fournisseurs').select('*').eq('actif', true),
@@ -2160,49 +2160,67 @@
 
             const container = document.getElementById('commandes-list');
             const empty = document.getElementById('commandes-empty');
-            const cmdList = commandes.filter(c => c.etablissement === currentEstablishment);
+            const all = commandes.filter(c => c.etablissement === currentEstablishment);
+            const actives = all.filter(c => ['brouillon', 'validee', 'envoyee'].includes(c.statut));
+            const histo = all.filter(c => ['recue', 'annulee'].includes(c.statut));
 
-            if (cmdList.length === 0) {
+            if (all.length === 0) {
                 container.innerHTML = '';
                 empty.classList.remove('hidden');
-            } else {
-                empty.classList.add('hidden');
-                container.innerHTML = cmdList.map(c => {
-                    const lignes = getOrderLines(c.id);
-                    return `
-                        <div class="order-card">
-                            <div class="order-header" onclick="toggleOrderExpand('${c.id}')">
-                                <div class="order-info">
-                                    <div class="order-supplier">${c.appro_fournisseurs?.nom || 'Fournisseur'}</div>
-                                    <div class="order-meta">
-                                        ${lignes.length} article(s) • ${new Date(c.date_creation).toLocaleDateString('fr-FR')}
-                                        <span class="badge badge-status ${c.statut}">${c.statut}</span>
-                                    </div>
-                                </div>
-                                <div class="order-total">
-                                    <div class="order-total-ht">${(c.total_ht || 0).toFixed(2)} €</div>
-                                    <div class="order-total-ttc">${(c.total_ttc || 0).toFixed(2)} €</div>
-                                </div>
-                                <div class="order-expand-icon" id="expand-icon-${c.id}">⋮</div>
-                            </div>
-                            <div class="order-lines" id="order-lines-${c.id}">
-                                ${lignes.map(l => `
-                                    <div class="order-line">
-                                        <div class="order-line-name">${l.designation}</div>
-                                        <div class="order-line-qty">${l.quantite} ${l.unite}</div>
-                                        <div class="order-line-price">${(l.montant_ht || l.montant || 0).toFixed(2)} €</div>
-                                    </div>
-                                `).join('')}
-                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200); display: flex; gap: 6px;">
-                                    ${c.statut === 'brouillon' ? `<button class="btn-small btn-primary" style="flex: 1;" onclick="updateOrderStatus('${c.id}', 'validee')">Valider</button>` : ''}
-                                    ${c.statut === 'validee' ? `<button class="btn-small btn-primary" style="flex: 1;" onclick="updateOrderStatus('${c.id}', 'envoyee')">Marquer envoyée</button>` : ''}
-                                    ${c.statut === 'envoyee' ? `<button class="btn-small btn-primary" style="flex: 1;" onclick="updateOrderStatus('${c.id}', 'recue')">Marquer reçue</button>` : ''}
-                                </div>
+                return;
+            }
+            empty.classList.add('hidden');
+            let html = '';
+            if (actives.length) {
+                html += `<div class="cmd-section-title">📦 En cours (${actives.length})</div>`;
+                html += actives.map(renderOrderCard).join('');
+            }
+            if (histo.length) {
+                html += `<div class="cmd-section-title cmd-histo">🗂 Historique — reçues / annulées (${histo.length})</div>`;
+                html += histo.map(renderOrderCard).join('');
+            }
+            container.innerHTML = html;
+        }
+
+        const CMD_STATUT_LABEL = { brouillon: 'Brouillon', validee: 'Validée', envoyee: 'Envoyée', recue: 'Reçue', annulee: 'Annulée' };
+
+        function renderOrderCard(c) {
+            const lignes = getOrderLines(c.id);
+            const statutLabel = CMD_STATUT_LABEL[c.statut] || c.statut;
+            const dateTxt = c.date_creation ? new Date(c.date_creation).toLocaleDateString('fr-FR') : '';
+            return `
+                <div class="order-card">
+                    <div class="order-header" onclick="toggleOrderExpand('${c.id}')">
+                        <div class="order-info">
+                            <div class="order-supplier">${c.appro_fournisseurs?.nom || c.fournisseur_nom || 'Fournisseur'}</div>
+                            <div class="order-meta">
+                                ${lignes.length} article(s) • ${dateTxt}
+                                <span class="badge badge-status ${c.statut}">${statutLabel}</span>
                             </div>
                         </div>
-                    `;
-                }).join('');
-            }
+                        <div class="order-total">
+                            <div class="order-total-ht">${(c.total_ht || 0).toFixed(2)} € HT</div>
+                            <div class="order-total-ttc">${(c.total_ttc || 0).toFixed(2)} € TTC</div>
+                        </div>
+                        <div class="order-expand-icon" id="expand-icon-${c.id}">⋮</div>
+                    </div>
+                    <div class="order-lines" id="order-lines-${c.id}">
+                        ${lignes.map(l => `
+                            <div class="order-line">
+                                <div class="order-line-name">${l.designation}</div>
+                                <div class="order-line-qty">${l.quantite} ${l.unite || ''}</div>
+                                <div class="order-line-price">${(l.montant_ht || l.montant || 0).toFixed(2)} €</div>
+                            </div>
+                        `).join('')}
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200); display: flex; gap: 6px;">
+                            ${c.statut === 'brouillon' ? `<button class="btn-small btn-primary" style="flex: 1;" onclick="updateOrderStatus('${c.id}', 'validee')">Valider</button>` : ''}
+                            ${c.statut === 'validee' ? `<button class="btn-small btn-primary" style="flex: 1;" onclick="updateOrderStatus('${c.id}', 'envoyee')">Marquer envoyée</button>` : ''}
+                            ${c.statut === 'envoyee' ? `<button class="btn-small btn-primary" style="flex: 1;" onclick="updateOrderStatus('${c.id}', 'recue')">Marquer reçue</button>` : ''}
+                            ${(c.statut === 'brouillon' || c.statut === 'validee') ? `<button class="btn-small btn-danger" onclick="updateOrderStatus('${c.id}', 'annulee')">Annuler</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         function getOrderLines(commandeId) {
@@ -2250,6 +2268,7 @@
                 // Regrouper par fournisseur selon les choix
                 const newOrders = {};
                 const besoinsSansPrix = [];
+                const orderedIds = new Set(); // besoins reellement integres a une commande
 
                 for (const besoin of validated) {
                     const selectedPrixId = selections[besoin.id];
@@ -2298,6 +2317,7 @@
                     });
                     newOrders[supplierId].total_ht += montant_ht;
                     newOrders[supplierId].total_ttc += montant_ttc;
+                    orderedIds.add(besoin.id);
                 }
 
                 if (besoinsSansPrix.length > 0) {
@@ -2309,29 +2329,37 @@
                     order.total_ht = Math.round(order.total_ht * 100) / 100;
                     order.total_ttc = Math.round(order.total_ttc * 100) / 100;
                     const lignes = order.lignes;
+                    // Payload BDD : UNIQUEMENT de vraies colonnes. Surtout pas `lignes` ni
+                    // `appro_fournisseurs` (champs locaux) : PostgREST rejetterait l insert
+                    // et la commande ne serait jamais enregistree (bug historique).
                     const orderForDb = { ...order };
                     delete orderForDb.lignes;
-                    orderForDb.appro_fournisseurs = { nom: order.fournisseur_nom };
+                    delete orderForDb.appro_fournisseurs;
 
                     if (!isDemo) {
                         const res = await supabase.from('appro_commandes').insert([orderForDb]).select();
+                        if (res.error) throw res.error;
                         if (res.data && res.data[0]) {
                             const cmdId = res.data[0].id;
-                            // Insérer les lignes
                             const lignesDb = lignes.map(l => ({ ...l, commande_id: cmdId }));
-                            await supabase.from('appro_commande_lignes').insert(lignesDb);
+                            const ligRes = await supabase.from('appro_commande_lignes').insert(lignesDb);
+                            if (ligRes.error) throw ligRes.error;
+                            res.data[0].appro_fournisseurs = { nom: order.fournisseur_nom };
                             res.data[0].lignes = lignes;
                             commandes.push(res.data[0]);
                         }
                     } else {
                         orderForDb.id = 'c' + Date.now() + Math.random().toString(36).slice(2, 5);
+                        orderForDb.appro_fournisseurs = { nom: order.fournisseur_nom };
                         orderForDb.lignes = lignes;
                         commandes.push(orderForDb);
                     }
                 }
 
-                // Mettre à jour les besoins en statut 'commande'
+                // Passer en 'commande' UNIQUEMENT les besoins reellement integres a une commande
+                // (les besoins sans prix/fournisseur restent 'valide' pour ne pas etre perdus).
                 for (const besoin of validated) {
+                    if (!orderedIds.has(besoin.id)) continue;
                     if (!isDemo) {
                         await supabase.from('appro_besoins').update({ statut: 'commande' }).eq('id', besoin.id);
                     }
@@ -2345,7 +2373,7 @@
                 showToast(`${nbCmd} commande(s) générée(s) chez ${nbCmd} fournisseur(s)`, 'success');
             } catch (e) {
                 console.error('Generate orders error:', e);
-                showToast('Erreur lors de la génération', 'error');
+                showToast('Erreur generation commande : ' + (e.message || e), 'error');
             }
         }
 
@@ -2874,6 +2902,9 @@
 
             if (tabName === 'catalogue') {
                 populateFournisseurSelect();
+            }
+            if (tabName === 'commandes') {
+                renderCommandes();
             }
             if (tabName === 'inventaire') {
                 loadInventaireJour();
@@ -3845,6 +3876,10 @@ table.besoins-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
 .besoins-table th.th-sort { cursor:pointer; user-select:none; white-space:nowrap; }
 .besoins-table th.th-sort:hover { color:var(--orange); }
 .ing-unite-inline { padding:2px 4px; border:1px solid #e5e7eb; border-radius:5px; font-size:0.8rem; background:#fff; }
+.cmd-section-title { font-weight:700; font-size:0.85rem; color:var(--gray-700); margin:6px 0 10px; }
+.cmd-section-title.cmd-histo { color:var(--gray-500); }
+.badge-status.recue { background:#dcfce7; color:#166534; }
+.badge-status.annulee { background:#fee2e2; color:#991b1b; }
 .besoins-table tr:last-child td { border-bottom:none; }
 .besoins-table .td-nom { font-weight:600; white-space:normal; min-width:140px; }
 .besoins-table tr.row-valide { background:#f6fef9; }
