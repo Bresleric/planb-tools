@@ -1503,6 +1503,7 @@
         let validationData = {};
         let currentModalContext = {};
         let selectedBesoins = new Set(); // ids des besoins cochés pour action groupée
+        let besoinsSort = { col: null, dir: 1 }; // tri du tableau besoins (col = cle, dir = 1 asc / -1 desc)
 
         function normalizeSearch(str) {
             return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1831,6 +1832,13 @@
             return ing ? (ing.categorie || '') : '';
         }
 
+        // Tri du tableau besoins : clic sur un titre de colonne (toggle asc/desc)
+        function sortBesoins(col) {
+            if (besoinsSort.col === col) besoinsSort.dir = -besoinsSort.dir;
+            else { besoinsSort.col = col; besoinsSort.dir = 1; }
+            renderBesoins();
+        }
+
         function renderBesoins() {
             const container = document.getElementById('besoins-list');
             const empty = document.getElementById('besoins-empty');
@@ -1854,8 +1862,28 @@
             }
             empty.classList.add('hidden');
 
-            // Demandes d'abord, puis validés
-            const rows = [...demandeBesoin, ...valideBesoin];
+            // Par défaut : demandes d'abord, puis validés. Si un tri colonne est actif, il prime.
+            let rows = [...demandeBesoin, ...valideBesoin];
+            if (besoinsSort.col) {
+                const val = (b) => {
+                    switch (besoinsSort.col) {
+                        case 'article': return (b.ingredient_nom || b.article_nom || '').toLowerCase();
+                        case 'categorie': return (categorieOf(b) || '').toLowerCase();
+                        case 'demandeur': return (b.demandeur_initiales || '').toLowerCase();
+                        case 'date': return b.date_demande ? new Date(b.date_demande).getTime() : 0;
+                        case 'urgence': return b.urgence ? 1 : 0;
+                        case 'statut': return b.statut || '';
+                        case 'quantite': return (b.quantite == null ? -1 : Number(b.quantite));
+                        default: return '';
+                    }
+                };
+                rows.sort((a, b) => {
+                    const va = val(a), vb = val(b);
+                    if (va < vb) return -1 * besoinsSort.dir;
+                    if (va > vb) return 1 * besoinsSort.dir;
+                    return 0;
+                });
+            }
 
             let html = '';
 
@@ -1873,9 +1901,11 @@
                 `;
             }
 
+            const arrow = (col) => besoinsSort.col === col ? (besoinsSort.dir === 1 ? ' ▲' : ' ▼') : '';
+            const th = (col, label) => `<th class="th-sort" onclick="sortBesoins('${col}')">${label}${arrow(col)}</th>`;
             html += `<div class="besoins-table-wrap"><table class="besoins-table"><thead><tr>`;
             if (isManager) html += `<th></th>`;
-            html += `<th>Article</th><th>Catégorie</th><th>Dem.</th><th>Date</th><th>Urg.</th><th>Statut</th><th>Quantité</th><th>Obs.</th><th>Actions</th>`;
+            html += th('article', 'Article') + th('categorie', 'Catégorie') + th('demandeur', 'Dem.') + th('date', 'Date') + th('urgence', 'Urg.') + th('statut', 'Statut') + th('quantite', 'Quantité') + `<th>Obs.</th><th>Actions</th>`;
             html += `</tr></thead><tbody>`;
 
             html += rows.map(b => {
@@ -3782,6 +3812,8 @@
 table.besoins-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
 .besoins-table th, .besoins-table td { padding:7px 9px; text-align:left; border-bottom:1px solid var(--gray-200); white-space:nowrap; vertical-align:middle; }
 .besoins-table th { font-size:0.7rem; text-transform:uppercase; color:#6b7280; font-weight:700; background:#f9fafb; }
+.besoins-table th.th-sort { cursor:pointer; user-select:none; white-space:nowrap; }
+.besoins-table th.th-sort:hover { color:var(--orange); }
 .besoins-table tr:last-child td { border-bottom:none; }
 .besoins-table .td-nom { font-weight:600; white-space:normal; min-width:140px; }
 .besoins-table tr.row-valide { background:#f6fef9; }
