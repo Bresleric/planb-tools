@@ -5834,15 +5834,24 @@
       displayService = 'Soir (veille)';
     }
 
-    // Load current briefing
-    const { data: briefing, error } = await supabaseClient
-      .from('service_briefings')
-      .select('*')
-      .eq('etablissement', currentEtablissement)
-      .eq('date_briefing', today)
-      .eq('service_type', currentService)
-      .single()
-      .catch(() => ({ data: null, error: null })); // Not found is OK
+    // Load current briefing (maybeSingle = pas d'erreur si 0 ligne ; try/catch si table absente)
+    let briefing = null;
+    try {
+      const { data, error } = await supabaseClient
+        .from('service_briefings')
+        .select('*')
+        .eq('etablissement', currentEtablissement)
+        .eq('date_briefing', today)
+        .eq('service_type', currentService)
+        .maybeSingle();
+      if (error) {
+        console.warn('Briefing: lecture impossible (table absente ?):', error.message);
+      } else {
+        briefing = data;
+      }
+    } catch (e) {
+      console.warn('Briefing: exception lecture:', e);
+    }
 
     let html = `<div class="briefing-container">
       <div style="margin-bottom:16px;">
@@ -5898,13 +5907,18 @@
       </div>`;
 
       // Historique (derniers briefings)
-      const { data: history } = await supabaseClient
-        .from('service_briefings')
-        .select('*')
-        .eq('etablissement', currentEtablissement)
-        .order('date_briefing', { ascending: false })
-        .limit(5)
-        .catch(() => ({ data: [] }));
+      let history = [];
+      try {
+        const { data: hist } = await supabaseClient
+          .from('service_briefings')
+          .select('*')
+          .eq('etablissement', currentEtablissement)
+          .order('date_briefing', { ascending: false })
+          .limit(5);
+        history = hist || [];
+      } catch (e) {
+        console.warn('Briefing: historique indisponible:', e);
+      }
 
       if (history && history.length > 1) {
         html += `<div class="briefing-history">
