@@ -1332,6 +1332,8 @@ function showToast(msg, type) {
   var inactivityTimer = null;
   var INACTIVITY_MS = 2 * 60 * 1000;
   function resetInactivity() {
+    // Mode developpement (admin) : pas de deconnexion auto pour cette session
+    try { if (sessionStorage.getItem('planb_dev_nolock') === '1') { if (inactivityTimer) clearTimeout(inactivityTimer); return; } } catch(e){}
     if (inactivityTimer) clearTimeout(inactivityTimer);
     inactivityTimer = setTimeout(window.__doLogout, INACTIVITY_MS);
   }

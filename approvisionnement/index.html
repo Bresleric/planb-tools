@@ -2732,46 +2732,72 @@
             if (f) f.classList.toggle('hidden');
         }
 
-        async function linkItemToFournisseur(ingredientId) {
+        // Helper partage : cree (au besoin) l article catalogue + le prix qui rattache l item au fournisseur.
+        // Retourne le nom du fournisseur. Leve une erreur en cas d echec.
+        async function doLinkItemFournisseur(ingredientId, fournId, pu_ht, cond) {
             const ing = ingredients.find(i => i.id === ingredientId);
-            if (!ing) return;
+            if (!ing) throw new Error('Item introuvable');
+            // 1. Article catalogue (creer si l item n en a aucun)
+            let art = articles.find(a => a.ingredient_id === ingredientId);
+            if (!art) {
+                const payload = {
+                    nom: ing.nom, nom_recherche: normalizeSearch(ing.nom || ''),
+                    categorie: ing.categorie || null, unite: ing.unite || 'kg',
+                    ingredient_id: ingredientId, actif: true
+                };
+                if (isDemo) { art = { id: 'a' + Date.now(), ...payload }; articles.push(art); }
+                else {
+                    const { data, error } = await supabase.from('appro_catalogue').insert([payload]).select().single();
+                    if (error) throw error;
+                    art = data; articles.push(art);
+                }
+            }
+            // 2. Prix = rattachement au fournisseur
+            const prixPayload = {
+                article_id: art.id, fournisseur_id: fournId, designation: ing.nom,
+                conditionnement: cond, pu_ht, unite: ing.unite || 'kg', source: 'manuel', actif: true
+            };
+            if (isDemo) { prix.push({ id: 'p' + Date.now(), ...prixPayload }); }
+            else {
+                const { data, error } = await supabase.from('appro_prix').insert([prixPayload]).select().single();
+                if (error) throw error;
+                prix.push(data);
+            }
+            return (fournisseurs.find(f => f.id === fournId) || {}).nom || 'fournisseur';
+        }
+
+        async function linkItemToFournisseur(ingredientId) {
             const fournId = document.getElementById('lf-fourn-' + ingredientId).value;
             if (!fournId) { showToast('Choisis un fournisseur', 'error'); return; }
             const puVal = parseFloat(document.getElementById('lf-prix-' + ingredientId).value);
             const pu_ht = isNaN(puVal) ? 0 : puVal;
             const cond = (document.getElementById('lf-cond-' + ingredientId).value || '').trim() || null;
+            const ing = ingredients.find(i => i.id === ingredientId);
             try {
-                // 1. Article catalogue (creer si l item n en a aucun)
-                let art = articles.find(a => a.ingredient_id === ingredientId);
-                if (!art) {
-                    const payload = {
-                        nom: ing.nom, nom_recherche: normalizeSearch(ing.nom || ''),
-                        categorie: ing.categorie || null, unite: ing.unite || 'kg',
-                        ingredient_id: ingredientId, actif: true
-                    };
-                    if (isDemo) { art = { id: 'a' + Date.now(), ...payload }; articles.push(art); }
-                    else {
-                        const { data, error } = await supabase.from('appro_catalogue').insert([payload]).select().single();
-                        if (error) throw error;
-                        art = data; articles.push(art);
-                    }
-                }
-                // 2. Prix = rattachement au fournisseur
-                const prixPayload = {
-                    article_id: art.id, fournisseur_id: fournId, designation: ing.nom,
-                    conditionnement: cond, pu_ht, unite: ing.unite || 'kg', source: 'manuel', actif: true
-                };
-                if (isDemo) { prix.push({ id: 'p' + Date.now(), ...prixPayload }); }
-                else {
-                    const { data, error } = await supabase.from('appro_prix').insert([prixPayload]).select().single();
-                    if (error) throw error;
-                    prix.push(data);
-                }
-                const fn = (fournisseurs.find(f => f.id === fournId) || {}).nom || 'fournisseur';
-                showToast(`« ${ing.nom} » rattaché à ${fn}`, 'success');
+                const fn = await doLinkItemFournisseur(ingredientId, fournId, pu_ht, cond);
+                showToast(`« ${ing ? ing.nom : 'Item'} » rattaché à ${fn}`, 'success');
                 renderItemsSansFournisseur(document.getElementById('lf-search').value);
             } catch (e) {
                 console.error('linkItemToFournisseur', e);
+                showToast('Erreur: ' + (e.message || e), 'error');
+            }
+        }
+
+        // Rattachement direct depuis la modale de generation de commandes (par besoin)
+        async function linkFromGenerate(besoinId) {
+            const b = besoins.find(x => x.id === besoinId);
+            if (!b) return;
+            if (!b.ingredient_id) { showToast('Cet ancien besoin n a pas d item rattachable — passe par le Catalogue', 'error'); return; }
+            const fournId = document.getElementById('gen-fourn-' + besoinId).value;
+            if (!fournId) { showToast('Choisis un fournisseur', 'error'); return; }
+            const puVal = parseFloat(document.getElementById('gen-prix-' + besoinId).value);
+            const pu_ht = isNaN(puVal) ? 0 : puVal;
+            try {
+                const fn = await doLinkItemFournisseur(b.ingredient_id, fournId, pu_ht, null);
+                showToast(`« ${b.ingredient_nom || b.article_nom} » rattaché à ${fn}`, 'success');
+                openGenerateOrdersModal(); // recalcule la modale : le besoin a maintenant un fournisseur
+            } catch (e) {
+                console.error('linkFromGenerate', e);
                 showToast('Erreur: ' + (e.message || e), 'error');
             }
         }
@@ -3420,16 +3446,28 @@
                 const nom = b.ingredient_nom || b.article_nom;
                 const qty = b.quantite || 1;
                 const unite = b.unite || 'kg';
+                const noFourn = options.length === 0;
 
-                html += `<div class="gen-row" data-besoin-id="${b.id}">`;
+                html += `<div class="gen-row${noFourn ? ' gen-row-warn' : ''}" data-besoin-id="${b.id}">`;
                 html += `  <div class="gen-row-header">`;
-                html += `    <div class="gen-row-name">${nom}</div>`;
+                html += `    <div class="gen-row-name">${noFourn ? '🔴 ' : ''}${nom}</div>`;
                 html += `    <div class="gen-row-qty">${qty} ${unite}</div>`;
                 html += `  </div>`;
 
-                if (options.length === 0) {
-                    html += `<div class="gen-row-noprice">⚠ Aucun fournisseur disponible — ce besoin sera ignoré</div>`;
+                if (noFourn) {
+                    html += `<div class="gen-row-noprice">⚠ Aucun fournisseur — ce besoin sera ignoré dans la commande</div>`;
                     nbSansFournisseur++;
+                    if (isAdminAppro() && b.ingredient_id) {
+                        const fournOpts = (fournisseurs || []).slice().sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
+                            .map(f => `<option value="${f.id}">${escapeHtmlRec(f.nom)}</option>`).join('');
+                        html += `<div class="gen-link-form">
+                            <select id="gen-fourn-${b.id}"><option value="">— Choisir un fournisseur —</option>${fournOpts}</select>
+                            <input type="number" id="gen-prix-${b.id}" step="0.01" min="0" placeholder="Prix HT €">
+                            <button class="btn-small btn-primary" onclick="linkFromGenerate('${b.id}')">🏷 Rattacher</button>
+                        </div>`;
+                    } else if (!b.ingredient_id) {
+                        html += `<div class="gen-link-note">Ancien besoin sans item — à rattacher via Catalogue</div>`;
+                    }
                 } else if (options.length === 1) {
                     const o = options[0];
                     const total = (o.pu_ht * qty).toFixed(2);
@@ -3758,6 +3796,11 @@ table.besoins-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
 .lf-form { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .lf-form select, .lf-form input { padding:6px 8px; border:1px solid #e5e7eb; border-radius:6px; font-size:0.85rem; }
 .lf-form input[type=number] { width:110px; }
+.gen-row-warn { border:1px solid #fecaca; background:#fef2f2; border-radius:8px; }
+.gen-link-form { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
+.gen-link-form select, .gen-link-form input { padding:6px 8px; border:1px solid #e5e7eb; border-radius:6px; font-size:0.85rem; }
+.gen-link-form input[type=number] { width:110px; }
+.gen-link-note { margin-top:6px; font-size:0.78rem; color:#92400e; font-style:italic; }
 </style>
 <!-- RÉCEPTIONS (Phase 1) -->
 <style id="rec-style">
@@ -3938,6 +3981,8 @@ table.besoins-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
   }
 
   function resetInactivity() {
+    // Mode developpement (admin) : pas de deconnexion auto pour cette session
+    try { if (sessionStorage.getItem('planb_dev_nolock') === '1') { if (inactivityTimer) clearTimeout(inactivityTimer); return; } } catch(e){}
     if (inactivityTimer) clearTimeout(inactivityTimer);
     inactivityTimer = setTimeout(__planbInactShow, INACTIVITY_MS);
   }

@@ -7007,6 +7007,8 @@ init();
   }
 
   function resetInactivity() {
+    // Mode developpement (admin) : pas de deconnexion auto pour cette session
+    try { if (sessionStorage.getItem('planb_dev_nolock') === '1') { if (inactivityTimer) clearTimeout(inactivityTimer); return; } } catch(e){}
     if (inactivityTimer) clearTimeout(inactivityTimer);
     inactivityTimer = setTimeout(__planbInactShow, INACTIVITY_MS);
   }

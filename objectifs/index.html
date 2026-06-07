@@ -628,6 +628,8 @@ function showLoading(on) { document.getElementById('loading').classList.toggle('
   var inactivityTimer = null;
   var INACTIVITY_MS = 5 * 60 * 1000; // 5 min (édition longue)
   function resetInactivity() {
+    // Mode developpement (admin) : pas de deconnexion auto pour cette session
+    try { if (sessionStorage.getItem('planb_dev_nolock') === '1') { if (inactivityTimer) clearTimeout(inactivityTimer); return; } } catch(e){}
     if (inactivityTimer) clearTimeout(inactivityTimer);
     inactivityTimer = setTimeout(window.__doLogout, INACTIVITY_MS);
   }
