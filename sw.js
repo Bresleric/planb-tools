@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v32';   // bump à chaque mise à jour du SW (v32 : appro fix commandes non enregistrees + visibilite historique commandes 07/06/2026)
+const CACHE_NAME = 'planb-tools-v33';   // bump à chaque mise à jour du SW (v33 : appro anti double-clic generation commandes 07/06/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

@@ -2250,6 +2250,10 @@
         }
 
         async function generateOrders() {
+            if (generateOrders._busy) return;            // anti double-clic : evite les commandes en double
+            generateOrders._busy = true;
+            const genBtn = document.querySelector('#modal-generate-orders [onclick="generateOrders()"]');
+            if (genBtn) genBtn.disabled = true;
             try {
                 const validated = besoins.filter(b => b.statut === 'valide' && b.etablissement === currentEstablishment);
                 if (validated.length === 0) {
@@ -2374,6 +2378,10 @@
             } catch (e) {
                 console.error('Generate orders error:', e);
                 showToast('Erreur generation commande : ' + (e.message || e), 'error');
+            } finally {
+                generateOrders._busy = false;
+                const gb = document.querySelector('#modal-generate-orders [onclick="generateOrders()"]');
+                if (gb) gb.disabled = false;
             }
         }
 
