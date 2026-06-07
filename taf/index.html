@@ -5951,14 +5951,9 @@
     let html = `<div style="padding:12px;">`;
     sections.forEach(sec => {
       const value = briefing[sec.key] || '';
-      const hasValue = !!value;
       html += `<div class="briefing-form-row">
-        <label>
-          <input type="checkbox" ${hasValue ? 'checked' : ''} onchange="document.getElementById('${sec.key}-field').style.display = this.checked ? 'block' : 'none'">
-          ${sec.label}
-          ${sec.caption ? ` <span style="color:var(--gray-400);font-weight:400;">(${sec.caption})</span>` : ''}
-        </label>
-        <textarea id="${sec.key}-field" placeholder="${sec.placeholder}" style="display:${hasValue ? 'block' : 'none'}">${escapeHtml(value)}</textarea>`;
+        <label>${sec.label}${sec.caption ? ` <span style="color:var(--gray-400);font-weight:400;">(${sec.caption})</span>` : ''}</label>
+        <textarea id="${sec.key}-field" placeholder="${sec.placeholder}">${escapeHtml(value)}</textarea>`;
 
       if (sec.key === 'equipements_defectueux') {
         const photoBase64 = briefing.equipements_defectueux_photo_base64 || '';
