@@ -1399,7 +1399,9 @@
                     <label class="form-label">Unité</label>
                     <select id="ing-unite" class="form-select">
                         <option value="kg">kg</option>
+                        <option value="g">g</option>
                         <option value="L">L</option>
+                        <option value="cL">cL</option>
                         <option value="pce">pce</option>
                         <option value="Unité">Unité</option>
                         <option value="Bouteille">Bouteille</option>
@@ -1830,6 +1832,34 @@
         function categorieOf(b) {
             const ing = ingredients.find(i => i.id === b.ingredient_id);
             return ing ? (ing.categorie || '') : '';
+        }
+
+        // Liste des unites + generateur d options (reutilise par l editeur inline et la modale)
+        const UNITES_DISPO = ['pce', 'Unité', 'kg', 'g', 'L', 'cL', 'Bouteille', 'Boîte', 'Carton', 'paq', 'Forfait'];
+        function uniteOptions(selected) {
+            const sel = selected || 'kg';
+            let o = UNITES_DISPO.map(u => `<option value="${u}"${u === sel ? ' selected' : ''}>${u}</option>`).join('');
+            if (!UNITES_DISPO.includes(sel)) o = `<option value="${sel}" selected>${sel}</option>` + o; // garde une unite hors liste
+            return o;
+        }
+
+        // Editeur d unite inline depuis la liste des Ingredients (sauvegarde immediate)
+        async function updateIngredientUnite(id, val) {
+            const ing = ingredients.find(i => i.id === id);
+            if (!ing) return;
+            const ancien = ing.unite;
+            ing.unite = val;
+            try {
+                if (!isDemo) {
+                    const { error } = await supabase.from('appro_ingredients').update({ unite: val, updated_at: new Date().toISOString() }).eq('id', id);
+                    if (error) throw error;
+                }
+                showToast(`Unité de « ${ing.nom} » : ${val}`, 'success');
+            } catch (e) {
+                ing.unite = ancien;
+                console.error('updateIngredientUnite', e);
+                showToast('Erreur sauvegarde unité', 'error');
+            }
         }
 
         // Tri du tableau besoins : clic sur un titre de colonne (toggle asc/desc)
@@ -2482,7 +2512,7 @@
                     <div class="table-row">
                         <div class="table-col">
                             <div class="table-col-header">${i.nom}${inactifBadge}</div>
-                            <div class="table-col-value">${i.categorie || '—'} • ${i.unite || 'kg'} • ${nbArt} article${nbArt > 1 ? 's' : ''}</div>
+                            <div class="table-col-value">${i.categorie || '—'} • <select class="ing-unite-inline" onchange="updateIngredientUnite('${i.id}', this.value)">${uniteOptions(i.unite)}</select> • ${nbArt} article${nbArt > 1 ? 's' : ''}</div>
                         </div>
                         <div class="table-col narrow" style="display:flex;gap:4px;">
                             <button class="btn-small btn-secondary" onclick="openIngredientArticlesModal('${i.id}')" title="Gérer les articles rattachés">🔗</button>
@@ -3814,6 +3844,7 @@ table.besoins-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
 .besoins-table th { font-size:0.7rem; text-transform:uppercase; color:#6b7280; font-weight:700; background:#f9fafb; }
 .besoins-table th.th-sort { cursor:pointer; user-select:none; white-space:nowrap; }
 .besoins-table th.th-sort:hover { color:var(--orange); }
+.ing-unite-inline { padding:2px 4px; border:1px solid #e5e7eb; border-radius:5px; font-size:0.8rem; background:#fff; }
 .besoins-table tr:last-child td { border-bottom:none; }
 .besoins-table .td-nom { font-weight:600; white-space:normal; min-width:140px; }
 .besoins-table tr.row-valide { background:#f6fef9; }
