@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v34';   // bump à chaque mise à jour du SW (v34 : appro editeur prix a completer (articles a 0 euro) 08/06/2026)
+const CACHE_NAME = 'planb-tools-v35';   // bump a chaque mise a jour du SW (v35 : stock rattachement badges scanneur 08/06/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
