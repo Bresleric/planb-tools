@@ -156,10 +156,10 @@
   <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/planb-common.js"></script>
   <script>
-const SUPABASE_URL = 'https://dzrherfavgiuygnimtux.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Config Supabase centralisee dans /js/planb-common.js (socle commun PBT)
+const sb = PLANB.client();
 
 // Multiplicateurs d'objectif par établissement (mêmes valeurs que le dashboard)
 const OBJECTIFS = {
