@@ -2661,20 +2661,44 @@ const DB = {
   },
 
   async saveIngredients(ficheId, ingredients) {
+    // Filet de securite HACCP : on releve les flags est_principal ACTUELS (par article_id
+    // puis par nom) avant de supprimer, pour ne JAMAIS les perdre si un appelant envoie une
+    // ligne sans le champ (ancienne version en cache, import, generation auto...).
+    // Un appelant qui envoie explicitement est_principal (true/false) reste prioritaire :
+    // le repli ne joue que si le champ est absent (undefined/null).
+    const prevPrincipal = {};
+    try {
+      const { data: prev } = await sb.from('fiche_ingredients')
+        .select('nom, article_id, est_principal').eq('fiche_id', ficheId);
+      (prev || []).forEach(r => {
+        if (r.est_principal) {
+          if (r.article_id) prevPrincipal['a:' + r.article_id] = true;
+          if (r.nom) prevPrincipal['n:' + String(r.nom).trim().toLowerCase()] = true;
+        }
+      });
+    } catch (e) { /* non bloquant : si la lecture echoue on continue sans repli */ }
+
     // Delete existing, then insert new
     await sb.from('fiche_ingredients').delete().eq('fiche_id', ficheId);
     if (ingredients.length > 0) {
-      const rows = ingredients.map((ing, i) => ({
-        fiche_id: ficheId,
-        nom: ing.nom,
-        quantite: ing.quantite,
-        unite: ing.unite,
-        prix_unitaire: ing.prix_unitaire,
-        cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
-        ordre: i,
-        article_id: ing.article_id || null,
-        est_principal: !!ing.est_principal,
-      }));
+      const rows = ingredients.map((ing, i) => {
+        const keyA = ing.article_id ? 'a:' + ing.article_id : null;
+        const keyN = 'n:' + String(ing.nom || '').trim().toLowerCase();
+        const principal = (ing.est_principal !== undefined && ing.est_principal !== null)
+          ? !!ing.est_principal
+          : !!((keyA && prevPrincipal[keyA]) || prevPrincipal[keyN]);
+        return {
+          fiche_id: ficheId,
+          nom: ing.nom,
+          quantite: ing.quantite,
+          unite: ing.unite,
+          prix_unitaire: ing.prix_unitaire,
+          cout_ligne: (ing.quantite || 0) * (ing.prix_unitaire || 0),
+          ordre: i,
+          article_id: ing.article_id || null,
+          est_principal: principal,
+        };
+      });
       const { error } = await sb.from('fiche_ingredients').insert(rows);
       if (error) throw error;
     }
