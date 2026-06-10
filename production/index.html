@@ -6697,10 +6697,10 @@ try { saveProduction = async function pdSaveProductionWrapper() {
           dlc: dlcVal ? new Date(dlcVal).toISOString() : null,
         });
       });
-      // DLC mere = la plus longue des filles, sinon today + 1 jour
+      // DLC mere = la plus longue des filles, sinon defaut +3 jours (coherent avec le defaut global)
       let motherDlc = null;
       spData.forEach(sp => { if (sp.dlc && (!motherDlc || sp.dlc > motherDlc)) motherDlc = sp.dlc; });
-      if (!motherDlc) motherDlc = new Date(now.getTime() + 86400000).toISOString();
+      if (!motherDlc) motherDlc = new Date(now.getTime() + 3 * 86400000).toISOString();
       const motherCode = fiche?.code_court || generateCodeFromName(nom.toUpperCase());
       const motherLot = await DB.createLot(dateStr, currentUser.id, currentUser.nom, currentUser.initiales, motherDlc, motherCode);
       allLots.push(motherLot);
