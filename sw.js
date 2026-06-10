@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v36';   // bump a chaque mise a jour du SW (v36 : production filet de securite est_principal a la sauvegarde des FT 10/06/2026)
+const CACHE_NAME = 'planb-tools-v37';   // bump a chaque mise a jour du SW (v37 : strategie RESEAU D'ABORD - les iPads chargent toujours la derniere version 10/06/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
@@ -41,14 +41,30 @@ self.addEventListener('activate', (event) => {
 
 
 // ----------------------------------------------------------------------------
-// Fetch : cache-first puis network fallback
+// Fetch : RESEAU D'ABORD (network-first) puis repli cache si hors-ligne.
+// Objectif : les iPads chargent TOUJOURS la derniere version quand il y a du
+// reseau (fini les anciennes versions servies depuis le cache). Le cache n'est
+// qu'un filet de secours hors-ligne, rafraichi a chaque reponse reussie.
 // ----------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
-    // On ne cache que les GET du même origin
     if (event.request.method !== 'GET') return;
 
+    // On ne gere QUE le meme origin. Tout le reste (API Supabase, CDN, polices...)
+    // part en direct reseau, sans interception ni mise en cache.
+    const url = new URL(event.request.url);
+    if (url.origin !== self.location.origin) return;
+
     event.respondWith(
-        caches.match(event.request).then((cached) => cached || fetch(event.request))
+        fetch(event.request)
+            .then((response) => {
+                // Reponse fraiche OK -> on met a jour le cache pour le mode hors-ligne
+                if (response && response.ok) {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+                }
+                return response;
+            })
+            .catch(() => caches.match(event.request))   // hors-ligne / reseau KO -> on sert le cache
     );
 });
 
