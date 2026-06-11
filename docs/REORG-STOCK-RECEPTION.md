@@ -218,6 +218,24 @@ suivante qu'après validation d'Eric sur iPad.
   live sur une vraie livraison. Profite du flag `scannable` (étape 1) pour ne pas
   signaler les lignes non-scannables comme « étiquette orpheline ».
 
+> #### Le code article fournisseur = la clé d'or du pont BL ↔ Commande
+> Le catalogue multi-fournisseur existe déjà : table **`appro_prix`** =
+> (`article_id`, `fournisseur_id`, **`reference_fournisseur`**, `designation`,
+> `pu_ht`…). Un même article PBT a **N lignes**, une par fournisseur, chacune avec
+> **son** code. Ex. « Knack » : code `051619` chez Iller, `3315` chez Koch, etc.
+>
+> **Constat (vérifié au 11/06/2026)** : `reconcile-session` matche aujourd'hui par
+> **désignation + poids** ; le `code_article` lu sur le BL est **transporté mais
+> jamais comparé**, et `appro_prix`/la commande **ne sont pas lus**.
+>
+> **À faire en 5b** : utiliser `reference_fournisseur` comme **clé de match
+> prioritaire** (fallback désignation/poids), distinctement sur les deux ponts :
+> - **① BL ↔ Commande** : même fournisseur des deux côtés → `code = code`, match
+>   **exact et non ambigu**. C'est ici que le code brille.
+> - **② Étiquette (carton) ↔ Article** : l'étiquette porte le code **fabricant /
+>   EAN**, pas la ref du distributeur → on reste sur désignation/poids (ou on
+>   ajoute l'EAN plus tard). Ne PAS attendre la ref Iller sur l'étiquette.
+
 ### Étape 6 — Facture comptable pure → Achats  🟠 structurant
 - **Pas** le BL de réception (qui reste le pivot de la Réception, étape 5).
 - Seulement la **facture seule** (sans marchandise, ou arrivée en différé) →
