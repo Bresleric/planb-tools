@@ -181,6 +181,32 @@ SELECT scannable, count(*) FROM appro_ingredients GROUP BY scannable;
 Chaque étape est **livrable seule, testable seule, réversible**. On ne passe à la
 suivante qu'après validation d'Eric sur iPad.
 
+### Étape 0 — ⚠️ PRÉREQUIS : réconcilier `appro_prix` ↔ `appro_ingredients`
+> Découvert le 11/06/2026 en vérifiant l'exemple « Knack ». **Bloquant pour
+> l'étape 5** (et pour tout rapprochement par code fournisseur).
+>
+> **Constat** : le référentiel de tarifs et le catalogue d'articles ne se parlent pas.
+> - `appro_prix` : **771 lignes / 771 orphelines** (`article_id` absent du catalogue).
+> - `appro_commande_lignes` : **76 / 76 orphelines** également.
+> - Cause probable : prix importés (`import_2025`, `import_2026`) avec leurs propres
+>   UUID, jamais raccordés aux `appro_ingredients` (recréés depuis ?).
+>
+> **Exemple Knack** : article catalogue « Knack » = `5d35396a` (Viande & charcuterie),
+> mais le tarif Koch (`2821`, KNACK D'ALSACE) pointe vers `2459f954` (fantôme) et le
+> tarif Iller (`062300`, SAUCISSE DE STRASBOURG) vers `92ea7c7a` (fantôme) — deux
+> articles différents, aucun relié au vrai « Knack ». Et seulement 2 fournisseurs
+> ont une ligne (ni Promocash, ni Metro).
+>
+> **Bonne nouvelle** : un **seul** maillon est rompu. La chaîne
+> `commande → prix → article → stock` se tient déjà (les lignes de commande pointent
+> vers les tarifs via `prix_id`). Réparer `appro_prix.article_id` **reconnecte tout
+> le reste automatiquement**.
+>
+> **À faire** : raccrocher chaque ligne `appro_prix` au bon `appro_ingredients`
+> (matching assisté par désignation + validation humaine, façon `reconcile-session`).
+> À cadrer comme mini-chantier dédié. Sans ça, le rapprochement par code fournisseur
+> (étape 5) ne peut pas relier un code au bon article de stock.
+
 ### Étape 1 — Flag « Scannable » : BDD + affichage lecture seule  🟢 faible risque
 - Migration `scripts/migration-scannable.sql` (colonne + init par famille).
 - Dans **Stock → Gérer les ingrédients** : afficher une colonne / un toggle
@@ -290,6 +316,7 @@ suivante qu'après validation d'Eric sur iPad.
 
 | Étape | État | Notes |
 |---|---|---|
+| 0 — Réconcilier appro_prix ↔ catalogue | ⬜ à faire | **prérequis bloquant** de l'étape 5 (771 tarifs orphelins) |
 | 1 — Flag Scannable (BDD + UI) | ⬜ à faire | |
 | 2 — Flag branché sur scan FEFO | ⬜ à faire | |
 | 3 — Suppression scan unitaire | ⬜ à faire | |
