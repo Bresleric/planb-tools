@@ -8,7 +8,7 @@
 // Chargement : ce script doit etre inclus APRES la librairie supabase-js et
 // AVANT le <script> du module. ATTENTION : chemin RELATIF (le site est servi
 // sous /planb-tools/ sur GitHub Pages, un chemin absolu /js/... pointerait au
-// mauvais endroit). Depuis un module a la racine (ex. objectifs/index.html) :
+// mauvais endroit). Depuis un module a la racine (ex. ventes/index.html) :
 //
 //   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 //   <script src="../js/planb-common.js"></script>
