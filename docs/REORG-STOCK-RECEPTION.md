@@ -43,17 +43,20 @@ qui doit l'être pour l'HACCP.
 ```
 📦 APPROVISIONNEMENT   →  ACHETER : Besoins · Commandes · Catalogue/Prix
                           └─ chaque article porte un flag « Scannable ? » ⭐ (nouveau)
+                          (tables appro_commandes / appro_commande_lignes existantes)
 
-📋 RÉCEPTION           →  RECEVOIR LA MARCHANDISE :
-                          ├─ Scan étiquettes matières (ex-« réception groupée »)
-                          │     ne propose QUE les articles scannables
-                          ├─ Sessions (rapprochement BL)
+📋 RÉCEPTION           →  RECEVOIR LA MARCHANDISE (flux unifié, cf. §2bis) :
+                          ├─ ① Scan BL/Facture         → ouvre la session, l'IA lit les lignes
+                          ├─ ② Scan étiquettes matières → uniquement les articles scannables (rafale)
+                          ├─ ③ Check humain            → livré vs commandé
+                          │     ⤷ async : Opus rapproche  Commande ↔ BL ↔ Étiquettes
                           ├─ Étiquettes (corrections) + Rattachement (fusionnés)
                           └─ ELIS (inchangé)
-                          ✗ scan unitaire supprimé
+                          ✗ scan unitaire « étiquette » supprimé (redondant)
 
-🛒 ACHATS / FACTURES   →  NUMÉRISER LES DOCUMENTS :
-                          └─ Scan BL / facture ⭐ (ex-scan unitaire, déplacé ici)
+🛒 ACHATS / FACTURES   →  FACTURES COMPTABLES :
+                          └─ Facture pure (sans marchandise / arrivée différée) ⭐
+                          ⚠️ le scan BL/facture de réception RESTE dans Réception (c'est le pivot)
 
 📦 STOCK               →  GÉRER LE STOCK :
                           ├─ État · Sorties du jour
@@ -66,7 +69,50 @@ qui doit l'être pour l'HACCP.
                           ✗ « Rattraper une production » → archivé
 ```
 
-**Les 4 verbes : Acheter · Recevoir · Numériser les factures · Gérer le stock.**
+**Les 4 verbes : Acheter · Recevoir · Facturer · Gérer le stock.**
+
+---
+
+## 2bis. Le flux de réception cible (le « rêve »)
+
+Une seule réception, une séquence claire pour l'équipe, et l'IA qui mouline **en
+tâche de fond** pendant que l'humain fait son contrôle visuel :
+
+```
+1. 📄 Scan BL/Facture          → ouvre la session ; l'IA extrait les lignes du document
+2. 🏷️  Scan des étiquettes       → en rafale, UNIQUEMENT les articles scannables
+3. ✅ Check humain              → « ce qui est livré » vs « ce qu'on a commandé »
+        ⤷ pendant ce temps, en async :
+4. 🤖 Opus 4.8 rapproche le TRIANGLE :  Commande ↔ BL/Facture ↔ Étiquettes
+        → écarts (manquant, sur-livré, prix, DLC), validation par PIN côté Réceptions
+```
+
+### Ce qui existe déjà (bonne nouvelle — c'est ~80 % en place)
+
+| Brique | État | Où |
+|---|---|---|
+| Commandes en base | ✅ existe | `appro_commandes`, `appro_commande_lignes` |
+| Session de réception groupée (N étiquettes + 1 BL) | ✅ existe | scanner mode `sburst` |
+| Extraction IA des étiquettes + du BL | ✅ existe | edge function `extract-document` (Opus 4.8) |
+| Rapprochement **asynchrone** Étiquettes ↔ BL | ✅ existe | edge function `reconcile-session` |
+| Affichage écarts + validation PIN | ✅ existe | module Réceptions |
+
+### Ce qui manque pour fermer le triangle
+
+1. **Ajouter la Commande comme 3ᵉ source** de `reconcile-session` : aujourd'hui
+   il rapproche Étiquettes ↔ BL ; il faut y injecter les lignes de
+   `appro_commande_lignes` de la commande liée → écarts **vs commande** (manquant,
+   sur-livré, article non commandé).
+2. **Lier la session à une commande** : choisir la commande appro au démarrage de
+   la réception (par fournisseur), pour donner à l'IA la 3ᵉ liste.
+3. **Réordonner l'UI** : scanner le **BL en premier** (point ① du flux), puis les
+   étiquettes — alors qu'aujourd'hui le BL peut venir en fin de session.
+
+> 💡 Le flag `scannable` et ce flux se renforcent : `reconcile-session` sait déjà
+> qu'une *« ligne BL sans étiquette est normale pour le sel, l'huile… »*. Le flag
+> rend cette intuition **déterministe** : une ligne d'article `scannable=false`
+> n'attend **aucune** étiquette → on la vérifie seulement en quantité (BL ↔
+> commande), sans la signaler comme « étiquette orpheline ».
 
 ---
 
@@ -89,6 +135,7 @@ lot/DLC qu'on veut tracer ? »*
 | Scan FEFO obligatoire = `est_principal` seul → peut réclamer le scan d'un lot de farine | Scan obligatoire = `est_principal` **ET** `article.scannable` → plus de scan absurde |
 | L'écran Rattachement mélange tout | On ne propose au scan/rattachement que `scannable = true` |
 | Stock par lot/DLC pour tout | Non-scannables → **stock en quantité simple** (pas de gestion lot/DLC) |
+| `reconcile-session` devine au cas par cas qu'une ligne BL « peut » ne pas avoir d'étiquette | Ligne d'article `scannable=false` → **aucune** étiquette attendue, vérif quantité seule, pas d'anomalie « orpheline » |
 
 ### Articulation avec l'existant — à ne pas casser
 
@@ -158,12 +205,26 @@ suivante qu'après validation d'Eric sur iPad.
 - **Pré-requis** : trancher le point ouvert §6 (où vit la quantité simple).
 - Plus gros morceau : à découper en sous-étapes au moment venu.
 
-### Étape 5 — Déplacer le scan BL/facture vers Achats/Factures  🟠 structurant
-- L'ex-scan unitaire (documents) devient l'outil de numérisation de **Achats**.
-- Alimente le rapprochement commande ↔ facture, pas le stock par lot.
-- À cadrer séparément (touche le module Achats + l'edge function `extract-document`).
+### Étape 5 — Fermer le triangle : Commande dans le rapprochement  🟠 structurant
+> C'est le cœur du « rêve » (§2bis). Évolution, pas révolution : on enrichit
+> l'existant plutôt que de repartir de zéro.
+- **5a.** Lier la session de réception à une `appro_commandes` (choix de la
+  commande/fournisseur au démarrage, point ① du flux).
+- **5b.** Injecter les `appro_commande_lignes` comme **3ᵉ liste** dans le prompt de
+  `reconcile-session` → écarts **vs commande** (manquant, sur-livré, non commandé,
+  prix). Mettre à jour le JSON de sortie + l'affichage écarts côté Réceptions.
+- **5c.** Réordonner l'UI scanner : **BL en premier**, étiquettes ensuite.
+- ⚠️ Touche `reconcile-session` (edge function) + module Réceptions. À tester en
+  live sur une vraie livraison. Profite du flag `scannable` (étape 1) pour ne pas
+  signaler les lignes non-scannables comme « étiquette orpheline ».
 
-### Étape 6 — Renommages / fusion d'onglets  🟢 faible risque (cosmétique)
+### Étape 6 — Facture comptable pure → Achats  🟠 structurant
+- **Pas** le BL de réception (qui reste le pivot de la Réception, étape 5).
+- Seulement la **facture seule** (sans marchandise, ou arrivée en différé) →
+  numérisation côté **Achats/Factures**, rapprochement avec la commande déjà reçue.
+- À cadrer séparément (module Achats + réutilise `extract-document`).
+
+### Étape 7 — Renommages / fusion d'onglets  🟢 faible risque (cosmétique)
 - Fusion **Étiquettes (corrections) + Rattachement**, renommages (« Vérif lot »,
   « Contrôle stock réel », « Ajustement exceptionnel »), archivage « Rattraper une
   production ». Purement libellés/regroupement → à faire en dernier, sans risque.
@@ -172,7 +233,7 @@ suivante qu'après validation d'Eric sur iPad.
 
 ## 5. Risques & points de vigilance (rappels PBT)
 
-- **Service Worker** : toute étape user-visible (1, 3, 6 surtout) → bumper
+- **Service Worker** : toute étape user-visible (1, 3, 5, 7 surtout) → bumper
   `CACHE_NAME = 'planb-tools-vN'` dans `sw.js`, sinon les iPads PWA gardent
   l'ancienne version en cache. (règle §5 / §11)
 - **Migrations** : toujours idempotentes (`IF NOT EXISTS`), jamais de schéma sans
@@ -187,19 +248,23 @@ suivante qu'après validation d'Eric sur iPad.
 
 ---
 
-## 6. Points ouverts à trancher avec Eric (avant les étapes 4 et 5)
+## 6. Points ouverts à trancher avec Eric
 
-1. **Où vit la quantité simple des non-scannables ?**
+1. **Où vit la quantité simple des non-scannables ?** (avant étape 4)
    Options : (a) une colonne quantité sur `appro_ingredients`, (b) des
    `stock_mouvements` sans lot (lot = NULL) agrégés, (c) une petite table dédiée.
-   → impacte l'étape 4. Recommandation provisoire : (b), pour réutiliser le
-   journal `stock_mouvements` déjà source de vérité.
+   Recommandation provisoire : (b), pour réutiliser le journal `stock_mouvements`
+   déjà source de vérité.
 
 2. **Init du flag `scannable`** : valider la liste réelle des catégories
    (`SELECT DISTINCT categorie FROM appro_ingredients;`) avant d'écrire le `UPDATE`.
 
-3. **Scan BL/facture dans Achats** (étape 5) : définir ce qu'on extrait
-   (fournisseur, montant, lignes ?) et le lien avec les commandes Appro existantes.
+3. **Lien session ↔ commande** (avant étape 5) : une réception = une seule
+   commande, ou plusieurs commandes regroupées ? Et que faire si la livraison
+   arrive **sans** commande enregistrée (achat direct) ?
+
+4. **Facture comptable** (avant étape 6) : définir ce qu'on extrait (fournisseur,
+   montant HT/TTC, lignes ?) et le rapprochement avec la commande déjà reçue.
 
 ---
 
@@ -211,5 +276,6 @@ suivante qu'après validation d'Eric sur iPad.
 | 2 — Flag branché sur scan FEFO | ⬜ à faire | |
 | 3 — Suppression scan unitaire | ⬜ à faire | |
 | 4 — Stock quantité simple | ⬜ à faire | dépend du point ouvert §6.1 |
-| 5 — Scan BL/facture → Achats | ⬜ à faire | dépend du point ouvert §6.3 |
-| 6 — Renommages / fusion onglets | ⬜ à faire | cosmétique, en dernier |
+| 5 — Triangle : Commande dans reconcile | ⬜ à faire | cœur du « rêve » ; dépend §6.3 |
+| 6 — Facture comptable → Achats | ⬜ à faire | dépend §6.4 |
+| 7 — Renommages / fusion onglets | ⬜ à faire | cosmétique, en dernier |
