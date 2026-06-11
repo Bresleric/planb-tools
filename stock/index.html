@@ -468,6 +468,12 @@
           if (s.lot) byKey[key].lots.add(s.lot);
           if (s.scans?.etablissement) byKey[key].etablissements.add(s.scans.etablissement);
           if (s.fabricant) byKey[key].fabricants.add(s.fabricant);
+          // Dates de numérisation min/max du groupe (pour affichage dans la card)
+          if (s.scans?.created_at) {
+            const g = byKey[key];
+            if (!g.date_min || s.scans.created_at < g.date_min) g.date_min = s.scans.created_at;
+            if (!g.date_max || s.scans.created_at > g.date_max) g.date_max = s.scans.created_at;
+          }
           if (s.scans?.created_by_id) {
             byKey[key].scanneurs.set(s.scans.created_by_id, {
               initiales: s.scans.created_by_initiales || '',
@@ -641,6 +647,13 @@
               <span class="gs-label">Scanné par</span>
               ${scanneurs.map(p => `<span class="scanneur-badge" title="${escapeHtml(p.nom || '')}">👤 ${escapeHtml(p.initiales || p.nom || '?')}</span>`).join('')}
             </div>` : '';
+      // Date(s) de numérisation : une seule date si tout scanné le même jour, sinon fourchette
+      let dateHtml = '';
+      if (g.date_min) {
+        const dMin = new Date(g.date_min).toLocaleDateString('fr-FR');
+        const dMax = g.date_max ? new Date(g.date_max).toLocaleDateString('fr-FR') : dMin;
+        dateHtml = ' · 📅 ' + (dMin === dMax ? dMin : 'du ' + dMin + ' au ' + dMax);
+      }
       // Contenu initial de la tuile photo (mis à jour par loadThumbs)
       let thumbInner;
       if (g.thumbUrl) {
@@ -663,7 +676,7 @@
               ${g.poids_total ? g.poids_total.toFixed(2) + ' kg total' : 'poids ?'} ·
               ${lotsArr.length} lot${lotsArr.length>1?'s':''} ${lotsArr.length ? '(' + lotsArr.slice(0,3).join(', ') + (lotsArr.length>3?'…':'') + ')' : ''} ·
               ${etabArr.join(', ')}
-              ${g.categorie_haccp ? ' · cat: ' + g.categorie_haccp : ''}
+              ${g.categorie_haccp ? ' · cat: ' + g.categorie_haccp : ''}${dateHtml}
             </div>
             ${scanneursHtml}
           </div>
