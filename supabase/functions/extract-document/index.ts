@@ -7,7 +7,7 @@
 //
 // Reçoit { scan_id } via POST.
 // Lit la ligne dans `scans`, télécharge le fichier depuis Storage `scans/`,
-// appelle Claude Haiku 4.5 Vision avec un prompt selon `type_document`,
+// appelle Claude Opus 4.8 Vision avec un prompt selon `type_document`,
 // parse le JSON retourné et écrit le détail dans `scan_tracabilite`
 // (étiquettes) ou `scan_lignes` (BL/factures).
 // =============================================================================
@@ -15,11 +15,11 @@
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
 // ---------- Constantes ------------------------------------------------------
-const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
+const ANTHROPIC_MODEL = 'claude-opus-4-8'
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_API_VERSION = '2023-06-01'
-const PRICE_INPUT_PER_MTOK = 1.0   // USD/Mtok
-const PRICE_OUTPUT_PER_MTOK = 5.0  // USD/Mtok
+const PRICE_INPUT_PER_MTOK = 5.0    // USD/Mtok (Opus 4.8)
+const PRICE_OUTPUT_PER_MTOK = 25.0  // USD/Mtok (Opus 4.8)
 const MAX_OUTPUT_TOKENS = 4096
 const ANTHROPIC_TIMEOUT_MS = 60_000
 
