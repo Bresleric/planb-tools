@@ -81,10 +81,10 @@ Pointent vers `appro_ingredients` (`article_id`) ou `appro_catalogue` :
 
 Exécuté le 12/06/2026 (script : `scripts/migration-assainissement-ingredients.sql`).
 
-1. ✅ Raccrocher les lignes `appro_catalogue` sans ingrédient (5/8 faits : Knack,
-   Sticks ketchup, Jaune d'œuf brique, Moutarde d'Alsace, Amer FDB).
-2. ⬜ Trancher les **3 derniers orphelins** : épaule d'agneau roulé (≠ « coupé en
-   sauté » ?), tablette lave-vaisselle (consommable), frais d'éco-participation.
+1. ✅ Raccrocher les lignes `appro_catalogue` sans ingrédient (6/8 : Knack,
+   Sticks ketchup, Jaune d'œuf brique, Moutarde d'Alsace, Amer FDB, Épaule d'agneau).
+   Les 2 derniers (tablette lave-vaisselle, frais d'éco-participation) sont laissés
+   **hors-stock volontairement** → chaîne complète **769/771**.
 3. ✅ Fusionner les 3 doublons (*Farine*, *Fromage blanc*, *PDT Épluchées*) :
    12 références re-pointées dans 5 tables, perdants désactivés + renommés.
 4. ✅ Contrainte d'unicité posée : index `appro_ingredients_nom_norm_uniq`

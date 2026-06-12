@@ -21,10 +21,15 @@ FROM (VALUES
 ) AS m(prefixe, ing)
 WHERE c.ingredient_id IS NULL AND c.nom LIKE m.prefixe || '%';
 
--- Orphelins NON traites (decision Eric) :
---   - Koch  "EPAULE D'AGNEAU ROULE S/OS"  (roule vs "coupe en saute" : produit different ?)
---   - Essentiel "TABLETTE LAVE VAISSELLE" (consommable, pas d'ingredient)
---   - Sapam "Frais d'eco participation"   (frais, pas un ingredient)
+-- Epaule d'agneau roule -> meme ingredient que le saute (decision Eric 12/06)
+UPDATE appro_catalogue
+SET ingredient_id = 'b377aefd-21d8-4410-9a08-0fec2b8ffdc0'  -- Epaule Agneau
+WHERE ingredient_id IS NULL AND nom LIKE 'EPAULE D''AGNEAU ROULE%';
+
+-- Laisses HORS-STOCK volontairement (pas des matieres premieres, decision Eric) :
+--   - Essentiel "TABLETTE LAVE VAISSELLE" (consommable)
+--   - Sapam "Frais d'eco participation"   (frais)
+-- => chaine complete : 769/771 tarifs relies (les 2 ci-dessus exclus a dessein)
 
 -- 2) Fusion des 3 doublons exacts (perdant -> gagnant) : re-pointe 5 tables
 --    Farine        : 4ac4eca0 -> 2624e228
