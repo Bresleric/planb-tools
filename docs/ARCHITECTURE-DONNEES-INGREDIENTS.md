@@ -77,11 +77,15 @@ Pointent vers `appro_ingredients` (`article_id`) ou `appro_catalogue` :
 « orphelin », **suivre la chaîne via `appro_catalogue`**, pas seulement
 `appro_ingredients`.
 
-## 5. Plan d'assainissement (en cours)
+## 5. Plan d'assainissement
 
-1. ✅ Raccrocher les lignes `appro_catalogue` sans ingrédient (5/8 faits, dont Knack).
-2. ⬜ Trancher les 3 derniers orphelins (épaule d'agneau roulé, tablette
-   lave-vaisselle, frais d'éco-participation).
-3. ⬜ Fusionner les 3 doublons (re-pointer les références vers l'exemplaire gardé,
-   puis désactiver le perdant) — migration soignée, touche `stock_mouvements`.
-4. ⬜ Ajouter la contrainte d'unicité sur le nom (après fusion).
+Exécuté le 12/06/2026 (script : `scripts/migration-assainissement-ingredients.sql`).
+
+1. ✅ Raccrocher les lignes `appro_catalogue` sans ingrédient (5/8 faits : Knack,
+   Sticks ketchup, Jaune d'œuf brique, Moutarde d'Alsace, Amer FDB).
+2. ⬜ Trancher les **3 derniers orphelins** : épaule d'agneau roulé (≠ « coupé en
+   sauté » ?), tablette lave-vaisselle (consommable), frais d'éco-participation.
+3. ✅ Fusionner les 3 doublons (*Farine*, *Fromage blanc*, *PDT Épluchées*) :
+   12 références re-pointées dans 5 tables, perdants désactivés + renommés.
+4. ✅ Contrainte d'unicité posée : index `appro_ingredients_nom_norm_uniq`
+   (nom normalisé, parmi les actifs) → empêche les futurs doublons.
