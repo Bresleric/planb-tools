@@ -94,7 +94,7 @@ tâche de fond** pendant que l'humain fait son contrôle visuel :
 | Commandes en base | ✅ existe | `appro_commandes`, `appro_commande_lignes` |
 | Session de réception groupée (N étiquettes + 1 BL) | ✅ existe | scanner mode `sburst` |
 | Extraction IA des étiquettes + du BL | ✅ existe | edge function `extract-document` (Opus 4.8) |
-| Rapprochement **asynchrone** Étiquettes ↔ BL | ✅ existe | edge function `reconcile-session` |
+| Rapprochement Étiquettes ↔ BL | ✅ existe | edge function `reconcile-session` (⚠️ tourne aujourd'hui en **Claude Haiku 4.5**, pas Opus — à arbitrer : bumper en Opus 4.8 pour le rapprochement 3 sources de l'étape 5b, plus exigeant) |
 | Affichage écarts + validation PIN | ✅ existe | module Réceptions |
 
 ### Ce qui manque pour fermer le triangle
@@ -316,7 +316,7 @@ suivante qu'après validation d'Eric sur iPad.
 
 | Étape | État | Notes |
 |---|---|---|
-| 0 — Réconcilier appro_prix ↔ catalogue | ⬜ à faire | **prérequis bloquant** de l'étape 5 (771 tarifs orphelins) |
+| 0 — Réconcilier appro_prix ↔ catalogue | ✅ fait (13/06/2026) | chaîne complète **769/771** (2 consommables hors-stock exprès) ; doublons ingrédients = 0 ; contrainte anti-doublon posée. Détail : `docs/ARCHITECTURE-DONNEES-INGREDIENTS.md` |
 | 1 — Flag Scannable (BDD + UI) | ⬜ à faire | |
 | 2 — Flag branché sur scan FEFO | ⬜ à faire | |
 | 3 — Suppression scan unitaire | ⬜ à faire | |
