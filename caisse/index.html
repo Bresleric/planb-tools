@@ -129,6 +129,85 @@
         .calc-value.error { background: var(--red-light); color: var(--red); }
         .calc-value.neutral { background: var(--gray-100); color: var(--gray-700); }
 
+        /* Saisie en grille compacte : toutes les cartes visibles, portrait ou paysage */
+        #tab-saisie .section-title { margin: 12px 0 6px; }
+        .field-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 6px;
+        }
+        .field-card {
+            background: white; border: 1.5px solid var(--gray-200); border-radius: 10px;
+            padding: 6px 10px; cursor: pointer; min-height: 50px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .field-card .fc-label {
+            font-size: 10.5px; font-weight: 600; color: var(--gray-500);
+            line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .field-card .fc-value {
+            font-size: 17px; font-weight: 700; color: var(--gray-800);
+            text-align: right; font-variant-numeric: tabular-nums; min-height: 21px;
+        }
+        .field-card .fc-value.empty { color: var(--gray-300); font-weight: 500; }
+        .field-card .fc-value.ok { color: var(--green); }
+        .field-card .fc-value.error { color: var(--red); }
+        .field-card .fc-value.neutral { color: var(--gray-700); }
+        .field-card.active {
+            border-color: var(--orange); background: var(--orange-light);
+            box-shadow: 0 0 0 2px rgba(249,115,22,0.2);
+        }
+        .field-card.readonly, .field-card.calc { background: var(--gray-50); cursor: default; }
+
+        /* Cellule quantité tappable (onglet Comptage) */
+        .qty-cell {
+            width: 100%; text-align: center; border: 1.5px solid var(--gray-300);
+            border-radius: 6px; padding: 8px 4px; font-size: 15px; font-weight: 600;
+            cursor: pointer; background: white;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .qty-cell.empty { color: var(--gray-300); }
+        .qty-cell.active {
+            border-color: var(--orange); background: var(--orange-light);
+            box-shadow: 0 0 0 2px rgba(249,115,22,0.2);
+        }
+
+        /* Pavé numérique intégré (remplace le clavier iOS) */
+        .numpad {
+            position: fixed; z-index: 150; background: white;
+            border: 1px solid var(--gray-200); border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+            padding: 8px; display: none;
+            grid-template-columns: repeat(4, 1fr); gap: 6px;
+        }
+        body.pad-visible .numpad { display: grid; }
+        .numpad .key {
+            border: none; border-radius: 10px; background: var(--gray-100);
+            font-size: 20px; font-weight: 700; color: var(--gray-800);
+            cursor: pointer; padding: 0; min-height: 48px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .numpad .key:active { background: var(--gray-300); }
+        .numpad .key-fn { background: var(--gray-200); font-size: 17px; }
+        .numpad .key-zero { grid-column: span 2; }
+        .numpad .key-next {
+            grid-row: span 2; background: var(--orange); color: white;
+            font-size: 15px; line-height: 1.2;
+        }
+        .numpad .key-next:active { background: var(--orange-dark); }
+
+        /* Portrait : pavé en bas, au-dessus de la barre Enregistrer */
+        @media (orientation: portrait) {
+            .numpad { left: 10px; right: 10px; bottom: 84px; }
+            body.pad-visible .tab-content.active { padding-bottom: 340px; }
+        }
+        /* Paysage : pavé à droite, les champs restent visibles à gauche */
+        @media (orientation: landscape) {
+            .numpad { right: 10px; bottom: 84px; width: 272px; }
+            .numpad .key { min-height: 52px; }
+            body.pad-visible .content { padding-right: 292px; }
+        }
+
         /* Save button */
         .save-bar {
             position: fixed; bottom: 0; left: 0; right: 0;
@@ -409,6 +488,24 @@
         </div>
     </div>
 
+    <!-- Pavé numérique -->
+    <div class="numpad" id="numpad">
+        <button class="key" onclick="padPress('7')">7</button>
+        <button class="key" onclick="padPress('8')">8</button>
+        <button class="key" onclick="padPress('9')">9</button>
+        <button class="key key-fn" onclick="padPress('del')">⌫</button>
+        <button class="key" onclick="padPress('4')">4</button>
+        <button class="key" onclick="padPress('5')">5</button>
+        <button class="key" onclick="padPress('6')">6</button>
+        <button class="key key-fn" onclick="padPress('clear')">C</button>
+        <button class="key" onclick="padPress('1')">1</button>
+        <button class="key" onclick="padPress('2')">2</button>
+        <button class="key" onclick="padPress('3')">3</button>
+        <button class="key key-next" onclick="padPress('next')">Suivant ›</button>
+        <button class="key key-zero" onclick="padPress('0')">0</button>
+        <button class="key" onclick="padPress(',')">,</button>
+    </div>
+
     <!-- Save bar -->
     <div class="save-bar" id="save-bar">
         <button class="btn btn-primary" id="btn-save" onclick="saveData()">Enregistrer</button>
@@ -458,6 +555,12 @@ let formData = {};
 let comptageData = {};
 let isDirty = false;
 let currentRecordId = null;
+let currentCashDebut = 0;
+
+// Pavé numérique
+let padTarget = null;     // { kind: 'field' | 'denom', key }
+let padBuffer = null;     // chaine en cours de frappe (null = la prochaine touche remplace la valeur)
+let padOrderFields = [];  // ordre des champs de la saisie pour le bouton Suivant
 
 // Demo storage
 let _demoControle = [];
@@ -563,6 +666,9 @@ const FIELDS = {
 // Helper: parse number
 function n(v) { return parseFloat(v) || 0; }
 
+// Helper: format montant a la francaise (virgule)
+function fmtMontant(v) { return n(v).toFixed(2).replace('.', ','); }
+
 // ============================================
 // INIT
 // ============================================
@@ -587,6 +693,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('etab-badge').textContent =
         currentEtab === 'freddy' ? 'Freddy' : 'Liesel';
     document.getElementById('user-badge').textContent = currentUser.initiales || '—';
+
+    // Pavé numérique visible dès l'ouverture (onglet Saisie actif par défaut)
+    document.body.classList.add('pad-visible');
 
     goToday();
 });
@@ -635,6 +744,18 @@ function switchTab(tab) {
     // Show/hide save bar
     const saveBar = document.getElementById('save-bar');
     saveBar.style.display = (tab === 'historique') ? 'none' : 'flex';
+
+    // Pavé numérique visible sur Saisie et Comptage uniquement
+    document.body.classList.toggle('pad-visible', tab !== 'historique');
+    if (tab === 'comptage') {
+        if (!padTarget || padTarget.kind !== 'denom') {
+            selectDenom(String(FIELDS[currentEtab].denominations[0]));
+        }
+    } else if (tab === 'saisie') {
+        if (padTarget && padTarget.kind === 'denom') clearPadSelection();
+    } else {
+        clearPadSelection();
+    }
 
     if (tab === 'historique') loadHistory();
 }
@@ -704,6 +825,7 @@ async function loadDay() {
         } catch(e) {}
     }
 
+    currentCashDebut = cashDebut;
     renderForm(cashDebut);
     renderComptage();
     updateCalculations(cashDebut);
@@ -714,85 +836,203 @@ async function loadDay() {
 // ============================================
 function renderForm(cashDebut) {
     const fields = FIELDS[currentEtab];
+    padOrderFields = [];
+    padTarget = null; padBuffer = null;
     let html = '';
 
-    // Cash début (readonly)
-    html += `<div class="section-title">Ouverture</div>`;
-    html += `<div class="form-row">
-        <label>Cash début de journée</label>
-        <input type="text" id="cash-debut" value="${cashDebut.toFixed(2)}" readonly>
+    const title = (t) => `<div class="section-title">${t}</div>`;
+    const grid = (inner) => `<div class="field-grid">${inner}</div>`;
+
+    // Ouverture + CA (cash début en lecture seule)
+    let sec = `<div class="field-card readonly">
+        <div class="fc-label">Cash début de journée</div>
+        <div class="fc-value" id="cash-debut-display">${fmtMontant(cashDebut)}</div>
     </div>`;
+    fields.ca.forEach(f => { sec += renderFieldCard(f); });
+    html += title('Ouverture · Chiffre d\'affaires') + grid(sec);
 
-    // CA section
-    html += `<div class="section-title">Chiffre d'affaires</div>`;
-    fields.ca.forEach(f => { html += renderField(f); });
-
-    // Paiements CB
-    html += `<div class="section-title">Paiements CB</div>`;
-    fields.paiements.forEach(f => { html += renderField(f); });
-
-    // Total CB (calculated)
-    html += `<div class="calc-row">
-        <label>Total CB</label>
-        <div class="calc-value neutral" id="calc-total-cb">0.00</div>
+    // Paiements CB + Total CB (calculé)
+    sec = '';
+    fields.paiements.forEach(f => { sec += renderFieldCard(f); });
+    sec += `<div class="field-card calc">
+        <div class="fc-label">Total CB</div>
+        <div class="fc-value neutral" id="calc-total-cb">0,00</div>
     </div>`;
+    html += title('Paiements CB') + grid(sec);
 
-    // Autres encaissements
-    html += `<div class="section-title">Autres encaissements</div>`;
-    fields.autres.forEach(f => { html += renderField(f); });
-
-    // Contrôle CA (calculated)
-    html += `<div class="calc-row">
-        <label>Contrôle CA</label>
-        <div class="calc-value ok" id="calc-controle-ca">0.00</div>
+    // Autres encaissements + Contrôle CA (calculé)
+    sec = '';
+    fields.autres.forEach(f => { sec += renderFieldCard(f); });
+    sec += `<div class="field-card calc">
+        <div class="fc-label">Contrôle CA</div>
+        <div class="fc-value ok" id="calc-controle-ca">0,00</div>
     </div>`;
+    html += title('Autres encaissements') + grid(sec);
 
     // Mouvements de caisse
-    html += `<div class="section-title">Mouvements de caisse</div>`;
-    fields.mouvements.forEach(f => { html += renderField(f); });
+    sec = '';
+    fields.mouvements.forEach(f => { sec += renderFieldCard(f); });
+    html += title('Mouvements de caisse') + grid(sec);
 
-    // Comptage caisse (linked from comptage tab)
-    html += `<div class="section-title">Clôture</div>`;
-    html += `<div class="form-row">
-        <label>Comptage caisse</label>
-        <input type="number" inputmode="decimal" step="0.01" id="field-comptage_caisse"
-            value="${n(formData.comptage_caisse).toFixed(2)}"
-            onchange="onFieldChange('comptage_caisse', this.value)"
-            onfocus="this.select()">
+    // Clôture : comptage saisissable + théorique + écart (calculés)
+    padOrderFields.push('comptage_caisse');
+    const valComptage = n(formData.comptage_caisse);
+    sec = `<div class="field-card" id="card-comptage_caisse" onclick="selectField('comptage_caisse')">
+        <div class="fc-label">Comptage caisse</div>
+        <div class="fc-value${Math.abs(valComptage) < 0.005 ? ' empty' : ''}" id="field-comptage_caisse">${fmtMontant(valComptage)}</div>
     </div>`;
-
-    // Caisse théorique (calculated)
-    html += `<div class="calc-row">
-        <label>Caisse théorique</label>
-        <div class="calc-value neutral" id="calc-caisse-theo">0.00</div>
+    sec += `<div class="field-card calc">
+        <div class="fc-label">Caisse théorique</div>
+        <div class="fc-value neutral" id="calc-caisse-theo">0,00</div>
     </div>`;
-
-    // Écart de caisse (calculated)
-    html += `<div class="calc-row">
-        <label>Écart de caisse</label>
-        <div class="calc-value ok" id="calc-ecart">0.00</div>
+    sec += `<div class="field-card calc">
+        <div class="fc-label">Écart de caisse</div>
+        <div class="fc-value ok" id="calc-ecart">0,00</div>
     </div>`;
+    html += title('Clôture') + grid(sec);
 
     document.getElementById('form-container').innerHTML = html;
+
+    // Jour vierge + onglet Saisie visible : on présélectionne le premier champ
+    const saisieActive = document.getElementById('tab-saisie').classList.contains('active');
+    if (!currentRecordId && saisieActive && padOrderFields.length) {
+        selectField(padOrderFields[0]);
+    }
 }
 
-function renderField(f) {
-    const val = n(formData[f.key]).toFixed(2);
-    return `<div class="form-row">
-        <label>${f.label}</label>
-        <input type="number" inputmode="decimal" step="0.01"
-            id="field-${f.key}" value="${val !== '0.00' ? val : ''}"
-            placeholder="0.00"
-            onchange="onFieldChange('${f.key}', this.value)"
-            onfocus="this.select()">
+function renderFieldCard(f) {
+    padOrderFields.push(f.key);
+    const val = n(formData[f.key]);
+    const empty = Math.abs(val) < 0.005;
+    return `<div class="field-card" id="card-${f.key}" onclick="selectField('${f.key}')">
+        <div class="fc-label">${f.label}</div>
+        <div class="fc-value${empty ? ' empty' : ''}" id="field-${f.key}">${fmtMontant(val)}</div>
     </div>`;
 }
 
 function onFieldChange(key, value) {
     formData[key] = parseFloat(value) || 0;
     isDirty = true;
-    const cashDebut = parseFloat(document.getElementById('cash-debut').value) || 0;
-    updateCalculations(cashDebut);
+    updateCalculations(currentCashDebut);
+}
+
+// ============================================
+// PAVÉ NUMÉRIQUE
+// ============================================
+function clearPadSelection() {
+    document.querySelectorAll('.field-card.active, .qty-cell.active')
+        .forEach(el => el.classList.remove('active'));
+    // Reformater proprement la valeur du champ que l'on quitte
+    if (padTarget) {
+        if (padTarget.kind === 'field') { padBuffer = null; refreshFieldDisplay(padTarget.key); }
+        else { padBuffer = null; refreshDenomDisplay(padTarget.key); }
+    }
+    padTarget = null; padBuffer = null;
+}
+
+function selectField(key) {
+    clearPadSelection();
+    padTarget = { kind: 'field', key };
+    padBuffer = null;
+    const card = document.getElementById('card-' + key);
+    if (card) {
+        card.classList.add('active');
+        card.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function selectDenom(d) {
+    clearPadSelection();
+    padTarget = { kind: 'denom', key: String(d) };
+    padBuffer = null;
+    const cell = document.getElementById('qty-' + String(d).replace('.','_'));
+    if (cell) {
+        cell.classList.add('active');
+        cell.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function padPress(k) {
+    if (!padTarget) { showToast('Touche un champ pour le saisir'); return; }
+    if (k === 'next') { padNext(); return; }
+
+    let buf = padBuffer;
+    if (k === 'del') {
+        buf = (buf === null) ? '' : buf.slice(0, -1);
+    } else if (k === 'clear') {
+        buf = '';
+    } else if (k === ',') {
+        if (padTarget.kind === 'denom') return; // quantités entières au comptage
+        if (buf === null || buf === '') buf = '0.';
+        else if (!buf.includes('.')) buf += '.';
+    } else {
+        if (buf === null) buf = ''; // première touche : la valeur repart de zéro
+        const di = buf.indexOf('.');
+        if (di >= 0 && buf.length - di > 2) return; // max 2 décimales
+        if (buf.replace('.', '').length >= 7) return;
+        buf += k;
+    }
+    padBuffer = buf;
+    padApply();
+}
+
+function padApply() {
+    const num = (padBuffer === null || padBuffer === '') ? 0 : (parseFloat(padBuffer) || 0);
+    if (padTarget.kind === 'denom') {
+        onDenomChange(padTarget.key, String(Math.round(num)));
+        refreshDenomDisplay(padTarget.key, true);
+    } else {
+        onFieldChange(padTarget.key, String(num));
+        refreshFieldDisplay(padTarget.key, true);
+    }
+}
+
+function refreshFieldDisplay(key, editing) {
+    const el = document.getElementById('field-' + key);
+    if (!el) return;
+    const val = n(formData[key]);
+    if (editing && padBuffer !== null) {
+        el.textContent = padBuffer === '' ? '0' : padBuffer.replace('.', ',');
+        el.classList.remove('empty');
+    } else {
+        el.textContent = fmtMontant(val);
+        el.classList.toggle('empty', Math.abs(val) < 0.005);
+    }
+}
+
+function refreshDenomDisplay(key, editing) {
+    const el = document.getElementById('qty-' + key.replace('.','_'));
+    if (!el) return;
+    const qty = comptageData[key] || 0;
+    if (editing && padBuffer !== null) {
+        el.textContent = padBuffer === '' ? '0' : padBuffer;
+        el.classList.remove('empty');
+    } else {
+        el.textContent = qty || '0';
+        el.classList.toggle('empty', !qty);
+    }
+}
+
+function padNext() {
+    if (!padTarget) return;
+    if (padTarget.kind === 'field') {
+        const idx = padOrderFields.indexOf(padTarget.key);
+        if (idx >= 0 && idx < padOrderFields.length - 1) {
+            selectField(padOrderFields[idx + 1]);
+        } else {
+            clearPadSelection();
+            showToast('Fin de la saisie — pense à Enregistrer');
+        }
+    } else {
+        const denoms = FIELDS[currentEtab].denominations.map(String);
+        const idx = denoms.indexOf(padTarget.key);
+        if (idx >= 0 && idx < denoms.length - 1) {
+            selectDenom(denoms[idx + 1]);
+        } else {
+            clearPadSelection();
+            showToast('Comptage terminé — pense à Reporter dans la saisie');
+        }
+    }
 }
 
 // ============================================
@@ -804,27 +1044,27 @@ function updateCalculations(cashDebut) {
     // Total CB
     const totalCB = fields.calcTotalCB(formData);
     const elTotalCB = document.getElementById('calc-total-cb');
-    if (elTotalCB) { elTotalCB.textContent = totalCB.toFixed(2) + ' €'; }
+    if (elTotalCB) { elTotalCB.textContent = fmtMontant(totalCB) + ' €'; }
 
     // Contrôle CA
     const controleCA = fields.calcControleCA(formData);
     const elControle = document.getElementById('calc-controle-ca');
     if (elControle) {
-        elControle.textContent = controleCA.toFixed(2) + ' €';
-        elControle.className = 'calc-value ' + (Math.abs(controleCA) < 0.01 ? 'ok' : 'error');
+        elControle.textContent = fmtMontant(controleCA) + ' €';
+        elControle.className = 'fc-value ' + (Math.abs(controleCA) < 0.01 ? 'ok' : 'error');
     }
 
     // Caisse théorique
     const caisseTheo = fields.calcCaisseTheorique(formData, cashDebut);
     const elTheo = document.getElementById('calc-caisse-theo');
-    if (elTheo) { elTheo.textContent = caisseTheo.toFixed(2) + ' €'; }
+    if (elTheo) { elTheo.textContent = fmtMontant(caisseTheo) + ' €'; }
 
     // Écart
     const ecart = fields.calcEcart(formData, cashDebut);
     const elEcart = document.getElementById('calc-ecart');
     if (elEcart) {
-        elEcart.textContent = ecart.toFixed(2) + ' €';
-        elEcart.className = 'calc-value ' + (Math.abs(ecart) < 0.01 ? 'ok' : 'error');
+        elEcart.textContent = fmtMontant(ecart) + ' €';
+        elEcart.className = 'fc-value ' + (Math.abs(ecart) < 0.01 ? 'ok' : 'error');
     }
 }
 
@@ -840,16 +1080,16 @@ function renderComptage() {
     html += `<div class="comptage-header">Sous-total</div>`;
 
     denoms.forEach(d => {
-        const qty = comptageData[String(d)] || 0;
+        const key = String(d);
+        const safeId = key.replace('.','_');
+        const qty = comptageData[key] || 0;
         const subtotal = (qty * d).toFixed(2);
         const denomLabel = d >= 1 ? d + ' €' : (d * 100).toFixed(0) + ' ct';
         html += `<div class="comptage-cell denom">${denomLabel}</div>`;
         html += `<div class="comptage-cell">
-            <input type="number" inputmode="numeric" min="0" value="${qty || ''}" placeholder="0"
-                id="denom-${String(d).replace('.','_')}"
-                onchange="onDenomChange('${d}', this.value)">
+            <div class="qty-cell${qty ? '' : ' empty'}" id="qty-${safeId}" onclick="selectDenom('${key}')">${qty || '0'}</div>
         </div>`;
-        html += `<div class="comptage-cell subtotal" id="subtotal-${String(d).replace('.','_')}">${subtotal} €</div>`;
+        html += `<div class="comptage-cell subtotal" id="subtotal-${safeId}">${subtotal} €</div>`;
     });
 
     html += `</div>`;
@@ -896,13 +1136,11 @@ function applyComptage() {
     const total = calcComptageTotal();
     formData.comptage_caisse = total;
 
-    // Update the comptage_caisse field in the form
-    const el = document.getElementById('field-comptage_caisse');
-    if (el) el.value = total.toFixed(2);
+    // Mettre a jour la carte Comptage caisse dans la saisie
+    refreshFieldDisplay('comptage_caisse');
 
     isDirty = true;
-    const cashDebut = parseFloat(document.getElementById('cash-debut')?.value) || 0;
-    updateCalculations(cashDebut);
+    updateCalculations(currentCashDebut);
 
     switchTab('saisie');
     showToast(`Comptage reporté : ${total.toFixed(2)} €`);
@@ -985,7 +1223,7 @@ async function saveData() {
 // ============================================
 async function terminerCloture() {
     const fields = FIELDS[currentEtab];
-    const cashDebut = parseFloat(document.getElementById('cash-debut')?.value) || 0;
+    const cashDebut = currentCashDebut;
     const totalCompte = calcComptageTotal(); // total dans l'onglet Comptage
     const comptageReporte = n(formData.comptage_caisse); // valeur dans le contrôle
 

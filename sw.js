@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v38';   // bump a chaque mise a jour du SW (v38 : fix DLC par defaut +3 jours sur productions multi sous-produits (TAF + Production) 10/06/2026)
+const CACHE_NAME = 'planb-tools-v39';   // bump a chaque mise a jour du SW (v39 : caisse en grille compacte + pave numerique integre 12/07/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
