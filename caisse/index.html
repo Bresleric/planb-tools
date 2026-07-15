@@ -189,7 +189,6 @@
         }
         .numpad .key:active { background: var(--gray-300); }
         .numpad .key-fn { background: var(--gray-200); font-size: 17px; }
-        .numpad .key-zero { grid-column: span 2; }
         .numpad .key-next {
             grid-row: span 2; background: var(--orange); color: white;
             font-size: 15px; line-height: 1.2;
@@ -502,8 +501,9 @@
         <button class="key" onclick="padPress('2')">2</button>
         <button class="key" onclick="padPress('3')">3</button>
         <button class="key key-next" onclick="padPress('next')">Suivant ›</button>
-        <button class="key key-zero" onclick="padPress('0')">0</button>
+        <button class="key" onclick="padPress('0')">0</button>
         <button class="key" onclick="padPress(',')">,</button>
+        <button class="key key-fn" onclick="padPress('neg')">±</button>
     </div>
 
     <!-- Save bar -->
@@ -965,11 +965,22 @@ function padPress(k) {
         if (padTarget.kind === 'denom') return; // quantités entières au comptage
         if (buf === null || buf === '') buf = '0.';
         else if (!buf.includes('.')) buf += '.';
+    } else if (k === 'neg') {
+        if (padTarget.kind === 'denom') return; // pas de quantité négative au comptage
+        // Bascule le signe : sur la valeur en cours de frappe, ou sur la valeur existante
+        if (buf === null) {
+            const cur = n(formData[padTarget.key]);
+            buf = cur === 0 ? '-' : String(-cur);
+        } else if (buf.startsWith('-')) {
+            buf = buf.slice(1);
+        } else {
+            buf = '-' + buf;
+        }
     } else {
         if (buf === null) buf = ''; // première touche : la valeur repart de zéro
         const di = buf.indexOf('.');
         if (di >= 0 && buf.length - di > 2) return; // max 2 décimales
-        if (buf.replace('.', '').length >= 7) return;
+        if (buf.replace(/[.\-]/g, '').length >= 7) return;
         buf += k;
     }
     padBuffer = buf;
