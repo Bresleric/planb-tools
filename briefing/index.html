@@ -359,6 +359,15 @@
             justify-content: center; color: var(--gray-500); transition: all 0.15s; flex-shrink: 0;
         }
         .btn-remove:active { background: var(--red-light); color: var(--red); transform: scale(0.9); }
+        /* Bouton archiver (Managers/Admin) : retire une info reprise + motif + journal */
+        .btn-archive {
+            background: var(--gray-100); border: none; width: 32px; height: 32px;
+            border-radius: 6px; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; color: var(--gray-400); transition: all 0.15s;
+            flex-shrink: 0; font-size: 15px; position: relative; touch-action: manipulation;
+        }
+        .btn-archive input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+        .btn-archive:active { background: var(--orange-light, #fff3e0); color: var(--orange); transform: scale(0.9); }
         .btn-add-item {
             width: 100%; padding: 10px; border: 2px dashed var(--gray-300);
             background: transparent; border-radius: 8px; font-size: 13px; font-weight: 600;
@@ -1931,28 +1940,28 @@
                 { key: 'commentaire', label: 'Commentaire', type: 'text', placeholder: 'A pousser...' }
             ]);
 
-            // Produits limites
+            // Produits limites (archivable : info persistante reprise du briefing precedent)
             html += renderListEditorSection('&#9888;&#65039;', 'Produits limites', 'produits_limites', b.produits_limites || [], [
                 { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Nom du produit' },
                 { key: 'quantite', label: 'Qte', type: 'number', placeholder: '0', width: '60px' },
                 { key: 'unite', label: 'Unite', type: 'text', placeholder: 'portions', width: '80px' },
                 { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
-            ]);
+            ], true);
 
-            // Dates courtes
+            // Dates courtes (archivable : info persistante reprise du briefing precedent)
             html += renderListEditorSection('&#128197;', 'Dates courtes', 'produits_dates_courtes', b.produits_dates_courtes || [], [
                 { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Nom du produit' },
                 { key: 'date_limite', label: 'DLC', type: 'date' },
                 { key: 'action', label: 'Action', type: 'select', options: ['Mettre en avant','A ecouler','Retirer'] },
                 { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
-            ]);
+            ], true);
 
-            // Incidents
+            // Incidents (archivable : revient tant que non resolu dans briefing_incidents)
             html += renderListEditorSection('&#128680;', 'Incidents', 'incidents', b.incidents || [], [
                 { key: 'description', label: 'Incident', type: 'textarea', placeholder: 'Description de l\'incident' },
                 { key: 'mesure_corrective', label: 'Mesure corrective', type: 'textarea', placeholder: 'Action mise en place' },
                 { key: 'priorite', label: 'Priorite', type: 'select', options: ['haute','moyenne','basse'] }
-            ]);
+            ], true);
 
             // Objectifs
             html += renderListEditorSection('&#127919;', 'Objectifs du service', 'objectifs', b.objectifs || [], [
@@ -1960,11 +1969,11 @@
                 { key: 'priorite', label: 'Priorite', type: 'select', options: ['haute','moyenne','basse'] }
             ]);
 
-            // Rappels
+            // Rappels (archivable : revient tant que actif=true dans briefing_rappels)
             html += renderListEditorSection('&#128172;', 'Rappels', 'rappels', b.rappels || [], [
                 { key: 'message', label: 'Message', type: 'textarea', placeholder: 'Rappel pour l\'equipe...' },
                 { key: 'categorie', label: 'Categorie', type: 'select', options: ['service','hygiene','securite','pratique','autre'] }
-            ]);
+            ], true);
 
             // Notes libres
             html += `<div class="form-section">
@@ -2032,7 +2041,7 @@
             return html;
         }
 
-        function renderListEditorSection(icon, title, key, items, fields) {
+        function renderListEditorSection(icon, title, key, items, fields, archivable) {
             let html = `<div class="form-section">
                 <div class="form-section-header" onclick="toggleFormSection(this)">
                     <div class="section-icon">${icon}</div>
@@ -2044,7 +2053,7 @@
                     <div class="list-editor" id="editor-${key}">`;
 
             items.forEach((item, idx) => {
-                html += renderEditorItem(key, idx, item, fields);
+                html += renderEditorItem(key, idx, item, fields, archivable);
             });
 
             html += `</div>
@@ -2055,7 +2064,7 @@
             return html;
         }
 
-        function renderEditorItem(key, idx, item, fields) {
+        function renderEditorItem(key, idx, item, fields, archivable) {
             const fieldConfigs = getFieldConfigs(key);
             let fieldsHtml = '<div class="list-editor-fields">';
 
@@ -2095,8 +2104,16 @@
 
             fieldsHtml += '</div>';
 
+            // Bouton archiver : seulement Managers/Admin, sur les sections persistantes (archivable),
+            // pour retirer une vieille info reprise + motif + journal + neutralisation de la source.
+            const canArchive = archivable && ['manager', 'admin'].includes(currentUser?.role);
+            const archiveBtn = canArchive
+                ? `<label class="btn-archive" title="Archiver cette info (retrait + motif)"><input type="checkbox" onchange="onArchiveCheck(this, '${key}')">&#128451;</label>`
+                : '';
+
             return `<div class="list-editor-item" data-key="${key}" data-idx="${idx}">
                 ${fieldsHtml}
+                ${archiveBtn}
                 <button class="btn-remove" onclick="removeEditorItem('${key}', ${idx})">&#10005;</button>
             </div>`;
         }
@@ -2169,12 +2186,140 @@
             const editor = document.getElementById(`editor-${key}`);
             const item = editor.querySelector(`.list-editor-item[data-key="${key}"][data-idx="${idx}"]`);
             if (item) item.remove();
-            // Reindex
+            reindexEditor(key);
+        }
+
+        function reindexEditor(key) {
+            const editor = document.getElementById(`editor-${key}`);
+            if (!editor) return;
             editor.querySelectorAll(`.list-editor-item[data-key="${key}"]`).forEach((el, i) => {
                 el.dataset.idx = i;
                 el.querySelectorAll('[data-idx]').forEach(input => input.dataset.idx = i);
-                el.querySelector('.btn-remove').setAttribute('onclick', `removeEditorItem('${key}', ${i})`);
+                const rm = el.querySelector('.btn-remove');
+                if (rm) rm.setAttribute('onclick', `removeEditorItem('${key}', ${i})`);
             });
+        }
+
+        // ============ ARCHIVAGE D'UNE INFO REPRISE (Managers/Admin) ============
+        // Le redacteur coche une vieille info -> saisit un motif -> elle est retiree
+        // du briefing (donc plus affichee/reprise), journalisee dans briefing_archives,
+        // et sa source est neutralisee pour qu'elle ne revienne plus.
+        let _archivePending = null;
+
+        function collectSingleItem(row) {
+            const item = {};
+            row.querySelectorAll('[data-field]').forEach(input => {
+                const field = input.dataset.field;
+                if (input.type === 'number') item[field] = parseFloat(input.value) || 0;
+                else item[field] = input.value.trim();
+            });
+            return item;
+        }
+
+        function onArchiveCheck(checkbox, key) {
+            if (!checkbox.checked) return;
+            const row = checkbox.closest('.list-editor-item');
+            const item = collectSingleItem(row);
+            const libelle = item.description || item.produit || item.message || '';
+            if (!libelle) {
+                showToast('Rien a archiver sur cette ligne', 'error');
+                checkbox.checked = false;
+                return;
+            }
+            _archivePending = { key, item, libelle, row, checkbox };
+            const html = `
+                <div class="modal-overlay active" id="archive-modal" onclick="if(event.target===this)cancelArchive()">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Archiver cette info</h2>
+                            <button class="modal-close" onclick="cancelArchive()">&#10005;</button>
+                        </div>
+                        <div class="modal-content">
+                            <div style="font-size:13px; color:var(--gray-600); margin-bottom:10px;">
+                                &laquo; <strong>${escapeHtml(libelle)}</strong> &raquo; sera retiree du briefing et ne reapparaitra plus.
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Motif (obligatoire)</label>
+                                <textarea class="form-textarea" id="archive-comment" placeholder="Ex: probleme resolu, produit ecoule, rappel plus d'actualite"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" onclick="cancelArchive()">Annuler</button>
+                            <button class="btn-primary" onclick="confirmArchiveItem()">Archiver</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+            setTimeout(() => document.getElementById('archive-comment')?.focus(), 50);
+        }
+
+        function cancelArchive() {
+            if (_archivePending?.checkbox) _archivePending.checkbox.checked = false;
+            document.getElementById('archive-modal')?.remove();
+            _archivePending = null;
+        }
+
+        async function confirmArchiveItem() {
+            if (!_archivePending) return;
+            const comment = document.getElementById('archive-comment')?.value?.trim();
+            if (!comment) { showToast('Motif obligatoire', 'error'); return; }
+            const { key, item, libelle, row } = _archivePending;
+
+            if (isDemo) {
+                if (row) row.remove();
+                reindexEditor(key);
+                document.getElementById('archive-modal')?.remove();
+                _archivePending = null;
+                showToast('Info archivee (demo)', 'success');
+                return;
+            }
+
+            try {
+                // 1. Journaliser l'archivage (tracabilite)
+                let sourceTable = null;
+                if (key === 'incidents') sourceTable = 'briefing_incidents';
+                else if (key === 'rappels') sourceTable = 'briefing_rappels';
+
+                const { error: logErr } = await supabaseClient.from('briefing_archives').insert({
+                    etablissement: currentEstablishment,
+                    briefing_date: editingBriefing?.date || null,
+                    section: key,
+                    libelle: libelle,
+                    contenu: item,
+                    commentaire: comment,
+                    source_table: sourceTable,
+                    archive_par_id: currentUser.id,
+                    archive_par_nom: currentUser.nom
+                });
+                if (logErr) throw logErr;
+
+                // 2. Neutraliser la source pour stopper le retour
+                if (key === 'incidents' && item.description) {
+                    await supabaseClient.from('briefing_incidents')
+                        .update({ statut: 'resolu', resolu_at: new Date().toISOString(), resolu_par_nom: currentUser.nom })
+                        .eq('etablissement', currentEstablishment)
+                        .eq('description', item.description)
+                        .in('statut', ['ouvert', 'en_cours']);
+                } else if (key === 'rappels' && item.message) {
+                    await supabaseClient.from('briefing_rappels')
+                        .update({ actif: false })
+                        .eq('etablissement', currentEstablishment)
+                        .eq('message', item.message);
+                }
+                // produits_limites / produits_dates_courtes : pas de table source,
+                // le simple retrait du briefing stoppe la reprise (le prochain recopie celui-ci).
+
+                // 3. Retirer la ligne du formulaire (donc du briefing a la sauvegarde)
+                if (row) row.remove();
+                reindexEditor(key);
+
+                document.getElementById('archive-modal')?.remove();
+                _archivePending = null;
+                showToast('Info archivee', 'success');
+            } catch (err) {
+                console.error('Error archiving item:', err);
+                showToast('Erreur archivage: ' + (err.message || 'echec'), 'error');
+            }
         }
 
         function collectEditorData(key) {
