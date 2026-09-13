@@ -900,7 +900,7 @@
                 { type: 'vip', description: 'Anniversaire table 12 - M. Martin', heure: '12h30', couverts: 6, allergies: 'Sans gluten x1' }
             ],
             plats_suggestions: [
-                { plat: 'Risotto aux cepes', prix: 18.50, commentaire: 'Nouveau plat, a pousser' }
+                { plat: 'Risotto aux cepes', prix: 12, commentaire: 'Nouveau plat, a pousser' }
             ],
             objectifs: [
                 { objectif: 'Proposer systematiquement l\'aperitif', priorite: 'haute' },
@@ -1259,13 +1259,13 @@
                         <div class="brief-item">
                             <div class="brief-item-icon">&#127869;</div>
                             <div class="brief-item-content">
-                                <div class="brief-item-title">${escapeHtml(p.plat)}${p.prix ? ' — ' + formatMoney(p.prix) : ''}</div>
+                                <div class="brief-item-title">${escapeHtml(p.plat)}${p.prix ? ' — ' + p.prix : ''}</div>
                                 ${p.commentaire ? `<div class="brief-item-subtitle">${escapeHtml(p.commentaire)}</div>` : ''}
                             </div>
                         </div>`;
                 });
                 if (!platsHtml) platsHtml = emptyTxt('Aucun plat ni suggestion');
-                html += renderSection('&#127869;', 'Plats / Suggestions', (b.plats_suggestions || []).length, platsHtml, true);
+                html += renderSection('&#127869;', 'Plats / Suggestions (Quantites)', (b.plats_suggestions || []).length, platsHtml, true);
             }
 
             // Section: Produits limites
@@ -1934,9 +1934,9 @@
             ]);
 
             // Plats / Suggestions
-            html += renderListEditorSection('&#127869;', 'Plats / Suggestions', 'plats_suggestions', b.plats_suggestions || [], [
+            html += renderListEditorSection('&#127869;', 'Plats / Suggestions (Quantites)', 'plats_suggestions', b.plats_suggestions || [], [
                 { key: 'plat', label: 'Plat', type: 'text', placeholder: 'Nom du plat' },
-                { key: 'prix', label: 'Prix', type: 'number', placeholder: '0.00', width: '70px' },
+                { key: 'prix', label: 'Qte', type: 'number', placeholder: '0', width: '60px' },
                 { key: 'commentaire', label: 'Commentaire', type: 'text', placeholder: 'A pousser...' }
             ]);
 
