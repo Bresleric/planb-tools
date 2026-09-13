@@ -1,0 +1,42 @@
+-- ============================================================================
+-- PlanB Tools - Module Briefings
+-- Migration : table briefing_archives (journal des infos archivees)
+--
+-- Permet aux Managers/Admin, pendant la redaction, de retirer une vieille info
+-- reprise (incident, produit limite, date courte, rappel) avec un motif.
+-- Cette table garde la trace de QUI a archive QUOI, QUAND et POURQUOI.
+--
+-- A executer dans Supabase -> SQL Editor (MCP en lecture seule).
+-- Idempotente : peut etre relancee sans risque.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS briefing_archives (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    etablissement TEXT NOT NULL CHECK (etablissement IN ('freddy', 'liesel')),
+    briefing_date DATE,
+    -- section concernee : incidents | produits_limites | produits_dates_courtes | rappels
+    section TEXT NOT NULL,
+    -- libelle lisible (description / produit / message) pour affichage rapide
+    libelle TEXT,
+    -- snapshot complet de l'item archive
+    contenu JSONB DEFAULT '{}',
+    -- motif obligatoire saisi par le redacteur
+    commentaire TEXT NOT NULL,
+    -- source neutralisee (briefing_incidents | briefing_rappels | NULL)
+    source_table TEXT,
+    archive_par_id UUID,
+    archive_par_nom TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_briefing_archives_etab_date
+    ON briefing_archives(etablissement, briefing_date);
+
+-- RLS (regle PBT : sans policy, anon est bloque en INSERT ET SELECT)
+ALTER TABLE briefing_archives ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS briefing_archives_anon_all ON briefing_archives;  -- CREATE POLICY IF NOT EXISTS n'existe pas en Postgres
+CREATE POLICY briefing_archives_anon_all ON briefing_archives
+    AS PERMISSIVE FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Verification post-migration :
+-- SELECT tablename, policyname FROM pg_policies WHERE tablename = 'briefing_archives';
