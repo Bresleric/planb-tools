@@ -24,7 +24,8 @@ CREATE POLICY combo_veilleur_log_anon_all ON combo_veilleur_log
     AS PERMISSIVE FOR ALL TO anon
     USING (true) WITH CHECK (true);
 
--- Reveil nocturne : 03h30 UTC (= 05h30 ete / 04h30 hiver a Strasbourg)
+-- Reveil bi-quotidien : 03h30 et 08h30 UTC (= 05h30/10h30 ete a Strasbourg)
+-- Le passage du matin rattrape les changements de planning de derniere minute.
 DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'combo-veilleur-nightly') THEN
@@ -35,7 +36,7 @@ $do$;
 
 SELECT cron.schedule(
   'combo-veilleur-nightly',
-  '30 3 * * *',
+  '30 3,8 * * *',
   $cron$
   SELECT net.http_post(
     url := 'https://dzrherfavgiuygnimtux.supabase.co/functions/v1/combo-veilleur',
