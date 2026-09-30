@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Rapport du jour — PlanB Tools</title>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --blue: #2563eb; --blue-light: #eff6ff;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--orange); padding: 12px 16px; position: sticky; top: 0; z-index: 10; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 760px; margin: 0 auto; }
+        h1 { font-size: 17px; color: var(--orange); }
+        .date-nav { display: flex; align-items: center; gap: 8px; }
+        .date-nav button { width: 36px; height: 36px; border: 1px solid var(--gray-200); background: white; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .date-nav button:active { background: var(--gray-100); }
+        #date-label { font-size: 13px; font-weight: 700; min-width: 118px; text-align: center; text-transform: capitalize; }
+
+        main { max-width: 760px; margin: 0 auto; padding: 12px; }
+        .etab-card { background: white; border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .etab-head { padding: 10px 14px; font-weight: 800; font-size: 15px; color: white; }
+        .etab-head.freddy { background: #b45309; }
+        .etab-head.liesel { background: #166534; }
+        .bloc { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); }
+        .bloc:last-child { border-bottom: none; }
+        .bloc-title { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+        .money-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+        .money-tile { flex: 1; min-width: 100px; background: var(--gray-50); border-radius: 10px; padding: 8px 10px; text-align: center; }
+        .money-tile .val { font-size: 19px; font-weight: 800; }
+        .money-tile .lbl { font-size: 10px; color: var(--gray-500); font-weight: 600; text-transform: uppercase; }
+        .money-tile .sub { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+        .pos { color: var(--green); } .neg { color: var(--red); }
+
+        .alert-line { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 13px; border-bottom: 1px dashed var(--gray-100); }
+        .alert-line:last-child { border-bottom: none; }
+        .alert-line .ico { flex-shrink: 0; }
+        .alert-line .meta { color: var(--gray-500); font-size: 12px; margin-left: auto; white-space: nowrap; }
+        .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge.red { background: var(--red-light); color: var(--red); }
+        .badge.green { background: var(--green-light); color: var(--green); }
+        .badge.orange { background: var(--orange-light); color: var(--orange); }
+        .badge.gray { background: var(--gray-100); color: var(--gray-500); }
+
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip { background: var(--gray-50); border-radius: 10px; padding: 7px 10px; font-size: 12px; font-weight: 600; }
+        .chip b { font-size: 14px; }
+        .empty { color: var(--gray-400); font-size: 12px; font-style: italic; }
+
+        .global-card { background: var(--blue-light); border: 1px solid #dbeafe; border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; }
+        .footer-note { text-align: center; font-size: 11px; color: var(--gray-400); margin-top: 18px; }
+
+        #gate { position: fixed; inset: 0; background: var(--gray-100); z-index: 100; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+        #gate .msg { max-width: 340px; font-size: 14px; color: var(--gray-600); line-height: 1.5; }
+        #loading { text-align: center; padding: 40px; color: var(--gray-400); }
+    </style>
+</head>
+<body>
+    <div id="gate"><div class="msg">🔒<br><br>Ce rapport est réservé.<br>Utilise ton lien personnel pour y accéder.</div></div>
+
+    <header style="display:none" id="app-header">
+        <div class="header-row">
+            <h1>📊 Rapport</h1>
+            <div class="date-nav">
+                <button onclick="changeDate(-1)">‹</button>
+                <div id="date-label"></div>
+                <button onclick="changeDate(1)" id="btn-next">›</button>
+            </div>
+        </div>
+    </header>
+
+    <main style="display:none" id="app-main">
+        <div id="global-zone"></div>
+        <div id="etabs-zone"><div id="loading">Chargement…</div></div>
+        <div class="footer-note" id="gen-note"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        const sb = PLANB.client();
+        const ETABS = [
+            { code: 'freddy', label: '🏪 Freddy' },
+            { code: 'liesel', label: '🍽️ Chez Tante Liesel' },
+        ];
+        let reportDate = null; // Date affichée (par défaut : hier)
+
+        function dstr(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+        function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function money(v) { return (v === null || v === undefined || isNaN(v)) ? '—' : Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function n(v) { return parseFloat(v) || 0; }
+
+        // ============ ACCÈS PAR LIEN MAGIQUE ============
+        async function checkAccess() {
+            const k = new URLSearchParams(location.search).get('k');
+            if (k) {
+                try {
+                    const { data } = await sb.from('rapport_acces').select('nom').eq('token', k).eq('actif', true).maybeSingle();
+                    if (data) return true;
+                } catch (e) { console.error(e); }
+            }
+            // Secours : session portail deja ouverte avec un role eleve
+            try {
+                const u = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+                if (u && ['admin', 'manager'].includes(u.role)) return true;
+            } catch (e) {}
+            return false;
+        }
+
+        // ============ CHARGEMENT DES DONNÉES D'UN ÉTABLISSEMENT ============
+        async function loadEtab(etab, date) {
+            const ds = dstr(date);
+            const today = dstr(new Date());
+            const demain = dstr(addDays(new Date(), 1));
+            const n1date = dstr(addDays(date, -364)); // meme jour de semaine, annee precedente
+
+            const [caisse, ventesN1, tasks, temps, checks, dlc, besoins, incidents, planning] = await Promise.all([
+                sb.from('caisse_controle').select('ca, vae, comptage_caisse, pourboires, valide, saisi_par_nom').eq('etablissement', etab).eq('date', ds).maybeSingle(),
+                sb.from('ventes_journalieres').select('ca_ttc, couverts').eq('etablissement', etab).eq('date', n1date),
+                sb.from('tasks').select('id, fait_par_id').eq('etablissement', etab).eq('echeance', ds),
+                sb.from('temp_releves').select('id, hors_norme').eq('etablissement', etab).eq('date', ds),
+                sb.from('checklist_validations').select('statut').eq('etablissement', etab).eq('periode', ds),
+                sb.from('stock_par_lot').select('produit, article_nom, dlc, quantite_restante, article_unite').eq('etablissement', etab).gt('quantite_restante', 0).not('dlc', 'is', null).lte('dlc', demain).order('dlc').limit(8),
+                sb.from('appro_besoins').select('id, urgence, article_nom, ingredient_nom, date_demande').eq('etablissement', etab).eq('statut', 'demande'),
+                sb.from('briefing_incidents').select('description, priorite').eq('etablissement', etab).in('statut', ['ouvert', 'en_cours']).order('created_at', { ascending: false }),
+                sb.from('planning_equipes').select('employe_nom, service, equipe').eq('etablissement', etab).eq('date', today),
+            ]);
+
+            return { etab, ds, caisse: caisse.data, ventesN1: ventesN1.data || [], tasks: tasks.data || [], temps: temps.data || [], checks: checks.data || [], dlc: dlc.data || [], besoins: besoins.data || [], incidents: incidents.data || [], planning: planning.data || [] };
+        }
+
+        // ============ RENDU ============
+        function renderEtab(d, etabDef) {
+            const c = d.caisse;
+            const ca = c ? n(c.ca) + n(c.vae) : null;
+            const caN1 = d.ventesN1.reduce((s, v) => s + n(v.ca_ttc), 0) || null;
+            const couvN1 = d.ventesN1.reduce((s, v) => s + (v.couverts || 0), 0);
+            let deltaHtml = '';
+            if (ca !== null && caN1) {
+                const pct = ((ca - caN1) / caN1) * 100;
+                deltaHtml = `<div class="sub ${pct >= 0 ? 'pos' : 'neg'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)} % vs N-1</div>`;
+            }
+
+            let html = `<div class="etab-card"><div class="etab-head ${d.etab}">${etabDef.label}</div>`;
+
+            // --- Bloc 1 : argent ---
+            html += `<div class="bloc"><div class="bloc-title">💰 La journée</div><div class="money-grid">`;
+            html += `<div class="money-tile"><div class="lbl">CA caisse</div><div class="val">${ca !== null ? money(ca) : '—'}</div>${deltaHtml}</div>`;
+            html += `<div class="money-tile"><div class="lbl">N-1 même jour</div><div class="val" style="font-size:15px; color:var(--gray-600)">${caN1 ? money(caN1) : '—'}</div><div class="sub">${couvN1 ? couvN1 + ' couverts' : ''}</div></div>`;
+            const valideBadge = !c ? '<span class="badge red">non saisie</span>'
+                : (c.valide ? '<span class="badge green">validée</span>' : '<span class="badge orange">à valider</span>');
+            html += `<div class="money-tile"><div class="lbl">Caisse</div><div class="val" style="font-size:13px; padding-top:4px;">${valideBadge}</div><div class="sub">${c && c.saisi_par_nom ? 'par ' + esc(c.saisi_par_nom.split(' ')[0]) : ''}</div></div>`;
+            html += `</div></div>`;
+
+            // --- Bloc 2 : à décider maintenant ---
+            html += `<div class="bloc"><div class="bloc-title">🔔 À décider maintenant</div>`;
+            let alerts = '';
+            d.dlc.forEach(l => {
+                const nom = l.produit || l.article_nom || 'Produit';
+                const isToday = l.dlc <= dstr(new Date());
+                alerts += `<div class="alert-line"><span class="ico">⏳</span><span>${esc(nom)}</span><span class="badge ${isToday ? 'red' : 'orange'}">${isToday ? 'DLC aujourd’hui' : 'DLC demain'}</span><span class="meta">${n(l.quantite_restante).toLocaleString('fr-FR')} ${esc(l.article_unite || '')}</span></div>`;
+            });
+            const urgents = d.besoins.filter(b => b.urgence);
+            if (d.besoins.length > 0) {
+                alerts += `<div class="alert-line"><span class="ico">🛒</span><span>${d.besoins.length} besoin${d.besoins.length > 1 ? 's' : ''} d'appro en attente</span>${urgents.length ? `<span class="badge red">${urgents.length} urgent${urgents.length > 1 ? 's' : ''}</span>` : ''}<span class="meta">→ Approvisionnement</span></div>`;
+            }
+            d.incidents.slice(0, 3).forEach(i => {
+                alerts += `<div class="alert-line"><span class="ico">🚨</span><span>${esc((i.description || '').slice(0, 70))}</span>${i.priorite === 'haute' ? '<span class="badge red">haute</span>' : ''}</div>`;
+            });
+            html += alerts || '<div class="empty">Rien en attente — tout est net. ✨</div>';
+            html += `</div>`;
+
+            // --- Bloc 3 : discipline de la journée ---
+            const faites = d.tasks.filter(t => t.fait_par_id).length;
+            const horsNorme = d.temps.filter(t => t.hors_norme).length;
+            const checksPb = d.checks.filter(x => x.statut === 'probleme').length;
+            html += `<div class="bloc"><div class="bloc-title">✅ Discipline</div><div class="chips">`;
+            html += `<div class="chip ${d.tasks.length && faites < d.tasks.length ? '' : ''}">TAF : <b>${faites}/${d.tasks.length}</b> faites${d.tasks.length - faites > 0 ? ` <span class="badge orange">${d.tasks.length - faites} reportée${d.tasks.length - faites > 1 ? 's' : ''}</span>` : ''}</div>`;
+            html += `<div class="chip">Frigos : <b>${d.temps.length}</b> relevés${horsNorme ? ` <span class="badge red">${horsNorme} hors norme</span>` : ''}</div>`;
+            html += `<div class="chip">Checklists : <b>${d.checks.length}</b> validée${d.checks.length > 1 ? 's' : ''}${checksPb ? ` <span class="badge red">${checksPb} pb</span>` : ''}</div>`;
+            html += `</div></div>`;
+
+            // --- Bloc 4 : forces en présence aujourd'hui ---
+            const midi = new Set(), soir = new Set();
+            d.planning.forEach(p => {
+                if (p.service === 'midi' || p.service === 'journee') midi.add(p.employe_nom);
+                if (p.service === 'soir' || p.service === 'journee') soir.add(p.employe_nom);
+            });
+            html += `<div class="bloc"><div class="bloc-title">👥 Aujourd'hui en salle et cuisine</div>`;
+            if (d.planning.length === 0) {
+                html += '<div class="empty">Pas de planning synchronisé pour aujourd’hui.</div>';
+            } else {
+                html += `<div class="chips"><div class="chip">Midi : <b>${midi.size}</b></div><div class="chip">Soir : <b>${soir.size}</b></div></div>`;
+            }
+            html += `</div></div>`;
+            return html;
+        }
+
+        async function renderGlobal() {
+            const depuis = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+            const { data } = await sb.from('combo_veilleur_log').select('nom, etablissement, statut, created_at').gte('created_at', depuis).order('created_at', { ascending: false });
+            const zone = document.getElementById('global-zone');
+            const rows = (data || []).filter(l => ['cree', 'a_verifier'].includes(l.statut));
+            if (rows.length === 0) { zone.innerHTML = ''; return; }
+            let html = `<div class="global-card"><div class="bloc-title">👤 Nouveaux collaborateurs (48 h)</div>`;
+            rows.forEach(l => {
+                html += `<div class="alert-line"><span class="ico">➕</span><span>${esc(l.nom)}</span><span class="badge ${l.statut === 'cree' ? 'green' : 'orange'}">${l.statut === 'cree' ? (l.etablissement || '') : 'à vérifier'}</span><span class="meta">PIN dans Admin</span></div>`;
+            });
+            zone.innerHTML = html + '</div>';
+        }
+
+        // ============ NAVIGATION + INIT ============
+        function updateDateLabel() {
+            const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+            document.getElementById('date-label').textContent = reportDate.toLocaleDateString('fr-FR', opts);
+            document.getElementById('btn-next').disabled = dstr(reportDate) >= dstr(addDays(new Date(), -1));
+        }
+
+        async function refresh() {
+            updateDateLabel();
+            const zone = document.getElementById('etabs-zone');
+            zone.innerHTML = '<div id="loading">Chargement…</div>';
+            try {
+                const results = await Promise.all(ETABS.map(e => loadEtab(e.code, reportDate)));
+                zone.innerHTML = results.map((d, i) => renderEtab(d, ETABS[i])).join('');
+                document.getElementById('gen-note').textContent = 'Généré le ' + new Date().toLocaleString('fr-FR');
+            } catch (e) {
+                console.error(e);
+                zone.innerHTML = '<div class="empty" style="text-align:center; padding:30px;">Erreur de chargement — vérifie la connexion.</div>';
+            }
+        }
+
+        function changeDate(delta) {
+            reportDate = addDays(reportDate, delta);
+            refresh();
+        }
+
+        (async function init() {
+            const ok = await checkAccess();
+            if (!ok) return; // le portillon reste affiché
+            document.getElementById('gate').style.display = 'none';
+            document.getElementById('app-header').style.display = '';
+            document.getElementById('app-main').style.display = '';
+            reportDate = addDays(new Date(), -1);
+            refresh();
+            renderGlobal();
+        })();
+    </script>
+</body>
+</html>
