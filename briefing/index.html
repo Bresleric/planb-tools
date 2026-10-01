@@ -2062,25 +2062,32 @@
                      + listeSimple('🧹 Plonge', '#8b5cf6', plonge)
                      + listeSimple('📋 Autre', '#6b7280', autres);
 
-            // --- Salle : tableau nom x rangs ---
-            let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin:6px 0 2px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length}) <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--gray-400);">— 2 rangs max par personne</span></div>
-                <table style="width:100%; border-collapse:collapse; font-size:11px;">
+            // --- Salle ---
+            // Les rangs (Bar, Accueil, A, B, C, Stub, Terrasse) n existent qu a Freddy :
+            // chez Liesel, la salle s affiche en liste simple comme cuisine et plonge.
+            let colD;
+            if (currentEstablishment !== 'freddy') {
+                colD = listeSimple('🍽️ Salle', '#f97316', salle);
+            } else {
+                colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin:6px 0 2px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length}) <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--gray-400);">— 2 rangs max par personne</span></div>
+                <table style="border-collapse:collapse; font-size:11px;">
                 <tr style="font-size:9px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px;">
                     <td style="padding:2px 4px;"></td>
                     ${RANGS_SALLE.map(r => `<td style="padding:2px 1px; text-align:center; white-space:nowrap; width:54px;">${r.replace('Rang ', '')}</td>`).join('')}
                 </tr>`;
-            salle.forEach(m => {
-                const rangsActifs = [m.rang1, m.rang2].filter(Boolean);
-                colD += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="display:table-row; border-bottom:1px solid var(--gray-100);">
-                    <td style="padding:4px 4px 4px 0;">
-                        <div style="font-weight:600; font-size:12px;">${escapeHtml(m.nom || '')}</div>
-                        <div style="color:var(--gray-500); font-size:9px;">${escapeHtml(m.horaire || '')}</div>
-                        ${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste', 'rang1', 'rang2', 'observation'])}
-                    </td>
-                    ${RANGS_SALLE.map(r => `<td style="text-align:center; padding:2px 1px;"><input type="checkbox" value="${r}" ${rangsActifs.includes(r) ? 'checked' : ''} onchange="onRangCheck(this)" style="width:16px; height:16px; accent-color:var(--orange); margin:0;"></td>`).join('')}
-                </tr>`;
-            });
-            colD += `</table>`;
+                salle.forEach(m => {
+                    const rangsActifs = [m.rang1, m.rang2].filter(Boolean);
+                    colD += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="display:table-row; border-bottom:1px solid var(--gray-100);">
+                        <td style="padding:4px 14px 4px 0; white-space:nowrap;">
+                            <div style="font-weight:600; font-size:12px;">${escapeHtml(m.nom || '')}</div>
+                            <div style="color:var(--gray-500); font-size:9px;">${escapeHtml(m.horaire || '')}</div>
+                            ${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste', 'rang1', 'rang2', 'observation'])}
+                        </td>
+                        ${RANGS_SALLE.map(r => `<td style="text-align:center; padding:2px 1px;"><input type="checkbox" value="${r}" ${rangsActifs.includes(r) ? 'checked' : ''} onchange="onRangCheck(this)" style="width:16px; height:16px; accent-color:var(--orange); margin:0;"></td>`).join('')}
+                    </tr>`;
+                });
+                colD += `</table>`;
+            }
 
             let html = `<div class="form-section">
                 <div class="form-section-header" onclick="toggleFormSection(this)">
