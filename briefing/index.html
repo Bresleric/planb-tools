@@ -1215,31 +1215,42 @@
                 html += renderSection('&#128200;', 'Tendances (' + (b.chiffres.tendances.nb_semaines || 4) + ' sem.)', '', renderTendancesCard(b.chiffres.tendances), false);
             }
 
-            // Section: Equipes (tableau compact)
+            // Section: Equipes — 2 blocs cote a cote : Cuisine & Plonge | Salle (rangs)
             if (b.equipes && b.equipes.length > 0) {
-                const equipesByType = {};
-                b.equipes.forEach(e => {
-                    const g = e.equipe || 'autre';
-                    if (!equipesByType[g]) equipesByType[g] = [];
-                    equipesByType[g].push(e);
-                });
-                const grpLabels = { cuisine: '👨‍🍳 Cuisine', salle: '🍽️ Salle', plonge: '🧹 Plonge', autre: '📋 Autre' };
                 const grpColors = { cuisine: '#ef4444', salle: '#f97316', plonge: '#8b5cf6', autre: '#6b7280' };
-                let equipesHtml = '';
-                for (const [equipe, members] of Object.entries(equipesByType)) {
-                    const color = grpColors[equipe] || '#6b7280';
-                    equipesHtml += `<div style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; margin:6px 0 2px; letter-spacing:0.5px;">${grpLabels[equipe] || equipe} (${members.length})</div>`;
-                    equipesHtml += `<table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
-                    members.forEach(m => {
-                        equipesHtml += `<tr style="border-bottom:1px solid var(--gray-50);">
-                            <td style="padding:1px 3px; font-weight:700; color:${color}; width:22px;">${escapeHtml(m.initiales || '?')}</td>
-                            <td style="padding:1px 3px; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
-                            <td style="padding:1px 3px; color:var(--gray-500); width:80px; font-size:10px;">${escapeHtml(m.poste || '')}</td>
-                            <td style="padding:1px 3px; color:var(--gray-500); width:70px; text-align:right; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
-                        </tr>`;
-                    });
-                    equipesHtml += `</table>`;
-                }
+                const gauche = b.equipes.filter(e => e.equipe !== 'salle');
+                const salle = b.equipes.filter(e => e.equipe === 'salle');
+
+                let colG = `<div style="font-size:10px; font-weight:700; color:#ef4444; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">👨‍🍳 Cuisine &amp; 🧹 Plonge (${gauche.length})</div>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.3;">`;
+                gauche.forEach(m => {
+                    const color = grpColors[m.equipe] || '#6b7280';
+                    colG += `<tr style="border-bottom:1px solid var(--gray-50);">
+                        <td style="padding:2px 3px; font-weight:700; color:${color}; width:22px; vertical-align:top;">${escapeHtml(m.initiales || '?')}</td>
+                        <td style="padding:2px 3px;">${escapeHtml(m.nom || '')}${m.poste ? `<span style="color:var(--gray-500); font-size:10px;"> — ${escapeHtml(m.poste)}</span>` : ''}</td>
+                        <td style="padding:2px 3px; color:var(--gray-500); width:62px; text-align:right; font-size:10px; vertical-align:top;">${escapeHtml(m.horaire || '')}</td>
+                    </tr>`;
+                });
+                colG += `</table>`;
+
+                let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">🍽️ Salle (${salle.length})</div>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.3;">`;
+                salle.forEach(m => {
+                    const rangs = [m.rang1, m.rang2].filter(Boolean);
+                    const badges = rangs.map(r => `<span style="display:inline-block; background:#fff7ed; color:#c2410c; font-size:9px; font-weight:700; padding:0 6px; border-radius:8px; margin-left:4px; vertical-align:1px;">${escapeHtml(r)}</span>`).join('');
+                    const obs = m.observation ? `<div style="color:var(--gray-500); font-size:10px;">${escapeHtml(m.observation)}</div>` : '';
+                    colD += `<tr style="border-bottom:1px solid var(--gray-50);">
+                        <td style="padding:2px 3px; font-weight:700; color:#f97316; width:22px; vertical-align:top;">${escapeHtml(m.initiales || '?')}</td>
+                        <td style="padding:2px 3px;">${escapeHtml(m.nom || '')}${badges}${obs}</td>
+                        <td style="padding:2px 3px; color:var(--gray-500); width:62px; text-align:right; font-size:10px; vertical-align:top;">${escapeHtml(m.horaire || '')}</td>
+                    </tr>`;
+                });
+                colD += `</table>`;
+
+                const equipesHtml = `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+                    <div style="flex:1; min-width:240px;">${colG}</div>
+                    <div style="flex:1; min-width:240px;">${colD}</div>
+                </div>`;
                 html += renderSection('&#128101;', 'Equipes', b.equipes.length, equipesHtml, true);
             }
 
@@ -2010,15 +2021,66 @@
             }));
         }
 
+        const RANGS_SALLE = ['Bar', 'Accueil', 'Rang A', 'Rang B', 'Rang C', 'Stub', 'Terrasse'];
+
         function renderEquipesTable(equipes) {
-            const groups = { cuisine: [], salle: [], plonge: [], autre: [] };
+            // 2 blocs cote a cote : Cuisine & Plonge | Salle (avec rangs + observation)
+            const gauche = [], salle = [];
             equipes.forEach((e, idx) => {
-                const g = groups[e.equipe] ? e.equipe : 'autre';
-                groups[g].push({ ...e, _idx: idx });
+                const m = { ...e, _idx: idx };
+                if (e.equipe === 'salle') salle.push(m); else gauche.push(m);
             });
 
-            const groupLabels = { cuisine: '👨‍🍳 Cuisine', salle: '🍽️ Salle', plonge: '🧹 Plonge', autre: '📋 Autre' };
             const groupColors = { cuisine: '#ef4444', salle: '#f97316', plonge: '#8b5cf6', autre: '#6b7280' };
+
+            // Champs caches communs : indispensables pour que collectEditorData('equipes')
+            // retrouve nom/equipe/horaire a la sauvegarde (sinon equipes effacees)
+            const hidden = (m) =>
+                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="initiales" value="${escapeHtml(m.initiales || '')}">` +
+                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="nom" value="${escapeHtml(m.nom || '')}">` +
+                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="equipe" value="${escapeHtml(m.equipe || 'autre')}">` +
+                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="horaire" value="${escapeHtml(m.horaire || '')}">`;
+
+            const rangSelect = (m, field) => {
+                const cur = m[field] || '';
+                const opts = ['<option value="">—</option>'].concat(RANGS_SALLE.map(r =>
+                    `<option value="${r}" ${r === cur ? 'selected' : ''}>${r}</option>`)).join('');
+                return `<select data-key="equipes" data-idx="${m._idx}" data-field="${field}" style="width:100%; padding:0 1px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);">${opts}</select>`;
+            };
+
+            const removeBtn = (m) => `<button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:11px; padding:0; line-height:1;">&#10005;</button>`;
+
+            // --- Bloc gauche : Cuisine & Plonge (poste libre) ---
+            let colG = `<div style="font-size:10px; font-weight:700; color:#ef4444; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">👨‍🍳 Cuisine &amp; 🧹 Plonge (${gauche.length})</div>
+                <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
+            gauche.forEach(m => {
+                const color = groupColors[m.equipe] || '#6b7280';
+                colG += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-50);">
+                    <td style="padding:1px 3px; font-weight:700; color:${color}; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}${hidden(m)}</td>
+                    <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
+                    <td style="padding:1px 2px; width:80px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
+                    <td style="padding:1px 3px; color:var(--gray-500); width:62px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
+                    <td style="padding:1px 0; width:16px;">${removeBtn(m)}</td>
+                </tr>`;
+            });
+            colG += `</table>`;
+
+            // --- Bloc droit : Salle (jusqu a 2 rangs + observation) ---
+            let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length})</div>
+                <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">
+                <tr style="font-size:9px; color:var(--gray-400); text-transform:uppercase;"><td></td><td></td><td style="padding:0 2px;">Rang 1</td><td style="padding:0 2px;">Rang 2</td><td style="padding:0 2px;">Observation</td><td></td><td></td></tr>`;
+            salle.forEach(m => {
+                colD += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-50);">
+                    <td style="padding:1px 3px; font-weight:700; color:#f97316; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}${hidden(m)}<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}"></td>
+                    <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
+                    <td style="padding:1px 2px; width:72px;">${rangSelect(m, 'rang1')}</td>
+                    <td style="padding:1px 2px; width:72px;">${rangSelect(m, 'rang2')}</td>
+                    <td style="padding:1px 2px; width:90px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="observation" value="${escapeHtml(m.observation || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
+                    <td style="padding:1px 3px; color:var(--gray-500); width:62px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
+                    <td style="padding:1px 0; width:16px;">${removeBtn(m)}</td>
+                </tr>`;
+            });
+            colD += `</table>`;
 
             let html = `<div class="form-section">
                 <div class="form-section-header" onclick="toggleFormSection(this)">
@@ -2028,31 +2090,12 @@
                     <div class="section-chevron">&#9654;</div>
                 </div>
                 <div class="form-section-body">
-                <div class="list-editor" id="editor-equipes">`;
-
-            for (const [grp, members] of Object.entries(groups)) {
-                if (members.length === 0) continue;
-                html += `<div style="margin-bottom:6px;">
-                    <div style="font-size:10px; font-weight:700; color:${groupColors[grp]}; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">${groupLabels[grp]} (${members.length})</div>
-                    <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
-
-                members.forEach(m => {
-                    // list-editor-item + champs caches : indispensables pour que
-                    // collectEditorData('equipes') retrouve ces lignes a la sauvegarde
-                    // (sinon les equipes sont effacees a chaque enregistrement)
-                    html += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-50);">
-                        <td style="padding:1px 3px; font-weight:700; color:${groupColors[grp]}; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="initiales" value="${escapeHtml(m.initiales || '')}"></td>
-                        <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="nom" value="${escapeHtml(m.nom || '')}"><input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="equipe" value="${escapeHtml(m.equipe || 'autre')}"><input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="horaire" value="${escapeHtml(m.horaire || '')}"></td>
-                        <td style="padding:1px 2px; width:80px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
-                        <td style="padding:1px 3px; color:var(--gray-500); width:70px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
-                        <td style="padding:1px 0; width:16px;"><button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:11px; padding:0; line-height:1;">&#10005;</button></td>
-                    </tr>`;
-                });
-
-                html += `</table></div>`;
-            }
-
-            html += `</div>
+                <div class="list-editor" id="editor-equipes">
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+                        <div style="flex:1; min-width:260px;">${colG}</div>
+                        <div style="flex:1.2; min-width:300px;">${colD}</div>
+                    </div>
+                </div>
                 <button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
                 </div>
             </div>`;
@@ -2144,6 +2187,9 @@
                     { key: 'initiales', label: 'Init.', type: 'text', placeholder: 'AB', width: '60px' },
                     { key: 'equipe', label: 'Equipe', type: 'select', options: ['salle','cuisine','plonge','autre'] },
                     { key: 'poste', label: 'Poste', type: 'text', placeholder: 'Poste' },
+                    { key: 'rang1', label: 'Rang 1', type: 'select', options: ['', 'Bar', 'Accueil', 'Rang A', 'Rang B', 'Rang C', 'Stub', 'Terrasse'] },
+                    { key: 'rang2', label: 'Rang 2', type: 'select', options: ['', 'Bar', 'Accueil', 'Rang A', 'Rang B', 'Rang C', 'Stub', 'Terrasse'] },
+                    { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' },
                     { key: 'horaire', label: 'Horaire', type: 'text', placeholder: '10h-15h' }
                 ],
                 evenements: [
