@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v47';   // bump a chaque mise a jour du SW (v47 : briefing - salle en tableau de rangs, cuisine et plonge separees, epure 01/10/2026)
+const CACHE_NAME = 'planb-tools-v48';   // bump a chaque mise a jour du SW (v48 : briefing - cases des rangs alignees sous les en-tetes du tableau salle 01/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
