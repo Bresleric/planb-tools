@@ -2024,7 +2024,7 @@
         const RANGS_SALLE = ['Bar', 'Accueil', 'Rang A', 'Rang B', 'Rang C', 'Stub', 'Terrasse'];
 
         function renderEquipesTable(equipes) {
-            // 2 blocs cote a cote : Cuisine & Plonge | Salle (avec rangs + observation)
+            // 2 blocs cote a cote : Cuisine & Plonge | Salle (rangs en cases a cocher)
             const gauche = [], salle = [];
             equipes.forEach((e, idx) => {
                 const m = { ...e, _idx: idx };
@@ -2033,54 +2033,46 @@
 
             const groupColors = { cuisine: '#ef4444', salle: '#f97316', plonge: '#8b5cf6', autre: '#6b7280' };
 
-            // Champs caches communs : indispensables pour que collectEditorData('equipes')
-            // retrouve nom/equipe/horaire a la sauvegarde (sinon equipes effacees)
-            const hidden = (m) =>
-                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="initiales" value="${escapeHtml(m.initiales || '')}">` +
-                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="nom" value="${escapeHtml(m.nom || '')}">` +
-                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="equipe" value="${escapeHtml(m.equipe || 'autre')}">` +
-                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="horaire" value="${escapeHtml(m.horaire || '')}">`;
+            // Champs caches : indispensables pour que collectEditorData('equipes')
+            // retrouve toutes les valeurs a la sauvegarde (sinon equipes effacees)
+            const hidden = (m, fields) => fields.map(f =>
+                `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="${f}" value="${escapeHtml(m[f] || (f === 'equipe' ? 'autre' : ''))}">`
+            ).join('');
 
-            const rangSelect = (m, field) => {
-                const cur = m[field] || '';
-                const opts = ['<option value="">—</option>'].concat(RANGS_SALLE.map(r =>
-                    `<option value="${r}" ${r === cur ? 'selected' : ''}>${r}</option>`)).join('');
-                return `<select data-key="equipes" data-idx="${m._idx}" data-field="${field}" style="width:100%; padding:0 1px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);">${opts}</select>`;
-            };
+            const removeBtn = (m) => `<button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:12px; padding:2px 4px; line-height:1;">&#10005;</button>`;
 
-            const removeBtn = (m) => `<button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:11px; padding:0; line-height:1;">&#10005;</button>`;
+            const headLine = (m, color) => `
+                <div style="display:flex; align-items:baseline; gap:6px;">
+                    <span style="font-weight:700; color:${color}; font-size:11px; min-width:20px;">${escapeHtml(m.initiales || '')}</span>
+                    <span style="font-weight:600; font-size:12px; flex:1;">${escapeHtml(m.nom || '')}</span>
+                    <span style="color:var(--gray-500); font-size:10px; white-space:nowrap;">${escapeHtml(m.horaire || '')}</span>
+                    ${removeBtn(m)}
+                </div>`;
 
             // --- Bloc gauche : Cuisine & Plonge (poste libre) ---
-            let colG = `<div style="font-size:10px; font-weight:700; color:#ef4444; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">👨‍🍳 Cuisine &amp; 🧹 Plonge (${gauche.length})</div>
-                <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
+            let colG = `<div style="font-size:10px; font-weight:700; color:#ef4444; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">👨‍🍳 Cuisine &amp; 🧹 Plonge (${gauche.length})</div>`;
             gauche.forEach(m => {
                 const color = groupColors[m.equipe] || '#6b7280';
-                colG += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-50);">
-                    <td style="padding:1px 3px; font-weight:700; color:${color}; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}${hidden(m)}</td>
-                    <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
-                    <td style="padding:1px 2px; width:80px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
-                    <td style="padding:1px 3px; color:var(--gray-500); width:62px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
-                    <td style="padding:1px 0; width:16px;">${removeBtn(m)}</td>
-                </tr>`;
+                colG += `<div class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="padding:5px 0; border-bottom:1px solid var(--gray-100);">
+                    ${headLine(m, color)}${hidden(m, ['initiales', 'nom', 'equipe', 'horaire'])}
+                    <div style="margin-top:3px; padding-left:26px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="Poste" style="width:150px; padding:2px 6px; font-size:11px; height:22px; border:1px solid var(--gray-200); border-radius:5px; background:var(--gray-50);"></div>
+                </div>`;
             });
-            colG += `</table>`;
 
-            // --- Bloc droit : Salle (jusqu a 2 rangs + observation) ---
-            let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length})</div>
-                <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">
-                <tr style="font-size:9px; color:var(--gray-400); text-transform:uppercase;"><td></td><td></td><td style="padding:0 2px;">Rang 1</td><td style="padding:0 2px;">Rang 2</td><td style="padding:0 2px;">Observation</td><td></td><td></td></tr>`;
+            // --- Bloc droit : Salle (cases a cocher des rangs, 2 max, + observation) ---
+            let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length}) <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--gray-400);">— 2 rangs max par personne</span></div>`;
             salle.forEach(m => {
-                colD += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-50);">
-                    <td style="padding:1px 3px; font-weight:700; color:#f97316; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}${hidden(m)}<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}"></td>
-                    <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
-                    <td style="padding:1px 2px; width:72px;">${rangSelect(m, 'rang1')}</td>
-                    <td style="padding:1px 2px; width:72px;">${rangSelect(m, 'rang2')}</td>
-                    <td style="padding:1px 2px; width:90px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="observation" value="${escapeHtml(m.observation || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
-                    <td style="padding:1px 3px; color:var(--gray-500); width:62px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
-                    <td style="padding:1px 0; width:16px;">${removeBtn(m)}</td>
-                </tr>`;
+                const rangsActifs = [m.rang1, m.rang2].filter(Boolean);
+                const chips = RANGS_SALLE.map(r => {
+                    const on = rangsActifs.includes(r);
+                    return `<label style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; border:1.5px solid ${on ? 'var(--orange)' : 'var(--gray-200)'}; background:${on ? '#fff7ed' : 'white'}; font-size:11px; font-weight:600; color:${on ? '#c2410c' : 'var(--gray-600)'}; cursor:pointer; user-select:none;"><input type="checkbox" value="${r}" ${on ? 'checked' : ''} onchange="onRangCheck(this)" style="width:14px; height:14px; accent-color:var(--orange); margin:0;">${r}</label>`;
+                }).join('');
+                colD += `<div class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="padding:5px 0; border-bottom:1px solid var(--gray-100);">
+                    ${headLine(m, '#f97316')}${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste', 'rang1', 'rang2'])}
+                    <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:5px; padding-left:26px;">${chips}</div>
+                    <div style="margin-top:5px; padding-left:26px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="observation" value="${escapeHtml(m.observation || '')}" placeholder="Observation" style="width:100%; max-width:300px; padding:2px 6px; font-size:11px; height:22px; border:1px solid var(--gray-200); border-radius:5px; background:var(--gray-50);"></div>
+                </div>`;
             });
-            colD += `</table>`;
 
             let html = `<div class="form-section">
                 <div class="form-section-header" onclick="toggleFormSection(this)">
@@ -2091,9 +2083,9 @@
                 </div>
                 <div class="form-section-body">
                 <div class="list-editor" id="editor-equipes">
-                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+                    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
                         <div style="flex:1; min-width:260px;">${colG}</div>
-                        <div style="flex:1.2; min-width:300px;">${colD}</div>
+                        <div style="flex:1.3; min-width:300px;">${colD}</div>
                     </div>
                 </div>
                 <button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
@@ -2101,6 +2093,30 @@
             </div>`;
 
             return html;
+        }
+
+        // Cases a cocher des rangs : 2 maximum par personne, valeurs copiees
+        // dans les champs caches rang1/rang2 (c est eux que la sauvegarde lit)
+        function onRangCheck(cb) {
+            const row = cb.closest('.list-editor-item');
+            if (!row) return;
+            let checked = Array.from(row.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value);
+            if (checked.length > 2) {
+                cb.checked = false;
+                showToast('2 rangs maximum par personne', 'error');
+                checked = checked.filter(v => v !== cb.value);
+            }
+            const r1 = row.querySelector('[data-field="rang1"]');
+            const r2 = row.querySelector('[data-field="rang2"]');
+            if (r1) r1.value = checked[0] || '';
+            if (r2) r2.value = checked[1] || '';
+            // Etat visuel des pastilles
+            row.querySelectorAll('input[type="checkbox"]').forEach(c => {
+                const lab = c.parentElement;
+                lab.style.borderColor = c.checked ? 'var(--orange)' : 'var(--gray-200)';
+                lab.style.background = c.checked ? '#fff7ed' : 'white';
+                lab.style.color = c.checked ? '#c2410c' : 'var(--gray-600)';
+            });
         }
 
         function renderListEditorSection(icon, title, key, items, fields, archivable) {
