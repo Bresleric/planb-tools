@@ -1064,6 +1064,16 @@
 
                 currentBriefing = briefing;
 
+                // Forces en presence : si le briefing stocke n a pas d equipes
+                // (anciens briefings sauvegardes avant le correctif), afficher
+                // le planning du jour synchronise depuis Combo
+                if (briefing && !isDemo && (!briefing.equipes || briefing.equipes.length === 0)) {
+                    try {
+                        const pe = await fetchPlanningEquipes(consultDate, currentEstablishment, consultService);
+                        if (pe.length > 0) briefing.equipes = pe;
+                    } catch (e) { console.warn('Planning equipes non charge:', e); }
+                }
+
                 // Enrichir avec meteo fraiche si pas stockee
                 if (briefing && !briefing.chiffres?.meteo) {
                     const liveMeteo = await fetchMeteo(consultDate);
@@ -1638,28 +1648,7 @@
                 // === TOUJOURS charger le planning equipes (meme si briefing existant) ===
                 let planningEquipes = [];
                 if (!isDemo) {
-                    const { data: planData } = await supabaseClient
-                        .from('planning_equipes')
-                        .select('*')
-                        .eq('date', consultDate)
-                        .eq('etablissement', currentEstablishment)
-                        .order('equipe', { ascending: true })
-                        .order('heure_debut', { ascending: true });
-                    if (planData && planData.length > 0) {
-                        const filtered = planData.filter(s => {
-                            if (!service || service === 'jour') return true;
-                            if (service === 'midi') return s.service === 'midi' || s.service === 'journee';
-                            if (service === 'soir') return s.service === 'soir' || s.service === 'journee';
-                            return true;
-                        });
-                        planningEquipes = filtered.map(s => ({
-                            nom: s.employe_nom,
-                            initiales: s.employe_initiales,
-                            equipe: s.equipe === 'aide_cuisine_plonge' ? 'plonge' : s.equipe,
-                            poste: s.poste || '',
-                            horaire: s.heure_debut.substring(0,5) + '-' + s.heure_fin.substring(0,5)
-                        }));
-                    }
+                    planningEquipes = await fetchPlanningEquipes(consultDate, currentEstablishment, service);
                 }
 
                 // === FALLBACK EFFECTIFS : users actifs si pas de planning ===
@@ -1996,6 +1985,31 @@
             container.innerHTML = html;
         }
 
+        // Charge le planning d une journee et le met au format equipes du briefing
+        async function fetchPlanningEquipes(dateStr, etab, service) {
+            const { data: planData } = await supabaseClient
+                .from('planning_equipes')
+                .select('*')
+                .eq('date', dateStr)
+                .eq('etablissement', etab)
+                .order('equipe', { ascending: true })
+                .order('heure_debut', { ascending: true });
+            if (!planData || planData.length === 0) return [];
+            const filtered = planData.filter(s => {
+                if (!service || service === 'jour') return true;
+                if (service === 'midi') return s.service === 'midi' || s.service === 'journee';
+                if (service === 'soir') return s.service === 'soir' || s.service === 'journee';
+                return true;
+            });
+            return filtered.map(s => ({
+                nom: s.employe_nom,
+                initiales: s.employe_initiales,
+                equipe: s.equipe === 'aide_cuisine_plonge' ? 'plonge' : s.equipe,
+                poste: s.poste || '',
+                horaire: s.heure_debut.substring(0,5) + '-' + s.heure_fin.substring(0,5)
+            }));
+        }
+
         function renderEquipesTable(equipes) {
             const groups = { cuisine: [], salle: [], plonge: [], autre: [] };
             equipes.forEach((e, idx) => {
@@ -2013,7 +2027,8 @@
                     ${equipes.length > 0 ? '<span class="section-count">' + equipes.length + '</span>' : ''}
                     <div class="section-chevron">&#9654;</div>
                 </div>
-                <div class="form-section-body">`;
+                <div class="form-section-body">
+                <div class="list-editor" id="editor-equipes">`;
 
             for (const [grp, members] of Object.entries(groups)) {
                 if (members.length === 0) continue;
@@ -2022,19 +2037,23 @@
                     <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.2;">`;
 
                 members.forEach(m => {
-                    html += `<tr style="border-bottom:1px solid var(--gray-50);">
-                        <td style="padding:1px 3px; font-weight:700; color:${groupColors[grp]}; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}</td>
-                        <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}</td>
+                    // list-editor-item + champs caches : indispensables pour que
+                    // collectEditorData('equipes') retrouve ces lignes a la sauvegarde
+                    // (sinon les equipes sont effacees a chaque enregistrement)
+                    html += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-50);">
+                        <td style="padding:1px 3px; font-weight:700; color:${groupColors[grp]}; width:22px; white-space:nowrap;">${escapeHtml(m.initiales || '')}<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="initiales" value="${escapeHtml(m.initiales || '')}"></td>
+                        <td style="padding:1px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;">${escapeHtml(m.nom || '')}<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="nom" value="${escapeHtml(m.nom || '')}"><input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="equipe" value="${escapeHtml(m.equipe || 'autre')}"><input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="horaire" value="${escapeHtml(m.horaire || '')}"></td>
                         <td style="padding:1px 2px; width:80px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="—" style="width:100%; padding:0 3px; font-size:10px; height:20px; border:1px solid var(--gray-200); border-radius:4px; background:var(--gray-50);"></td>
                         <td style="padding:1px 3px; color:var(--gray-500); width:70px; text-align:right; white-space:nowrap; font-size:10px;">${escapeHtml(m.horaire || '')}</td>
-                        <td style="padding:1px 0; width:16px;"><button onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:11px; padding:0; line-height:1;">&#10005;</button></td>
+                        <td style="padding:1px 0; width:16px;"><button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:11px; padding:0; line-height:1;">&#10005;</button></td>
                     </tr>`;
                 });
 
                 html += `</table></div>`;
             }
 
-            html += `<button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
+            html += `</div>
+                <button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
                 </div>
             </div>`;
 

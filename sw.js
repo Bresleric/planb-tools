@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v43';   // bump a chaque mise a jour du SW (v43 : nouveau module rapport journalier avec lien magique 30/09/2026)
+const CACHE_NAME = 'planb-tools-v44';   // bump a chaque mise a jour du SW (v44 : briefing - equipes conservees a la sauvegarde + affichage planning en consultation 01/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
