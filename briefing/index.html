@@ -2024,14 +2024,16 @@
         const RANGS_SALLE = ['Bar', 'Accueil', 'Rang A', 'Rang B', 'Rang C', 'Stub', 'Terrasse'];
 
         function renderEquipesTable(equipes) {
-            // 2 blocs cote a cote : Cuisine & Plonge | Salle (rangs en cases a cocher)
-            const gauche = [], salle = [];
+            // Gauche : Cuisine puis Plonge (listes separees, nom seul)
+            // Droite : Salle en tableau (1 ligne par salarie, 1 colonne par rang)
+            const cuisine = [], plonge = [], salle = [], autres = [];
             equipes.forEach((e, idx) => {
                 const m = { ...e, _idx: idx };
-                if (e.equipe === 'salle') salle.push(m); else gauche.push(m);
+                if (e.equipe === 'salle') salle.push(m);
+                else if (e.equipe === 'plonge') plonge.push(m);
+                else if (e.equipe === 'cuisine') cuisine.push(m);
+                else autres.push(m);
             });
-
-            const groupColors = { cuisine: '#ef4444', salle: '#f97316', plonge: '#8b5cf6', autre: '#6b7280' };
 
             // Champs caches : indispensables pour que collectEditorData('equipes')
             // retrouve toutes les valeurs a la sauvegarde (sinon equipes effacees)
@@ -2041,38 +2043,44 @@
 
             const removeBtn = (m) => `<button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:12px; padding:2px 4px; line-height:1;">&#10005;</button>`;
 
-            const headLine = (m, color) => `
-                <div style="display:flex; align-items:baseline; gap:6px;">
-                    <span style="font-weight:700; color:${color}; font-size:11px; min-width:20px;">${escapeHtml(m.initiales || '')}</span>
-                    <span style="font-weight:600; font-size:12px; flex:1;">${escapeHtml(m.nom || '')}</span>
-                    <span style="color:var(--gray-500); font-size:10px; white-space:nowrap;">${escapeHtml(m.horaire || '')}</span>
-                    ${removeBtn(m)}
-                </div>`;
+            const listeSimple = (titre, couleur, membres) => {
+                if (membres.length === 0) return '';
+                let h = `<div style="font-size:10px; font-weight:700; color:${couleur}; margin:6px 0 2px; text-transform:uppercase; letter-spacing:0.5px;">${titre} (${membres.length})</div>`;
+                membres.forEach(m => {
+                    h += `<div class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="display:flex; align-items:baseline; gap:6px; padding:4px 0; border-bottom:1px solid var(--gray-100);">
+                        <span style="font-weight:600; font-size:12px; flex:1;">${escapeHtml(m.nom || '')}</span>
+                        <span style="color:var(--gray-500); font-size:10px; white-space:nowrap;">${escapeHtml(m.horaire || '')}</span>
+                        ${removeBtn(m)}${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste'])}
+                    </div>`;
+                });
+                return h;
+            };
 
-            // --- Bloc gauche : Cuisine & Plonge (poste libre) ---
-            let colG = `<div style="font-size:10px; font-weight:700; color:#ef4444; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">👨‍🍳 Cuisine &amp; 🧹 Plonge (${gauche.length})</div>`;
-            gauche.forEach(m => {
-                const color = groupColors[m.equipe] || '#6b7280';
-                colG += `<div class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="padding:5px 0; border-bottom:1px solid var(--gray-100);">
-                    ${headLine(m, color)}${hidden(m, ['initiales', 'nom', 'equipe', 'horaire'])}
-                    <div style="margin-top:3px; padding-left:26px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="poste" value="${escapeHtml(m.poste || '')}" placeholder="Poste" style="width:150px; padding:2px 6px; font-size:11px; height:22px; border:1px solid var(--gray-200); border-radius:5px; background:var(--gray-50);"></div>
-                </div>`;
-            });
+            let colG = listeSimple('👨‍🍳 Cuisine', '#ef4444', cuisine)
+                     + listeSimple('🧹 Plonge', '#8b5cf6', plonge)
+                     + listeSimple('📋 Autre', '#6b7280', autres);
 
-            // --- Bloc droit : Salle (cases a cocher des rangs, 2 max, + observation) ---
-            let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length}) <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--gray-400);">— 2 rangs max par personne</span></div>`;
+            // --- Salle : tableau nom x rangs ---
+            let colD = `<div style="font-size:10px; font-weight:700; color:#f97316; margin:6px 0 2px; text-transform:uppercase; letter-spacing:0.5px;">🍽️ Salle (${salle.length}) <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--gray-400);">— 2 rangs max par personne</span></div>
+                <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                <tr style="font-size:9px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px;">
+                    <td style="padding:2px 4px;"></td>
+                    ${RANGS_SALLE.map(r => `<td style="padding:2px 1px; text-align:center; white-space:nowrap;">${r.replace('Rang ', '')}</td>`).join('')}
+                    <td></td>
+                </tr>`;
             salle.forEach(m => {
                 const rangsActifs = [m.rang1, m.rang2].filter(Boolean);
-                const chips = RANGS_SALLE.map(r => {
-                    const on = rangsActifs.includes(r);
-                    return `<label style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; border:1.5px solid ${on ? 'var(--orange)' : 'var(--gray-200)'}; background:${on ? '#fff7ed' : 'white'}; font-size:11px; font-weight:600; color:${on ? '#c2410c' : 'var(--gray-600)'}; cursor:pointer; user-select:none;"><input type="checkbox" value="${r}" ${on ? 'checked' : ''} onchange="onRangCheck(this)" style="width:14px; height:14px; accent-color:var(--orange); margin:0;">${r}</label>`;
-                }).join('');
-                colD += `<div class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="padding:5px 0; border-bottom:1px solid var(--gray-100);">
-                    ${headLine(m, '#f97316')}${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste', 'rang1', 'rang2'])}
-                    <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:5px; padding-left:26px;">${chips}</div>
-                    <div style="margin-top:5px; padding-left:26px;"><input type="text" data-key="equipes" data-idx="${m._idx}" data-field="observation" value="${escapeHtml(m.observation || '')}" placeholder="Observation" style="width:100%; max-width:300px; padding:2px 6px; font-size:11px; height:22px; border:1px solid var(--gray-200); border-radius:5px; background:var(--gray-50);"></div>
-                </div>`;
+                colD += `<tr class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="border-bottom:1px solid var(--gray-100);">
+                    <td style="padding:4px 4px 4px 0;">
+                        <div style="font-weight:600; font-size:12px;">${escapeHtml(m.nom || '')}</div>
+                        <div style="color:var(--gray-500); font-size:9px;">${escapeHtml(m.horaire || '')}</div>
+                        ${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste', 'rang1', 'rang2', 'observation'])}
+                    </td>
+                    ${RANGS_SALLE.map(r => `<td style="text-align:center; padding:2px 1px;"><input type="checkbox" value="${r}" ${rangsActifs.includes(r) ? 'checked' : ''} onchange="onRangCheck(this)" style="width:16px; height:16px; accent-color:var(--orange); margin:0;"></td>`).join('')}
+                    <td style="width:16px; text-align:right;">${removeBtn(m)}</td>
+                </tr>`;
             });
+            colD += `</table>`;
 
             let html = `<div class="form-section">
                 <div class="form-section-header" onclick="toggleFormSection(this)">
@@ -2083,9 +2091,9 @@
                 </div>
                 <div class="form-section-body">
                 <div class="list-editor" id="editor-equipes">
-                    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
-                        <div style="flex:1; min-width:260px;">${colG}</div>
-                        <div style="flex:1.3; min-width:300px;">${colD}</div>
+                    <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+                        <div style="flex:0 1 230px; min-width:200px;">${colG}</div>
+                        <div style="flex:1; min-width:320px;">${colD}</div>
                     </div>
                 </div>
                 <button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
@@ -2110,13 +2118,6 @@
             const r2 = row.querySelector('[data-field="rang2"]');
             if (r1) r1.value = checked[0] || '';
             if (r2) r2.value = checked[1] || '';
-            // Etat visuel des pastilles
-            row.querySelectorAll('input[type="checkbox"]').forEach(c => {
-                const lab = c.parentElement;
-                lab.style.borderColor = c.checked ? 'var(--orange)' : 'var(--gray-200)';
-                lab.style.background = c.checked ? '#fff7ed' : 'white';
-                lab.style.color = c.checked ? '#c2410c' : 'var(--gray-600)';
-            });
         }
 
         function renderListEditorSection(icon, title, key, items, fields, archivable) {
