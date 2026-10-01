@@ -1247,10 +1247,13 @@
                 });
                 colD += `</table>`;
 
+                const obsEquipes = b.equipes_observation
+                    ? `<div style="margin-top:6px; font-size:11px; color:var(--gray-600); background:var(--gray-50); border-radius:6px; padding:5px 8px;">&#128221; ${escapeHtml(b.equipes_observation)}</div>`
+                    : '';
                 const equipesHtml = `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">
                     <div style="flex:1; min-width:240px;">${colG}</div>
                     <div style="flex:1; min-width:240px;">${colD}</div>
-                </div>`;
+                </div>` + obsEquipes;
                 html += renderSection('&#128101;', 'Equipes', b.equipes.length, equipesHtml, true);
             }
 
@@ -1923,7 +1926,7 @@
             </div>`;
 
             // Equipes section - tableau compact
-            html += renderEquipesTable(b.equipes || []);
+            html += renderEquipesTable(b.equipes || [], b.equipes_observation || '');
 
             // Evenements / VIP
             html += renderListEditorSection('&#11088;', 'Evenements / VIP', 'evenements', b.evenements || [], [
@@ -2023,9 +2026,10 @@
 
         const RANGS_SALLE = ['Bar', 'Accueil', 'Rang A', 'Rang B', 'Rang C', 'Stub', 'Terrasse'];
 
-        function renderEquipesTable(equipes) {
+        function renderEquipesTable(equipes, equipesObservation) {
             // Gauche : Cuisine puis Plonge (listes separees, nom seul)
             // Droite : Salle en tableau (1 ligne par salarie, 1 colonne par rang)
+            // Bas : observation libre concernant tout le bloc Equipes
             const cuisine = [], plonge = [], salle = [], autres = [];
             equipes.forEach((e, idx) => {
                 const m = { ...e, _idx: idx };
@@ -2041,8 +2045,6 @@
                 `<input type="hidden" data-key="equipes" data-idx="${m._idx}" data-field="${f}" value="${escapeHtml(m[f] || (f === 'equipe' ? 'autre' : ''))}">`
             ).join('');
 
-            const removeBtn = (m) => `<button class="btn-remove" onclick="removeEditorItem('equipes', ${m._idx})" style="background:none; border:none; color:var(--gray-300); cursor:pointer; font-size:12px; padding:2px 4px; line-height:1;">&#10005;</button>`;
-
             const listeSimple = (titre, couleur, membres) => {
                 if (membres.length === 0) return '';
                 let h = `<div style="font-size:10px; font-weight:700; color:${couleur}; margin:6px 0 2px; text-transform:uppercase; letter-spacing:0.5px;">${titre} (${membres.length})</div>`;
@@ -2050,7 +2052,7 @@
                     h += `<div class="list-editor-item" data-key="equipes" data-idx="${m._idx}" style="display:flex; align-items:baseline; gap:6px; padding:4px 0; border-bottom:1px solid var(--gray-100);">
                         <span style="font-weight:600; font-size:12px; flex:1;">${escapeHtml(m.nom || '')}</span>
                         <span style="color:var(--gray-500); font-size:10px; white-space:nowrap;">${escapeHtml(m.horaire || '')}</span>
-                        ${removeBtn(m)}${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste'])}
+                        ${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste'])}
                     </div>`;
                 });
                 return h;
@@ -2066,7 +2068,6 @@
                 <tr style="font-size:9px; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.3px;">
                     <td style="padding:2px 4px;"></td>
                     ${RANGS_SALLE.map(r => `<td style="padding:2px 1px; text-align:center; white-space:nowrap; width:54px;">${r.replace('Rang ', '')}</td>`).join('')}
-                    <td style="width:20px;"></td>
                 </tr>`;
             salle.forEach(m => {
                 const rangsActifs = [m.rang1, m.rang2].filter(Boolean);
@@ -2077,7 +2078,6 @@
                         ${hidden(m, ['initiales', 'nom', 'equipe', 'horaire', 'poste', 'rang1', 'rang2', 'observation'])}
                     </td>
                     ${RANGS_SALLE.map(r => `<td style="text-align:center; padding:2px 1px;"><input type="checkbox" value="${r}" ${rangsActifs.includes(r) ? 'checked' : ''} onchange="onRangCheck(this)" style="width:16px; height:16px; accent-color:var(--orange); margin:0;"></td>`).join('')}
-                    <td style="width:16px; text-align:right;">${removeBtn(m)}</td>
                 </tr>`;
             });
             colD += `</table>`;
@@ -2097,6 +2097,10 @@
                     </div>
                 </div>
                 <button class="btn-add-item" onclick="addEditorItem('equipes')">+ Ajouter</button>
+                <div style="margin-top:10px;">
+                    <div style="font-size:10px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px;">Observation</div>
+                    <textarea id="f-equipes-observation" placeholder="Note concernant les equipes du jour..." style="width:100%; min-height:42px; padding:6px 8px; font-size:12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--gray-50); box-sizing:border-box; resize:vertical; font-family:inherit;">${escapeHtml(equipesObservation || '')}</textarea>
+                </div>
                 </div>
             </div>`;
 
@@ -2453,6 +2457,7 @@
                         tendances: editingBriefing?.chiffres?.tendances || null
                     },
                     equipes: collectEditorData('equipes'),
+                    equipes_observation: document.getElementById('f-equipes-observation')?.value?.trim() || '',
                     evenements: collectEditorData('evenements'),
                     plats_suggestions: collectEditorData('plats_suggestions'),
                     produits_limites: collectEditorData('produits_limites'),
