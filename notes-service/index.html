@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Notes de service — PlanB Tools</title>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--orange); padding: 10px 16px; position: sticky; top: 0; z-index: 10; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 820px; margin: 0 auto; gap: 8px; }
+        h1 { font-size: 17px; color: var(--orange); white-space: nowrap; }
+        .etab-badge { background: var(--orange-light); color: var(--orange); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+        .btn-back { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+        .tabs { display: flex; background: white; border-bottom: 1px solid var(--gray-200); max-width: 820px; margin: 0 auto; }
+        .tab { flex: 1; text-align: center; padding: 11px 4px; font-size: 13px; font-weight: 600; color: var(--gray-500); border-bottom: 3px solid transparent; cursor: pointer; }
+        .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+        main { max-width: 820px; margin: 0 auto; padding: 12px; }
+        .note-card { background: white; border-radius: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+        .note-head { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); }
+        .note-titre { font-size: 15px; font-weight: 800; }
+        .note-meta { font-size: 11px; color: var(--gray-500); margin-top: 3px; }
+        .note-contenu { padding: 12px 14px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+        .note-footer { padding: 10px 14px; background: var(--gray-50); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .lu-count { font-size: 12px; color: var(--gray-500); font-weight: 600; }
+        .btn-lu { background: var(--orange); color: white; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-lu:active { transform: scale(0.97); }
+        .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge.orange { background: var(--orange-light); color: var(--orange); }
+        .badge.gray { background: var(--gray-100); color: var(--gray-500); }
+        .badge.green { background: var(--green-light); color: var(--green); }
+        .badge.red { background: var(--red-light); color: var(--red); }
+
+        .suivi-note { background: white; border-radius: 14px; margin-bottom: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .suivi-cols { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+        .suivi-col { flex: 1; min-width: 220px; }
+        .suivi-col-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .suivi-line { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed var(--gray-100); }
+        .suivi-line .quand { color: var(--gray-400); font-size: 11px; }
+
+        .form-card { background: white; border-radius: 14px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 14px; }
+        .form-label { display: block; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 4px; }
+        .form-input, .form-select { width: 100%; padding: 9px 10px; font-size: 14px; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--gray-50); }
+        .form-textarea { width: 100%; min-height: 220px; padding: 10px; font-size: 13px; line-height: 1.5; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--gray-50); resize: vertical; font-family: inherit; }
+        .btn-primary { width: 100%; margin-top: 14px; background: var(--orange); color: white; border: none; border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .btn-small { border: 1px solid var(--gray-200); background: white; border-radius: 7px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+
+        .empty { text-align: center; color: var(--gray-400); padding: 36px 10px; font-size: 13px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 16px; padding: 20px; width: 100%; max-width: 340px; text-align: center; }
+        .modal h2 { font-size: 16px; margin-bottom: 4px; }
+        .modal .sub { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; }
+        #pin-input { width: 100%; padding: 12px; font-size: 22px; text-align: center; letter-spacing: 8px; border: 1px solid var(--gray-300); border-radius: 10px; }
+        #pin-error { color: var(--red); font-size: 12px; min-height: 16px; margin-top: 6px; }
+        .modal-btns { display: flex; gap: 8px; margin-top: 12px; }
+        .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        #pin-ok { background: var(--orange); color: white; border: none; }
+        #pin-cancel { background: white; border: 1px solid var(--gray-200); }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <h1>📌 Notes de service</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="etab-badge" id="etab-badge"></span>
+                <button class="btn-back" onclick="location.href='../'">← Portail</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="notes" onclick="switchTab('notes')">Notes</div>
+        <div class="tab" data-tab="suivi" id="tab-suivi" style="display:none" onclick="switchTab('suivi')">Suivi</div>
+        <div class="tab" data-tab="redaction" id="tab-redaction" style="display:none" onclick="switchTab('redaction')">Rédaction</div>
+    </div>
+
+    <main id="main">
+        <div class="empty">Chargement…</div>
+    </main>
+
+    <div class="modal-overlay" id="pin-modal">
+        <div class="modal">
+            <h2>✍️ Signature de lecture</h2>
+            <div class="sub" id="pin-sub">Saisis ton code personnel pour confirmer</div>
+            <input type="password" id="pin-input" inputmode="numeric" maxlength="6" placeholder="••••">
+            <div id="pin-error"></div>
+            <div class="modal-btns">
+                <button id="pin-cancel">Annuler</button>
+                <button id="pin-ok">Je signe</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        const sb = PLANB.client();
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        const currentEstablishment = sessionStorage.getItem('planb_etablissement');
+        if (!currentUser || !currentEstablishment) location.href = '../';
+
+        const isManager = ['manager', 'admin'].includes(currentUser?.role);
+        let notes = [];
+        let lectures = [];
+        let currentTab = 'notes';
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function fmtDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; }
+        function fmtDateTime(ts) { return ts ? new Date(ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? 'var(--red)' : (type === 'success' ? 'var(--green)' : 'var(--gray-800)');
+            t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200);
+        }
+        function cibleLabel(e) { return e === 'tous' ? 'Freddy + Liesel' : (e === 'freddy' ? 'Freddy' : 'Liesel'); }
+
+        // ============ PIN (signature sur iPad partage) ============
+        function askPIN(callback) {
+            const overlay = document.getElementById('pin-modal');
+            const input = document.getElementById('pin-input');
+            const err = document.getElementById('pin-error');
+            input.value = ''; err.textContent = '';
+            overlay.style.display = 'flex';
+            setTimeout(() => input.focus(), 60);
+            const close = () => { overlay.style.display = 'none'; };
+            document.getElementById('pin-cancel').onclick = close;
+            document.getElementById('pin-ok').onclick = async () => {
+                const code = (input.value || '').trim();
+                if (code.length < 4) { err.textContent = 'Code invalide'; return; }
+                try {
+                    const { data, error } = await sb.from('users')
+                        .select('id, nom, initiales, role, etablissement, acces_etablissements, actif')
+                        .eq('code', code).eq('actif', true);
+                    if (error) throw error;
+                    const u = (data || []).find(x =>
+                        x.etablissement === currentEstablishment ||
+                        (x.acces_etablissements || []).includes(currentEstablishment) ||
+                        x.role === 'admin');
+                    if (!u) { err.textContent = 'Code inconnu pour cet établissement'; input.value = ''; return; }
+                    close();
+                    callback(u);
+                } catch (e) { err.textContent = 'Erreur de vérification'; }
+            };
+            input.onkeydown = (ev) => { if (ev.key === 'Enter') document.getElementById('pin-ok').click(); };
+        }
+
+        // ============ CHARGEMENT ============
+        async function loadData() {
+            const { data: n, error } = await sb.from('notes_service')
+                .select('*')
+                .in('etablissement', [currentEstablishment, 'tous'])
+                .order('date_publication', { ascending: false });
+            if (error) {
+                document.getElementById('main').innerHTML = '<div class="empty">Module pas encore initialisé côté base de données.<br>(table notes_service manquante)</div>';
+                throw error;
+            }
+            notes = n || [];
+            const ids = notes.map(x => x.id);
+            lectures = [];
+            if (ids.length > 0) {
+                const { data: l } = await sb.from('notes_service_lectures').select('*').in('note_id', ids);
+                lectures = l || [];
+            }
+        }
+
+        function lecturesDeNote(noteId) { return lectures.filter(l => l.note_id === noteId); }
+        function noteVisible(n) {
+            return n.actif && (!n.date_expiration || n.date_expiration >= new Date().toISOString().split('T')[0]);
+        }
+
+        // ============ ONGLET NOTES ============
+        function renderNotes() {
+            const vis = notes.filter(noteVisible);
+            if (vis.length === 0) return '<div class="empty">Aucune note de service en vigueur. 📭</div>';
+            return vis.map(n => {
+                const lus = lecturesDeNote(n.id);
+                return `<div class="note-card">
+                    <div class="note-head">
+                        <div class="note-titre">${n.numero ? esc(n.numero) + ' — ' : ''}${esc(n.titre)}</div>
+                        <div class="note-meta">Publiée le ${fmtDate(n.date_publication)}${n.publie_par_nom ? ' par ' + esc(n.publie_par_nom) : ''} · <span class="badge orange">${cibleLabel(n.etablissement)}</span>${n.date_expiration ? ' · expire le ' + fmtDate(n.date_expiration) : ''}</div>
+                    </div>
+                    <div class="note-contenu">${esc(n.contenu)}</div>
+                    <div class="note-footer">
+                        <span class="lu-count">✍️ Lue et signée par <b>${lus.length}</b> personne${lus.length > 1 ? 's' : ''}</span>
+                        <button class="btn-lu" onclick="signerLecture('${n.id}')">✓ J'ai lu et compris</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function signerLecture(noteId) {
+            askPIN(async (u) => {
+                try {
+                    const { error } = await sb.from('notes_service_lectures').insert({
+                        note_id: noteId, user_id: u.id, user_nom: u.nom,
+                        user_initiales: u.initiales, etablissement: currentEstablishment,
+                    });
+                    if (error) {
+                        if (String(error.code) === '23505') { showToast(`${u.nom} a déjà signé cette note 👍`, 'success'); return; }
+                        throw error;
+                    }
+                    showToast(`Merci ${u.nom.split(' ')[0]} — lecture enregistrée ✓`, 'success');
+                    await loadData(); render();
+                } catch (e) { console.error(e); showToast('Erreur d enregistrement', 'error'); }
+            });
+        }
+
+        // ============ ONGLET SUIVI (managers/admin) ============
+        let usersActifs = [];
+        async function renderSuivi() {
+            if (usersActifs.length === 0) {
+                const { data } = await sb.from('users')
+                    .select('id, nom, etablissement, acces_etablissements, actif, role')
+                    .eq('actif', true).order('nom');
+                usersActifs = data || [];
+            }
+            const actives = notes.filter(n => n.actif);
+            if (actives.length === 0) return '<div class="empty">Aucune note à suivre.</div>';
+            return actives.map(n => {
+                const cibles = usersActifs.filter(u =>
+                    n.etablissement === 'tous' ||
+                    u.etablissement === n.etablissement ||
+                    (u.acces_etablissements || []).includes(n.etablissement));
+                const lus = lecturesDeNote(n.id);
+                const lusIds = new Set(lus.map(l => l.user_id));
+                const pasLu = cibles.filter(u => !lusIds.has(u.id));
+                const pct = cibles.length ? Math.round(100 * (cibles.length - pasLu.length) / cibles.length) : 0;
+                return `<div class="suivi-note">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap;">
+                        <b style="font-size:14px;">${n.numero ? esc(n.numero) + ' — ' : ''}${esc(n.titre)}</b>
+                        <span class="badge ${pct === 100 ? 'green' : 'orange'}">${pct} % lu</span>
+                    </div>
+                    <div class="note-meta" style="font-size:11px; color:var(--gray-500); margin-top:2px;">${cibleLabel(n.etablissement)} · publiée le ${fmtDate(n.date_publication)}</div>
+                    <div class="suivi-cols">
+                        <div class="suivi-col">
+                            <div class="suivi-col-title" style="color:var(--green);">✓ Ont lu (${lus.length})</div>
+                            ${lus.map(l => `<div class="suivi-line"><span>${esc(l.user_nom)}</span><span class="quand">${fmtDateTime(l.lu_at)}</span></div>`).join('') || '<div class="empty" style="padding:8px;">Personne pour le moment</div>'}
+                        </div>
+                        <div class="suivi-col">
+                            <div class="suivi-col-title" style="color:var(--red);">✗ N'ont pas lu (${pasLu.length})</div>
+                            ${pasLu.map(u => `<div class="suivi-line"><span>${esc(u.nom)}</span></div>`).join('') || '<div class="empty" style="padding:8px;">Tout le monde a signé 🎉</div>'}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ============ ONGLET REDACTION (managers/admin) ============
+        function renderRedaction() {
+            let html = `<div class="form-card">
+                <b style="font-size:14px;">Nouvelle note de service</b>
+                <label class="form-label">Numéro (optionnel)</label>
+                <input class="form-input" id="f-numero" placeholder="Ex : N°10" style="max-width:140px;">
+                <label class="form-label">Titre</label>
+                <input class="form-input" id="f-titre" placeholder="Objet de la note">
+                <label class="form-label">Contenu</label>
+                <textarea class="form-textarea" id="f-contenu" placeholder="Texte de la note..."></textarea>
+                <label class="form-label">Destinataires</label>
+                <select class="form-select" id="f-cible">
+                    <option value="tous">Freddy + Liesel</option>
+                    <option value="freddy">Freddy uniquement</option>
+                    <option value="liesel">Liesel uniquement</option>
+                </select>
+                <label class="form-label">Date d'expiration (optionnel)</label>
+                <input class="form-input" type="date" id="f-expiration" style="max-width:200px;">
+                <button class="btn-primary" onclick="publierNote()">📣 Publier la note</button>
+            </div>`;
+
+            html += `<div class="form-card"><b style="font-size:14px;">Toutes les notes</b>`;
+            if (notes.length === 0) html += '<div class="empty">Aucune note.</div>';
+            notes.forEach(n => {
+                html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--gray-100); flex-wrap:wrap;">
+                    <div>
+                        <b style="font-size:13px;">${n.numero ? esc(n.numero) + ' — ' : ''}${esc(n.titre)}</b>
+                        <div style="font-size:11px; color:var(--gray-500);">${fmtDate(n.date_publication)} · ${cibleLabel(n.etablissement)} · ${n.actif ? (noteVisible(n) ? '<span class="badge green">en vigueur</span>' : '<span class="badge gray">expirée</span>') : '<span class="badge gray">archivée</span>'}</div>
+                    </div>
+                    <button class="btn-small" onclick="toggleNote('${n.id}', ${n.actif})">${n.actif ? 'Archiver' : 'Réactiver'}</button>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        async function publierNote() {
+            const titre = document.getElementById('f-titre').value.trim();
+            const contenu = document.getElementById('f-contenu').value.trim();
+            if (!titre || !contenu) { showToast('Titre et contenu obligatoires', 'error'); return; }
+            try {
+                const { error } = await sb.from('notes_service').insert({
+                    numero: document.getElementById('f-numero').value.trim() || null,
+                    titre, contenu,
+                    etablissement: document.getElementById('f-cible').value,
+                    date_expiration: document.getElementById('f-expiration').value || null,
+                    publie_par_id: currentUser.id, publie_par_nom: currentUser.nom,
+                });
+                if (error) throw error;
+                showToast('Note publiée 📣', 'success');
+                await loadData(); switchTab('notes');
+            } catch (e) { console.error(e); showToast('Erreur de publication', 'error'); }
+        }
+
+        async function toggleNote(id, actif) {
+            try {
+                const { error } = await sb.from('notes_service').update({ actif: !actif }).eq('id', id);
+                if (error) throw error;
+                showToast(actif ? 'Note archivée' : 'Note réactivée', 'success');
+                await loadData(); render();
+            } catch (e) { showToast('Erreur', 'error'); }
+        }
+
+        // ============ NAVIGATION ============
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            render();
+        }
+
+        async function render() {
+            const main = document.getElementById('main');
+            if (currentTab === 'suivi') main.innerHTML = await renderSuivi();
+            else if (currentTab === 'redaction') main.innerHTML = renderRedaction();
+            else main.innerHTML = renderNotes();
+        }
+
+        (async function init() {
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            if (isManager) {
+                document.getElementById('tab-suivi').style.display = '';
+                document.getElementById('tab-redaction').style.display = '';
+            }
+            try {
+                await loadData();
+                render();
+            } catch (e) { console.error(e); }
+        })();
+    </script>
+</body>
+</html>
