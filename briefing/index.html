@@ -161,6 +161,13 @@
         .section-chevron {
             color: var(--gray-400); font-size: 14px; transition: transform 0.2s; flex-shrink: 0;
         }
+        /* Controle de publication : pastille A voir / Vu sur chaque chapitre */
+        .section-vue-chip {
+            border: 1px solid var(--gray-300, #d1d5db); background: white; color: var(--gray-500, #6b7280);
+            font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px;
+            cursor: pointer; margin-right: 8px; flex-shrink: 0; white-space: nowrap;
+        }
+        .section-vue-chip.vue { border-color: #16a34a; background: #f0fdf4; color: #16a34a; }
         .section-header.expanded .section-chevron { transform: rotate(90deg); }
         .section-body { display: none; padding: 0 14px 14px; border-top: 1px solid var(--gray-100); }
         .section-body.expanded { display: block; }
@@ -1993,10 +2000,76 @@
             // Action buttons
             html += `<div style="display:flex; gap:8px; margin-top:16px; padding-bottom:20px;">
                 <button class="btn-secondary" style="flex:1;" onclick="saveBriefing('brouillon')">&#128190; Sauvegarder</button>
-                <button class="btn-primary" style="flex:1;" onclick="saveBriefing('publie')">&#128227; Publier</button>
+                <button class="btn-primary" id="btn-publier" style="flex:1;" onclick="saveBriefing('publie')">&#128227; Publier</button>
             </div>`;
 
             container.innerHTML = html;
+
+            // Controle de publication : pastilles A voir / Vu sur chaque chapitre
+            initSectionsVues(container, b.sections_vues || []);
+        }
+
+        // ===== CONTROLE DE PUBLICATION : tous les chapitres doivent etre vus =====
+        let sectionsVues = new Set();
+
+        function sectionKeyFromTitle(t) {
+            return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        }
+
+        function initSectionsVues(container, saved) {
+            sectionsVues = new Set(Array.isArray(saved) ? saved : []);
+            container.querySelectorAll('.form-section').forEach(sec => {
+                const header = sec.querySelector('.form-section-header');
+                const titleEl = sec.querySelector('.section-title');
+                if (!header || !titleEl) return;
+                const key = sectionKeyFromTitle(titleEl.textContent);
+                sec.dataset.sectionKey = key;
+                const vue = sectionsVues.has(key);
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'section-vue-chip' + (vue ? ' vue' : '');
+                chip.textContent = vue ? '✓ Vu' : 'A voir';
+                chip.onclick = (ev) => { ev.stopPropagation(); toggleSectionVue(key, chip); };
+                const chevron = header.querySelector('.section-chevron');
+                if (chevron) header.insertBefore(chip, chevron); else header.appendChild(chip);
+            });
+            updatePublishGate();
+        }
+
+        function toggleSectionVue(key, chip) {
+            if (sectionsVues.has(key)) {
+                sectionsVues.delete(key);
+                chip.classList.remove('vue');
+                chip.textContent = 'A voir';
+            } else {
+                sectionsVues.add(key);
+                chip.classList.add('vue');
+                chip.textContent = '✓ Vu';
+            }
+            updatePublishGate();
+        }
+
+        function allSectionsState() {
+            const keys = Array.from(document.querySelectorAll('.form-section[data-section-key]'))
+                .map(s => s.dataset.sectionKey);
+            const vues = keys.filter(k => sectionsVues.has(k)).length;
+            return { total: keys.length, vues };
+        }
+
+        function updatePublishGate() {
+            const btn = document.getElementById('btn-publier');
+            if (!btn) return;
+            const { total, vues } = allSectionsState();
+            if (total > 0 && vues >= total) {
+                btn.disabled = false;
+                btn.style.opacity = '';
+                btn.innerHTML = '&#128227; Publier';
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.45';
+                btn.innerHTML = `&#128274; Publier (${vues}/${total} chapitres vus)`;
+            }
         }
 
         // Charge le planning d une journee et le met au format equipes du briefing
@@ -2439,6 +2512,14 @@
         }
 
         async function saveBriefing(statut) {
+            // Verrou de publication : tous les chapitres doivent etre marques Vu
+            if (statut === 'publie') {
+                const { total, vues } = allSectionsState();
+                if (vues < total) {
+                    showToast(`Publication impossible : ${total - vues} chapitre${total - vues > 1 ? 's' : ''} restant a voir`, 'error');
+                    return;
+                }
+            }
             if (isDemo) {
                 showToast(statut === 'publie' ? 'Briefing publie (demo)' : 'Brouillon sauvegarde (demo)', 'success');
                 return;
@@ -2465,6 +2546,7 @@
                     },
                     equipes: collectEditorData('equipes'),
                     equipes_observation: document.getElementById('f-equipes-observation')?.value?.trim() || '',
+                    sections_vues: Array.from(sectionsVues),
                     evenements: collectEditorData('evenements'),
                     plats_suggestions: collectEditorData('plats_suggestions'),
                     produits_limites: collectEditorData('produits_limites'),
