@@ -58,6 +58,21 @@
         .global-card { background: var(--blue-light); border: 1px solid #dbeafe; border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; }
         .footer-note { text-align: center; font-size: 11px; color: var(--gray-400); margin-top: 18px; }
 
+
+        details.fold { margin-top: 6px; }
+        details.fold summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--blue); list-style: none; padding: 4px 0; }
+        details.fold summary::-webkit-details-marker { display: none; }
+        details.fold summary::before { content: '▸ '; }
+        details.fold[open] summary::before { content: '▾ '; }
+        .sub-title { font-size: 12px; font-weight: 700; color: var(--gray-600); margin: 12px 0 4px; }
+        .row { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-size: 13px; border-bottom: 1px dashed var(--gray-100); }
+        .row:last-child { border-bottom: none; }
+        .row .grow { flex: 1; min-width: 0; }
+        .row .meta { color: var(--gray-500); font-size: 12px; white-space: nowrap; }
+        .row.done .grow { color: var(--gray-400); text-decoration: line-through; }
+        .creneau { font-size: 11px; font-weight: 700; color: var(--gray-400); text-transform: uppercase; margin-top: 6px; }
+        .small { font-size: 12px; color: var(--gray-500); font-weight: 500; }
+
         #gate { position: fixed; inset: 0; background: var(--gray-100); z-index: 100; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; }
         #gate .msg { max-width: 340px; font-size: 14px; color: var(--gray-600); line-height: 1.5; }
         #loading { text-align: center; padding: 40px; color: var(--gray-400); }
@@ -85,19 +100,30 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="../js/planb-common.js"></script>
+    <script src="../js/caisse-calc.js"></script>
     <script>
         const sb = PLANB.client();
         const ETABS = [
             { code: 'freddy', label: '🏪 Freddy' },
             { code: 'liesel', label: '🍽️ Chez Tante Liesel' },
         ];
-        let reportDate = null; // Date affichée (par défaut : hier)
+        const CRENEAUX = ['Matin', 'Midi', 'Soir'];
+        let reportDate = null; // Date du bilan (par défaut : hier). "Aujourd'hui" = reportDate + 1.
 
         function dstr(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
         function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function dayStart(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
         function money(v) { return (v === null || v === undefined || isNaN(v)) ? '—' : Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+        function money0(v) { return (v === null || v === undefined || isNaN(v)) ? '—' : Math.round(v).toLocaleString('fr-FR') + ' €'; }
         function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
         function n(v) { return parseFloat(v) || 0; }
+        function hhmm(iso) { return iso ? new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; }
+        function jourCourt(d) { return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }); }
+        function prenom(nom) { return (nom || '').split(' ')[0]; }
+        function pctBadge(pct, label) {
+            if (pct === null || !isFinite(pct)) return '';
+            return `<div class="sub ${pct >= 0 ? 'pos' : 'neg'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)} % ${label}</div>`;
+        }
 
         // ============ ACCÈS PAR LIEN MAGIQUE ============
         async function checkAccess() {
@@ -117,51 +143,206 @@
         }
 
         // ============ CHARGEMENT DES DONNÉES D'UN ÉTABLISSEMENT ============
+        // J = jour du bilan (hier par défaut), J1 = "aujourd'hui", J2 = "demain"
         async function loadEtab(etab, date) {
-            const ds = dstr(date);
-            const today = dstr(new Date());
-            const demain = dstr(addDays(new Date(), 1));
-            const n1date = dstr(addDays(date, -364)); // meme jour de semaine, annee precedente
+            const J = dayStart(date), J1 = addDays(J, 1), J2 = addDays(J, 2);
+            const ds = dstr(J), ds1 = dstr(J1), ds2 = dstr(J2);
+            const debutMois = new Date(J.getFullYear(), J.getMonth(), 1);
+            const dsMois = dstr(debutMois);
+            const dsVeilleCaisse = dstr(addDays(J, -1) < debutMois ? addDays(J, -1) : debutMois); // pour le fond de caisse de J
+            const n1Debut = dstr(addDays(debutMois, -364)), n1Fin = dstr(addDays(J, -364)); // meme jour de semaine, annee precedente
+            const isoJ = J.toISOString(), isoJ1 = J1.toISOString();
+            const demainReel = dstr(addDays(new Date(), 1));
 
-            const [caisse, ventesN1, tasks, temps, checks, dlc, besoins, incidents, planning] = await Promise.all([
-                sb.from('caisse_controle').select('ca, vae, comptage_caisse, pourboires, valide, saisi_par_nom').eq('etablissement', etab).eq('date', ds).maybeSingle(),
-                sb.from('ventes_journalieres').select('ca_ttc, couverts').eq('etablissement', etab).eq('date', n1date),
-                sb.from('tasks').select('id, fait_par_id').eq('etablissement', etab).eq('echeance', ds),
-                sb.from('temp_releves').select('id, hors_norme').eq('etablissement', etab).eq('date', ds),
+            const q = await Promise.all([
+                sb.from('caisse_controle').select('*').eq('etablissement', etab).gte('date', dsVeilleCaisse).lte('date', ds),
+                sb.from('ventes_journalieres').select('date, ca_ttc, couverts').eq('etablissement', etab).gte('date', n1Debut).lte('date', n1Fin),
+                sb.from('briefing_previsions').select('date, ca_prevu, couverts_attendus').eq('etablissement', etab).gte('date', dsMois).lte('date', ds1),
+                sb.from('tasks').select('id, tache, creneau, equipe, echeance, fait_par_id, fait_par_initiales, date_validation').eq('etablissement', etab).gte('echeance', ds).lte('echeance', ds2).order('priorite', { ascending: true }),
+                sb.from('temp_releves').select('frigo_id, frigo_nom, temperature, hors_norme, statut, user_nom, created_at').eq('etablissement', etab).eq('date', ds).order('created_at'),
+                sb.from('temp_frigos').select('id, nom').eq('etablissement', etab).eq('actif', true),
                 sb.from('checklist_validations').select('statut').eq('etablissement', etab).eq('periode', ds),
-                sb.from('stock_par_lot').select('produit, article_nom, dlc, quantite_restante, article_unite').eq('etablissement', etab).gt('quantite_restante', 0).not('dlc', 'is', null).lte('dlc', demain).order('dlc').limit(8),
-                sb.from('appro_besoins').select('id, urgence, article_nom, ingredient_nom, date_demande').eq('etablissement', etab).eq('statut', 'demande'),
+                sb.from('productions').select('nom_produit, quantite_produite, unite, producteur_initiales, statut, date_production').eq('etablissement', etab).gte('date_production', isoJ).lt('date_production', isoJ1).order('date_production'),
+                sb.from('scan_sessions').select('fournisseur_nom, statut, nb_etiquettes, rapprochement_anomalies_count, created_by_nom, validee_par_nom, created_at').eq('etablissement', etab).eq('date_reception', ds).order('created_at'),
+                sb.from('cartons_jvr').select('type, salarie_nom, description, auteur_nom, date_evenement').eq('etablissement', etab).gte('created_at', isoJ).lt('created_at', isoJ1).order('created_at'),
+                sb.from('stock_par_lot').select('produit, article_nom, dlc, quantite_restante, article_unite').eq('etablissement', etab).gt('quantite_restante', 0).not('dlc', 'is', null).lte('dlc', demainReel).order('dlc').limit(8),
+                sb.from('appro_besoins').select('article_nom, ingredient_nom, quantite, unite, urgence, demandeur_initiales, demandeur_nom, date_demande').eq('etablissement', etab).eq('statut', 'demande').order('urgence', { ascending: false }).order('date_demande'),
                 sb.from('briefing_incidents').select('description, priorite').eq('etablissement', etab).in('statut', ['ouvert', 'en_cours']).order('created_at', { ascending: false }),
-                sb.from('planning_equipes').select('employe_nom, service, equipe').eq('etablissement', etab).eq('date', today),
+                sb.from('planning_equipes').select('employe_nom, service').eq('etablissement', etab).eq('date', ds1),
             ]);
+            const err = q.find(r => r.error);
+            if (err) throw err.error;
+            const [caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, receptions, cartons, dlc, besoins, incidents, planning] = q.map(r => r.data || []);
+            return { etab, J, ds, ds1, ds2, caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, receptions, cartons, dlc, besoins, incidents, planning };
+        }
 
-            return { etab, ds, caisse: caisse.data, ventesN1: ventesN1.data || [], tasks: tasks.data || [], temps: temps.data || [], checks: checks.data || [], dlc: dlc.data || [], besoins: besoins.data || [], incidents: incidents.data || [], planning: planning.data || [] };
+        // ============ CALCULS ============
+        function calcArgent(d) {
+            const caisseByDate = {};
+            d.caisse.forEach(c => { caisseByDate[c.date] = c; });
+            const prevuByDate = {};
+            d.previsions.forEach(p => { prevuByDate[p.date] = (prevuByDate[p.date] || 0) + n(p.ca_prevu); });
+            const couvAttendus = d.previsions.filter(p => p.date === d.ds1).reduce((s, p) => s + (p.couverts_attendus || 0), 0);
+            const n1ByDate = {};
+            d.ventesN1.forEach(v => { n1ByDate[v.date] = (n1ByDate[v.date] || 0) + n(v.ca_ttc); });
+            const caOf = c => n(c.ca) + n(c.vae);
+
+            // Jour J
+            const c = caisseByDate[d.ds] || null;
+            const ca = c ? caOf(c) : null;
+            const caN1 = n1ByDate[dstr(addDays(d.J, -364))] || null;
+            const prevuJ = prevuByDate[d.ds] || null;
+
+            // Ecart de caisse (meme formule que le module Caisse : js/caisse-calc.js)
+            let ecart = null;
+            if (c && c.comptage_caisse !== null && c.comptage_caisse !== undefined) {
+                const veille = caisseByDate[dstr(addDays(d.J, -1))];
+                const cashDebut = veille ? n(veille.comptage_caisse) : 0;
+                ecart = CAISSE_CALC[d.etab].calcEcart(c, cashDebut);
+            }
+
+            // Cumul du mois, a perimetre egal : seuls les jours avec une caisse saisie
+            const debutMois = dstr(new Date(d.J.getFullYear(), d.J.getMonth(), 1));
+            // (les % ne portent que sur les jours presents des deux cotes)
+            let cumul = 0, nbJours = 0, cumulN1 = 0, caSurN1 = 0, cumulPrevu = 0, caSurPrevu = 0;
+            d.caisse.filter(x => x.date >= debutMois && x.date <= d.ds).forEach(x => {
+                const v = caOf(x);
+                cumul += v; nbJours++;
+                const dN1 = dstr(addDays(new Date(x.date + 'T12:00:00'), -364));
+                if (n1ByDate[dN1]) { cumulN1 += n1ByDate[dN1]; caSurN1 += v; }
+                if (prevuByDate[x.date]) { cumulPrevu += prevuByDate[x.date]; caSurPrevu += v; }
+            });
+            return {
+                c, ca, caN1, prevuJ, ecart, nbJours, cumul,
+                pctN1: cumulN1 ? ((caSurN1 - cumulN1) / cumulN1) * 100 : null,
+                pctPrevu: cumulPrevu ? (caSurPrevu / cumulPrevu) * 100 : null,
+                attendu: prevuByDate[d.ds1] || null, couvAttendus,
+            };
         }
 
         // ============ RENDU ============
-        function renderEtab(d, etabDef) {
-            const c = d.caisse;
-            const ca = c ? n(c.ca) + n(c.vae) : null;
-            const caN1 = d.ventesN1.reduce((s, v) => s + n(v.ca_ttc), 0) || null;
-            const couvN1 = d.ventesN1.reduce((s, v) => s + (v.couverts || 0), 0);
-            let deltaHtml = '';
-            if (ca !== null && caN1) {
-                const pct = ((ca - caN1) / caN1) * 100;
-                deltaHtml = `<div class="sub ${pct >= 0 ? 'pos' : 'neg'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)} % vs N-1</div>`;
-            }
+        function renderTafJour(tasks, label, date) {
+            const faites = tasks.filter(t => t.fait_par_id).length;
+            let html = `<div class="row"><span class="grow"><b>${label}</b> <span class="small">${jourCourt(date)}</span></span>`;
+            html += tasks.length ? `<span class="badge ${faites === tasks.length ? 'green' : 'gray'}">${faites}/${tasks.length} faites</span>` : '<span class="small">aucune</span>';
+            html += `</div>`;
+            if (tasks.length === 0) return html;
+            html += `<details class="fold"><summary>${tasks.length > 1 ? `Voir les ${tasks.length} tâches` : 'Voir la tâche'}</summary>`;
+            const creneaux = [...CRENEAUX, ...new Set(tasks.map(t => t.creneau).filter(c => !CRENEAUX.includes(c)))];
+            creneaux.forEach(cr => {
+                const list = tasks.filter(t => t.creneau === cr);
+                if (!list.length) return;
+                html += `<div class="creneau">${esc(cr)} · ${list.filter(t => t.fait_par_id).length}/${list.length}</div>`;
+                list.forEach(t => {
+                    html += `<div class="row ${t.fait_par_id ? 'done' : ''}"><span>${t.fait_par_id ? '✅' : '⬜'}</span><span class="grow">${esc(t.tache)}</span><span class="meta">${t.fait_par_id ? esc(t.fait_par_initiales || '') + ' ' + hhmm(t.date_validation) : esc(t.equipe || '')}</span></div>`;
+                });
+            });
+            return html + `</details>`;
+        }
 
+        function renderTemperatures(d) {
+            const releves = d.temps;
+            const relevesIds = new Set(releves.map(r => r.frigo_id));
+            const manquants = d.frigos.filter(f => !relevesIds.has(f.id));
+            const horsNorme = releves.filter(r => r.hors_norme);
+            let html = `<div class="sub-title">🌡️ Températures</div>`;
+            if (releves.length === 0) {
+                return html + `<div class="row"><span class="grow">Aucun relevé</span><span class="badge red">non fait</span></div>`;
+            }
+            // Regroupe les releves en "passages" : meme personne, moins de 45 min d'ecart
+            const passages = [];
+            releves.forEach(r => {
+                const last = passages[passages.length - 1];
+                const t = new Date(r.created_at).getTime();
+                if (last && last.user === r.user_nom && t - last.fin <= 45 * 60000) { last.fin = t; last.nb++; }
+                else passages.push({ user: r.user_nom, debut: t, fin: t, nb: 1 });
+            });
+            html += `<div class="row"><span class="grow">${relevesIds.size}/${d.frigos.length} équipements relevés</span>${manquants.length ? `<span class="badge orange">${manquants.length} manquant${manquants.length > 1 ? 's' : ''}</span>` : '<span class="badge green">complet</span>'}${horsNorme.length ? `<span class="badge red">${horsNorme.length} hors norme</span>` : ''}</div>`;
+            passages.forEach(p => {
+                const plage = hhmm(new Date(p.debut).toISOString()) + (p.fin - p.debut > 60000 ? '–' + hhmm(new Date(p.fin).toISOString()) : '');
+                html += `<div class="row"><span>👤</span><span class="grow">${esc(p.user || '?')}</span><span class="meta">${plage} · ${p.nb} relevé${p.nb > 1 ? 's' : ''}</span></div>`;
+            });
+            horsNorme.forEach(r => {
+                html += `<div class="row"><span>⚠️</span><span class="grow">${esc(r.frigo_nom)}</span><span class="badge red">${n(r.temperature).toLocaleString('fr-FR')} °C</span><span class="meta">${hhmm(r.created_at)}</span></div>`;
+            });
+            if (manquants.length) html += `<div class="small" style="padding-top:4px;">Non relevés : ${manquants.map(f => esc(f.nom)).join(', ')}</div>`;
+            return html;
+        }
+
+        function renderProductions(d) {
+            let html = `<div class="sub-title">🍳 Productions</div>`;
+            if (d.productions.length === 0) return html + `<div class="empty">Aucune production enregistrée.</div>`;
+            const jetees = d.productions.filter(p => p.statut === 'jete').length;
+            html += `<div class="row"><span class="grow"><b>${d.productions.length}</b> production${d.productions.length > 1 ? 's' : ''}</span>${jetees ? `<span class="badge red">${jetees} jetée${jetees > 1 ? 's' : ''}</span>` : ''}</div>`;
+            html += `<details class="fold"><summary>Voir le détail</summary>`;
+            d.productions.forEach(p => {
+                const qte = p.quantite_produite ? n(p.quantite_produite).toLocaleString('fr-FR') + ' ' + esc(p.unite || '') : '';
+                html += `<div class="row"><span class="grow">${esc(p.nom_produit || 'Production')}${p.statut === 'jete' ? ' <span class="badge red">jetée</span>' : ''}</span><span class="meta">${qte} · ${esc(p.producteur_initiales || '')} ${hhmm(p.date_production)}</span></div>`;
+            });
+            return html + `</details>`;
+        }
+
+        function renderReceptions(d) {
+            let html = `<div class="sub-title">📦 Réceptions</div>`;
+            if (d.receptions.length === 0) return html + `<div class="empty">Aucune réception enregistrée.</div>`;
+            const STATUTS = { validee: ['green', 'validée'], rapprochee: ['orange', 'à valider'], bl_scanne: ['orange', 'BL scanné'], en_cours: ['gray', 'en cours'] };
+            d.receptions.forEach(r => {
+                const st = STATUTS[r.statut] || ['gray', r.statut || ''];
+                html += `<div class="row"><span class="grow">${esc(r.fournisseur_nom || 'Fournisseur ?')}${r.rapprochement_anomalies_count ? ` <span class="badge red">${r.rapprochement_anomalies_count} anomalie${r.rapprochement_anomalies_count > 1 ? 's' : ''}</span>` : ''}</span><span class="badge ${st[0]}">${esc(st[1])}</span><span class="meta">${r.nb_etiquettes || 0} étiq. · ${esc(prenom(r.created_by_nom))}</span></div>`;
+            });
+            return html;
+        }
+
+        function renderCartons(d) {
+            let html = `<div class="sub-title">🟨 Cartons saisis</div>`;
+            if (d.cartons.length === 0) return html + `<div class="empty">Aucun carton saisi.</div>`;
+            const ICO = { vert: '🟩', jaune: '🟨', rouge: '🟥' };
+            d.cartons.forEach(c => {
+                html += `<div class="row"><span>${ICO[c.type] || '▫️'}</span><span class="grow"><b>${esc(c.salarie_nom)}</b>${c.description ? ' — ' + esc(c.description.slice(0, 90)) : ''}</span><span class="meta">par ${esc(prenom(c.auteur_nom))}</span></div>`;
+            });
+            return html;
+        }
+
+        function renderEtab(d, etabDef) {
+            const a = calcArgent(d);
             let html = `<div class="etab-card"><div class="etab-head ${d.etab}">${etabDef.label}</div>`;
 
-            // --- Bloc 1 : argent ---
-            html += `<div class="bloc"><div class="bloc-title">💰 La journée</div><div class="money-grid">`;
-            html += `<div class="money-tile"><div class="lbl">CA caisse</div><div class="val">${ca !== null ? money(ca) : '—'}</div>${deltaHtml}</div>`;
-            html += `<div class="money-tile"><div class="lbl">N-1 même jour</div><div class="val" style="font-size:15px; color:var(--gray-600)">${caN1 ? money(caN1) : '—'}</div><div class="sub">${couvN1 ? couvN1 + ' couverts' : ''}</div></div>`;
+            // --- Bloc 1 : la journee d'hier + le mois ---
+            html += `<div class="bloc"><div class="bloc-title">💰 La journée (${jourCourt(d.J)})</div><div class="money-grid">`;
+            html += `<div class="money-tile"><div class="lbl">CA caisse</div><div class="val">${a.ca !== null ? money(a.ca) : '—'}</div>${a.ca !== null && a.caN1 ? pctBadge(((a.ca - a.caN1) / a.caN1) * 100, 'vs N-1') : ''}${a.prevuJ ? `<div class="sub">prévu ${money0(a.prevuJ)}</div>` : ''}</div>`;
+            // Controle de caisse
+            const c = a.c;
+            let ecartHtml = '—', ecartCls = '';
+            if (a.ecart !== null) {
+                const abs = Math.abs(a.ecart);
+                ecartCls = abs < 1 ? 'pos' : (abs <= 10 ? '' : 'neg');
+                ecartHtml = abs < 0.005 ? '0,00 €' : (a.ecart > 0 ? '+' : '−') + money(abs);
+            }
             const valideBadge = !c ? '<span class="badge red">non saisie</span>'
                 : (c.valide ? '<span class="badge green">validée</span>' : '<span class="badge orange">à valider</span>');
-            html += `<div class="money-tile"><div class="lbl">Caisse</div><div class="val" style="font-size:13px; padding-top:4px;">${valideBadge}</div><div class="sub">${c && c.saisi_par_nom ? 'par ' + esc(c.saisi_par_nom.split(' ')[0]) : ''}</div></div>`;
+            html += `<div class="money-tile"><div class="lbl">Écart de caisse</div><div class="val ${ecartCls}" style="${ecartCls === '' && a.ecart !== null ? 'color:var(--orange)' : ''}">${ecartHtml}</div><div class="sub">${valideBadge}${c && c.saisi_par_nom ? ' ' + esc(prenom(c.saisi_par_nom)) : ''}</div></div>`;
+            // Mois
+            const moisLbl = d.J.toLocaleDateString('fr-FR', { month: 'long' });
+            html += `<div class="money-tile"><div class="lbl">${esc(moisLbl)} (${a.nbJours} j)</div><div class="val" style="font-size:16px;">${a.nbJours ? money0(a.cumul) : '—'}</div>${pctBadge(a.pctN1, 'vs N-1')}${a.pctPrevu !== null ? `<div class="sub ${a.pctPrevu >= 100 ? 'pos' : 'neg'}">${a.pctPrevu.toFixed(0)} % du prévu</div>` : ''}</div>`;
             html += `</div></div>`;
 
-            // --- Bloc 2 : à décider maintenant ---
+            // --- Bloc 2 : aujourd'hui ---
+            const tafJ1 = d.tasks.filter(t => (t.echeance || '').slice(0, 10) === d.ds1);
+            const tafJ2 = d.tasks.filter(t => (t.echeance || '').slice(0, 10) === d.ds2);
+            const midi = new Set(), soir = new Set();
+            d.planning.forEach(p => {
+                if (p.service === 'midi' || p.service === 'journee') midi.add(p.employe_nom);
+                if (p.service === 'soir' || p.service === 'journee') soir.add(p.employe_nom);
+            });
+            html += `<div class="bloc"><div class="bloc-title">📅 Aujourd'hui (${jourCourt(addDays(d.J, 1))})</div><div class="chips">`;
+            html += `<div class="chip">CA attendu : <b>${a.attendu ? money0(a.attendu) : '—'}</b>${a.couvAttendus ? ` <span class="small">· ${a.couvAttendus} couv.</span>` : ''}</div>`;
+            html += d.planning.length ? `<div class="chip">Équipe midi <b>${midi.size}</b> · soir <b>${soir.size}</b></div>` : `<div class="chip"><span class="small">Pas de planning synchronisé</span></div>`;
+            html += `</div><div class="sub-title" style="margin-top:10px;">📋 TAF</div>`;
+            html += renderTafJour(tafJ1, "Aujourd'hui", addDays(d.J, 1));
+            html += renderTafJour(tafJ2, 'Demain', addDays(d.J, 2));
+            html += `</div>`;
+
+            // --- Bloc 3 : a decider maintenant (etat courant) ---
             html += `<div class="bloc"><div class="bloc-title">🔔 À décider maintenant</div>`;
             let alerts = '';
             d.dlc.forEach(l => {
@@ -169,53 +350,98 @@
                 const isToday = l.dlc <= dstr(new Date());
                 alerts += `<div class="alert-line"><span class="ico">⏳</span><span>${esc(nom)}</span><span class="badge ${isToday ? 'red' : 'orange'}">${isToday ? 'DLC aujourd’hui' : 'DLC demain'}</span><span class="meta">${n(l.quantite_restante).toLocaleString('fr-FR')} ${esc(l.article_unite || '')}</span></div>`;
             });
-            const urgents = d.besoins.filter(b => b.urgence);
-            if (d.besoins.length > 0) {
-                alerts += `<div class="alert-line"><span class="ico">🛒</span><span>${d.besoins.length} besoin${d.besoins.length > 1 ? 's' : ''} d'appro en attente</span>${urgents.length ? `<span class="badge red">${urgents.length} urgent${urgents.length > 1 ? 's' : ''}</span>` : ''}<span class="meta">→ Approvisionnement</span></div>`;
-            }
             d.incidents.slice(0, 3).forEach(i => {
                 alerts += `<div class="alert-line"><span class="ico">🚨</span><span>${esc((i.description || '').slice(0, 70))}</span>${i.priorite === 'haute' ? '<span class="badge red">haute</span>' : ''}</div>`;
             });
-            html += alerts || '<div class="empty">Rien en attente — tout est net. ✨</div>';
+            html += alerts || (d.besoins.length ? '' : '<div class="empty">Rien en attente — tout est net. ✨</div>');
+            if (d.besoins.length) {
+                const urgents = d.besoins.filter(b => b.urgence).length;
+                html += `<div class="sub-title">🛒 Besoins d'appro en attente (${d.besoins.length})${urgents ? ` <span class="badge red">${urgents} urgent${urgents > 1 ? 's' : ''}</span>` : ''}</div>`;
+                d.besoins.forEach(b => {
+                    const qte = b.quantite ? n(b.quantite).toLocaleString('fr-FR') + ' ' + esc(b.unite || '') : '';
+                    html += `<div class="row"><span class="grow">${b.urgence ? '🔴 ' : ''}${esc(b.article_nom || b.ingredient_nom || 'Article ?')}</span><span class="meta">${qte} · ${esc(b.demandeur_initiales || prenom(b.demandeur_nom))} · ${b.date_demande ? new Date(b.date_demande).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}</span></div>`;
+                });
+            }
             html += `</div>`;
 
-            // --- Bloc 3 : discipline de la journée ---
-            const faites = d.tasks.filter(t => t.fait_par_id).length;
-            const horsNorme = d.temps.filter(t => t.hors_norme).length;
+            // --- Bloc 4 : bilan d'hier ---
+            const tafJ = d.tasks.filter(t => (t.echeance || '').slice(0, 10) === d.ds);
+            const faitesJ = tafJ.filter(t => t.fait_par_id).length;
             const checksPb = d.checks.filter(x => x.statut === 'probleme').length;
-            html += `<div class="bloc"><div class="bloc-title">✅ Discipline</div><div class="chips">`;
-            html += `<div class="chip ${d.tasks.length && faites < d.tasks.length ? '' : ''}">TAF : <b>${faites}/${d.tasks.length}</b> faites${d.tasks.length - faites > 0 ? ` <span class="badge orange">${d.tasks.length - faites} reportée${d.tasks.length - faites > 1 ? 's' : ''}</span>` : ''}</div>`;
-            html += `<div class="chip">Frigos : <b>${d.temps.length}</b> relevés${horsNorme ? ` <span class="badge red">${horsNorme} hors norme</span>` : ''}</div>`;
-            html += `<div class="chip">Checklists : <b>${d.checks.length}</b> validée${d.checks.length > 1 ? 's' : ''}${checksPb ? ` <span class="badge red">${checksPb} pb</span>` : ''}</div>`;
-            html += `</div></div>`;
-
-            // --- Bloc 4 : forces en présence aujourd'hui ---
-            const midi = new Set(), soir = new Set();
-            d.planning.forEach(p => {
-                if (p.service === 'midi' || p.service === 'journee') midi.add(p.employe_nom);
-                if (p.service === 'soir' || p.service === 'journee') soir.add(p.employe_nom);
-            });
-            html += `<div class="bloc"><div class="bloc-title">👥 Aujourd'hui en salle et cuisine</div>`;
-            if (d.planning.length === 0) {
-                html += '<div class="empty">Pas de planning synchronisé pour aujourd’hui.</div>';
-            } else {
-                html += `<div class="chips"><div class="chip">Midi : <b>${midi.size}</b></div><div class="chip">Soir : <b>${soir.size}</b></div></div>`;
-            }
+            html += `<div class="bloc"><div class="bloc-title">✅ Bilan du ${jourCourt(d.J)}</div><div class="chips">`;
+            html += `<div class="chip">TAF : <b>${faitesJ}/${tafJ.length}</b> faites${tafJ.length - faitesJ > 0 ? ` <span class="badge orange">${tafJ.length - faitesJ} non faite${tafJ.length - faitesJ > 1 ? 's' : ''}</span>` : ''}</div>`;
+            html += `<div class="chip">Checklists : <b>${d.checks.length}</b>${checksPb ? ` <span class="badge red">${checksPb} pb</span>` : ''}</div>`;
+            html += `</div>`;
+            html += renderTemperatures(d);
+            html += renderProductions(d);
+            html += renderReceptions(d);
+            html += renderCartons(d);
             html += `</div></div>`;
             return html;
         }
 
+        // ============ BLOC GLOBAL : notes de service, informations, Combo ============
         async function renderGlobal() {
-            const depuis = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
-            const { data } = await sb.from('combo_veilleur_log').select('nom, etablissement, statut, created_at').gte('created_at', depuis).order('created_at', { ascending: false });
             const zone = document.getElementById('global-zone');
-            const rows = (data || []).filter(l => ['cree', 'a_verifier'].includes(l.statut));
-            if (rows.length === 0) { zone.innerHTML = ''; return; }
-            let html = `<div class="global-card"><div class="bloc-title">👤 Nouveaux collaborateurs (48 h)</div>`;
-            rows.forEach(l => {
-                html += `<div class="alert-line"><span class="ico">➕</span><span>${esc(l.nom)}</span><span class="badge ${l.statut === 'cree' ? 'green' : 'orange'}">${l.statut === 'cree' ? (l.etablissement || '') : 'à vérifier'}</span><span class="meta">PIN dans Admin</span></div>`;
-            });
-            zone.innerHTML = html + '</div>';
+            const today = dstr(new Date());
+            let html = '';
+            try {
+                const depuis = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+                const [users, notes, infos, combo] = await Promise.all([
+                    sb.from('users').select('id, etablissement, acces_etablissements, equipe').eq('actif', true),
+                    sb.from('notes_service').select('id, numero, titre, etablissement, date_expiration').eq('actif', true),
+                    sb.from('informations').select('id, titre, ciblage_type, ciblage_value').eq('statut', 'publiee').is('archived_at', null),
+                    sb.from('combo_veilleur_log').select('nom, etablissement, statut, created_at').gte('created_at', depuis).order('created_at', { ascending: false }),
+                ]);
+                const actifs = users.data || [];
+                const notesVis = (notes.data || []).filter(x => !x.date_expiration || x.date_expiration >= today);
+                const infosVis = infos.data || [];
+                const [lNotes, lInfos, tInfos] = await Promise.all([
+                    notesVis.length ? sb.from('notes_service_lectures').select('note_id, user_id').in('note_id', notesVis.map(x => x.id)) : { data: [] },
+                    infosVis.length ? sb.from('information_lectures').select('information_id, user_id').in('information_id', infosVis.map(x => x.id)) : { data: [] },
+                    infosVis.length ? sb.from('information_targets').select('information_id, user_id').in('information_id', infosVis.map(x => x.id)) : { data: [] },
+                ]);
+
+                // Memes regles de ciblage que les modules Notes de service et Information
+                const lignes = [];
+                notesVis.forEach(note => {
+                    const cibles = actifs.filter(u => note.etablissement === 'tous' || u.etablissement === note.etablissement || (u.acces_etablissements || []).includes(note.etablissement));
+                    const lus = new Set((lNotes.data || []).filter(l => l.note_id === note.id).map(l => l.user_id));
+                    const nbLus = cibles.filter(u => lus.has(u.id)).length;
+                    if (cibles.length && nbLus < cibles.length) lignes.push({ ico: '📌', titre: (note.numero ? note.numero + ' — ' : '') + note.titre, lus: nbLus, total: cibles.length });
+                });
+                infosVis.forEach(info => {
+                    let cibles = [];
+                    if (info.ciblage_type === 'entreprise') cibles = actifs.map(u => u.id);
+                    else if (info.ciblage_type === 'etablissement') cibles = actifs.filter(u => u.etablissement === info.ciblage_value).map(u => u.id);
+                    else if (info.ciblage_type === 'equipe') cibles = actifs.filter(u => u.equipe === info.ciblage_value).map(u => u.id);
+                    else if (info.ciblage_type === 'collaborateurs') cibles = (tInfos.data || []).filter(t => t.information_id === info.id).map(t => t.user_id);
+                    const lus = new Set((lInfos.data || []).filter(l => l.information_id === info.id).map(l => l.user_id));
+                    const nbLus = cibles.filter(id => lus.has(id)).length;
+                    if (cibles.length && nbLus < cibles.length) lignes.push({ ico: 'ℹ️', titre: info.titre, lus: nbLus, total: cibles.length });
+                });
+                if (lignes.length) {
+                    html += `<div class="global-card"><div class="bloc-title">📣 Lecture des notes de service et informations</div>`;
+                    lignes.forEach(l => {
+                        const pct = Math.round(100 * l.lus / l.total);
+                        html += `<div class="alert-line"><span class="ico">${l.ico}</span><span>${esc(l.titre)}</span><span class="badge ${pct >= 80 ? 'orange' : 'red'}">${pct} % lu</span><span class="meta">${l.lus}/${l.total}</span></div>`;
+                    });
+                    html += `</div>`;
+                }
+
+                const rows = (combo.data || []).filter(l => ['cree', 'a_verifier'].includes(l.statut));
+                if (rows.length) {
+                    html += `<div class="global-card"><div class="bloc-title">👤 Nouveaux collaborateurs (48 h)</div>`;
+                    rows.forEach(l => {
+                        html += `<div class="alert-line"><span class="ico">➕</span><span>${esc(l.nom)}</span><span class="badge ${l.statut === 'cree' ? 'green' : 'orange'}">${l.statut === 'cree' ? esc(l.etablissement || '') : 'à vérifier'}</span><span class="meta">PIN dans Admin</span></div>`;
+                    });
+                    html += `</div>`;
+                }
+            } catch (e) {
+                console.error(e);
+                html = '<div class="global-card"><div class="empty">Notes de service / informations : erreur de chargement.</div></div>';
+            }
+            zone.innerHTML = html;
         }
 
         // ============ NAVIGATION + INIT ============
@@ -250,7 +476,7 @@
             document.getElementById('gate').style.display = 'none';
             document.getElementById('app-header').style.display = '';
             document.getElementById('app-main').style.display = '';
-            reportDate = addDays(new Date(), -1);
+            reportDate = addDays(dayStart(new Date()), -1);
             refresh();
             renderGlobal();
         })();

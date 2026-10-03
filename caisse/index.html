@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#f97316">
     <title>Contrôle Caisse - PlanB Tools</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/caisse-calc.js"></script>
     <style>
         :root {
             --orange: #f97316; --orange-light: #fff7ed; --orange-dark: #ea580c;
@@ -600,24 +601,11 @@ const FIELDS = {
             { key: 'pourboires', label: 'Pourboires (espèces)', type: 'input' },
         ],
         denominations: [500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01],
-        calcControleCA: (d) => {
-            const totalCB = n(d.cb_sans_contact) + n(d.cb_emv) + n(d.cb_sans_contact_sg) + n(d.cb_emv_sg)
-                + n(d.credit) + n(d.titres_restaurant) + n(d.amex);
-            return n(d.ca) - n(d.plus_cash) - totalCB - n(d.plus_tr) - n(d.plus_chq_virement)
-                + n(d.pourboire_cb) - n(d.click_collect) - n(d.compte_client);
-        },
-        calcTotalCB: (d) => {
-            return n(d.cb_sans_contact) + n(d.cb_emv) + n(d.cb_sans_contact_sg) + n(d.cb_emv_sg)
-                + n(d.credit) + n(d.titres_restaurant) + n(d.amex);
-        },
-        calcCaisseTheorique: (d, cashDebut) => {
-            return n(cashDebut) + n(d.plus_cash) + n(d.prelevement) - n(d.pourboire_cb)
-                - n(d.acomptes_verse) + n(d.depense_caisse) + n(d.ajout);
-        },
-        calcEcart: (d, cashDebut) => {
-            const theo = FIELDS.freddy.calcCaisseTheorique(d, cashDebut);
-            return theo - n(d.comptage_caisse) + n(d.pourboires);
-        }
+        // Formules partagees avec le rapport journalier : voir js/caisse-calc.js
+        calcControleCA: CAISSE_CALC.freddy.calcControleCA,
+        calcTotalCB: CAISSE_CALC.freddy.calcTotalCB,
+        calcCaisseTheorique: CAISSE_CALC.freddy.calcCaisseTheorique,
+        calcEcart: CAISSE_CALC.freddy.calcEcart
     },
     liesel: {
         ca: [
@@ -644,22 +632,11 @@ const FIELDS = {
             { key: 'pourboires', label: 'Pourboires (espèces)', type: 'input' },
         ],
         denominations: [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01],
-        calcControleCA: (d) => {
-            return n(d.ca) - n(d.plus_cash) - n(d.cb_emv) - n(d.cm_cic) - n(d.cb_sans_contact)
-                - n(d.amex) - n(d.titres_restaurant) - n(d.compte_client) - n(d.plus_chq_virement)
-                + n(d.pourboire_cb);
-        },
-        calcTotalCB: (d) => {
-            return n(d.cb_emv) + n(d.cm_cic) + n(d.cb_sans_contact) + n(d.amex) + n(d.titres_restaurant);
-        },
-        calcCaisseTheorique: (d, cashDebut) => {
-            return n(cashDebut) + n(d.plus_cash) - n(d.pourboire_cb)
-                - n(d.acomptes_verse) - n(d.achats_divers) - n(d.prelevement) + n(d.ajout);
-        },
-        calcEcart: (d, cashDebut) => {
-            const theo = FIELDS.liesel.calcCaisseTheorique(d, cashDebut);
-            return n(d.comptage_caisse) - theo;
-        }
+        // Formules partagees avec le rapport journalier : voir js/caisse-calc.js
+        calcControleCA: CAISSE_CALC.liesel.calcControleCA,
+        calcTotalCB: CAISSE_CALC.liesel.calcTotalCB,
+        calcCaisseTheorique: CAISSE_CALC.liesel.calcCaisseTheorique,
+        calcEcart: CAISSE_CALC.liesel.calcEcart
     }
 };
 

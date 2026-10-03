@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v59';   // bump a chaque mise a jour du SW (v59 : appro - le compteur quantite rafraichit son affichage immediatement 03/10/2026)
+const CACHE_NAME = 'planb-tools-v60';   // bump a chaque mise a jour du SW (v60 : rapport journalier v2 + formules caisse partagees js/caisse-calc.js 04/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

@@ -1,13 +1,15 @@
 # Reprise — Rapport journalier (module `rapport/`)
 
 > Brief de passation pour continuer ce chantier depuis une autre conversation.
-> Rédigé le 04/10/2026. État du code : v1 déployée et fonctionnelle (SW v59).
+> Rédigé le 04/10/2026, mis à jour le 04/10/2026 (v2). État du code : v2 (SW v60).
 
 ## Ce que c'est
 
-Synthèse quotidienne pour Eric (propriétaire) : les données de la veille des DEUX
-établissements côte à côte, pour décider le matin. Module `rapport/index.html`,
-lecture seule, navigation par date (défaut : hier).
+Synthèse quotidienne pour Eric (propriétaire), lue le MATIN : les DEUX
+établissements côte à côte. Module `rapport/index.html`, lecture seule.
+Logique de dates (arbitrée par Eric) : J = date affichée (défaut : hier) =
+le BILAN ; J+1 = « aujourd'hui » (TAF, CA attendu, équipe) ; J+2 = « demain »
+(TAF). Les flèches ‹ › déplacent tout ensemble.
 
 ## Accès — lien magique (PAS le login portail)
 
@@ -16,44 +18,60 @@ lecture seule, navigation par date (défaut : hier).
   portail admin/manager. Révocation : `UPDATE rapport_acces SET actif=false`.
 - ⚠️ Ne JAMAIS committer un token (repo public). Les tokens se créent en base.
 
-## Contenu v1 (par établissement)
+## Contenu v2 (par établissement) — demande d'Eric du 04/10/2026
 
-1. 💰 La journée : CA = caisse_controle.ca + vae (PAS ventes_journalieres, voir
-   pièges) ; comparaison N-1 = ventes_journalieres du même jour de semaine un an
-   avant (date - 364 j) ; statut caisse (valide / à valider / non saisie).
-2. 🔔 À décider maintenant (état COURANT, pas la date affichée) : lots DLC
-   aujourd'hui/demain (stock_par_lot, quantite_restante > 0), besoins appro
-   statut='demande' (+ urgence), incidents briefing ouverts/en_cours.
-3. ✅ Discipline (à la date affichée) : tasks faites/total (echeance = date),
-   temp_releves (+ hors_norme), checklist_validations (periode = date).
-4. 👥 Aujourd'hui : planning_equipes du jour (synchro Combo, 2x/jour) — effectifs
-   midi/soir distincts.
-5. 👤 Bloc global : combo_veilleur_log des dernières 48 h (statuts cree/a_verifier).
+1. 💰 La journée (J) : CA = caisse_controle.ca + vae, vs N-1 (ventes_journalieres
+   date - 364 j) et vs prévu (briefing_previsions.ca_prevu, somme midi+soir) ;
+   ÉCART DE CAISSE via `js/caisse-calc.js` (fond de départ = comptage_caisse de
+   J-1, 0 si absent — même règle que le module Caisse) ; statut validée/à valider ;
+   cumul du mois (1er → J) en % vs N-1 et en % du prévu, calculés seulement sur
+   les jours présents des deux côtés.
+2. 📅 Aujourd'hui (J+1) : CA attendu (+ couverts attendus), équipe midi/soir
+   (planning_equipes), TAF de J+1 et J+2 : compteur + liste dépliable par créneau.
+3. 🔔 À décider maintenant (état COURANT) : DLC aujourd'hui/demain, incidents
+   ouverts, LISTE des besoins appro statut='demande' (urgents en tête).
+4. ✅ Bilan de J : TAF faites/total, checklists ; températures (équipements
+   relevés / actifs, passages = même personne à moins de 45 min d'écart, avec
+   l'heure, hors norme, manquants) ; productions (dépliable, `date_production`
+   dans la journée locale) ; réceptions = `scan_sessions.date_reception` (le
+   module Réceptions actuel ; `receptions_documents` / `reception_sessions`
+   sont morts depuis avril) ; cartons = `cartons_jvr.created_at` dans J (pas
+   de notion de validation : saisi = validé).
+5. Bloc global : notes de service (actives, non expirées) et informations
+   (publiées, non archivées) dont le % de lecture < 100 %, avec les MÊMES règles
+   de ciblage que les modules notes-service et information ; combo_veilleur_log 48 h.
+
+## Formules de caisse partagées
+
+`js/caisse-calc.js` (objet global `CAISSE_CALC.freddy|liesel`) est la SOURCE
+UNIQUE des formules (contrôle CA, total CB, caisse théorique, écart). Le
+module Caisse (`FIELDS.*.calc*`) et le rapport y font référence. Ne jamais
+recopier une formule ailleurs.
 
 ## Pièges connus (vérifiés, ne pas re-découvrir)
 
 - `ventes_journalieres` : imports L'Addition ARRÊTÉS depuis le 09/06/2026. Sert
   uniquement au N-1 (données antérieures). Le CA vivant est dans `caisse_controle`.
 - `objectifs_ventes` : table VIDE (0 ligne). Pas de comparaison objectif en v1.
-- Écart de caisse : volontairement ABSENT de la v1. Sa formule vit dans
-  caisse/index.html (différente Freddy/Liesel, FIELDS.*.calcEcart) — ne pas la
-  dupliquer. Piste v2 : le module Caisse enregistre l'écart calculé en base,
-  le rapport le lit.
+- Caisse : AUCUNE journée n'est marquée `valide=true` depuis au moins 14 jours
+  (badge « à valider » partout). Question de process à poser à Eric.
+- Températures Liesel : pas de statut N_A utilisé depuis août (normal ?).
+- Réceptions Liesel : aucune scan_session depuis juillet 2026.
+- Cartons : dernier carton saisi le 30/06/2026.
 - `checklist_validations` : en sommeil depuis fin juin (module peu utilisé).
 - Statuts besoins : 'demande' (en attente), 'valide', 'commande', 'annule'.
 
 ## Idées v2 (discutées avec Eric, non arbitrées)
 
-- Écart de caisse (via enregistrement côté module Caisse, cf. ci-dessus).
 - Envoi périodique à l'administrateur : email quotidien 8h via Gmail (proposé,
   pas encore accepté) et/ou Telegram (bot jamais créé — token BotFather attendu
   depuis septembre). Le rappel iOS + lien magique est la solution en place.
-- Production du jour (lots crées), réceptions, heures pointées vs planifiées.
+- Heures pointées vs planifiées.
 - Relance des imports de ventes (sinon le N-1 s'assèche dès l'été 2027).
 
 ## Rappels de méthode (en plus de CLAUDE.md)
 
-- Toute modif front user-visible → bump CACHE_NAME dans sw.js (actuel : v59).
+- Toute modif front user-visible → bump CACHE_NAME dans sw.js (actuel : v60).
 - Flux git : commit sur la branche de travail, puis merge dans main (déploiement
   GitHub Pages) — Eric a validé ce flux en continu.
 - Un chantier = une conversation à la fois (éviter deux sessions qui éditent les
