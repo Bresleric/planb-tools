@@ -2043,11 +2043,33 @@
                 chip.classList.remove('vue');
                 chip.textContent = 'A voir';
             } else {
+                // Verrou chapitre Equipes : pas de "Vu" tant que chaque salarie de
+                // salle n a pas au moins un rang attribue (Freddy uniquement)
+                if (key === 'equipes' && !equipesRangsComplets()) return;
                 sectionsVues.add(key);
                 chip.classList.add('vue');
                 chip.textContent = '✓ Vu';
             }
             updatePublishGate();
+        }
+
+        function equipesRangsComplets() {
+            if (currentEstablishment !== 'freddy') return true; // pas de rangs chez Liesel
+            const manquants = [];
+            document.querySelectorAll('#editor-equipes .list-editor-item').forEach(row => {
+                const equipe = row.querySelector('[data-field="equipe"]')?.value;
+                if (equipe !== 'salle') return;
+                const r1 = row.querySelector('[data-field="rang1"]')?.value;
+                if (!r1) {
+                    const nom = row.querySelector('[data-field="nom"]')?.value || '?';
+                    manquants.push(nom.split(' ')[0]);
+                }
+            });
+            if (manquants.length > 0) {
+                showToast(`Rangs a attribuer avant de valider : ${manquants.join(', ')}`, 'error');
+                return false;
+            }
+            return true;
         }
 
         function allSectionsState() {
