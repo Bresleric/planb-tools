@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v55';   // bump a chaque mise a jour du SW (v55 : appro - role manager retabli dans les droits besoins et commandes, bouton urgence clarifie 03/10/2026)
+const CACHE_NAME = 'planb-tools-v56';   // bump a chaque mise a jour du SW (v56 : appro - quantites editables par managers + rattachement des besoins libres au catalogue 03/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

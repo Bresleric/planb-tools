@@ -1974,14 +1974,13 @@
                     ? `<td><input type="checkbox" class="besoin-check" data-id="${b.id}" onchange="toggleBesoinSelect('${b.id}', this.checked)" ${selectedBesoins.has(b.id) ? 'checked' : ''}></td>`
                     : '';
 
-                // Quantité : roulette 1-40 uniquement apres validation (et pour managers)
+                // Quantité : modifiable par responsable/manager/admin a tout moment
+                // (avant comme apres validation - demande Eric 03/10/2026)
                 let qtyCell;
-                if (isValide && isManager) {
+                if (isManager) {
                     qtyCell = `<select class="qty-roulette" onchange="updateBesoinQuantite('${b.id}', this.value)">${qtyRouletteOptions(b.quantite)}</select> <span class="muted">${b.unite || ''}</span>`;
-                } else if (isValide) {
-                    qtyCell = `${b.quantite ?? '—'} ${b.unite || ''}`;
                 } else {
-                    qtyCell = `<span class="muted" title="Saisissable après validation">—</span>`;
+                    qtyCell = `${b.quantite ?? '—'} ${b.unite || ''}`;
                 }
 
                 // 🔴 = reellement urgent ; le bouton de bascule (demandeur ou valideur)
@@ -1997,9 +1996,16 @@
                 if (!isValide && (isOwner || isManager)) actions += `<button class="btn-small btn-danger" onclick="deleteBesoin('${b.id}')">✕</button>`;
                 if (isValide && isManager) actions += `<button class="btn-small btn-danger" onclick="cancelBesoin('${b.id}')">Retirer</button>`;
 
+                // Besoin saisi en texte libre (sans article du catalogue) : il serait
+                // ignore a la generation de commande -> badge + bouton de rattachement
+                const horsCatalogue = !b.article_id;
+                const nomCell = horsCatalogue
+                    ? `${nom} <span class="badge-wait" title="Saisi en texte libre : aucun fournisseur/prix possible" style="font-size:10px;">hors catalogue</span>${isManager ? ` <button class="btn-small" title="Rattacher a un article du catalogue" onclick="openRattacherModal('${b.id}')">🔗</button>` : ''}`
+                    : nom;
+
                 return `<tr class="${isValide ? 'row-valide' : 'row-demande'}">
                     ${chk}
-                    <td class="td-nom">${nom}</td>
+                    <td class="td-nom">${nomCell}</td>
                     <td>${categorieOf(b)}</td>
                     <td>${b.demandeur_initiales || '?'}</td>
                     <td>${dateTxt}</td>
@@ -2089,6 +2095,85 @@
                 showToast('Besoin supprimé', 'success');
             } catch (e) {
                 showToast('Erreur lors de la suppression', 'error');
+            }
+        }
+
+        // ====== RATTACHEMENT D UN BESOIN LIBRE AU CATALOGUE ======
+        // 58 besoins sur 59 etaient saisis en texte libre (sans article_id) :
+        // invisibles pour la generation de commande. Ce modal permet aux valideurs
+        // de les raccorder a un article du catalogue (prerequis fournisseur/prix).
+        function rattacherSuggestions(texte) {
+            const mots = (texte || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 2);
+            return articles
+                .filter(a => a.actif !== false && (!a.etablissement || a.etablissement === currentEstablishment))
+                .map(a => {
+                    const nomNorm = (a.nom || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+                    let score = 0;
+                    mots.forEach(w => { if (nomNorm.includes(w)) score += w.length; });
+                    if (nomNorm === mots.join(' ')) score += 100;
+                    return { a, score };
+                })
+                .sort((x, y) => y.score - x.score || x.a.nom.localeCompare(y.a.nom));
+        }
+
+        function openRattacherModal(besoinId) {
+            const b = besoins.find(x => x.id === besoinId);
+            if (!b) return;
+            document.getElementById('modal-rattacher-besoin')?.remove();
+            const ov = document.createElement('div');
+            ov.className = 'modal-overlay show';
+            ov.id = 'modal-rattacher-besoin';
+            ov.innerHTML = `<div class="modal" style="max-width:480px;">
+                <div class="modal-header"><div class="modal-title">🔗 Rattacher « ${escapeHtml(b.article_nom || '')} »</div>
+                <button class="modal-close" onclick="document.getElementById('modal-rattacher-besoin').remove()">✕</button></div>
+                <div class="modal-body">
+                    <input type="text" class="form-input" id="rattacher-search" placeholder="Chercher dans le catalogue..." oninput="renderRattacherList('${besoinId}')">
+                    <div id="rattacher-list" style="max-height:300px; overflow-y:auto; margin-top:8px;"></div>
+                </div>
+            </div>`;
+            ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+            document.body.appendChild(ov);
+            document.getElementById('rattacher-search').value = b.article_nom || '';
+            renderRattacherList(besoinId);
+        }
+
+        function renderRattacherList(besoinId) {
+            const term = document.getElementById('rattacher-search')?.value || '';
+            const list = document.getElementById('rattacher-list');
+            if (!list) return;
+            const sugg = rattacherSuggestions(term).slice(0, 20);
+            list.innerHTML = sugg.map(({ a, score }) => `
+                <div onclick="rattacherBesoin('${besoinId}', '${a.id}')" style="display:flex; justify-content:space-between; gap:8px; padding:9px 10px; border-bottom:1px solid #f3f4f6; cursor:pointer; ${score > 0 ? '' : 'opacity:0.55;'}">
+                    <span style="font-weight:600; font-size:13px;">${escapeHtml(a.nom)}</span>
+                    <span class="muted" style="font-size:11px; white-space:nowrap;">${escapeHtml(a.categorie || '')}</span>
+                </div>`).join('') || '<div class="muted" style="padding:12px;">Aucun article</div>';
+        }
+
+        async function rattacherBesoin(besoinId, articleId) {
+            const b = besoins.find(x => x.id === besoinId);
+            const art = articles.find(a => a.id === articleId);
+            if (!b || !art) return;
+            try {
+                const saisieOrigine = b.article_nom && b.article_nom.trim().toLowerCase() !== art.nom.trim().toLowerCase()
+                    ? (b.observation ? b.observation + ' ' : '') + `(saisi : ${b.article_nom})`
+                    : b.observation;
+                const updates = {
+                    article_id: art.id,
+                    article_nom: art.nom,
+                    ingredient_id: art.ingredient_id || null,
+                    observation: saisieOrigine || b.observation || null,
+                };
+                if (!isDemo) {
+                    const { error } = await supabase.from('appro_besoins').update(updates).eq('id', besoinId);
+                    if (error) throw error;
+                }
+                Object.assign(b, updates);
+                document.getElementById('modal-rattacher-besoin')?.remove();
+                showToast(`Rattaché à « ${art.nom} » ✓`, 'success');
+                renderBesoins();
+            } catch (e) {
+                console.error(e);
+                showToast('Erreur de rattachement', 'error');
             }
         }
 
