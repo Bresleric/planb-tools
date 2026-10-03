@@ -1903,7 +1903,9 @@
 
             const demandeBesoin = besoins.filter(b => b.statut === 'demande' && b.etablissement === currentEstablishment);
             const valideBesoin = besoins.filter(b => b.statut === 'valide' && b.etablissement === currentEstablishment);
-            const isManager = currentUser.role === 'responsable' || currentUser.role === 'admin';
+            // Droits de validation : responsable, manager et admin (le role manager
+            // avait ete oublie - bug corrige le 03/10/2026, capture Eric MP vs EL)
+            const isManager = ['responsable', 'manager', 'admin'].includes(currentUser.role);
 
             // Apurement : ne garder dans la sélection que des besoins encore visibles
             const visibleIds = new Set([...demandeBesoin, ...valideBesoin].map(b => b.id));
@@ -1982,7 +1984,9 @@
                     qtyCell = `<span class="muted" title="Saisissable après validation">—</span>`;
                 }
 
-                const urgCell = `${b.urgence ? '🔴' : ''}${(isOwner && !isValide) ? ` <button class="btn-tiny" title="Basculer urgence" onclick="toggleUrgence('${b.id}', ${!b.urgence})">${b.urgence ? '🟢' : '🔴'}</button>` : ''}`;
+                // 🔴 = reellement urgent ; le bouton de bascule (demandeur ou valideur)
+                // affiche un drapeau neutre pour ne plus etre confondu avec l urgence
+                const urgCell = `${b.urgence ? '🔴' : ''}${((isOwner || isManager) && !isValide) ? ` <button class="btn-tiny" title="${b.urgence ? 'Retirer l urgence' : 'Marquer urgent'}" onclick="toggleUrgence('${b.id}', ${!b.urgence})">${b.urgence ? '↩' : '🚩'}</button>` : ''}`;
 
                 const statutCell = isValide
                     ? `<span class="badge-ok">Validé</span>`
@@ -2177,7 +2181,7 @@
         }
 
         function renderCommandes() {
-            if (currentUser.role !== 'responsable' && currentUser.role !== 'admin') {
+            if (!['responsable', 'manager', 'admin'].includes(currentUser.role)) {
                 document.getElementById('tab-commandes').innerHTML = '<div class="empty-state"><div class="empty-state-text">Accès restreint</div></div>';
                 return;
             }
