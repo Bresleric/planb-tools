@@ -1144,6 +1144,13 @@
             };
             sessionStorage.setItem('planb_user', JSON.stringify(sessionData));
             sessionStorage.setItem('planb_etablissement', establishment);
+            // Connexion memorisee (admin uniquement, choix fait dans la fenetre post-login) :
+            // l etablissement etant maintenant connu, on peut persister la session complete.
+            try {
+                if (user.role === 'admin' && sessionStorage.getItem('planb_remember_pending') === '1') {
+                    localStorage.setItem('planb_remember', JSON.stringify(sessionData));
+                }
+            } catch (e) {}
         }
 
         // ============= Mode Developpement (admin uniquement) =============
@@ -1164,14 +1171,27 @@
                   +   '<div style="margin-bottom:20px;font-size:13px;color:#94a3b8;line-height:1.4;">Quel mode pour cette session ?</div>'
                   +   '<button id="planb-devmode-dev" type="button" style="width:100%;padding:15px;margin-bottom:10px;background:#0ea5e9;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">Mode developpement<br><span style="font-size:12px;font-weight:400;opacity:.85;">pas de deconnexion auto</span></button>'
                   +   '<button id="planb-devmode-normal" type="button" style="width:100%;padding:15px;background:#334155;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">Utilisation normale<br><span style="font-size:12px;font-weight:400;opacity:.85;">deconnexion apres inactivite</span></button>'
+                  +   '<label style="display:flex;align-items:center;gap:9px;justify-content:center;margin-top:16px;font-size:13px;color:#cbd5e1;cursor:pointer;"><input type="checkbox" id="planb-remember-chk" style="width:18px;height:18px;accent-color:#0ea5e9;margin:0;"> Rester connecte sur cet appareil</label>'
+                  +   '<div style="margin-top:5px;font-size:10px;color:#64748b;">Uniquement sur un appareil personnel verrouille (Face ID)</div>'
                   + '</div>';
                 document.body.appendChild(ov);
+                // Pre-cocher si la memorisation est deja active sur cet appareil
+                try { if (localStorage.getItem('planb_remember')) ov.querySelector('#planb-remember-chk').checked = true; } catch(e){}
+                function applyRememberChoice() {
+                    try {
+                        var checked = ov.querySelector('#planb-remember-chk').checked;
+                        sessionStorage.setItem('planb_remember_pending', checked ? '1' : '0');
+                        if (!checked) localStorage.removeItem('planb_remember');
+                    } catch(e){}
+                }
                 function cleanup() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
                 ov.querySelector('#planb-devmode-dev').addEventListener('click', function() {
                     try { sessionStorage.setItem('planb_dev_nolock', '1'); } catch(e){}
+                    applyRememberChoice();
                     cleanup(); resolve();
                 });
                 ov.querySelector('#planb-devmode-normal').addEventListener('click', function() {
+                    applyRememberChoice();
                     cleanup(); resolve();
                 });
             });
@@ -1915,6 +1935,8 @@
 
         // ============= Event Listeners: Logout =============
         logoutBtn.addEventListener('click', () => {
+            // Deconnexion explicite : efface aussi la connexion memorisee de l appareil
+            try { localStorage.removeItem('planb_remember'); } catch (e) {}
             clearSession();
             currentPin = '';
             updatePinDisplay();
@@ -1944,7 +1966,23 @@
                 }
                 await showDashboardOrBriefing();
             } else {
-                showScreen(loginScreen);
+                // Connexion memorisee (admin uniquement) : l appareil personnel est
+                // protege par Face ID, on restaure la session sans redemander le PIN
+                let remembered = null;
+                try { remembered = JSON.parse(localStorage.getItem('planb_remember') || 'null'); } catch (e) {}
+                if (remembered && remembered.role === 'admin' && remembered.etablissement) {
+                    remembered.timestamp = Date.now();
+                    sessionStorage.setItem('planb_user', JSON.stringify(remembered));
+                    sessionStorage.setItem('planb_etablissement', remembered.etablissement);
+                    currentUser = remembered;
+                    currentEstablishment = remembered.etablissement;
+                    if (remembered.device_id) {
+                        currentDevice = { id: remembered.device_id, nom: remembered.device_nom };
+                    }
+                    await showDashboardOrBriefing();
+                } else {
+                    showScreen(loginScreen);
+                }
             }
 
             updatePinDisplay();
