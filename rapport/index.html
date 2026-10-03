@@ -60,6 +60,15 @@
 
         #gate { position: fixed; inset: 0; background: var(--gray-100); z-index: 100; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; }
         #gate .msg { max-width: 340px; font-size: 14px; color: var(--gray-600); line-height: 1.5; }
+        .hint { font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--gray-400); margin-left: 6px; }
+        .sem-wrap { overflow-x: auto; }
+        table.sem { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+        table.sem th { font-size: 10px; color: var(--gray-500); font-weight: 700; text-transform: capitalize; padding: 2px 2px 6px; }
+        table.sem th span { font-size: 13px; color: var(--gray-800); }
+        table.sem td { padding: 5px 2px; border-top: 1px solid var(--gray-100); font-weight: 600; white-space: nowrap; }
+        table.sem td.lbl { text-align: left; color: var(--gray-500); font-weight: 600; padding-right: 6px; }
+        table.sem td.ok { color: var(--green); } table.sem td.moy { color: var(--orange); } table.sem td.ko { color: var(--red); }
+        #resume-zone .money-tile .val { font-size: 22px; }
         #loading { text-align: center; padding: 40px; color: var(--gray-400); }
     </style>
 </head>
@@ -78,6 +87,7 @@
     </header>
 
     <main style="display:none" id="app-main">
+        <div id="resume-zone"></div>
         <div id="global-zone"></div>
         <div id="etabs-zone"><div id="loading">Chargement…</div></div>
         <div class="footer-note" id="gen-note"></div>
@@ -123,7 +133,13 @@
             const demain = dstr(addDays(new Date(), 1));
             const n1date = dstr(addDays(date, -364)); // meme jour de semaine, annee precedente
 
-            const [caisse, ventesN1, tasks, temps, checks, dlc, besoins, incidents, planning] = await Promise.all([
+            const sem0 = dstr(addDays(date, -6)); // debut de la fenetre 7 jours (jour affiche inclus)
+            const ds1 = dstr(addDays(date, 1));
+            const il14j = dstr(addDays(new Date(), -14));
+            const il30j = addDays(new Date(), -30).toISOString();
+
+            const [caisse, ventesN1, tasks, temps, checks, dlc, besoins, incidents, planning,
+                   caissesNV, scansAV, prodSansFiche, rappels, tachesSignalees, semTasks, semProd, semTemps, semScans] = await Promise.all([
                 sb.from('caisse_controle').select('ca, vae, comptage_caisse, pourboires, valide, saisi_par_nom').eq('etablissement', etab).eq('date', ds).maybeSingle(),
                 sb.from('ventes_journalieres').select('ca_ttc, couverts').eq('etablissement', etab).eq('date', n1date),
                 sb.from('tasks').select('id, fait_par_id').eq('etablissement', etab).eq('echeance', ds),
@@ -131,11 +147,62 @@
                 sb.from('checklist_validations').select('statut').eq('etablissement', etab).eq('periode', ds),
                 sb.from('stock_par_lot').select('produit, article_nom, dlc, quantite_restante, article_unite').eq('etablissement', etab).gt('quantite_restante', 0).not('dlc', 'is', null).lte('dlc', demain).order('dlc').limit(8),
                 sb.from('appro_besoins').select('id, urgence, article_nom, ingredient_nom, date_demande').eq('etablissement', etab).eq('statut', 'demande'),
-                sb.from('briefing_incidents').select('description, priorite').eq('etablissement', etab).in('statut', ['ouvert', 'en_cours']).order('created_at', { ascending: false }),
+                fetchAll(() => sb.from('briefing_incidents').select('description, priorite, date').eq('etablissement', etab).in('statut', ['ouvert', 'en_cours']).order('created_at', { ascending: false })),
                 sb.from('planning_equipes').select('employe_nom, service, equipe').eq('etablissement', etab).eq('date', today),
+                // --- A traiter (etat actuel, independant du jour affiche) ---
+                sb.from('caisse_controle').select('date').eq('etablissement', etab).gte('date', il14j).or('valide.is.null,valide.eq.false').order('date'),
+                sb.from('scans').select('type_document, statut').eq('etablissement', etab).in('statut', ['en_attente_validation', 'erreur']).gte('created_at', il30j),
+                fetchAll(() => sb.from('productions').select('nom_produit').eq('etablissement', etab).is('fiche_id', null).not('a_creer_motif', 'is', null).gte('date_production', il30j)),
+                sb.from('briefing_rappels').select('message, priorite').eq('etablissement', etab).eq('actif', true).order('created_at', { ascending: false }),
+                sb.from('tasks').select('tache, observation, echeance').eq('etablissement', etab).eq('a_traiter', true).is('fait_par_id', null).order('echeance'),
+                // --- Travail des equipes sur 7 jours ---
+                fetchAll(() => sb.from('tasks').select('echeance, fait_par_id').eq('etablissement', etab).gte('echeance', sem0).lt('echeance', ds1)),
+                fetchAll(() => sb.from('productions').select('date_production').eq('etablissement', etab).gte('date_production', sem0).lt('date_production', ds1)),
+                fetchAll(() => sb.from('temp_releves').select('date, hors_norme').eq('etablissement', etab).gte('date', sem0).lt('date', ds1)),
+                fetchAll(() => sb.from('scans').select('created_at').eq('etablissement', etab).eq('type_document', 'etiquette_produit').gte('created_at', sem0).lt('created_at', ds1)),
             ]);
 
-            return { etab, ds, caisse: caisse.data, ventesN1: ventesN1.data || [], tasks: tasks.data || [], temps: temps.data || [], checks: checks.data || [], dlc: dlc.data || [], besoins: besoins.data || [], incidents: incidents.data || [], planning: planning.data || [] };
+            return { etab, ds, caisse: caisse.data, ventesN1: ventesN1.data || [], tasks: tasks.data || [], temps: temps.data || [], checks: checks.data || [], dlc: dlc.data || [], besoins: besoins.data || [], incidents: incidents.data || [], planning: planning.data || [],
+                     caissesNV: caissesNV.data || [], scansAV: scansAV.data || [], prodSansFiche: prodSansFiche.data || [], rappels: rappels.data || [], tachesSignalees: tachesSignalees.data || [],
+                     sem: { debut: sem0, tasks: semTasks.data || [], prod: semProd.data || [], temps: semTemps.data || [], scans: semScans.data || [] } };
+        }
+
+        // Supabase plafonne a 1000 lignes par requete : on pagine pour les tables volumineuses
+        async function fetchAll(build) {
+            const PAGE = 1000;
+            let all = [];
+            for (let from = 0; ; from += PAGE) {
+                const { data, error } = await build().range(from, from + PAGE - 1);
+                if (error) throw error;
+                all = all.concat(data || []);
+                if (!data || data.length < PAGE) break;
+            }
+            return { data: all };
+        }
+
+        // Le briefing reenregistre le meme incident a chaque sauvegarde : on regroupe par description
+        function grouperIncidents(rows) {
+            const map = new Map();
+            rows.forEach(r => {
+                const desc = (r.description || '').trim();
+                if (!desc || /^(aucun|rien|ras|néant|neant)\.?$/i.test(desc)) return;
+                const key = desc.toLowerCase();
+                const g = map.get(key) || { description: desc, nb: 0, haute: false, premier: r.date, dernier: r.date };
+                g.nb++;
+                if (r.priorite === 'haute') g.haute = true;
+                if (r.date && (!g.premier || r.date < g.premier)) g.premier = r.date;
+                if (r.date && (!g.dernier || r.date > g.dernier)) g.dernier = r.date;
+                map.set(key, g);
+            });
+            return [...map.values()].sort((a, b) => (b.haute - a.haute) || String(b.dernier).localeCompare(String(a.dernier)));
+        }
+
+        function joursDepuis(ds) {
+            if (!ds) return null;
+            return Math.floor((new Date(dstr(new Date())) - new Date(String(ds).slice(0, 10))) / 86400000);
+        }
+        function fmtCourt(ds) {
+            return new Date(String(ds).slice(0, 10) + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
         }
 
         // ============ RENDU ============
@@ -161,8 +228,8 @@
             html += `<div class="money-tile"><div class="lbl">Caisse</div><div class="val" style="font-size:13px; padding-top:4px;">${valideBadge}</div><div class="sub">${c && c.saisi_par_nom ? 'par ' + esc(c.saisi_par_nom.split(' ')[0]) : ''}</div></div>`;
             html += `</div></div>`;
 
-            // --- Bloc 2 : à décider maintenant ---
-            html += `<div class="bloc"><div class="bloc-title">🔔 À décider maintenant</div>`;
+            // --- Bloc 2 : à traiter (état actuel) ---
+            html += `<div class="bloc"><div class="bloc-title">📥 À traiter <span class="hint">état actuel</span></div>`;
             let alerts = '';
             d.dlc.forEach(l => {
                 const nom = l.produit || l.article_nom || 'Produit';
@@ -171,12 +238,45 @@
             });
             const urgents = d.besoins.filter(b => b.urgence);
             if (d.besoins.length > 0) {
-                alerts += `<div class="alert-line"><span class="ico">🛒</span><span>${d.besoins.length} besoin${d.besoins.length > 1 ? 's' : ''} d'appro en attente</span>${urgents.length ? `<span class="badge red">${urgents.length} urgent${urgents.length > 1 ? 's' : ''}</span>` : ''}<span class="meta">→ Approvisionnement</span></div>`;
+                const vieux = d.besoins.filter(b => joursDepuis(b.date_demande) > 7).length;
+                alerts += `<div class="alert-line"><span class="ico">🛒</span><span>${d.besoins.length} besoin${d.besoins.length > 1 ? 's' : ''} d'appro en attente</span>${urgents.length ? `<span class="badge red">${urgents.length} urgent${urgents.length > 1 ? 's' : ''}</span>` : ''}${vieux ? `<span class="badge gray">${vieux} de + de 7 j</span>` : ''}<span class="meta">→ Approvisionnement</span></div>`;
             }
-            d.incidents.slice(0, 3).forEach(i => {
-                alerts += `<div class="alert-line"><span class="ico">🚨</span><span>${esc((i.description || '').slice(0, 70))}</span>${i.priorite === 'haute' ? '<span class="badge red">haute</span>' : ''}</div>`;
-            });
+            if (d.caissesNV.length > 0) {
+                const plusVieille = d.caissesNV[0].date;
+                alerts += `<div class="alert-line"><span class="ico">🧾</span><span>${d.caissesNV.length} caisse${d.caissesNV.length > 1 ? 's' : ''} non validée${d.caissesNV.length > 1 ? 's' : ''} (14 j)</span><span class="badge orange">depuis le ${fmtCourt(plusVieille)}</span><span class="meta">→ Caisse</span></div>`;
+            }
+            const scansEtiq = d.scansAV.filter(s => s.type_document === 'etiquette_produit' && s.statut === 'en_attente_validation').length;
+            const scansBL = d.scansAV.filter(s => s.type_document !== 'etiquette_produit' && s.statut === 'en_attente_validation').length;
+            const scansErr = d.scansAV.filter(s => s.statut === 'erreur').length;
+            if (scansEtiq + scansBL + scansErr > 0) {
+                const parts = [];
+                if (scansEtiq) parts.push(`${scansEtiq} étiquette${scansEtiq > 1 ? 's' : ''}`);
+                if (scansBL) parts.push(`${scansBL} BL/facture${scansBL > 1 ? 's' : ''}`);
+                alerts += `<div class="alert-line"><span class="ico">📷</span><span>Scans à valider (30 j) : ${parts.join(' + ') || '—'}</span>${scansErr ? `<span class="badge red">${scansErr} en erreur</span>` : ''}<span class="meta">→ Scanner</span></div>`;
+            }
+            const sansFiche = new Set(d.prodSansFiche.map(p => (p.nom_produit || '').trim().toLowerCase()).filter(Boolean));
+            if (sansFiche.size > 0) {
+                alerts += `<div class="alert-line"><span class="ico">📋</span><span>${sansFiche.size} produit${sansFiche.size > 1 ? 's' : ''} fabriqué${sansFiche.size > 1 ? 's' : ''} sans fiche technique (30 j)</span><span class="meta">→ Production</span></div>`;
+            }
             html += alerts || '<div class="empty">Rien en attente — tout est net. ✨</div>';
+            html += `</div>`;
+
+            // --- Bloc 2 bis : messages des équipes ---
+            const groupes = grouperIncidents(d.incidents);
+            let msgs = '';
+            groupes.slice(0, 6).forEach(g => {
+                const age = joursDepuis(g.premier);
+                msgs += `<div class="alert-line"><span class="ico">🚨</span><span>${esc(g.description.slice(0, 80))}</span>${g.haute ? '<span class="badge red">haute</span>' : ''}<span class="meta">${age !== null ? (age === 0 ? 'aujourd’hui' : 'depuis ' + age + ' j') : ''}</span></div>`;
+            });
+            if (groupes.length > 6) msgs += `<div class="empty">… et ${groupes.length - 6} autre${groupes.length - 6 > 1 ? 's' : ''} incident${groupes.length - 6 > 1 ? 's' : ''} ouvert${groupes.length - 6 > 1 ? 's' : ''}</div>`;
+            d.tachesSignalees.slice(0, 5).forEach(t => {
+                msgs += `<div class="alert-line"><span class="ico">🚩</span><span>${esc((t.tache || '').slice(0, 60))}${t.observation ? ' — <i>' + esc(t.observation.slice(0, 60)) + '</i>' : ''}</span><span class="badge orange">tâche signalée</span></div>`;
+            });
+            d.rappels.slice(0, 4).forEach(r => {
+                msgs += `<div class="alert-line"><span class="ico">📌</span><span>${esc((r.message || '').slice(0, 80))}</span>${r.priorite === 'haute' ? '<span class="badge red">haute</span>' : '<span class="badge gray">rappel</span>'}</div>`;
+            });
+            html += `<div class="bloc"><div class="bloc-title">💬 Messages des équipes <span class="hint">${groupes.length} incident${groupes.length > 1 ? 's' : ''} ouvert${groupes.length > 1 ? 's' : ''}</span></div>`;
+            html += msgs || '<div class="empty">Aucun message en attente.</div>';
             html += `</div>`;
 
             // --- Bloc 3 : discipline de la journée ---
@@ -188,6 +288,9 @@
             html += `<div class="chip">Frigos : <b>${d.temps.length}</b> relevés${horsNorme ? ` <span class="badge red">${horsNorme} hors norme</span>` : ''}</div>`;
             html += `<div class="chip">Checklists : <b>${d.checks.length}</b> validée${d.checks.length > 1 ? 's' : ''}${checksPb ? ` <span class="badge red">${checksPb} pb</span>` : ''}</div>`;
             html += `</div></div>`;
+
+            // --- Bloc 3 bis : travail des équipes sur 7 jours ---
+            html += `<div class="bloc"><div class="bloc-title">📈 Travail des équipes — 7 jours</div>${renderSemaine(d.sem)}</div>`;
 
             // --- Bloc 4 : forces en présence aujourd'hui ---
             const midi = new Set(), soir = new Set();
@@ -205,17 +308,93 @@
             return html;
         }
 
+        function renderSemaine(sem) {
+            const jours = [];
+            for (let i = 0; i < 7; i++) jours.push(dstr(addDays(new Date(sem.debut + 'T12:00:00'), i)));
+            const parJour = (rows, champ) => {
+                const m = {};
+                rows.forEach(r => {
+                    const v = String(r[champ] || '');
+                    const k = v.length > 10 ? dstr(new Date(v)) : v; // horodatage -> jour local
+                    (m[k] = m[k] || []).push(r);
+                });
+                return m;
+            };
+            const t = parJour(sem.tasks, 'echeance'), p = parJour(sem.prod, 'date_production'),
+                  f = parJour(sem.temps, 'date'), s = parJour(sem.scans, 'created_at');
+            let h = '<div class="sem-wrap"><table class="sem"><thead><tr><th></th>';
+            jours.forEach(j => {
+                const dt = new Date(j + 'T12:00:00');
+                h += `<th>${dt.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}<br><span>${dt.getDate()}</span></th>`;
+            });
+            h += '</tr></thead><tbody>';
+            // TAF : faites / prévues, coloré selon le taux
+            h += '<tr><td class="lbl">TAF</td>';
+            jours.forEach(j => {
+                const rows = t[j] || [];
+                const faites = rows.filter(r => r.fait_par_id).length;
+                const taux = rows.length ? faites / rows.length : null;
+                const cls = taux === null ? '' : (taux >= 0.9 ? 'ok' : (taux >= 0.6 ? 'moy' : 'ko'));
+                h += `<td class="${cls}">${rows.length ? faites + '/' + rows.length : '—'}</td>`;
+            });
+            h += '</tr><tr><td class="lbl">Productions</td>';
+            jours.forEach(j => { h += `<td>${(p[j] || []).length || '—'}</td>`; });
+            h += '</tr><tr><td class="lbl">Frigos</td>';
+            jours.forEach(j => {
+                const rows = f[j] || [];
+                const hn = rows.filter(r => r.hors_norme).length;
+                h += `<td class="${hn ? 'ko' : ''}">${rows.length || '—'}${hn ? '<sup>⚠' + hn + '</sup>' : ''}</td>`;
+            });
+            h += '</tr><tr><td class="lbl">Étiquettes</td>';
+            jours.forEach(j => { h += `<td>${(s[j] || []).length || '—'}</td>`; });
+            h += '</tr></tbody></table></div>';
+            return h;
+        }
+
         async function renderGlobal() {
             const depuis = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
-            const { data } = await sb.from('combo_veilleur_log').select('nom, etablissement, statut, created_at').gte('created_at', depuis).order('created_at', { ascending: false });
+            const [combo, infos] = await Promise.all([
+                sb.from('combo_veilleur_log').select('nom, etablissement, statut, created_at').gte('created_at', depuis).order('created_at', { ascending: false }),
+                sb.from('informations').select('titre, auteur_nom, created_at').eq('statut', 'proposition').order('created_at'),
+            ]);
             const zone = document.getElementById('global-zone');
-            const rows = (data || []).filter(l => ['cree', 'a_verifier'].includes(l.statut));
-            if (rows.length === 0) { zone.innerHTML = ''; return; }
-            let html = `<div class="global-card"><div class="bloc-title">👤 Nouveaux collaborateurs (48 h)</div>`;
-            rows.forEach(l => {
-                html += `<div class="alert-line"><span class="ico">➕</span><span>${esc(l.nom)}</span><span class="badge ${l.statut === 'cree' ? 'green' : 'orange'}">${l.statut === 'cree' ? (l.etablissement || '') : 'à vérifier'}</span><span class="meta">PIN dans Admin</span></div>`;
+            const rows = (combo.data || []).filter(l => ['cree', 'a_verifier'].includes(l.statut));
+            const propositions = infos.data || [];
+            if (rows.length === 0 && propositions.length === 0) { zone.innerHTML = ''; return; }
+            let html = '';
+            if (propositions.length) {
+                html += `<div class="global-card"><div class="bloc-title">📰 Informations proposées à valider</div>`;
+                propositions.forEach(i => {
+                    html += `<div class="alert-line"><span class="ico">✉️</span><span>${esc(i.titre || 'Sans titre')}</span><span class="meta">${esc((i.auteur_nom || '').split(' ')[0])} · ${fmtCourt(i.created_at)}</span></div>`;
+                });
+                html += `</div>`;
+            }
+            if (rows.length) {
+                html += `<div class="global-card"><div class="bloc-title">👤 Nouveaux collaborateurs (48 h)</div>`;
+                rows.forEach(l => {
+                    html += `<div class="alert-line"><span class="ico">➕</span><span>${esc(l.nom)}</span><span class="badge ${l.statut === 'cree' ? 'green' : 'orange'}">${l.statut === 'cree' ? (l.etablissement || '') : 'à vérifier'}</span><span class="meta">PIN dans Admin</span></div>`;
+                });
+                html += `</div>`;
+            }
+            zone.innerHTML = html;
+        }
+
+        // Synthèse chiffrée « à traiter » des deux établissements
+        function renderResume(results) {
+            const tot = { caisses: 0, besoins: 0, scans: 0, incidents: 0, sansFiche: 0 };
+            results.forEach(d => {
+                tot.caisses += d.caissesNV.length;
+                tot.besoins += d.besoins.length;
+                tot.scans += d.scansAV.length;
+                tot.incidents += grouperIncidents(d.incidents).length;
+                tot.sansFiche += new Set(d.prodSansFiche.map(p => (p.nom_produit || '').trim().toLowerCase()).filter(Boolean)).size;
             });
-            zone.innerHTML = html + '</div>';
+            const tile = (val, lbl) => `<div class="money-tile"><div class="val ${val ? '' : 'pos'}">${val}</div><div class="lbl">${lbl}</div></div>`;
+            document.getElementById('resume-zone').innerHTML =
+                `<div class="etab-card"><div class="bloc"><div class="bloc-title">📥 À traiter — les deux maisons</div><div class="money-grid">`
+                + tile(tot.caisses, 'Caisses à valider') + tile(tot.besoins, 'Besoins appro') + tile(tot.scans, 'Scans à valider')
+                + tile(tot.incidents, 'Incidents ouverts') + tile(tot.sansFiche, 'Produits sans fiche')
+                + `</div></div></div>`;
         }
 
         // ============ NAVIGATION + INIT ============
@@ -231,6 +410,7 @@
             zone.innerHTML = '<div id="loading">Chargement…</div>';
             try {
                 const results = await Promise.all(ETABS.map(e => loadEtab(e.code, reportDate)));
+                renderResume(results);
                 zone.innerHTML = results.map((d, i) => renderEtab(d, ETABS[i])).join('');
                 document.getElementById('gen-note').textContent = 'Généré le ' + new Date().toLocaleString('fr-FR');
             } catch (e) {
