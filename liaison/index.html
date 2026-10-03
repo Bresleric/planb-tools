@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Cahier de liaison — PlanB Tools</title>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --blue: #2563eb; --blue-light: #eff6ff;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 50px; }
+
+        header { background: white; border-bottom: 3px solid var(--orange); padding: 10px 16px; position: sticky; top: 0; z-index: 10; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 760px; margin: 0 auto; gap: 8px; }
+        h1 { font-size: 17px; color: var(--orange); white-space: nowrap; }
+        .etab-badge { background: var(--orange-light); color: var(--orange); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+        .btn-back { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+        main { max-width: 760px; margin: 0 auto; padding: 12px; }
+
+        .composer { background: white; border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; }
+        .composer textarea { width: 100%; min-height: 64px; padding: 10px; font-size: 14px; line-height: 1.45; border: 1px solid var(--gray-200); border-radius: 10px; background: var(--gray-50); resize: vertical; font-family: inherit; }
+        .dest-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+        .dest-label { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+        .dest-chip { border: 1.5px solid var(--gray-200); background: white; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 600; color: var(--gray-600); cursor: pointer; user-select: none; }
+        .dest-chip.on { border-color: var(--orange); background: var(--orange-light); color: #c2410c; }
+        .btn-envoyer { width: 100%; margin-top: 10px; background: var(--orange); color: white; border: none; border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .btn-envoyer:active { transform: scale(0.99); }
+
+        .day-sep { text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-400); text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 8px; }
+        .msg { background: white; border-radius: 14px; padding: 10px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 10px; }
+        .msg.epingle { border: 1.5px solid var(--orange); }
+        .msg-head { display: flex; align-items: baseline; gap: 8px; }
+        .msg-auteur { font-weight: 700; font-size: 13px; }
+        .msg-heure { font-size: 11px; color: var(--gray-400); }
+        .msg-texte { font-size: 14px; line-height: 1.5; margin-top: 4px; white-space: pre-wrap; }
+        .msg-dest { margin-top: 6px; }
+        .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-right: 4px; }
+        .badge.orange { background: var(--orange-light); color: #c2410c; }
+        .badge.green { background: var(--green-light); color: var(--green); }
+        .badge.gray { background: var(--gray-100); color: var(--gray-500); }
+        .msg-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .lu-info { font-size: 11px; color: var(--gray-500); }
+        .msg-actions { display: flex; gap: 6px; }
+        .btn-small { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-lu { background: var(--green); color: white; border: none; }
+
+        .empty { text-align: center; color: var(--gray-400); padding: 36px 10px; font-size: 13px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 16px; padding: 20px; width: 100%; max-width: 340px; text-align: center; }
+        .modal h2 { font-size: 16px; margin-bottom: 4px; }
+        .modal .sub { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; }
+        #pin-input { width: 100%; padding: 12px; font-size: 22px; text-align: center; letter-spacing: 8px; border: 1px solid var(--gray-300); border-radius: 10px; }
+        #pin-error { color: var(--red); font-size: 12px; min-height: 16px; margin-top: 6px; }
+        .modal-btns { display: flex; gap: 8px; margin-top: 12px; }
+        .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        #pin-ok { background: var(--orange); color: white; border: none; }
+        #pin-cancel { background: white; border: 1px solid var(--gray-200); }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <h1>📒 Cahier de liaison</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="etab-badge" id="etab-badge"></span>
+                <button class="btn-back" onclick="location.href='../'">← Portail</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="composer">
+            <textarea id="compose-texte" placeholder="Consigne, info de service, passation entre équipes..."></textarea>
+            <div class="dest-row" id="dest-row">
+                <span class="dest-label">À l'attention de :</span>
+                <span class="dest-chip on" id="dest-tous" onclick="resetDest()">👥 Toute l'équipe</span>
+            </div>
+            <button class="btn-envoyer" onclick="envoyerMessage()">✍️ Publier (signé par PIN)</button>
+        </div>
+        <div id="feed"><div class="empty">Chargement…</div></div>
+    </main>
+
+    <div class="modal-overlay" id="pin-modal">
+        <div class="modal">
+            <h2 id="pin-title">✍️ Signature</h2>
+            <div class="sub" id="pin-sub">Saisis ton code personnel</div>
+            <input type="password" id="pin-input" inputmode="numeric" maxlength="6" placeholder="••••">
+            <div id="pin-error"></div>
+            <div class="modal-btns">
+                <button id="pin-cancel">Annuler</button>
+                <button id="pin-ok">Je signe</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        const sb = PLANB.client();
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        const currentEstablishment = sessionStorage.getItem('planb_etablissement');
+        if (!currentUser || !currentEstablishment) location.href = '../';
+
+        const isManager = ['responsable', 'manager', 'admin'].includes(currentUser?.role);
+        let messages = [];
+        let lectures = [];
+        let equipe = [];
+        let destSelection = new Set(); // vide = toute l equipe
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? 'var(--red)' : (type === 'success' ? 'var(--green)' : 'var(--gray-800)');
+            t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200);
+        }
+
+        // ============ PIN (signature sur iPad partage) ============
+        function askPIN(titre, callback) {
+            const overlay = document.getElementById('pin-modal');
+            const input = document.getElementById('pin-input');
+            const err = document.getElementById('pin-error');
+            document.getElementById('pin-title').textContent = titre;
+            input.value = ''; err.textContent = '';
+            overlay.style.display = 'flex';
+            setTimeout(() => input.focus(), 60);
+            const close = () => { overlay.style.display = 'none'; };
+            document.getElementById('pin-cancel').onclick = close;
+            document.getElementById('pin-ok').onclick = async () => {
+                const code = (input.value || '').trim();
+                if (code.length < 4) { err.textContent = 'Code invalide'; return; }
+                try {
+                    const { data, error } = await sb.from('users')
+                        .select('id, nom, initiales, role, etablissement, acces_etablissements, actif')
+                        .eq('code', code).eq('actif', true);
+                    if (error) throw error;
+                    const u = (data || []).find(x =>
+                        x.etablissement === currentEstablishment ||
+                        (x.acces_etablissements || []).includes(currentEstablishment) ||
+                        x.role === 'admin');
+                    if (!u) { err.textContent = 'Code inconnu pour cet établissement'; input.value = ''; return; }
+                    close();
+                    callback(u);
+                } catch (e) { err.textContent = 'Erreur de vérification'; }
+            };
+            input.onkeydown = (ev) => { if (ev.key === 'Enter') document.getElementById('pin-ok').click(); };
+        }
+
+        // ============ CHARGEMENT ============
+        async function loadData() {
+            const depuis = new Date(Date.now() - 14 * 86400000).toISOString();
+            const [msgRes, eqRes] = await Promise.all([
+                sb.from('liaison_messages').select('*')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('archive', false)
+                    .or(`created_at.gte.${depuis},epingle.eq.true`)
+                    .order('created_at', { ascending: false })
+                    .limit(200),
+                sb.from('users').select('id, nom, initiales')
+                    .eq('actif', true).eq('etablissement', currentEstablishment).order('nom'),
+            ]);
+            if (msgRes.error) {
+                document.getElementById('feed').innerHTML = '<div class="empty">Module pas encore initialisé côté base de données.<br>(table liaison_messages manquante)</div>';
+                throw msgRes.error;
+            }
+            messages = msgRes.data || [];
+            equipe = eqRes.data || [];
+            lectures = [];
+            const ids = messages.map(m => m.id);
+            if (ids.length > 0) {
+                const { data: l } = await sb.from('liaison_lectures').select('*').in('message_id', ids);
+                lectures = l || [];
+            }
+            renderDestChips();
+            renderFeed();
+        }
+
+        // ============ COMPOSER ============
+        function renderDestChips() {
+            const row = document.getElementById('dest-row');
+            row.querySelectorAll('.dest-chip:not(#dest-tous)').forEach(c => c.remove());
+            equipe.forEach(u => {
+                const chip = document.createElement('span');
+                chip.className = 'dest-chip' + (destSelection.has(u.id) ? ' on' : '');
+                chip.textContent = u.nom.split(' ')[0];
+                chip.onclick = () => {
+                    if (destSelection.has(u.id)) destSelection.delete(u.id); else destSelection.add(u.id);
+                    document.getElementById('dest-tous').classList.toggle('on', destSelection.size === 0);
+                    chip.classList.toggle('on');
+                };
+                row.appendChild(chip);
+            });
+            document.getElementById('dest-tous').classList.toggle('on', destSelection.size === 0);
+        }
+
+        function resetDest() {
+            destSelection.clear();
+            renderDestChips();
+        }
+
+        function envoyerMessage() {
+            const texte = document.getElementById('compose-texte').value.trim();
+            if (!texte) { showToast('Écris un message d abord', 'error'); return; }
+            askPIN('✍️ Signer le message', async (u) => {
+                try {
+                    const dests = equipe.filter(x => destSelection.has(x.id)).map(x => ({ id: x.id, nom: x.nom }));
+                    const { error } = await sb.from('liaison_messages').insert({
+                        etablissement: currentEstablishment,
+                        texte,
+                        auteur_id: u.id, auteur_nom: u.nom, auteur_initiales: u.initiales,
+                        destinataires: dests,
+                    });
+                    if (error) throw error;
+                    document.getElementById('compose-texte').value = '';
+                    resetDest();
+                    showToast(`Publié — signé ${u.nom.split(' ')[0]} ✓`, 'success');
+                    await loadData();
+                } catch (e) { console.error(e); showToast('Erreur de publication', 'error'); }
+            });
+        }
+
+        // ============ FEED ============
+        function lecturesDe(msgId) { return lectures.filter(l => l.message_id === msgId); }
+
+        function dayLabel(ts) {
+            const d = new Date(ts);
+            const today = new Date(); today.setHours(0,0,0,0);
+            const md = new Date(d); md.setHours(0,0,0,0);
+            const diff = Math.round((today - md) / 86400000);
+            if (diff === 0) return "Aujourd'hui";
+            if (diff === 1) return 'Hier';
+            return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+
+        function renderFeed() {
+            const feed = document.getElementById('feed');
+            if (messages.length === 0) {
+                feed.innerHTML = '<div class="empty">Aucun message. Le cahier est vierge — à vous d écrire la première page. 📒</div>';
+                return;
+            }
+            const epingles = messages.filter(m => m.epingle);
+            const autres = messages.filter(m => !m.epingle);
+            let html = '';
+            if (epingles.length > 0) {
+                html += '<div class="day-sep">📌 Épinglés</div>';
+                epingles.forEach(m => { html += renderMsg(m); });
+            }
+            let lastDay = '';
+            autres.forEach(m => {
+                const lbl = dayLabel(m.created_at);
+                if (lbl !== lastDay) { html += `<div class="day-sep">${lbl}</div>`; lastDay = lbl; }
+                html += renderMsg(m);
+            });
+            feed.innerHTML = html;
+        }
+
+        function renderMsg(m) {
+            const heure = new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const lus = lecturesDe(m.id);
+            const dests = Array.isArray(m.destinataires) ? m.destinataires : [];
+            const lusIds = new Set(lus.map(l => l.user_id));
+            let destHtml = '';
+            if (dests.length > 0) {
+                destHtml = `<div class="msg-dest">À l'attention de : ` + dests.map(d =>
+                    `<span class="badge ${lusIds.has(d.id) ? 'green' : 'orange'}">${esc(d.nom.split(' ')[0])}${lusIds.has(d.id) ? ' ✓' : ''}</span>`).join('') + '</div>';
+            }
+            const luInfo = lus.length > 0
+                ? `👁 Lu par ${lus.map(l => esc(l.user_initiales || l.user_nom)).join(', ')}`
+                : '<span style="color:var(--gray-300)">Pas encore lu</span>';
+            let actions = `<button class="btn-small btn-lu" onclick="marquerLu('${m.id}')">✓ Lu</button>`;
+            if (isManager) {
+                actions += ` <button class="btn-small" onclick="togglePin('${m.id}', ${m.epingle})" title="Épingler">${m.epingle ? '📌✕' : '📌'}</button>`;
+                actions += ` <button class="btn-small" onclick="archiverMsg('${m.id}')" title="Archiver">🗄</button>`;
+            }
+            return `<div class="msg${m.epingle ? ' epingle' : ''}">
+                <div class="msg-head"><span class="msg-auteur">${esc(m.auteur_nom || '?')}</span><span class="msg-heure">${heure}</span></div>
+                <div class="msg-texte">${esc(m.texte)}</div>
+                ${destHtml}
+                <div class="msg-footer"><span class="lu-info">${luInfo}</span><span class="msg-actions">${actions}</span></div>
+            </div>`;
+        }
+
+        function marquerLu(msgId) {
+            askPIN('👁 Confirmer la lecture', async (u) => {
+                try {
+                    const { error } = await sb.from('liaison_lectures').insert({
+                        message_id: msgId, user_id: u.id, user_nom: u.nom, user_initiales: u.initiales,
+                    });
+                    if (error) {
+                        if (String(error.code) === '23505') { showToast(`${u.nom.split(' ')[0]} a déjà lu ce message 👍`, 'success'); return; }
+                        throw error;
+                    }
+                    showToast(`Lecture enregistrée — ${u.nom.split(' ')[0]} ✓`, 'success');
+                    await loadData();
+                } catch (e) { console.error(e); showToast('Erreur', 'error'); }
+            });
+        }
+
+        async function togglePin(msgId, cur) {
+            try {
+                const { error } = await sb.from('liaison_messages').update({ epingle: !cur }).eq('id', msgId);
+                if (error) throw error;
+                await loadData();
+            } catch (e) { showToast('Erreur', 'error'); }
+        }
+
+        async function archiverMsg(msgId) {
+            if (!confirm('Archiver ce message ? Il disparaîtra du cahier (conservé en base).')) return;
+            try {
+                const { error } = await sb.from('liaison_messages').update({ archive: true }).eq('id', msgId);
+                if (error) throw error;
+                showToast('Message archivé', 'success');
+                await loadData();
+            } catch (e) { showToast('Erreur', 'error'); }
+        }
+
+        (async function init() {
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            try { await loadData(); } catch (e) { console.error(e); }
+        })();
+    </script>
+</body>
+</html>
