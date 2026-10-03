@@ -1853,6 +1853,38 @@
             return o;
         }
 
+        // Options fournisseur/tarif disponibles pour un besoin (meme logique que
+        // la fenetre de generation) : via l ingredient, sinon l article direct
+        function besoinPrixOptions(b) {
+            let articlesLies = [];
+            if (b.ingredient_id) articlesLies = articles.filter(a => a.ingredient_id === b.ingredient_id);
+            else if (b.article_id) articlesLies = articles.filter(a => a.id === b.article_id);
+            const ids = articlesLies.map(a => a.id);
+            return prix.filter(p => ids.includes(p.article_id) && p.actif)
+                .map(p => ({ ...p, fournisseur_nom: (fournisseurs.find(f => f.id === p.fournisseur_id) || {}).nom || '?' }))
+                .sort((a, b) => a.pu_ht - b.pu_ht);
+        }
+
+        async function updateBesoinPrix(id, prixId) {
+            const b = besoins.find(x => x.id === id);
+            if (!b) return;
+            const val = prixId || null;
+            try {
+                if (!isDemo) {
+                    const { error } = await supabase.from('appro_besoins').update({ prix_id: val }).eq('id', id);
+                    if (error) throw error;
+                }
+                b.prix_id = val;
+            } catch (e) { showToast('Erreur fournisseur', 'error'); }
+        }
+
+        function stepQty(id, delta) {
+            const b = besoins.find(x => x.id === id);
+            if (!b) return;
+            const v = Math.max(1, (parseFloat(b.quantite) || 0) + delta);
+            updateBesoinQuantite(id, v);
+        }
+
         function categorieOf(b) {
             const ing = ingredients.find(i => i.id === b.ingredient_id);
             return ing ? (ing.categorie || '') : '';
@@ -1961,7 +1993,7 @@
             const th = (col, label) => `<th class="th-sort" onclick="sortBesoins('${col}')">${label}${arrow(col)}</th>`;
             html += `<div class="besoins-table-wrap"><table class="besoins-table"><thead><tr>`;
             if (isManager) html += `<th></th>`;
-            html += th('article', 'Article') + th('categorie', 'Catégorie') + th('demandeur', 'Dem.') + th('date', 'Date') + th('urgence', 'Urg.') + th('statut', 'Statut') + th('quantite', 'Quantité') + `<th>Obs.</th><th>Actions</th>`;
+            html += th('article', 'Article') + th('categorie', 'Catégorie') + th('demandeur', 'Dem.') + th('date', 'Date') + th('urgence', 'Urg.') + th('statut', 'Statut') + th('quantite', 'Quantité') + `<th>Fournisseur</th><th>Obs.</th><th>Actions</th>`;
             html += `</tr></thead><tbody>`;
 
             html += rows.map(b => {
@@ -1978,9 +2010,28 @@
                 // (avant comme apres validation - demande Eric 03/10/2026)
                 let qtyCell;
                 if (isManager) {
-                    qtyCell = `<select class="qty-roulette" onchange="updateBesoinQuantite('${b.id}', this.value)">${qtyRouletteOptions(b.quantite)}</select> <span class="muted">${b.unite || ''}</span>`;
+                    // Compteur -/+ (demande Eric : plus rapide qu un menu deroulant)
+                    qtyCell = `<span style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
+                        <button onclick="stepQty('${b.id}', -1)" style="width:27px; height:27px; border:1px solid #d1d5db; background:white; border-radius:7px; font-size:15px; font-weight:700; cursor:pointer; line-height:1;">−</button>
+                        <input type="text" inputmode="decimal" value="${b.quantite ?? ''}" placeholder="—" onchange="updateBesoinQuantite('${b.id}', this.value)" style="width:44px; height:27px; text-align:center; border:1px solid #e5e7eb; border-radius:7px; font-size:13px;">
+                        <button onclick="stepQty('${b.id}', 1)" style="width:27px; height:27px; border:1px solid #d1d5db; background:white; border-radius:7px; font-size:15px; font-weight:700; cursor:pointer; line-height:1;">+</button>
+                        <span class="muted">${b.unite || ''}</span></span>`;
                 } else {
                     qtyCell = `${b.quantite ?? '—'} ${b.unite || ''}`;
+                }
+
+                // Choix du fournisseur directement dans l onglet Besoins (demande Eric) :
+                // memorise sur le besoin (prix_id), repris par la generation de commandes
+                let fournCell = '<span class="muted">—</span>';
+                const fOpts = besoinPrixOptions(b);
+                if (fOpts.length > 0) {
+                    if (isManager) {
+                        const optHtml = fOpts.map(o => `<option value="${o.id}" ${b.prix_id === o.id ? 'selected' : ''}>${escapeHtml(o.fournisseur_nom)} · ${Number(o.pu_ht).toFixed(2)}€</option>`).join('');
+                        fournCell = `<select class="qty-roulette" onchange="updateBesoinPrix('${b.id}', this.value)" style="max-width:170px;"><option value="">— moins cher —</option>${optHtml}</select>`;
+                    } else {
+                        const chosen = b.prix_id ? fOpts.find(o => o.id === b.prix_id) : null;
+                        fournCell = chosen ? escapeHtml(chosen.fournisseur_nom) : `<span class="muted">${fOpts.length} possible${fOpts.length > 1 ? 's' : ''}</span>`;
+                    }
                 }
 
                 // 🔴 = reellement urgent ; le bouton de bascule (demandeur ou valideur)
@@ -2012,6 +2063,7 @@
                     <td>${urgCell}</td>
                     <td>${statutCell}</td>
                     <td class="td-qty">${qtyCell}</td>
+                    <td>${fournCell}</td>
                     <td class="muted">${b.observation || ''}</td>
                     <td class="td-act">${actions || '—'}</td>
                 </tr>`;
@@ -3750,7 +3802,7 @@
                     options.forEach((o, oidx) => {
                         const total = (o.pu_ht * qty).toFixed(2);
                         const label = `${o.fournisseur_nom} — ${o.pu_ht.toFixed(2)} €/${o.unite || unite} (total ${total} €) — ${o.designation || nom}`;
-                        html += `<option value="${o.id}"${oidx === 0 ? ' selected' : ''}>${label}</option>`;
+                        html += `<option value="${o.id}"${(b.prix_id ? o.id === b.prix_id : oidx === 0) ? ' selected' : ''}>${label}</option>`;
                     });
                     html += `</select>`;
                 }
