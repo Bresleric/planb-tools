@@ -1878,10 +1878,13 @@
             } catch (e) { showToast('Erreur fournisseur', 'error'); }
         }
 
-        function stepQty(id, delta) {
+        function stepQty(id, delta, btn) {
             const b = besoins.find(x => x.id === id);
             if (!b) return;
             const v = Math.max(1, (parseFloat(b.quantite) || 0) + delta);
+            // Mettre a jour l affichage immediatement (sans attendre un re-rendu complet)
+            const input = btn?.parentElement?.querySelector('input');
+            if (input) input.value = v;
             updateBesoinQuantite(id, v);
         }
 
@@ -2012,9 +2015,9 @@
                 if (isManager) {
                     // Compteur -/+ (demande Eric : plus rapide qu un menu deroulant)
                     qtyCell = `<span style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
-                        <button onclick="stepQty('${b.id}', -1)" style="width:27px; height:27px; border:1px solid #d1d5db; background:white; border-radius:7px; font-size:15px; font-weight:700; cursor:pointer; line-height:1;">−</button>
+                        <button onclick="stepQty('${b.id}', -1, this)" style="width:27px; height:27px; border:1px solid #d1d5db; background:white; border-radius:7px; font-size:15px; font-weight:700; cursor:pointer; line-height:1;">−</button>
                         <input type="text" inputmode="decimal" value="${b.quantite ?? ''}" placeholder="—" onchange="updateBesoinQuantite('${b.id}', this.value)" style="width:44px; height:27px; text-align:center; border:1px solid #e5e7eb; border-radius:7px; font-size:13px;">
-                        <button onclick="stepQty('${b.id}', 1)" style="width:27px; height:27px; border:1px solid #d1d5db; background:white; border-radius:7px; font-size:15px; font-weight:700; cursor:pointer; line-height:1;">+</button>
+                        <button onclick="stepQty('${b.id}', 1, this)" style="width:27px; height:27px; border:1px solid #d1d5db; background:white; border-radius:7px; font-size:15px; font-weight:700; cursor:pointer; line-height:1;">+</button>
                         <span class="muted">${b.unite || ''}</span></span>`;
                 } else {
                     qtyCell = `${b.quantite ?? '—'} ${b.unite || ''}`;
