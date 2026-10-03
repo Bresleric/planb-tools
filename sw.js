@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v52';   // bump a chaque mise a jour du SW (v52 : nouveau module notes de service avec signature de lecture 02/10/2026)
+const CACHE_NAME = 'planb-tools-v53';   // bump a chaque mise a jour du SW (v53 : notes de service - redaction et suivi reserves admin 03/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

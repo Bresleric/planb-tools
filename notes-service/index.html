@@ -115,7 +115,8 @@
         const currentEstablishment = sessionStorage.getItem('planb_etablissement');
         if (!currentUser || !currentEstablishment) location.href = '../';
 
-        const isManager = ['manager', 'admin'].includes(currentUser?.role);
+        // Redaction et suivi des lectures : reserves a l administrateur (decision Eric 03/10/2026)
+        const isAdmin = currentUser?.role === 'admin';
         let notes = [];
         let lectures = [];
         let currentTab = 'notes';
@@ -199,7 +200,7 @@
                     </div>
                     <div class="note-contenu">${esc(n.contenu)}</div>
                     <div class="note-footer">
-                        <span class="lu-count">✍️ Lue et signée par <b>${lus.length}</b> personne${lus.length > 1 ? 's' : ''}</span>
+                        ${isAdmin ? `<span class="lu-count">✍️ Lue et signée par <b>${lus.length}</b> personne${lus.length > 1 ? 's' : ''}</span>` : '<span></span>'}
                         <button class="btn-lu" onclick="signerLecture('${n.id}')">✓ J'ai lu et compris</button>
                     </div>
                 </div>`;
@@ -300,6 +301,7 @@
         }
 
         async function publierNote() {
+            if (!isAdmin) { showToast('Reserve a l administrateur', 'error'); return; }
             const titre = document.getElementById('f-titre').value.trim();
             const contenu = document.getElementById('f-contenu').value.trim();
             if (!titre || !contenu) { showToast('Titre et contenu obligatoires', 'error'); return; }
@@ -318,6 +320,7 @@
         }
 
         async function toggleNote(id, actif) {
+            if (!isAdmin) { showToast('Reserve a l administrateur', 'error'); return; }
             try {
                 const { error } = await sb.from('notes_service').update({ actif: !actif }).eq('id', id);
                 if (error) throw error;
@@ -335,6 +338,7 @@
 
         async function render() {
             const main = document.getElementById('main');
+            if (!isAdmin && currentTab !== 'notes') currentTab = 'notes';
             if (currentTab === 'suivi') main.innerHTML = await renderSuivi();
             else if (currentTab === 'redaction') main.innerHTML = renderRedaction();
             else main.innerHTML = renderNotes();
@@ -342,7 +346,7 @@
 
         (async function init() {
             document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
-            if (isManager) {
+            if (isAdmin) {
                 document.getElementById('tab-suivi').style.display = '';
                 document.getElementById('tab-redaction').style.display = '';
             }
