@@ -198,7 +198,16 @@
     .lightbox.visible { display:flex; }
     .lightbox img { max-width:95vw; max-height:95vh; object-fit:contain; }
     .lightbox-close { position:fixed; top:16px; right:16px; padding:8px 14px; background:white; border:none; border-radius:var(--radius); font-size:14px; cursor:pointer; }
-  </style>
+  
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
+           La barre translucide flotte par-dessus les PWA ; on repousse les
+           en-tetes sous la zone sure declaree par le systeme. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
 </head>
 <body>
   <header class="header">

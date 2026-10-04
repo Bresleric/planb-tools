@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v66';   // bump a chaque mise a jour du SW (v66 : cahier de liaison - visibilite restreinte des messages cibles 04/10/2026)
+const CACHE_NAME = 'planb-tools-v67';   // bump a chaque mise a jour du SW (v67 : en-tetes degages de la barre de statut iOS 26 Liquid Glass, tous modules 05/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

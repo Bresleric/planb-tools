@@ -879,7 +879,16 @@
     .briefing-history { margin-top: 16px; max-height: 300px; overflow-y: auto; }
     .history-item { background: var(--gray-50); padding: 8px 12px; border-radius: var(--radius-sm);
       margin-bottom: 6px; font-size: 0.8rem; color: var(--gray-600); }
-  </style>
+  
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
+           La barre translucide flotte par-dessus les PWA ; on repousse les
+           en-tetes sous la zone sure declaree par le systeme. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
 </head>
 <body>
 

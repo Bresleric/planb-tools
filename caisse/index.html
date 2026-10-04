@@ -431,6 +431,15 @@
         .modal-card .modal-actions .btn-validate {
             background: var(--green); color: white;
         }
+    
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
+           La barre translucide flotte par-dessus les PWA ; on repousse les
+           en-tetes sous la zone sure declaree par le systeme. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
     </style>
 </head>
 <body>

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Administration - PlanB Tools</title>
@@ -597,7 +597,16 @@
                 background: white; font-size: 12px; cursor: pointer; color: var(--gray-600);
             }
             .device-actions button.delete-btn { color: var(--error); border-color: var(--error); }
-        </style>
+        
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
+           La barre translucide flotte par-dessus les PWA ; on repousse les
+           en-tetes sous la zone sure declaree par le systeme. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="app">

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#4f46e5">
   <title>Pointages - PlanB Tools</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
@@ -344,7 +344,16 @@
     .first-banner-icon { font-size: 2rem; margin-bottom: 6px; }
     .first-banner-text { font-size: 1.05rem; font-weight: 600; }
     .first-banner-sub { font-size: 0.88rem; margin-top: 4px; opacity: 0.9; }
-  </style>
+  
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
+           La barre translucide flotte par-dessus les PWA ; on repousse les
+           en-tetes sous la zone sure declaree par le systeme. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
 </head>
 <body>
   <header class="header">

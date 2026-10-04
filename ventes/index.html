@@ -347,7 +347,16 @@
     #tab-objectifs .btn-save-row:disabled { opacity: 0.5; cursor: not-allowed; }
     #tab-objectifs .btn-reset { padding: 4px 8px; background: white; border: 1px solid var(--gray-300); color: var(--gray-500); border-radius: 4px; font-size: 0.72rem; cursor: pointer; }
     #tab-objectifs .obj-empty { padding: 32px 16px; text-align: center; color: var(--gray-400); font-size: 0.85rem; }
-  </style>
+  
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
+           La barre translucide flotte par-dessus les PWA ; on repousse les
+           en-tetes sous la zone sure declaree par le systeme. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
 </head>
 <body>
 
