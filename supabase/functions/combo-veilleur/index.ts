@@ -22,7 +22,7 @@ const PARIS = "Europe/Paris";
 function normName(s: string): string {
   // Minuscules sans accents, puis mots tries par ordre alphabetique :
   // "BRESLER Eric" et "Eric Bresler" donnent la meme cle (Combo inverse parfois)
-  return s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+  return s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .split(/\s+/).sort().join(" ");
 }
 
@@ -110,6 +110,9 @@ Deno.serve(async (_req) => {
 
     const today = parisDate(0);
     const tomorrow = parisDate(1);
+    // L API Combo EXCLUT end_date : pour avoir aujourd hui ET demain, on demande
+    // jusqu a apres-demain (constat du 04/10/2026, le planning du lendemain manquait)
+    const apresDemain = parisDate(2);
 
     const seen = new Set<string>();
     for (const loc of locations) {
@@ -160,7 +163,7 @@ Deno.serve(async (_req) => {
       if (!etab) continue;
       try {
         const shifts = (await comboGet(
-          `/api/v1/plannings?start_date=${today}&end_date=${tomorrow}&location_id=${encodeURIComponent(loc.id)}`,
+          `/api/v1/plannings?start_date=${today}&end_date=${apresDemain}&location_id=${encodeURIComponent(loc.id)}`,
         )) as Array<{
           date: string; starts_at: string | null; ends_at: string | null;
           break_duration: number | null; note: string | null;

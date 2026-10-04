@@ -48,15 +48,34 @@ le BILAN ; J+1 = « aujourd'hui » (TAF, CA attendu, équipe) ; J+2 = « demain 
   seulement, 7 derniers jours) : % de lecture par message. Cibles = destinataires
   du message, ou à défaut tous les users actifs de l'établissement, auteur exclu
   (`liaison_lectures`). Les destinataires nommés qui n'ont pas lu sont affichés.
-- ✅ Bilan de J : ⏱️ planning vs pointage. Planning = `planning_equipes` (Combo,
-  heures + « pause 30mn » dans notes) ; pointage = `pointage_periodes_travail`
-  (module Pointages PBT, `duree_travail_minutes` déjà net de pauses).
-  AUCUN lien en base (planning_id et ecart_planning_minutes jamais remplis) :
-  rapprochement par nom normalisé (minuscules, sans accents). Alertes : non
-  pointé, hors planning, sortie non pointée (fin à 23:59 = clôture auto),
-  retard ≥ 10 min, écart d'heures ≥ 30 min.
-  `combo_pointages` est MORT depuis le 05/06/2026 (imports CSV arrêtés).
-- Constat 03/10 : la moitié de l'équipe planifiée ne pointe pas dans PBT.
+- ✅ Bilan de J : ⏱️ planning vs pointage, SOURCE COMBO (table `combo_pointages`).
+  L'équipe badge dans COMBO (badgeuse), PAS dans le module Pointages PBT
+  (`pointage_periodes_travail` ne contient que quelques personnes : ne pas s'en servir).
+  Alertes : non badgé, sortie non badgée, retard ≥ 10 min, pause badgée < prévue
+  - 10 min, écart retenu/prévu ≥ 30 min (si entrée ET sortie badgées).
+
+## Synchro des pointages Combo (mise en place le 04/10/2026)
+
+- Edge function `combo-pointages` (supabase/functions/combo-pointages) appelée par
+  pg_cron `combo-pointages-sync` à 03h45 et 08h45 UTC (après le veilleur).
+  Par défaut : J-2 et J-1. Rattrapage : `?start=AAAA-MM-JJ&end=AAAA-MM-JJ`.
+  Historique chargé depuis le 01/09/2026. Trace : scripts/migration-combo-pointages-cron.sql.
+- Source : GET /api/v1/plannings (même endpoint que le veilleur). Champs par shift :
+  `starts_at/ends_at/break_duration` (prévu), `real_starts_at/real_ends_at/
+  real_break_duration` (retenu, arrondi par Combo), `events[]` (badgeages bruts :
+  clock_in, clock_out, break_start, break_end avec event_occurred_at).
+- Stockage : prévu → *_planifie ; badgeages bruts → debut_pointe/fin_pointee/
+  pauses_pointees_minutes ; retenu → debut_valide/fin_validee/pauses_validees_minutes.
+  `duree_travail_minutes` est une colonne GÉNÉRÉE (ne pas l'insérer).
+  Lignes API marquées `import_fichier_nom = 'api-combo'` (remplacées à chaque passage) ;
+  les lignes de juin (imports Excel) ne sont pas touchées.
+- ⚠️ PIÈGE : sans badgeage, Combo RECOPIE le prévu dans le retenu (et une sortie
+  non badgée reçoit l'heure de fin prévue). « Non badgé » = debut_pointe IS NULL.
+- ⚠️ PIÈGE API Combo : `end_date` est EXCLUE. start=J&end=J+1 renvoie le seul jour J.
+  Ce piège faisait que le veilleur ne chargeait jamais le planning du lendemain :
+  corrigé le 04/10/2026 (end_date = après-demain), veilleur v4.
+- Fonction `combo-diagnostic` : neutralisée (renvoie 410). Peut être supprimée
+  depuis le dashboard Supabase.
 
 ## Formules de caisse partagées
 

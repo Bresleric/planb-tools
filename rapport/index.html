@@ -178,14 +178,14 @@
                 sb.from('stock_par_lot').select('produit, article_nom, dlc, quantite_restante, article_unite').eq('etablissement', etab).gt('quantite_restante', 0).not('dlc', 'is', null).lte('dlc', demainReel).order('dlc').limit(8),
                 sb.from('appro_besoins').select('article_nom, ingredient_nom, quantite, unite, urgence, demandeur_initiales, demandeur_nom, date_demande').eq('etablissement', etab).eq('statut', 'demande').order('urgence', { ascending: false }).order('date_demande'),
                 sb.from('briefing_incidents').select('description, priorite').eq('etablissement', etab).in('statut', ['ouvert', 'en_cours']).order('created_at', { ascending: false }),
-                sb.from('planning_equipes').select('date, employe_nom, service, heure_debut, heure_fin, notes').eq('etablissement', etab).in('date', [ds, ds1]),
-                sb.from('pointage_periodes_travail').select('user_id, user_nom, debut_service, fin_service, duree_travail_minutes').eq('etablissement', etab).eq('date_service', ds).order('debut_service'),
+                sb.from('planning_equipes').select('employe_nom, service').eq('etablissement', etab).eq('date', ds1),
+                sb.from('combo_pointages').select('collaborateur_nom_combo, debut_planifie, fin_planifiee, pauses_planifiees_minutes, debut_pointe, fin_pointee, pauses_pointees_minutes, debut_valide, fin_validee, pauses_validees_minutes, duree_travail_minutes').eq('etablissement', etab).eq('date_service', ds).order('debut_planifie'),
                 sb.from('liaison_messages').select('id, titre, texte, auteur_id, auteur_nom, destinataires, created_at').eq('etablissement', etab).eq('archive', false).is('reponse_a', null).gte('created_at', isoLiaison).lt('created_at', isoJ2).order('created_at', { ascending: false }),
                 sb.from('users').select('id, nom').eq('etablissement', etab).eq('actif', true),
             ]);
             const err = q.find(r => r.error);
             if (err) throw err.error;
-            const [caisse, ventesN1, previsions, tasks, temps, frigos, checks, productionsAll, receptions, cartons, dlc, besoins, incidents, planningAll, pointages, liaison, equipe] = q.map(r => r.data || []);
+            const [caisse, ventesN1, previsions, tasks, temps, frigos, checks, productionsAll, receptions, cartons, dlc, besoins, incidents, planning, pointages, liaison, equipe] = q.map(r => r.data || []);
             // Lectures du cahier de liaison (2e temps : il faut les id des messages)
             let liaisonLectures = [];
             if (liaison.length) {
@@ -195,9 +195,7 @@
             }
             const productions = productionsAll.filter(p => new Date(p.date_production) < J1);
             const productionsJ1 = productionsAll.filter(p => new Date(p.date_production) >= J1);
-            const planning = planningAll.filter(p => p.date === ds1);
-            const planningJ = planningAll.filter(p => p.date === ds);
-            return { etab, J, ds, ds1, ds2, caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, productionsJ1, receptions, cartons, dlc, besoins, incidents, planning, planningJ, pointages, liaison, liaisonLectures, equipe };
+            return { etab, J, ds, ds1, ds2, caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, productionsJ1, receptions, cartons, dlc, besoins, incidents, planning, pointages, liaison, liaisonLectures, equipe };
         }
 
         // ============ CALCULS ============
@@ -350,60 +348,46 @@
             return html;
         }
 
-        // ---- Planning (Combo) vs pointage (module Pointages) pour le jour J ----
-        // Rapprochement par nom (pas de lien en base) : minuscules, sans accents.
-        function normNom(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
-        function minOfTime(t) { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; }
+        // ---- Planning vs pointage, source Combo (table combo_pointages, synchro combo-pointages) ----
+        // prevu = debut/fin_planifie ; badge = debut/fin_pointe (badgeuse brute) ;
+        // retenu = debut/fin_valide (heures paie). Sans badgeage, Combo recopie le
+        // prevu dans le retenu : "non badge" se lit sur debut_pointe, jamais sur le retenu.
         function fmtMin(m) { return m === null ? '—' : Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0'); }
         function fmtEcart(m) { const a = Math.abs(m); return (m >= 0 ? '+' : '−') + (a >= 60 ? Math.floor(a / 60) + 'h' + String(a % 60).padStart(2, '0') : a + ' min'); }
-        function hm(min) { return String(Math.floor(min / 60) % 24).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+        function minEntre(a, b) { return (a && b) ? Math.round((new Date(b) - new Date(a)) / 60000) : null; }
         function renderPlanningPointage(d) {
-            let html = `<div class="sub-title">⏱️ Planning vs pointage</div>`;
-            if (d.planningJ.length === 0 && d.pointages.length === 0) return html + `<div class="empty">Ni planning ni pointage pour ce jour.</div>`;
+            let html = `<div class="sub-title">⏱️ Planning vs pointage <span class="small">(Combo)</span></div>`;
+            if (d.pointages.length === 0) return html + `<div class="empty">Aucun shift Combo pour ce jour (synchro à 5h45 et 10h45).</div>`;
             const pers = {};
-            const get = (nom) => { const k = normNom(nom); return pers[k] = pers[k] || { nom, plan: null, debutPlan: null, finPlan: null, pointe: null, debutPt: null, finPt: null, sansSortie: false }; };
-            d.planningJ.forEach(p => {
-                const x = get(p.employe_nom);
-                let deb = minOfTime(p.heure_debut), fin = minOfTime(p.heure_fin);
-                if (fin <= deb) fin += 24 * 60; // service qui finit apres minuit
-                const pause = parseInt(((p.notes || '').match(/pause\s*(\d+)/i) || [])[1] || '0', 10);
-                x.plan = (x.plan || 0) + (fin - deb) - pause;
-                x.debutPlan = x.debutPlan === null ? deb : Math.min(x.debutPlan, deb);
-                x.finPlan = x.finPlan === null ? fin : Math.max(x.finPlan, fin);
-            });
             d.pointages.forEach(p => {
-                const x = get(p.user_nom);
-                const deb = new Date(p.debut_service), fin = p.fin_service ? new Date(p.fin_service) : null;
-                const debMin = deb.getHours() * 60 + deb.getMinutes();
-                x.pointe = (x.pointe || 0) + (p.duree_travail_minutes || 0);
-                x.debutPt = x.debutPt === null ? debMin : Math.min(x.debutPt, debMin);
-                if (fin) {
-                    let finMin = fin.getHours() * 60 + fin.getMinutes();
-                    if (dstr(fin) !== d.ds) finMin += 24 * 60;
-                    x.finPt = Math.max(x.finPt || 0, finMin);
-                    if (fin.getHours() === 23 && fin.getMinutes() === 59) x.sansSortie = true; // cloture automatique de fin de journee
-                } else x.sansSortie = true;
+                const x = pers[p.collaborateur_nom_combo] = pers[p.collaborateur_nom_combo] || { nom: p.collaborateur_nom_combo, shifts: [], prevu: 0, retenu: 0, alertes: [] };
+                x.shifts.push(p);
+                x.prevu += Math.max(0, (minEntre(p.debut_planifie, p.fin_planifiee) || 0) - (p.pauses_planifiees_minutes || 0));
+                x.retenu += p.duree_travail_minutes || 0;
             });
             const liste = Object.values(pers);
-            let totPlan = 0, totPt = 0;
+            let totPrevu = 0, totRetenu = 0;
             liste.forEach(x => {
-                if (x.plan !== null) totPlan += x.plan;
-                if (x.pointe !== null) totPt += x.pointe;
-                x.alertes = [];
-                if (x.plan !== null && x.pointe === null) x.alertes.push(['red', 'non pointé']);
-                if (x.plan === null && x.pointe !== null) x.alertes.push(['gray', 'hors planning']);
-                if (x.sansSortie) x.alertes.push(['red', 'sortie non pointée']);
-                if (x.plan !== null && x.pointe !== null) {
-                    const retard = x.debutPt - x.debutPlan;
+                totPrevu += x.prevu; totRetenu += x.retenu;
+                x.shifts.forEach(p => {
+                    if (!p.debut_pointe) { x.alertes.push(['red', 'non badgé']); return; }
+                    if (!p.fin_pointee) x.alertes.push(['red', 'sortie non badgée']);
+                    const retard = minEntre(p.debut_planifie, p.debut_pointe);
                     if (retard >= 10) x.alertes.push(['orange', 'retard ' + retard + ' min']);
-                    x.ecart = x.pointe - x.plan;
-                    if (!x.sansSortie && Math.abs(x.ecart) >= 30) x.alertes.push([x.ecart > 0 ? 'orange' : 'red', fmtEcart(x.ecart)]);
-                }
+                    if (p.pauses_planifiees_minutes >= 20 && (p.pauses_pointees_minutes || 0) < p.pauses_planifiees_minutes - 10)
+                        x.alertes.push(['gray', 'pause ' + (p.pauses_pointees_minutes || 0) + '/' + p.pauses_planifiees_minutes + ' min']);
+                });
+                const toutBadge = x.shifts.every(p => p.debut_pointe && p.fin_pointee);
+                x.ecart = x.retenu - x.prevu;
+                if (toutBadge && Math.abs(x.ecart) >= 30) x.alertes.push([x.ecart > 0 ? 'orange' : 'red', fmtEcart(x.ecart)]);
             });
-            liste.sort((a, b) => b.alertes.length - a.alertes.length || (a.debutPlan ?? a.debutPt ?? 0) - (b.debutPlan ?? b.debutPt ?? 0));
+            liste.sort((a, b) => b.alertes.length - a.alertes.length || new Date(a.shifts[0].debut_planifie) - new Date(b.shifts[0].debut_planifie));
             const nbAlertes = liste.filter(x => x.alertes.length).length;
-            html += `<div class="row"><span class="grow">Prévu <b>${fmtMin(totPlan)}</b> · pointé <b>${fmtMin(totPt)}</b></span>${totPlan ? `<span class="badge ${Math.abs(totPt - totPlan) < 60 ? 'green' : 'orange'}">${fmtEcart(totPt - totPlan)}</span>` : ''}${nbAlertes ? `<span class="badge red">${nbAlertes} à voir</span>` : '<span class="badge green">conforme</span>'}</div>`;
-            const ligne = x => `<div class="row"><span class="grow">${esc(x.nom)}<div class="small">prévu ${x.plan !== null ? hm(x.debutPlan) + '–' + hm(x.finPlan) + ' (' + fmtMin(x.plan) + ')' : '—'} · pointé ${x.pointe !== null ? hm(x.debutPt) + '–' + (x.finPt !== null && !x.sansSortie ? hm(x.finPt) : '?') + ' (' + fmtMin(x.pointe) + ')' : '—'}</div></span>${x.alertes.map(a => `<span class="badge ${a[0]}">${esc(a[1])}</span>`).join('')}</div>`;
+            html += `<div class="row"><span class="grow">Prévu <b>${fmtMin(totPrevu)}</b> · retenu <b>${fmtMin(totRetenu)}</b></span><span class="badge ${Math.abs(totRetenu - totPrevu) < 60 ? 'green' : 'orange'}">${fmtEcart(totRetenu - totPrevu)}</span>${nbAlertes ? `<span class="badge red">${nbAlertes} à voir</span>` : '<span class="badge green">conforme</span>'}</div>`;
+            const ligne = x => {
+                const det = x.shifts.map(p => `prévu ${hhmm(p.debut_planifie)}–${hhmm(p.fin_planifiee)} · badgé ${p.debut_pointe ? hhmm(p.debut_pointe) + '–' + (p.fin_pointee ? hhmm(p.fin_pointee) : '?') : '—'}`).join('<br>');
+                return `<div class="row"><span class="grow">${esc(x.nom)} <span class="small">${fmtMin(x.retenu)} retenues</span><div class="small">${det}</div></span>${x.alertes.map(a => `<span class="badge ${a[0]}">${esc(a[1])}</span>`).join('')}</div>`;
+            };
             liste.filter(x => x.alertes.length).forEach(x => { html += ligne(x); });
             const ok = liste.filter(x => !x.alertes.length);
             if (ok.length) html += `<details class="fold"><summary>${ok.length} conforme${ok.length > 1 ? 's' : ''}</summary>${ok.map(ligne).join('')}</details>`;
