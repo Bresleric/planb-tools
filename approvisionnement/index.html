@@ -2460,15 +2460,24 @@
         async function updateOrderStatus(id, newStatus) {
             try {
                 if (!isDemo) {
-                    await supabase.from('appro_commandes').update({ statut: newStatus }).eq('id', id);
-                } else {
-                    const cmd = commandes.find(c => c.id === id);
-                    if (cmd) cmd.statut = newStatus;
+                    const updates = { statut: newStatus };
+                    if (newStatus === 'validee') {
+                        updates.date_validation = new Date().toISOString();
+                        updates.validee_par_id = currentUser.id;
+                        updates.validee_par_nom = currentUser.nom;
+                    }
+                    const { error } = await supabase.from('appro_commandes').update(updates).eq('id', id);
+                    if (error) throw error;
                 }
+                // Mettre a jour la copie locale AUSSI hors demo (sinon l ecran
+                // continue d afficher l ancien statut - bug constate par Eric)
+                const cmd = commandes.find(c => c.id === id);
+                if (cmd) cmd.statut = newStatus;
                 renderCommandes();
                 showToast('Statut mis à jour', 'success');
             } catch (e) {
-                showToast('Erreur', 'error');
+                console.error('updateOrderStatus', e);
+                showToast('Erreur de mise à jour : ' + (e.message || 'échec'), 'error');
             }
         }
 
