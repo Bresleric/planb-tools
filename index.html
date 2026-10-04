@@ -1319,21 +1319,23 @@
                     .eq('etablissement', currentEstablishment)
                     .eq('archive', false)
                     .or(`created_at.gte.${depuis},epingle.eq.true`);
-                // Meme regle de visibilite que le module : un message cible ne compte
-                // que pour ses destinataires, son auteur et l admin ; les reponses
-                // suivent leur question
+                // La pastille compte le courrier PERSONNEL a lire :
+                // - jamais ses propres messages (on ne lit pas son propre mot)
+                // - messages a toute l equipe, messages qui me sont adresses,
+                //   et reponses dans les fils que j ai ouverts
+                // (la visibilite elargie de l admin dans le module ne gonfle pas sa pastille)
                 const tous = liaisonMsgs || [];
                 const parentById = {};
                 tous.filter(m => !m.reponse_a).forEach(m => { parentById[m.id] = m; });
-                const visiblePourMoi = (m) => {
+                const aLirePourMoi = (m) => {
+                    if (m.auteur_id === currentUser.id) return false;
                     const p = m.reponse_a ? parentById[m.reponse_a] : m;
                     if (!p) return false;
-                    if (currentUser.role === 'admin') return true;
                     const dests = Array.isArray(p.destinataires) ? p.destinataires : [];
                     if (dests.length === 0) return true;
-                    return p.auteur_id === currentUser.id || dests.some(d => d.id === currentUser.id);
+                    return dests.some(d => d.id === currentUser.id) || p.auteur_id === currentUser.id;
                 };
-                const msgIds = tous.filter(visiblePourMoi).map(m => m.id);
+                const msgIds = tous.filter(aLirePourMoi).map(m => m.id);
                 let nonLus = 0;
                 if (msgIds.length > 0) {
                     const { data: mesLectures } = await supabaseClient
