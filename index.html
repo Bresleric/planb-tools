@@ -1110,9 +1110,17 @@
             modalOverlay.classList.remove('active');
         }
 
+        // Modules de communication universels : visibles de TOUS les collaborateurs
+        // actifs, meme quand une liste acces_modules personnalisee existe (ces listes
+        // datent d avant leur creation et ne doivent pas les masquer).
+        const MODULES_UNIVERSELS = ['liaison', 'notes-service'];
+
         function canAccessModule(moduleId, minRole) {
             // Admin a toujours accès à tout (peu importe acces_modules)
             if (currentUser.role === 'admin') return true;
+
+            // Communication interne : jamais filtree par les listes personnalisees
+            if (MODULES_UNIVERSELS.includes(moduleId)) return true;
 
             // Si acces_modules est explicitement défini → cette liste est la règle qui prime.
             // L'admin peut donc accorder ponctuellement un module sensible à un user de niveau inférieur
