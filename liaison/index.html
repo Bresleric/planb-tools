@@ -178,6 +178,16 @@
             }
             messages = msgRes.data || [];
             equipe = eqRes.data || [];
+            // Charger aussi les reponses des messages affiches (meme anciennes)
+            try {
+                const parentIds = messages.filter(m => !m.reponse_a).map(m => m.id);
+                if (parentIds.length > 0) {
+                    const { data: reps } = await sb.from('liaison_messages').select('*')
+                        .in('reponse_a', parentIds).eq('archive', false);
+                    const connus = new Set(messages.map(m => m.id));
+                    (reps || []).forEach(r => { if (!connus.has(r.id)) messages.push(r); });
+                }
+            } catch (e) { console.warn('Reponses non chargees:', e); }
             lectures = [];
             const ids = messages.map(m => m.id);
             if (ids.length > 0) {
@@ -251,23 +261,27 @@
                 feed.innerHTML = '<div class="empty">Aucun message. Le cahier est vierge — à vous d écrire la première page. 📒</div>';
                 return;
             }
-            const epingles = messages.filter(m => m.epingle);
-            const autres = messages.filter(m => !m.epingle);
+            const parents = messages.filter(m => !m.reponse_a);
+            const reponsesDe = (id) => messages
+                .filter(m => m.reponse_a === id)
+                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            const epingles = parents.filter(m => m.epingle);
+            const autres = parents.filter(m => !m.epingle);
             let html = '';
             if (epingles.length > 0) {
                 html += '<div class="day-sep">📌 Épinglés</div>';
-                epingles.forEach(m => { html += renderMsg(m); });
+                epingles.forEach(m => { html += renderMsg(m, reponsesDe(m.id)); });
             }
             let lastDay = '';
             autres.forEach(m => {
                 const lbl = dayLabel(m.created_at);
                 if (lbl !== lastDay) { html += `<div class="day-sep">${lbl}</div>`; lastDay = lbl; }
-                html += renderMsg(m);
+                html += renderMsg(m, reponsesDe(m.id));
             });
             feed.innerHTML = html;
         }
 
-        function renderMsg(m) {
+        function renderMsg(m, reponses, estReponse) {
             const heure = new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
             const lus = lecturesDe(m.id);
             const dests = Array.isArray(m.destinataires) ? m.destinataires : [];
@@ -281,16 +295,61 @@
                 ? `👁 Lu par ${lus.map(l => esc(l.user_initiales || l.user_nom)).join(', ')}`
                 : '<span style="color:var(--gray-300)">Pas encore lu</span>';
             let actions = `<button class="btn-small btn-lu" onclick="marquerLu('${m.id}')">✓ Lu</button>`;
+            if (!estReponse) {
+                actions += ` <button class="btn-small" onclick="toggleReponse('${m.id}')" title="Répondre">↩ Répondre</button>`;
+            }
             if (isManager) {
-                actions += ` <button class="btn-small" onclick="togglePin('${m.id}', ${m.epingle})" title="Épingler">${m.epingle ? '📌✕' : '📌'}</button>`;
+                if (!estReponse) actions += ` <button class="btn-small" onclick="togglePin('${m.id}', ${m.epingle})" title="Épingler">${m.epingle ? '📌✕' : '📌'}</button>`;
                 actions += ` <button class="btn-small" onclick="archiverMsg('${m.id}')" title="Archiver">🗄</button>`;
             }
-            return `<div class="msg${m.epingle ? ' epingle' : ''}">
-                <div class="msg-head"><span class="msg-auteur">${esc(m.auteur_nom || '?')}</span><span class="msg-heure">${heure}</span></div>
+
+            // Reponses indentees sous le message + zone de reponse repliable
+            let repHtml = '';
+            if (!estReponse) {
+                repHtml += (reponses || []).map(r => renderMsg(r, [], true)).join('');
+                repHtml += `<div id="repbox-${m.id}" style="display:none; margin:8px 0 2px 18px;">
+                    <textarea id="reptxt-${m.id}" placeholder="Ta réponse..." style="width:100%; min-height:44px; padding:8px; font-size:13px; border:1px solid var(--gray-200); border-radius:8px; background:var(--gray-50); resize:vertical; font-family:inherit;"></textarea>
+                    <button class="btn-small btn-lu" style="margin-top:4px;" onclick="envoyerReponse('${m.id}')">↩ Répondre (signé par PIN)</button>
+                </div>`;
+            }
+
+            return `<div class="msg${m.epingle && !estReponse ? ' epingle' : ''}"${estReponse ? ' style="margin:8px 0 2px 18px; background:var(--gray-50); box-shadow:none; border-left:3px solid var(--orange);"' : ''}>
+                <div class="msg-head">${estReponse ? '<span style="color:var(--gray-400); font-size:12px;">↩</span>' : ''}<span class="msg-auteur">${esc(m.auteur_nom || '?')}</span><span class="msg-heure">${heure}</span></div>
                 <div class="msg-texte">${esc(m.texte)}</div>
                 ${destHtml}
                 <div class="msg-footer"><span class="lu-info">${luInfo}</span><span class="msg-actions">${actions}</span></div>
+                ${repHtml}
             </div>`;
+        }
+
+        function toggleReponse(parentId) {
+            const box = document.getElementById(`repbox-${parentId}`);
+            if (!box) return;
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+            if (box.style.display === 'block') document.getElementById(`reptxt-${parentId}`)?.focus();
+        }
+
+        function envoyerReponse(parentId) {
+            const texte = (document.getElementById(`reptxt-${parentId}`)?.value || '').trim();
+            if (!texte) { showToast('Écris ta réponse d abord', 'error'); return; }
+            const parent = messages.find(m => m.id === parentId);
+            askPIN('↩ Signer la réponse', async (u) => {
+                try {
+                    // La reponse est automatiquement a l attention de l auteur de la question
+                    const dests = (parent && parent.auteur_id && parent.auteur_id !== u.id)
+                        ? [{ id: parent.auteur_id, nom: parent.auteur_nom || '' }] : [];
+                    const { error } = await sb.from('liaison_messages').insert({
+                        etablissement: currentEstablishment,
+                        texte,
+                        auteur_id: u.id, auteur_nom: u.nom, auteur_initiales: u.initiales,
+                        destinataires: dests,
+                        reponse_a: parentId,
+                    });
+                    if (error) throw error;
+                    showToast(`Réponse publiée — signée ${u.nom.split(' ')[0]} ✓`, 'success');
+                    await loadData();
+                } catch (e) { console.error(e); showToast('Erreur de publication', 'error'); }
+            });
         }
 
         function marquerLu(msgId) {

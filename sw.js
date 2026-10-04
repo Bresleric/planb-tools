@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v64';   // bump a chaque mise a jour du SW (v64 : portail - pastille des messages non lus sur la tuile cahier de liaison 04/10/2026)
+const CACHE_NAME = 'planb-tools-v65';   // bump a chaque mise a jour du SW (v65 : cahier de liaison - reponses en fil de discussion 04/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
