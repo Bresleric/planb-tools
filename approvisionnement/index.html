@@ -2069,7 +2069,7 @@
 
                 // Besoin saisi en texte libre (sans article du catalogue) : il serait
                 // ignore a la generation de commande -> badge + bouton de rattachement
-                const horsCatalogue = !b.article_id;
+                const horsCatalogue = !b.article_id && !b.ingredient_id;
                 const nomCell = horsCatalogue
                     ? `${nom} <span class="badge-wait" title="Saisi en texte libre : aucun fournisseur/prix possible" style="font-size:10px;">hors catalogue</span>${isManager ? ` <button class="btn-small" title="Rattacher a un article du catalogue" onclick="openRattacherModal('${b.id}')">🔗</button>` : ''}`
                     : nom;
@@ -2174,10 +2174,13 @@
         // 58 besoins sur 59 etaient saisis en texte libre (sans article_id) :
         // invisibles pour la generation de commande. Ce modal permet aux valideurs
         // de les raccorder a un article du catalogue (prerequis fournisseur/prix).
+        // Rattachement au niveau INGREDIENT (decision Eric 05/10) : le catalogue
+        // n est que la declinaison fournisseur ; lie a l ingredient, le besoin
+        // voit les tarifs de TOUTES les variantes.
         function rattacherSuggestions(texte) {
             const mots = (texte || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 2);
-            return articles
-                .filter(a => a.actif !== false && (!a.etablissement || a.etablissement === currentEstablishment))
+            return ingredients
+                .filter(i => i.actif !== false)
                 .map(a => {
                     const nomNorm = (a.nom || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
                     let score = 0;
@@ -2196,7 +2199,7 @@
             ov.className = 'modal-overlay show';
             ov.id = 'modal-rattacher-besoin';
             ov.innerHTML = `<div class="modal" style="max-width:480px;">
-                <div class="modal-header"><div class="modal-title">🔗 Rattacher « ${escapeHtml(b.article_nom || '')} »</div>
+                <div class="modal-header"><div class="modal-title">🔗 Rattacher « ${escapeHtml(b.article_nom || b.ingredient_nom || '')} » à un ingrédient</div>
                 <button class="modal-close" onclick="document.getElementById('modal-rattacher-besoin').remove()">✕</button></div>
                 <div class="modal-body">
                     <input type="text" class="form-input" id="rattacher-search" placeholder="Chercher dans le catalogue..." oninput="renderRattacherList('${besoinId}')">
@@ -2221,18 +2224,19 @@
                 </div>`).join('') || '<div class="muted" style="padding:12px;">Aucun article</div>';
         }
 
-        async function rattacherBesoin(besoinId, articleId) {
+        async function rattacherBesoin(besoinId, ingredientId) {
             const b = besoins.find(x => x.id === besoinId);
-            const art = articles.find(a => a.id === articleId);
-            if (!b || !art) return;
+            const ing = ingredients.find(i => i.id === ingredientId);
+            if (!b || !ing) return;
             try {
-                const saisieOrigine = b.article_nom && b.article_nom.trim().toLowerCase() !== art.nom.trim().toLowerCase()
-                    ? (b.observation ? b.observation + ' ' : '') + `(saisi : ${b.article_nom})`
+                const saisie = b.article_nom || b.ingredient_nom || '';
+                const saisieOrigine = saisie && saisie.trim().toLowerCase() !== ing.nom.trim().toLowerCase()
+                    ? (b.observation ? b.observation + ' ' : '') + `(saisi : ${saisie})`
                     : b.observation;
                 const updates = {
-                    article_id: art.id,
-                    article_nom: art.nom,
-                    ingredient_id: art.ingredient_id || null,
+                    ingredient_id: ing.id,
+                    ingredient_nom: ing.nom,
+                    article_id: null,
                     observation: saisieOrigine || b.observation || null,
                 };
                 if (!isDemo) {
@@ -2241,7 +2245,7 @@
                 }
                 Object.assign(b, updates);
                 document.getElementById('modal-rattacher-besoin')?.remove();
-                showToast(`Rattaché à « ${art.nom} » ✓`, 'success');
+                showToast(`Rattaché à l'ingrédient « ${ing.nom} » ✓`, 'success');
                 renderBesoins();
             } catch (e) {
                 console.error(e);
