@@ -2360,15 +2360,49 @@
             }
             empty.classList.add('hidden');
             let html = '';
+            // Barre de tri (demande Eric 05/10) : par date ou par fournisseur
+            const triBtn = (mode, label) => `<button class="btn-small" onclick="setCommandesTri('${mode}')" style="${commandesTri === mode ? 'background:#fff7ed; border-color:#f97316; color:#c2410c; font-weight:700;' : ''}">${label}</button>`;
+            html += `<div style="display:flex; gap:8px; align-items:center; margin:4px 0 10px;">
+                <span style="font-size:12px; color:#6b7280; font-weight:600;">Trier :</span>
+                ${triBtn('date', '📅 Date')}
+                ${triBtn('fournisseur', '🚚 Fournisseur')}
+            </div>`;
             if (actives.length) {
                 html += `<div class="cmd-section-title">📦 En cours (${actives.length})</div>`;
-                html += actives.map(renderOrderCard).join('');
+                html += renderCommandesGroupe(actives);
             }
             if (histo.length) {
                 html += `<div class="cmd-section-title cmd-histo">🗂 Historique — reçues / annulées (${histo.length})</div>`;
-                html += histo.map(renderOrderCard).join('');
+                html += renderCommandesGroupe(histo);
             }
             container.innerHTML = html;
+        }
+
+        // Tri + regroupement visuel des commandes (en-tetes de groupe par jour ou par fournisseur)
+        let commandesTri = 'date';
+        function setCommandesTri(mode) { commandesTri = mode; renderCommandes(); }
+
+        function renderCommandesGroupe(list) {
+            const nomF = (c) => c.appro_fournisseurs?.nom || c.fournisseur_nom || 'Fournisseur';
+            const sorted = [...list].sort((a, b) => {
+                if (commandesTri === 'fournisseur') {
+                    const n = nomF(a).localeCompare(nomF(b), 'fr');
+                    if (n !== 0) return n;
+                }
+                return new Date(b.date_creation || 0) - new Date(a.date_creation || 0);
+            });
+            let html = '', lastKey = null;
+            sorted.forEach(c => {
+                const key = commandesTri === 'fournisseur'
+                    ? nomF(c)
+                    : (c.date_creation ? new Date(c.date_creation).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Sans date');
+                if (key !== lastKey) {
+                    html += `<div style="font-size:11px; font-weight:800; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 6px;">${commandesTri === 'fournisseur' ? '🚚' : '📅'} ${escapeHtml(key)}</div>`;
+                    lastKey = key;
+                }
+                html += renderOrderCard(c);
+            });
+            return html;
         }
 
         const CMD_STATUT_LABEL = { brouillon: 'Brouillon', validee: 'Validée', envoyee: 'Envoyée', recue: 'Reçue', annulee: 'Annulée' };
