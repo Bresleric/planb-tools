@@ -1306,11 +1306,25 @@
                 const depuis = new Date(Date.now() - 14 * 86400000).toISOString();
                 const { data: liaisonMsgs } = await supabaseClient
                     .from('liaison_messages')
-                    .select('id')
+                    .select('id, destinataires, auteur_id, reponse_a')
                     .eq('etablissement', currentEstablishment)
                     .eq('archive', false)
                     .or(`created_at.gte.${depuis},epingle.eq.true`);
-                const msgIds = (liaisonMsgs || []).map(m => m.id);
+                // Meme regle de visibilite que le module : un message cible ne compte
+                // que pour ses destinataires, son auteur et l admin ; les reponses
+                // suivent leur question
+                const tous = liaisonMsgs || [];
+                const parentById = {};
+                tous.filter(m => !m.reponse_a).forEach(m => { parentById[m.id] = m; });
+                const visiblePourMoi = (m) => {
+                    const p = m.reponse_a ? parentById[m.reponse_a] : m;
+                    if (!p) return false;
+                    if (currentUser.role === 'admin') return true;
+                    const dests = Array.isArray(p.destinataires) ? p.destinataires : [];
+                    if (dests.length === 0) return true;
+                    return p.auteur_id === currentUser.id || dests.some(d => d.id === currentUser.id);
+                };
+                const msgIds = tous.filter(visiblePourMoi).map(m => m.id);
                 let nonLus = 0;
                 if (msgIds.length > 0) {
                     const { data: mesLectures } = await supabaseClient

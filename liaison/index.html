@@ -245,6 +245,16 @@
         // ============ FEED ============
         function lecturesDe(msgId) { return lectures.filter(l => l.message_id === msgId); }
 
+        // Visibilite (demande Eric 04/10) : un message cible n est visible que de
+        // ses destinataires, de son auteur et de l admin ; un message a toute
+        // l equipe est visible de tous. Les reponses suivent leur question.
+        function threadVisible(parent) {
+            if (currentUser.role === 'admin') return true;
+            const dests = Array.isArray(parent.destinataires) ? parent.destinataires : [];
+            if (dests.length === 0) return true;
+            return parent.auteur_id === currentUser.id || dests.some(d => d.id === currentUser.id);
+        }
+
         function dayLabel(ts) {
             const d = new Date(ts);
             const today = new Date(); today.setHours(0,0,0,0);
@@ -257,11 +267,11 @@
 
         function renderFeed() {
             const feed = document.getElementById('feed');
-            if (messages.length === 0) {
-                feed.innerHTML = '<div class="empty">Aucun message. Le cahier est vierge — à vous d écrire la première page. 📒</div>';
+            if (messages.filter(m => !m.reponse_a && threadVisible(m)).length === 0) {
+                feed.innerHTML = '<div class="empty">Aucun message pour toi. 📒</div>';
                 return;
             }
-            const parents = messages.filter(m => !m.reponse_a);
+            const parents = messages.filter(m => !m.reponse_a && threadVisible(m));
             const reponsesDe = (id) => messages
                 .filter(m => m.reponse_a === id)
                 .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
