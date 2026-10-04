@@ -1877,14 +1877,24 @@
         async function updateBesoinPrix(id, prixId) {
             const b = besoins.find(x => x.id === id);
             if (!b) return;
-            const val = prixId || null;
             try {
+                let val = prixId || null;
+                // Option Magasin : creer a la volee la ligne tarif (prix 0) si besoin
+                if (prixId === '__magasin__') {
+                    const magasin = fournisseurs.find(f => (f.nom || '').toLowerCase() === 'magasin');
+                    if (!magasin || !b.ingredient_id) { showToast('Option Magasin indisponible pour ce besoin', 'error'); return; }
+                    await doLinkItemFournisseur(b.ingredient_id, magasin.id, 0, null);
+                    const opt = besoinPrixOptions(b).find(o => o.fournisseur_id === magasin.id);
+                    if (!opt) { showToast('Erreur creation ligne Magasin', 'error'); return; }
+                    val = opt.id;
+                }
                 if (!isDemo) {
                     const { error } = await supabase.from('appro_besoins').update({ prix_id: val }).eq('id', id);
                     if (error) throw error;
                 }
                 b.prix_id = val;
-            } catch (e) { showToast('Erreur fournisseur', 'error'); }
+                if (prixId === '__magasin__') { showToast('🛒 Mis sur la liste de courses Magasin', 'success'); renderBesoins(); }
+            } catch (e) { console.error(e); showToast('Erreur fournisseur', 'error'); }
         }
 
         function stepQty(id, delta, btn) {
@@ -2044,10 +2054,15 @@
                     const dedup = Object.values(parFournisseur).map(lignes => ({ meilleure: lignes[0], nb: lignes.length }));
                     const chosenLine = b.prix_id ? fOpts.find(o => o.id === b.prix_id) : null;
                     if (isManager) {
-                        const optHtml = dedup.map(({ meilleure: o, nb }) => {
+                        let optHtml = dedup.map(({ meilleure: o, nb }) => {
                             const sel = chosenLine && chosenLine.fournisseur_id === o.fournisseur_id;
                             return `<option value="${o.id}" ${sel ? 'selected' : ''}>${escapeHtml(o.fournisseur_nom)} · ${nb > 1 ? 'dès ' : ''}${Number(o.pu_ht).toFixed(2)}€</option>`;
                         }).join('');
+                        // Option Magasin (course directe) toujours proposee si pas deja listee
+                        const magasin = fournisseurs.find(f => (f.nom || '').toLowerCase() === 'magasin');
+                        if (magasin && b.ingredient_id && !dedup.some(d => d.meilleure.fournisseur_id === magasin.id)) {
+                            optHtml += `<option value="__magasin__">🛒 Magasin (course)</option>`;
+                        }
                         fournCell = `<select class="qty-roulette" onchange="updateBesoinPrix('${b.id}', this.value)" style="max-width:170px;"><option value="">— moins cher —</option>${optHtml}</select>`;
                     } else {
                         fournCell = chosenLine ? escapeHtml(chosenLine.fournisseur_nom) : `<span class="muted">${dedup.length} possible${dedup.length > 1 ? 's' : ''}</span>`;
