@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v74';   // bump a chaque mise a jour du SW (v74 : appro - fournisseur Magasin pour les courses directes 05/10/2026)
+const CACHE_NAME = 'planb-tools-v75';   // bump a chaque mise a jour du SW (v75 : appro - Metro cree, Promocash ouvert aux deux etablissements, option course generalisee 05/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

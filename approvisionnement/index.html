@@ -1879,13 +1879,15 @@
             if (!b) return;
             try {
                 let val = prixId || null;
-                // Option Magasin : creer a la volee la ligne tarif (prix 0) si besoin
-                if (prixId === '__magasin__') {
-                    const magasin = fournisseurs.find(f => (f.nom || '').toLowerCase() === 'magasin');
-                    if (!magasin || !b.ingredient_id) { showToast('Option Magasin indisponible pour ce besoin', 'error'); return; }
-                    await doLinkItemFournisseur(b.ingredient_id, magasin.id, 0, null);
-                    const opt = besoinPrixOptions(b).find(o => o.fournisseur_id === magasin.id);
-                    if (!opt) { showToast('Erreur creation ligne Magasin', 'error'); return; }
+                // Fournisseur course directe : creer a la volee la ligne tarif (prix 0)
+                const estCourse = typeof prixId === 'string' && prixId.startsWith('__direct__');
+                if (estCourse) {
+                    const fId = prixId.slice('__direct__'.length);
+                    const fDirect = fournisseurs.find(f => f.id === fId);
+                    if (!fDirect || !b.ingredient_id) { showToast('Option indisponible pour ce besoin', 'error'); return; }
+                    await doLinkItemFournisseur(b.ingredient_id, fDirect.id, 0, null);
+                    const opt = besoinPrixOptions(b).find(o => o.fournisseur_id === fDirect.id);
+                    if (!opt) { showToast('Erreur creation ligne ' + fDirect.nom, 'error'); return; }
                     val = opt.id;
                 }
                 if (!isDemo) {
@@ -1893,7 +1895,11 @@
                     if (error) throw error;
                 }
                 b.prix_id = val;
-                if (prixId === '__magasin__') { showToast('🛒 Mis sur la liste de courses Magasin', 'success'); renderBesoins(); }
+                if (estCourse) {
+                    const fDirect = fournisseurs.find(f => f.id === prixId.slice('__direct__'.length));
+                    showToast(`🛒 Mis sur la liste de courses ${fDirect ? fDirect.nom : ''}`, 'success');
+                    renderBesoins();
+                }
             } catch (e) { console.error(e); showToast('Erreur fournisseur', 'error'); }
         }
 
@@ -2058,10 +2064,15 @@
                             const sel = chosenLine && chosenLine.fournisseur_id === o.fournisseur_id;
                             return `<option value="${o.id}" ${sel ? 'selected' : ''}>${escapeHtml(o.fournisseur_nom)} · ${nb > 1 ? 'dès ' : ''}${Number(o.pu_ht).toFixed(2)}€</option>`;
                         }).join('');
-                        // Option Magasin (course directe) toujours proposee si pas deja listee
-                        const magasin = fournisseurs.find(f => (f.nom || '').toLowerCase() === 'magasin');
-                        if (magasin && b.ingredient_id && !dedup.some(d => d.meilleure.fournisseur_id === magasin.id)) {
-                            optHtml += `<option value="__magasin__">🛒 Magasin (course)</option>`;
+                        // Fournisseurs de type course directe (mode_commande = direct :
+                        // Magasin, Metro...) : toujours proposes, meme sans ligne tarif
+                        if (b.ingredient_id) {
+                            fournisseurs.filter(f => f.mode_commande === 'direct' && f.actif !== false)
+                                .forEach(f => {
+                                    if (!dedup.some(d => d.meilleure.fournisseur_id === f.id)) {
+                                        optHtml += `<option value="__direct__${f.id}">🛒 ${escapeHtml(f.nom)} (course)</option>`;
+                                    }
+                                });
                         }
                         fournCell = `<select class="qty-roulette" onchange="updateBesoinPrix('${b.id}', this.value)" style="max-width:170px;"><option value="">— moins cher —</option>${optHtml}</select>`;
                     } else {
