@@ -160,7 +160,8 @@
             const dsMois = dstr(debutMois);
             const dsVeilleCaisse = dstr(addDays(J, -1) < debutMois ? addDays(J, -1) : debutMois); // pour le fond de caisse de J
             const n1Debut = dstr(addDays(debutMois, -364)), n1Fin = dstr(addDays(J, -364)); // meme jour de semaine, annee precedente
-            const isoJ = J.toISOString(), isoJ1 = J1.toISOString();
+            const isoJ = J.toISOString(), isoJ1 = J1.toISOString(), isoJ2 = J2.toISOString();
+            const isoLiaison = addDays(J, -6).toISOString(); // cahier de liaison : 7 derniers jours + aujourd'hui
             const demainReel = dstr(addDays(new Date(), 1));
 
             const q = await Promise.all([
@@ -171,18 +172,32 @@
                 sb.from('temp_releves').select('frigo_id, frigo_nom, temperature, hors_norme, statut, user_nom, created_at').eq('etablissement', etab).eq('date', ds).order('created_at'),
                 sb.from('temp_frigos').select('id, nom').eq('etablissement', etab).eq('actif', true),
                 sb.from('checklist_validations').select('statut').eq('etablissement', etab).eq('periode', ds),
-                sb.from('productions').select('nom_produit, quantite_produite, unite, producteur_initiales, statut, date_production').eq('etablissement', etab).gte('date_production', isoJ).lt('date_production', isoJ1).order('date_production'),
+                sb.from('productions').select('nom_produit, quantite_produite, unite, producteur_initiales, statut, date_production').eq('etablissement', etab).gte('date_production', isoJ).lt('date_production', isoJ2).order('date_production'),
                 sb.from('scan_sessions').select('fournisseur_nom, statut, nb_etiquettes, rapprochement_anomalies_count, created_by_nom, validee_par_nom, created_at').eq('etablissement', etab).eq('date_reception', ds).order('created_at'),
                 sb.from('cartons_jvr').select('type, salarie_nom, description, auteur_nom, date_evenement').eq('etablissement', etab).gte('created_at', isoJ).lt('created_at', isoJ1).order('created_at'),
                 sb.from('stock_par_lot').select('produit, article_nom, dlc, quantite_restante, article_unite').eq('etablissement', etab).gt('quantite_restante', 0).not('dlc', 'is', null).lte('dlc', demainReel).order('dlc').limit(8),
                 sb.from('appro_besoins').select('article_nom, ingredient_nom, quantite, unite, urgence, demandeur_initiales, demandeur_nom, date_demande').eq('etablissement', etab).eq('statut', 'demande').order('urgence', { ascending: false }).order('date_demande'),
                 sb.from('briefing_incidents').select('description, priorite').eq('etablissement', etab).in('statut', ['ouvert', 'en_cours']).order('created_at', { ascending: false }),
-                sb.from('planning_equipes').select('employe_nom, service').eq('etablissement', etab).eq('date', ds1),
+                sb.from('planning_equipes').select('date, employe_nom, service, heure_debut, heure_fin, notes').eq('etablissement', etab).in('date', [ds, ds1]),
+                sb.from('pointage_periodes_travail').select('user_id, user_nom, debut_service, fin_service, duree_travail_minutes').eq('etablissement', etab).eq('date_service', ds).order('debut_service'),
+                sb.from('liaison_messages').select('id, titre, texte, auteur_id, auteur_nom, destinataires, created_at').eq('etablissement', etab).eq('archive', false).is('reponse_a', null).gte('created_at', isoLiaison).lt('created_at', isoJ2).order('created_at', { ascending: false }),
+                sb.from('users').select('id, nom').eq('etablissement', etab).eq('actif', true),
             ]);
             const err = q.find(r => r.error);
             if (err) throw err.error;
-            const [caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, receptions, cartons, dlc, besoins, incidents, planning] = q.map(r => r.data || []);
-            return { etab, J, ds, ds1, ds2, caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, receptions, cartons, dlc, besoins, incidents, planning };
+            const [caisse, ventesN1, previsions, tasks, temps, frigos, checks, productionsAll, receptions, cartons, dlc, besoins, incidents, planningAll, pointages, liaison, equipe] = q.map(r => r.data || []);
+            // Lectures du cahier de liaison (2e temps : il faut les id des messages)
+            let liaisonLectures = [];
+            if (liaison.length) {
+                const { data, error } = await sb.from('liaison_lectures').select('message_id, user_id').in('message_id', liaison.map(m => m.id));
+                if (error) throw error;
+                liaisonLectures = data || [];
+            }
+            const productions = productionsAll.filter(p => new Date(p.date_production) < J1);
+            const productionsJ1 = productionsAll.filter(p => new Date(p.date_production) >= J1);
+            const planning = planningAll.filter(p => p.date === ds1);
+            const planningJ = planningAll.filter(p => p.date === ds);
+            return { etab, J, ds, ds1, ds2, caisse, ventesN1, previsions, tasks, temps, frigos, checks, productions, productionsJ1, receptions, cartons, dlc, besoins, incidents, planning, planningJ, pointages, liaison, liaisonLectures, equipe };
         }
 
         // ============ CALCULS ============
@@ -278,13 +293,13 @@
             return html;
         }
 
-        function renderProductions(d) {
-            let html = `<div class="sub-title">🍳 Productions</div>`;
-            if (d.productions.length === 0) return html + `<div class="empty">Aucune production enregistrée.</div>`;
-            const jetees = d.productions.filter(p => p.statut === 'jete').length;
-            html += `<div class="row"><span class="grow"><b>${d.productions.length}</b> production${d.productions.length > 1 ? 's' : ''}</span>${jetees ? `<span class="badge red">${jetees} jetée${jetees > 1 ? 's' : ''}</span>` : ''}</div>`;
-            html += `<details class="fold"><summary>Voir le détail</summary>`;
-            d.productions.forEach(p => {
+        function renderProductions(prods, titre, deplie) {
+            let html = `<div class="sub-title">${titre}</div>`;
+            if (prods.length === 0) return html + `<div class="empty">Aucune production enregistrée.</div>`;
+            const jetees = prods.filter(p => p.statut === 'jete').length;
+            html += `<div class="row"><span class="grow"><b>${prods.length}</b> production${prods.length > 1 ? 's' : ''}</span>${jetees ? `<span class="badge red">${jetees} jetée${jetees > 1 ? 's' : ''}</span>` : ''}</div>`;
+            html += `<details class="fold"${deplie ? ' open' : ''}><summary>Voir le détail</summary>`;
+            prods.forEach(p => {
                 const qte = p.quantite_produite ? n(p.quantite_produite).toLocaleString('fr-FR') + ' ' + esc(p.unite || '') : '';
                 html += `<div class="row"><span class="grow">${esc(p.nom_produit || 'Production')}${p.statut === 'jete' ? ' <span class="badge red">jetée</span>' : ''}</span><span class="meta">${qte} · ${esc(p.producteur_initiales || '')} ${hhmm(p.date_production)}</span></div>`;
             });
@@ -309,6 +324,89 @@
             d.cartons.forEach(c => {
                 html += `<div class="row"><span>${ICO[c.type] || '▫️'}</span><span class="grow"><b>${esc(c.salarie_nom)}</b>${c.description ? ' — ' + esc(c.description.slice(0, 90)) : ''}</span><span class="meta">par ${esc(prenom(c.auteur_nom))}</span></div>`;
             });
+            return html;
+        }
+
+        // ---- Cahier de liaison : % de lecture par message (memes cibles que le module liaison) ----
+        function renderLiaison(d) {
+            let html = `<div class="sub-title">📒 Cahier de liaison <span class="small">(7 derniers jours)</span></div>`;
+            if (d.liaison.length === 0) return html + `<div class="empty">Aucun message.</div>`;
+            const lignes = d.liaison.map(m => {
+                const dests = Array.isArray(m.destinataires) ? m.destinataires : [];
+                // Message a toute l'equipe = tous les actifs de l'etablissement, hors auteur
+                const cibles = (dests.length ? dests.map(x => x.id) : d.equipe.map(u => u.id)).filter(id => id !== m.auteur_id);
+                const lus = new Set(d.liaisonLectures.filter(l => l.message_id === m.id).map(l => l.user_id));
+                const nbLus = cibles.filter(id => lus.has(id)).length;
+                const nonLus = dests.length ? dests.filter(x => x.id !== m.auteur_id && !lus.has(x.id)).map(x => prenom(x.nom)) : [];
+                return { m, total: cibles.length, nbLus, pct: cibles.length ? Math.round(100 * nbLus / cibles.length) : 100, cible: dests.length ? dests.map(x => prenom(x.nom)).join(', ') : 'toute l’équipe', nonLus };
+            });
+            const complets = lignes.filter(l => l.pct === 100).length;
+            html += `<div class="row"><span class="grow">${lignes.length} message${lignes.length > 1 ? 's' : ''}</span><span class="badge ${complets === lignes.length ? 'green' : 'orange'}">${complets}/${lignes.length} lu${complets > 1 ? 's' : ''} par tous</span></div>`;
+            lignes.forEach(l => {
+                const resume = l.m.titre || (l.m.texte || '').slice(0, 50) + ((l.m.texte || '').length > 50 ? '…' : '');
+                const quand = new Date(l.m.created_at).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+                html += `<div class="row"><span class="grow">${esc(resume)}<div class="small">${esc(prenom(l.m.auteur_nom))} → ${esc(l.cible)} · ${quand}${l.nonLus.length ? ` · <span style="color:var(--red)">pas lu : ${esc(l.nonLus.join(', '))}</span>` : ''}</div></span><span class="badge ${l.pct === 100 ? 'green' : (l.pct >= 50 ? 'orange' : 'red')}">${l.pct} %</span><span class="meta">${l.nbLus}/${l.total}</span></div>`;
+            });
+            return html;
+        }
+
+        // ---- Planning (Combo) vs pointage (module Pointages) pour le jour J ----
+        // Rapprochement par nom (pas de lien en base) : minuscules, sans accents.
+        function normNom(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+        function minOfTime(t) { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; }
+        function fmtMin(m) { return m === null ? '—' : Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0'); }
+        function fmtEcart(m) { const a = Math.abs(m); return (m >= 0 ? '+' : '−') + (a >= 60 ? Math.floor(a / 60) + 'h' + String(a % 60).padStart(2, '0') : a + ' min'); }
+        function hm(min) { return String(Math.floor(min / 60) % 24).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+        function renderPlanningPointage(d) {
+            let html = `<div class="sub-title">⏱️ Planning vs pointage</div>`;
+            if (d.planningJ.length === 0 && d.pointages.length === 0) return html + `<div class="empty">Ni planning ni pointage pour ce jour.</div>`;
+            const pers = {};
+            const get = (nom) => { const k = normNom(nom); return pers[k] = pers[k] || { nom, plan: null, debutPlan: null, finPlan: null, pointe: null, debutPt: null, finPt: null, sansSortie: false }; };
+            d.planningJ.forEach(p => {
+                const x = get(p.employe_nom);
+                let deb = minOfTime(p.heure_debut), fin = minOfTime(p.heure_fin);
+                if (fin <= deb) fin += 24 * 60; // service qui finit apres minuit
+                const pause = parseInt(((p.notes || '').match(/pause\s*(\d+)/i) || [])[1] || '0', 10);
+                x.plan = (x.plan || 0) + (fin - deb) - pause;
+                x.debutPlan = x.debutPlan === null ? deb : Math.min(x.debutPlan, deb);
+                x.finPlan = x.finPlan === null ? fin : Math.max(x.finPlan, fin);
+            });
+            d.pointages.forEach(p => {
+                const x = get(p.user_nom);
+                const deb = new Date(p.debut_service), fin = p.fin_service ? new Date(p.fin_service) : null;
+                const debMin = deb.getHours() * 60 + deb.getMinutes();
+                x.pointe = (x.pointe || 0) + (p.duree_travail_minutes || 0);
+                x.debutPt = x.debutPt === null ? debMin : Math.min(x.debutPt, debMin);
+                if (fin) {
+                    let finMin = fin.getHours() * 60 + fin.getMinutes();
+                    if (dstr(fin) !== d.ds) finMin += 24 * 60;
+                    x.finPt = Math.max(x.finPt || 0, finMin);
+                    if (fin.getHours() === 23 && fin.getMinutes() === 59) x.sansSortie = true; // cloture automatique de fin de journee
+                } else x.sansSortie = true;
+            });
+            const liste = Object.values(pers);
+            let totPlan = 0, totPt = 0;
+            liste.forEach(x => {
+                if (x.plan !== null) totPlan += x.plan;
+                if (x.pointe !== null) totPt += x.pointe;
+                x.alertes = [];
+                if (x.plan !== null && x.pointe === null) x.alertes.push(['red', 'non pointé']);
+                if (x.plan === null && x.pointe !== null) x.alertes.push(['gray', 'hors planning']);
+                if (x.sansSortie) x.alertes.push(['red', 'sortie non pointée']);
+                if (x.plan !== null && x.pointe !== null) {
+                    const retard = x.debutPt - x.debutPlan;
+                    if (retard >= 10) x.alertes.push(['orange', 'retard ' + retard + ' min']);
+                    x.ecart = x.pointe - x.plan;
+                    if (!x.sansSortie && Math.abs(x.ecart) >= 30) x.alertes.push([x.ecart > 0 ? 'orange' : 'red', fmtEcart(x.ecart)]);
+                }
+            });
+            liste.sort((a, b) => b.alertes.length - a.alertes.length || (a.debutPlan ?? a.debutPt ?? 0) - (b.debutPlan ?? b.debutPt ?? 0));
+            const nbAlertes = liste.filter(x => x.alertes.length).length;
+            html += `<div class="row"><span class="grow">Prévu <b>${fmtMin(totPlan)}</b> · pointé <b>${fmtMin(totPt)}</b></span>${totPlan ? `<span class="badge ${Math.abs(totPt - totPlan) < 60 ? 'green' : 'orange'}">${fmtEcart(totPt - totPlan)}</span>` : ''}${nbAlertes ? `<span class="badge red">${nbAlertes} à voir</span>` : '<span class="badge green">conforme</span>'}</div>`;
+            const ligne = x => `<div class="row"><span class="grow">${esc(x.nom)}<div class="small">prévu ${x.plan !== null ? hm(x.debutPlan) + '–' + hm(x.finPlan) + ' (' + fmtMin(x.plan) + ')' : '—'} · pointé ${x.pointe !== null ? hm(x.debutPt) + '–' + (x.finPt !== null && !x.sansSortie ? hm(x.finPt) : '?') + ' (' + fmtMin(x.pointe) + ')' : '—'}</div></span>${x.alertes.map(a => `<span class="badge ${a[0]}">${esc(a[1])}</span>`).join('')}</div>`;
+            liste.filter(x => x.alertes.length).forEach(x => { html += ligne(x); });
+            const ok = liste.filter(x => !x.alertes.length);
+            if (ok.length) html += `<details class="fold"><summary>${ok.length} conforme${ok.length > 1 ? 's' : ''}</summary>${ok.map(ligne).join('')}</details>`;
             return html;
         }
 
@@ -349,6 +447,8 @@
             html += `</div><div class="sub-title" style="margin-top:10px;">📋 TAF</div>`;
             html += renderTafJour(tafJ1, "Aujourd'hui", addDays(d.J, 1));
             html += renderTafJour(tafJ2, 'Demain', addDays(d.J, 2));
+            html += renderProductions(d.productionsJ1, "🍳 Productions réalisées aujourd'hui", true);
+            html += renderLiaison(d);
             html += `</div>`;
 
             // --- Bloc 3 : a decider maintenant (etat courant) ---
@@ -382,7 +482,8 @@
             html += `<div class="chip">Checklists : <b>${d.checks.length}</b>${checksPb ? ` <span class="badge red">${checksPb} pb</span>` : ''}</div>`;
             html += `</div>`;
             html += renderTemperatures(d);
-            html += renderProductions(d);
+            html += renderProductions(d.productions, '🍳 Productions', false);
+            html += renderPlanningPointage(d);
             html += renderReceptions(d);
             html += renderCartons(d);
             html += `</div></div>`;

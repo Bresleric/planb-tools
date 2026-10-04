@@ -1,7 +1,7 @@
 # Reprise — Rapport journalier (module `rapport/`)
 
 > Brief de passation pour continuer ce chantier depuis une autre conversation.
-> Rédigé le 04/10/2026, mis à jour le 04/10/2026 (v2). État du code : v2 (SW v60).
+> Rédigé le 04/10/2026, mis à jour le 04/10/2026 (v2). État du code : v2.1 (SW v70).
 
 ## Ce que c'est
 
@@ -40,6 +40,23 @@ le BILAN ; J+1 = « aujourd'hui » (TAF, CA attendu, équipe) ; J+2 = « demain 
 5. Bloc global : notes de service (actives, non expirées) et informations
    (publiées, non archivées) dont le % de lecture < 100 %, avec les MÊMES règles
    de ciblage que les modules notes-service et information ; combo_veilleur_log 48 h.
+
+### Ajouts v2.1 (demande Eric du 04/10/2026)
+
+- 📅 Aujourd'hui : productions réalisées aujourd'hui (J+1, liste dépliée) et
+  📒 cahier de liaison (`liaison_messages` non archivés, messages racines
+  seulement, 7 derniers jours) : % de lecture par message. Cibles = destinataires
+  du message, ou à défaut tous les users actifs de l'établissement, auteur exclu
+  (`liaison_lectures`). Les destinataires nommés qui n'ont pas lu sont affichés.
+- ✅ Bilan de J : ⏱️ planning vs pointage. Planning = `planning_equipes` (Combo,
+  heures + « pause 30mn » dans notes) ; pointage = `pointage_periodes_travail`
+  (module Pointages PBT, `duree_travail_minutes` déjà net de pauses).
+  AUCUN lien en base (planning_id et ecart_planning_minutes jamais remplis) :
+  rapprochement par nom normalisé (minuscules, sans accents). Alertes : non
+  pointé, hors planning, sortie non pointée (fin à 23:59 = clôture auto),
+  retard ≥ 10 min, écart d'heures ≥ 30 min.
+  `combo_pointages` est MORT depuis le 05/06/2026 (imports CSV arrêtés).
+- Constat 03/10 : la moitié de l'équipe planifiée ne pointe pas dans PBT.
 
 ## Formules de caisse partagées
 
