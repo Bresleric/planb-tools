@@ -89,6 +89,7 @@
 
     <main>
         <div class="composer">
+            <input type="text" id="compose-titre" placeholder="Titre (optionnel) — ex : Choucroute, Parking, Passation midi→soir" style="width:100%; padding:9px 10px; font-size:14px; font-weight:600; border:1px solid var(--gray-200); border-radius:10px; background:var(--gray-50); margin-bottom:6px;">
             <textarea id="compose-texte" placeholder="Consigne, info de service, passation entre équipes..."></textarea>
             <div class="dest-row" id="dest-row">
                 <span class="dest-label">À l'attention de :</span>
@@ -232,6 +233,7 @@
 
         function envoyerMessage() {
             const texte = document.getElementById('compose-texte').value.trim();
+            const titre = document.getElementById('compose-titre').value.trim();
             if (!texte) { showToast('Écris un message d abord', 'error'); return; }
             askPIN('✍️ Signer le message', async (u) => {
                 try {
@@ -239,11 +241,13 @@
                     const { error } = await sb.from('liaison_messages').insert({
                         etablissement: currentEstablishment,
                         texte,
+                        titre: titre || null,
                         auteur_id: u.id, auteur_nom: u.nom, auteur_initiales: u.initiales,
                         destinataires: dests,
                     });
                     if (error) throw error;
                     document.getElementById('compose-texte').value = '';
+                    document.getElementById('compose-titre').value = '';
                     resetDest();
                     showToast(`Publié — signé ${u.nom.split(' ')[0]} ✓`, 'success');
                     await loadData();
@@ -300,8 +304,35 @@
             feed.innerHTML = html;
         }
 
+        // Posts reduits : preference memorisee sur CET appareil (localStorage)
+        function getReduits() {
+            try { return new Set(JSON.parse(localStorage.getItem('planb_liaison_reduits') || '[]')); }
+            catch (e) { return new Set(); }
+        }
+        function toggleReduit(msgId) {
+            const r = getReduits();
+            if (r.has(msgId)) r.delete(msgId); else r.add(msgId);
+            try { localStorage.setItem('planb_liaison_reduits', JSON.stringify([...r])); } catch (e) {}
+            renderFeed();
+        }
+
         function renderMsg(m, reponses, estReponse) {
             const heure = new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+            // Vue reduite : une seule ligne avec l essentiel (titre ou debut du texte,
+            // auteur, heure, nombre de reponses) - un tap pour redeployer
+            if (!estReponse && getReduits().has(m.id)) {
+                const resume = m.titre || (m.texte || '').slice(0, 60) + ((m.texte || '').length > 60 ? '…' : '');
+                const nbRep = (reponses || []).length;
+                return `<div class="msg${m.epingle ? ' epingle' : ''}" onclick="toggleReduit('${m.id}')" style="cursor:pointer; padding:8px 14px;">
+                    <div style="display:flex; align-items:baseline; gap:8px;">
+                        <span style="color:var(--gray-400);">▸</span>
+                        <span style="font-weight:700; font-size:13px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(resume)}</span>
+                        ${nbRep ? `<span class="badge gray">↩ ${nbRep}</span>` : ''}
+                        <span class="msg-heure">${esc((m.auteur_initiales || m.auteur_nom || '?'))} · ${heure}</span>
+                    </div>
+                </div>`;
+            }
             const lus = lecturesDe(m.id);
             const dests = Array.isArray(m.destinataires) ? m.destinataires : [];
             const lusIds = new Set(lus.map(l => l.user_id));
@@ -333,7 +364,8 @@
             }
 
             return `<div class="msg${m.epingle && !estReponse ? ' epingle' : ''}"${estReponse ? ' style="margin:8px 0 2px 18px; background:var(--gray-50); box-shadow:none; border-left:3px solid var(--orange);"' : ''}>
-                <div class="msg-head">${estReponse ? '<span style="color:var(--gray-400); font-size:12px;">↩</span>' : ''}<span class="msg-auteur">${esc(m.auteur_nom || '?')}</span><span class="msg-heure">${heure}</span></div>
+                <div class="msg-head">${estReponse ? '<span style="color:var(--gray-400); font-size:12px;">↩</span>' : ''}<span class="msg-auteur">${esc(m.auteur_nom || '?')}</span><span class="msg-heure">${heure}</span>${!estReponse ? `<button onclick="toggleReduit('${m.id}')" title="Réduire" style="margin-left:auto; background:none; border:none; color:var(--gray-400); font-size:13px; cursor:pointer; padding:2px 6px;">▾</button>` : ''}</div>
+                ${m.titre && !estReponse ? `<div style="font-weight:800; font-size:14px; margin-top:2px;">${esc(m.titre)}</div>` : ''}
                 <div class="msg-texte">${esc(m.texte)}</div>
                 ${destHtml}
                 <div class="msg-footer"><span class="lu-info">${luInfo}</span><span class="msg-actions">${actions}</span></div>

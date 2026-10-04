@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v68';   // bump a chaque mise a jour du SW (v68 : pastille liaison - exclure ses propres messages et le courrier des autres 05/10/2026)
+const CACHE_NAME = 'planb-tools-v69';   // bump a chaque mise a jour du SW (v69 : cahier de liaison - titres et posts reduisibles 05/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
