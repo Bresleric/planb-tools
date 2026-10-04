@@ -1301,6 +1301,30 @@
             } catch (e) { console.warn('Badge TAF error:', e); }
 
             try {
+                // Cahier de liaison : messages (14 j glissants + epingles) que la
+                // personne connectee n a pas encore marques Lu
+                const depuis = new Date(Date.now() - 14 * 86400000).toISOString();
+                const { data: liaisonMsgs } = await supabaseClient
+                    .from('liaison_messages')
+                    .select('id')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('archive', false)
+                    .or(`created_at.gte.${depuis},epingle.eq.true`);
+                const msgIds = (liaisonMsgs || []).map(m => m.id);
+                let nonLus = 0;
+                if (msgIds.length > 0) {
+                    const { data: mesLectures } = await supabaseClient
+                        .from('liaison_lectures')
+                        .select('message_id')
+                        .eq('user_id', currentUser.id)
+                        .in('message_id', msgIds);
+                    const lus = new Set((mesLectures || []).map(l => l.message_id));
+                    nonLus = msgIds.filter(id => !lus.has(id)).length;
+                }
+                setBadge('liaison', nonLus);
+            } catch (e) { console.warn('Badge liaison error:', e); }
+
+            try {
                 // 2. Check-Lists : checklists actives pour aujourd'hui, non complétées (tout service)
                 // Inclut les checklists rattachées à l'établissement courant OU partagées (partagee=true)
                 const { data: clData } = await supabaseClient
