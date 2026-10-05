@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Achats / Factures — PlanB Tools</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -84,6 +84,11 @@ tr:nth-child(even) td{background:#fafbfc;}
 .b-reset{border-color:#fca5a5!important;color:#b91c1c!important;}
 .b-cancel{margin-left:auto;}
 .m-busy{opacity:.5;pointer-events:none;}
+
+/* iOS 26 Liquid Glass : decaler le corps de page sous la bande de verre systeme */
+@supports (padding: env(safe-area-inset-top)) {
+    body { padding-top: env(safe-area-inset-top); }
+}
 </style>
 </head>
 <body>

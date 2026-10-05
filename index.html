@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="PlanB Tools - Gestion interne restaurants">
     <meta name="theme-color" content="#f97316">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -591,12 +591,11 @@
         .bo-equipe-member { font-size:12px; color:#4b5563; padding:2px 0; display:flex; gap:6px; }
         .bo-equipe-initiales { font-weight:700; width:22px; }
     
-        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
-           La barre translucide flotte par-dessus les PWA ; on repousse les
-           en-tetes sous la zone sure declaree par le systeme. */
+        /* iOS 26 Liquid Glass : app plein ecran - decaler TOUT le corps de page
+           sous la bande de verre systeme (meme remede que l Approvisionnement). */
         @supports (padding: env(safe-area-inset-top)) {
-            header, .header {
-                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            body {
+                padding-top: env(safe-area-inset-top);
             }
         }
     </style>

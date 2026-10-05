@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v82';   // bump a chaque mise a jour du SW (v82 : appro - corps de page decale sous la bande de verre iOS 26, 2e tentative ciblee 05/10/2026)
+const CACHE_NAME = 'planb-tools-v83';   // bump a chaque mise a jour du SW (v83 : correctif verre iOS 26 sur les 5 modules plein ecran restants + UV produits entre maisons 05/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
