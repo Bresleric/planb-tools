@@ -999,6 +999,7 @@
                 <div class="tab" data-tab="commandes" onclick="switchTab('commandes')">📦 Commandes</div>
                 <div class="tab" data-tab="inventaire" onclick="switchTab('inventaire')">🔍 Inventaire</div>
                 <div class="tab" data-tab="receptions" onclick="switchTab('receptions')">🚚 Réceptions</div>
+                <div class="tab" data-tab="entremaisons" onclick="switchTab('entremaisons')">🤝 Entre maisons</div>
                 <div class="tab hidden" id="tab-btn-catalogue" data-tab="catalogue" onclick="switchTab('catalogue')">📚 Catalogue</div>
                 <div class="tab hidden" id="tab-btn-ingredients" data-tab="ingredients" onclick="switchTab('ingredients')">🥘 Ingrédients</div>
             </div>
@@ -1124,6 +1125,11 @@
             </div>
 
             <!-- TAB: Catalogue -->
+            <div class="tab-content" id="tab-entremaisons">
+                <h2 class="rec-h2">🤝 Commandes entre maisons</h2>
+                <div id="em-content"><div class="empty-state"><div class="empty-state-text">Chargement…</div></div></div>
+            </div>
+
             <div class="tab-content" id="tab-catalogue">
                 <div class="catalog-subtabs">
                     <div class="subtab active" onclick="switchCatalogSubtab('fournisseurs')">Fournisseurs</div>
@@ -3216,6 +3222,190 @@
             }
         }
 
+        // ====== COMMANDES ENTRE MAISONS (produits intermediaires) ======
+        // Circuit : demande (etab A) -> validation (ADMIN uniquement, declenche la
+        // preparation) -> prete (etab B) -> recuperee (etab A). Produits geres par l admin.
+        let emProduits = [];
+        let emCommandes = [];
+
+        async function renderEntreMaisons() {
+            const zone = document.getElementById('em-content');
+            zone.innerHTML = '<div class="empty-state"><div class="empty-state-text">Chargement…</div></div>';
+            try {
+                const [pRes, cRes] = await Promise.all([
+                    supabase.from('interetab_produits').select('*').order('ordre'),
+                    supabase.from('interetab_commandes').select('*').order('created_at', { ascending: false }).limit(60),
+                ]);
+                if (pRes.error) throw pRes.error;
+                emProduits = pRes.data || [];
+                emCommandes = cRes.data || [];
+            } catch (e) {
+                zone.innerHTML = '<div class="empty-state"><div class="empty-state-text">Module pas encore initialisé côté base de données<br>(tables interetab manquantes)</div></div>';
+                return;
+            }
+            const autre = currentEstablishment === 'freddy' ? 'liesel' : 'freddy';
+            const nomEtab = (e) => e === 'freddy' ? 'Freddy' : 'Liesel';
+            const emAdmin = currentUser.role === 'admin';
+            const emMgr = ['responsable', 'manager', 'admin'].includes(currentUser.role);
+            const statutLbl = { demande: '⏳ En attente de validation', validee: '🧑‍🍳 À préparer', prete: '🍱 Prête — à récupérer', recuperee: '✓ Récupérée', annulee: '✕ Annulée' };
+
+            const carte = (c, vue) => {
+                const lignes = (Array.isArray(c.lignes) ? c.lignes : []).map(l =>
+                    `<div style="display:flex; justify-content:space-between; font-size:13px; padding:2px 0;"><span>${escapeHtml(l.nom)}</span><b>${l.quantite} ${escapeHtml(l.unite || '')}</b></div>`).join('');
+                let actions = '';
+                if (c.statut === 'demande' && emAdmin) actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'validee')">✓ Valider — lancer la préparation</button> `;
+                if (c.statut === 'demande' && (emAdmin || c.demande_par_id === currentUser.id)) actions += `<button class="btn-small btn-danger" onclick="emSetStatut('${c.id}', 'annulee')">Annuler</button>`;
+                if (c.statut === 'validee' && vue === 'preparer' && emMgr) actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'prete')">🍱 Marquer prête</button>`;
+                if (c.statut === 'prete' && vue === 'demandes' && emMgr) actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'recuperee')">🚗 Récupérée</button>`;
+                const quand = new Date(c.created_at).toLocaleDateString('fr-FR');
+                const souhait = c.date_souhaitee ? ` · pour le ${new Date(c.date_souhaitee + 'T12:00:00').toLocaleDateString('fr-FR')}` : '';
+                return `<div style="background:white; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:baseline;">
+                        <b style="font-size:13px;">${nomEtab(c.demandeur_etab)} → ${nomEtab(c.fournisseur_etab)}</b>
+                        <span class="${c.statut === 'prete' || c.statut === 'recuperee' ? 'badge-ok' : 'badge-wait'}" style="font-size:11px;">${statutLbl[c.statut] || c.statut}</span>
+                    </div>
+                    <div class="muted" style="font-size:11px; margin:2px 0 6px;">Demandée le ${quand} par ${escapeHtml(c.demande_par_nom || '?')}${souhait}${c.validee_par_nom ? ` · validée par ${escapeHtml(c.validee_par_nom)}` : ''}${c.prete_par_nom ? ` · préparée par ${escapeHtml(c.prete_par_nom)}` : ''}</div>
+                    ${lignes}
+                    ${c.notes ? `<div class="muted" style="font-size:12px; margin-top:4px;">📝 ${escapeHtml(c.notes)}</div>` : ''}
+                    ${actions ? `<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">${actions}</div>` : ''}
+                </div>`;
+            };
+
+            const actives = emCommandes.filter(c => !['recuperee', 'annulee'].includes(c.statut));
+            const histo = emCommandes.filter(c => ['recuperee', 'annulee'].includes(c.statut)).slice(0, 10);
+            const mesDemandes = actives.filter(c => c.demandeur_etab === currentEstablishment);
+            const aPreparer = actives.filter(c => c.fournisseur_etab === currentEstablishment);
+
+            let html = `<div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                ${emMgr ? `<button class="btn-main primary" onclick="emOpenNouvelle()">➕ Commander à ${nomEtab(autre)}</button>` : ''}
+                ${emAdmin ? `<button class="btn-main secondary" onclick="emOpenProduits()">⚙️ Gérer les produits</button>` : ''}
+            </div>`;
+            html += `<div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+                <div style="flex:1; min-width:280px;"><div class="cmd-section-title">📤 Nos demandes (${mesDemandes.length})</div>${mesDemandes.map(c => carte(c, 'demandes')).join('') || '<div class="muted" style="padding:8px;">Aucune demande en cours</div>'}</div>
+                <div style="flex:1; min-width:280px;"><div class="cmd-section-title">🧑‍🍳 À préparer ici pour ${nomEtab(autre)} (${aPreparer.length})</div>${aPreparer.map(c => carte(c, 'preparer')).join('') || '<div class="muted" style="padding:8px;">Rien à préparer</div>'}</div>
+            </div>`;
+            if (histo.length) html += `<div class="cmd-section-title cmd-histo" style="margin-top:14px;">🗂 Historique récent</div>` + histo.map(c => carte(c, 'histo')).join('');
+            zone.innerHTML = html;
+        }
+
+        async function emSetStatut(id, statut) {
+            const updates = { statut };
+            const now = new Date().toISOString();
+            if (statut === 'validee') { updates.validee_par_id = currentUser.id; updates.validee_par_nom = currentUser.nom; updates.validee_at = now; }
+            if (statut === 'prete') { updates.prete_par_id = currentUser.id; updates.prete_par_nom = currentUser.nom; updates.prete_at = now; }
+            if (statut === 'recuperee') { updates.recuperee_par_id = currentUser.id; updates.recuperee_par_nom = currentUser.nom; updates.recuperee_at = now; }
+            try {
+                const { error } = await supabase.from('interetab_commandes').update(updates).eq('id', id);
+                if (error) throw error;
+                showToast('Statut mis à jour', 'success');
+                renderEntreMaisons();
+            } catch (e) { console.error(e); showToast('Erreur de mise à jour', 'error'); }
+        }
+
+        function emOpenNouvelle() {
+            const autre = currentEstablishment === 'freddy' ? 'liesel' : 'freddy';
+            const rows = emProduits.filter(p => p.actif !== false).map(p => `
+                <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+                    <span style="flex:1; font-size:13px; font-weight:600;">${escapeHtml(p.nom)}</span>
+                    <input type="number" step="0.5" min="0" data-em-prod="${p.id}" placeholder="0" style="width:70px; padding:5px; border:1px solid #e5e7eb; border-radius:7px; text-align:center;">
+                    <span class="muted" style="width:32px; font-size:12px;">${escapeHtml(p.unite)}</span>
+                </div>`).join('');
+            document.getElementById('modal-em-nouvelle')?.remove();
+            const ov = document.createElement('div');
+            ov.className = 'modal-overlay show'; ov.id = 'modal-em-nouvelle';
+            ov.innerHTML = `<div class="modal" style="max-width:460px;">
+                <div class="modal-header"><div class="modal-title">➕ Commander à ${autre === 'freddy' ? 'Freddy' : 'Liesel'}</div>
+                <button class="modal-close" onclick="document.getElementById('modal-em-nouvelle').remove()">✕</button></div>
+                <div class="modal-body">
+                    ${rows || '<div class="muted">Aucun produit défini — passe par ⚙️ Gérer les produits</div>'}
+                    <label class="form-label" style="margin-top:10px;">Pour le (optionnel)</label>
+                    <input type="date" id="em-date" class="form-input" style="max-width:190px;">
+                    <label class="form-label">Note</label>
+                    <input type="text" id="em-notes" class="form-input" placeholder="Précisions...">
+                </div>
+                <div class="modal-footer"><button class="btn-small btn-primary" onclick="emCreerCommande()">📨 Envoyer la demande</button></div>
+            </div>`;
+            document.body.appendChild(ov);
+        }
+
+        async function emCreerCommande() {
+            const autre = currentEstablishment === 'freddy' ? 'liesel' : 'freddy';
+            const lignes = [];
+            document.querySelectorAll('[data-em-prod]').forEach(inp => {
+                const q = parseFloat(inp.value);
+                if (q > 0) {
+                    const p = emProduits.find(x => x.id === inp.getAttribute('data-em-prod'));
+                    if (p) lignes.push({ nom: p.nom, quantite: q, unite: p.unite });
+                }
+            });
+            if (lignes.length === 0) { showToast('Saisis au moins une quantité', 'error'); return; }
+            try {
+                const { error } = await supabase.from('interetab_commandes').insert({
+                    demandeur_etab: currentEstablishment, fournisseur_etab: autre,
+                    lignes,
+                    notes: document.getElementById('em-notes').value.trim() || null,
+                    date_souhaitee: document.getElementById('em-date').value || null,
+                    demande_par_id: currentUser.id, demande_par_nom: currentUser.nom,
+                });
+                if (error) throw error;
+                document.getElementById('modal-em-nouvelle')?.remove();
+                showToast('Demande envoyée — en attente de validation', 'success');
+                renderEntreMaisons();
+            } catch (e) { console.error(e); showToast('Erreur de création', 'error'); }
+        }
+
+        function emOpenProduits() {
+            const rows = emProduits.map(p => `
+                <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+                    <span style="flex:1; font-size:13px; ${p.actif === false ? 'text-decoration:line-through; color:#9ca3af;' : ''}">${escapeHtml(p.nom)} <span class="muted">(${escapeHtml(p.unite)})</span></span>
+                    <button class="btn-small" onclick="emToggleProduit('${p.id}', ${p.actif !== false})">${p.actif !== false ? 'Désactiver' : 'Réactiver'}</button>
+                </div>`).join('');
+            document.getElementById('modal-em-produits')?.remove();
+            const ov = document.createElement('div');
+            ov.className = 'modal-overlay show'; ov.id = 'modal-em-produits';
+            ov.innerHTML = `<div class="modal" style="max-width:460px;">
+                <div class="modal-header"><div class="modal-title">⚙️ Produits commandables entre maisons</div>
+                <button class="modal-close" onclick="document.getElementById('modal-em-produits').remove()">✕</button></div>
+                <div class="modal-body">
+                    ${rows || '<div class="muted">Aucun produit</div>'}
+                    <div style="display:flex; gap:6px; margin-top:12px;">
+                        <input type="text" id="em-new-nom" class="form-input" placeholder="Nouveau produit..." style="flex:1;">
+                        <input type="text" id="em-new-unite" class="form-input" placeholder="kg" style="width:70px;">
+                        <button class="btn-small btn-primary" onclick="emAjouterProduit()">➕</button>
+                    </div>
+                </div>
+            </div>`;
+            document.body.appendChild(ov);
+        }
+
+        async function emAjouterProduit() {
+            if (!isAdminAppro()) { showToast('Réservé aux administrateurs', 'error'); return; }
+            const nom = document.getElementById('em-new-nom').value.trim();
+            if (!nom) { showToast('Nom du produit ?', 'error'); return; }
+            const unite = document.getElementById('em-new-unite').value.trim() || 'kg';
+            try {
+                const { error } = await supabase.from('interetab_produits').insert({ nom, unite, ordre: emProduits.length + 1 });
+                if (error) throw error;
+                const { data } = await supabase.from('interetab_produits').select('*').order('ordre');
+                emProduits = data || [];
+                document.getElementById('modal-em-produits')?.remove();
+                emOpenProduits();
+                showToast('Produit ajouté', 'success');
+            } catch (e) { showToast('Erreur', 'error'); }
+        }
+
+        async function emToggleProduit(id, actif) {
+            if (!isAdminAppro()) { showToast('Réservé aux administrateurs', 'error'); return; }
+            try {
+                const { error } = await supabase.from('interetab_produits').update({ actif: !actif }).eq('id', id);
+                if (error) throw error;
+                const { data } = await supabase.from('interetab_produits').select('*').order('ordre');
+                emProduits = data || [];
+                document.getElementById('modal-em-produits')?.remove();
+                emOpenProduits();
+            } catch (e) { showToast('Erreur', 'error'); }
+        }
+
         function switchTab(tabName) {
             // Garde-fou : empêcher l'accès aux onglets Catalogue / Ingrédients aux non-admins (URL/hash manuels)
             if ((tabName === 'catalogue' || tabName === 'ingredients') && !isAdminAppro()) {
@@ -3228,6 +3418,9 @@
 
             if (tabName === 'catalogue') {
                 populateFournisseurSelect();
+            }
+            if (tabName === 'entremaisons') {
+                renderEntreMaisons();
             }
             if (tabName === 'commandes') {
                 renderCommandes();
