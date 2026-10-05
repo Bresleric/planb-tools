@@ -1666,6 +1666,8 @@
       await generateRecurringTasks();
       // Reload tasks after generation
       tasks = await DB.getTasks(filterDate);
+      // Attribution automatique depuis le planning Combo (personne seule en poste)
+      await autoAssignFromPlanning();
       renderCurrentTab();
     } catch (e) {
       console.error('Erreur chargement:', e);
@@ -1712,6 +1714,45 @@
       }
     } catch (e) {
       console.warn('Report des tâches en retard impossible:', e);
+    }
+  }
+
+  // ====== ATTRIBUTION AUTOMATIQUE DEPUIS LE PLANNING COMBO ======
+  // Regle (Eric 05/10/2026) : une tache du jour NON attribuee est affectee a la
+  // personne planifiee de la meme equipe sur son creneau, UNIQUEMENT si elle est
+  // seule en poste (zero ou plusieurs personnes -> attribution manuelle comme avant).
+  // Une attribution deja posee (manuelle ou de la veille) n est JAMAIS ecrasee.
+  function normNomPlanning(s) {
+    return (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .split(/\s+/).sort().join(' ');
+  }
+
+  async function autoAssignFromPlanning() {
+    if (!isToday(filterDate)) return;
+    const aAttribuer = tasks.filter(t => !t.fait_par_id && !t.attribue_a_id && t.creneau && t.equipe);
+    if (aAttribuer.length === 0 || !planningToday || planningToday.length === 0) return;
+
+    const usersByNorm = {};
+    users.forEach(u => { usersByNorm[normNomPlanning(u.nom)] = u; });
+
+    let nb = 0;
+    const noms = new Set();
+    for (const t of aAttribuer) {
+      const enPoste = [...new Set(planningToday
+        .filter(p => p.equipe === t.equipe && (p.service === t.creneau || p.service === 'journee'))
+        .map(p => p.employe_nom))];
+      if (enPoste.length !== 1) continue;           // ambigu ou personne : on laisse en manuel
+      const u = usersByNorm[normNomPlanning(enPoste[0])];
+      if (!u) continue;                              // pas de compte utilisateur correspondant
+      try {
+        await DB.updateTask(t.id, { attribue_a_id: u.id, attribue_a_nom: u.nom, attribue_a_initiales: u.initiales });
+        t.attribue_a_id = u.id; t.attribue_a_nom = u.nom; t.attribue_a_initiales = u.initiales;
+        nb++;
+        noms.add((u.nom || '').split(' ')[0]);
+      } catch (e) { console.warn('Attribution auto impossible:', e); }
+    }
+    if (nb > 0) {
+      showToast(`🤖 ${nb} tâche${nb > 1 ? 's' : ''} attribuée${nb > 1 ? 's' : ''} automatiquement : ${[...noms].join(', ')}`, 'success');
     }
   }
 

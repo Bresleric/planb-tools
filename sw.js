@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v76';   // bump a chaque mise a jour du SW (v76 : portail - bascule d etablissement sans deconnexion pour les comptes multi-etablissements 05/10/2026)
+const CACHE_NAME = 'planb-tools-v77';   // bump a chaque mise a jour du SW (v77 : taf - attribution automatique des taches depuis le planning Combo 05/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
