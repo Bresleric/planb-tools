@@ -1632,6 +1632,9 @@ function switchTab(tab) {
 
 // ============= RÉCAP PAR PERSONNE =============
 let recapEtabFilter = 'current'; // 'current' | 'all'
+let recapProdsBrutes = [];       // lignes brutes de la periode (pour export CSV)
+let recapDureesMap = {};
+let recapPeriode = { from: '', to: '' };
 let recapDatesInited = false;
 
 function initRecapDates() {
@@ -1689,6 +1692,11 @@ async function loadRecapPersonnes() {
     (tasks || []).forEach(t => { if (t.duree_accumulee_secondes) dureeMap[t.id] = t.duree_accumulee_secondes; });
   }
 
+  // Conserver les lignes brutes pour l export CSV par collaborateur
+  recapProdsBrutes = prods;
+  recapDureesMap = dureeMap;
+  recapPeriode = { from: dFrom, to: dTo };
+
   // Agrégation par producteur (+ etab si vue "all")
   const byPerson = {};
   prods.forEach(p => {
@@ -1732,6 +1740,49 @@ function fmtSec(sec) {
   const h = Math.floor(m / 60);
   const r = m % 60;
   return h + 'h' + (r < 10 ? '0' + r : r);
+}
+
+// ====== EXPORT CSV DES PRODUCTIONS D UN COLLABORATEUR (periode affichee) ======
+function exportRecapCSV(producteurId, etab) {
+  const lignes = recapProdsBrutes.filter(p =>
+    p.producteur_id === producteurId && (recapEtabFilter !== 'all' || p.etablissement === etab));
+  if (lignes.length === 0) { showToast('Rien à exporter', 'error'); return; }
+  const nomPers = lignes[0].producteur_nom || 'collaborateur';
+  const sep = ';';
+  const head = ['Date', 'Produit', 'Quantite', 'Unite', 'Statut', 'Etablissement', 'Duree TAF (min)'].join(sep);
+  const rows = lignes
+    .slice().sort((a, b) => new Date(a.date_production) - new Date(b.date_production))
+    .map(p => [
+      new Date(p.date_production).toLocaleDateString('fr-FR'),
+      '"' + String(p.nom_produit || '').replace(/"/g, '""') + '"',
+      String(p.quantite_produite ?? '').replace('.', ','),
+      p.unite || '',
+      p.statut || '',
+      p.etablissement || '',
+      (p.tache_id && recapDureesMap[p.tache_id]) ? Math.round(recapDureesMap[p.tache_id] / 60) : ''
+    ].join(sep));
+  const csv = '﻿' + head + '\n' + rows.join('\n');   // BOM : accents corrects dans Excel
+  const fichier = `productions_${nomPers.trim().replace(/\s+/g, '_')}_${recapPeriode.from}_${recapPeriode.to}.csv`;
+  telechargerCSV(csv, fichier);
+}
+
+async function telechargerCSV(contenu, nomFichier) {
+  const blob = new Blob([contenu], { type: 'text/csv;charset=utf-8;' });
+  // iPad/iPhone : feuille de partage (Fichiers, Mail, AirDrop...) ; sinon telechargement direct
+  try {
+    const file = new File([blob], nomFichier, { type: 'text/csv' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: nomFichier });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // partage annule par l utilisateur
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nomFichier;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
 }
 function escapeHtmlRecap(s) {
   if (s == null) return '';
@@ -1793,6 +1844,7 @@ function renderRecapPersonnes(list, dFrom, dTo) {
           <div style="text-align:right;">
             <div style="font-size:1.6rem; font-weight:700; color:#7c3aed; line-height:1;">${p.nb_prods}</div>
             <div style="font-size:.7rem; color:#6b7280;">prod${p.nb_prods>1?'s':''}</div>
+            <button onclick="exportRecapCSV('${p.id}', '${p.etablissement}')" title="Exporter les productions de la période en CSV" style="margin-top:6px; border:1px solid #e5e7eb; background:white; border-radius:7px; padding:4px 9px; font-size:.72rem; font-weight:600; color:#4b5563; cursor:pointer;">⬇ CSV</button>
           </div>
         </div>
 
