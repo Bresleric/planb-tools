@@ -56,13 +56,14 @@ Deno.serve(async (req) => {
   if (action === 'whoami') {
     if (chatId) return json({ error: 'deja configure' }, 403);
     const upd = await tg('getUpdates', {});
+    const hook = await tg('getWebhookInfo', {});
     const chats = ((upd.result as Array<Record<string, any>>) || [])
       .map((u) => u.message?.chat)
       .filter(Boolean)
       .map((c) => ({ id: c.id, nom: [c.first_name, c.last_name].filter(Boolean).join(' '), username: c.username || null }));
     const seen = new Set<number>();
     const uniq = chats.filter((c) => !seen.has(c.id) && !!seen.add(c.id));
-    return json({ ok: upd.ok, chats: uniq });
+    return json({ ok: upd.ok, chats: uniq, webhook: hook.result?.url || null });
   }
 
   // --- Setup : enregistrement du chat admin (premier arrive = verrouille) ---
