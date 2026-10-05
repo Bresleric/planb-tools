@@ -1309,10 +1309,15 @@
 
             const today = new Date().toISOString().split('T')[0];
 
+            // Compteurs collectes au passage pour l alerte de connexion
+            // (seuls les modules VISIBLES par la personne ont un element pastille)
+            const badgeCounts = {};
+
             // Reset all badges to 0
             const setBadge = (moduleId, count) => {
                 const el = document.querySelector(`[data-badge="${moduleId}"]`);
                 if (!el) return;
+                badgeCounts[moduleId] = count;
                 if (count > 0) {
                     el.textContent = count > 99 ? '99+' : count;
                     el.classList.add('visible');
@@ -1502,6 +1507,67 @@
                 if (errInfo) throw errInfo;
                 setBadge('information', cnt || 0);
             } catch (e) { console.warn('Badge Information error:', e); }
+
+            // Toutes les pastilles sont chargees : alerte de connexion si besoin
+            maybeShowActionsAlert(badgeCounts);
+        }
+
+        // ============= Alerte connexion : actions requises =============
+        // A chaque connexion (PIN ou connexion memorisee), si des modules
+        // affichent une pastille, un panneau recapitule ce qui attend la
+        // personne, avec acces direct au module concerne.
+        const ALERTE_LIBELLES = {
+            'taf':          'tâche(s) à faire',
+            'liaison':      'message(s) à lire dans le cahier',
+            'checklist':    'check-list(s) à compléter',
+            'temperatures': 'relevé(s) de température à faire',
+            'briefings':    'briefing(s) à lire',
+            'information':  'info(s) à lire'
+        };
+        function maybeShowActionsAlert(badgeCounts) {
+            try {
+                if (sessionStorage.getItem('planb_alerte_actions') !== '1') return;
+                // Consommee dans tous les cas : une seule alerte par connexion
+                sessionStorage.removeItem('planb_alerte_actions');
+                const items = MODULES
+                    .filter(m => (badgeCounts[m.id] || 0) > 0)
+                    .map(m => ({ module: m, count: badgeCounts[m.id] }));
+                if (items.length === 0) return;
+                if (document.getElementById('planb-alerte-overlay')) return;
+
+                const ov = document.createElement('div');
+                ov.id = 'planb-alerte-overlay';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.88);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,system-ui,"Segoe UI",sans-serif;';
+
+                const rows = items.map((it, idx) => `
+                    <button type="button" data-alerte-idx="${idx}" style="width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-sizing:border-box;">
+                        <span style="font-size:24px;">${it.module.icon}</span>
+                        <span style="flex:1;text-align:left;min-width:0;">
+                            <span style="display:block;font-size:15px;font-weight:700;color:#0f172a;">${it.module.name}</span>
+                            <span style="display:block;font-size:12px;color:#64748b;">${it.count} ${ALERTE_LIBELLES[it.module.id] || 'action(s) en attente'}</span>
+                        </span>
+                        <span style="background:#ef4444;color:#fff;border-radius:999px;min-width:26px;height:26px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-sizing:border-box;">${it.count > 99 ? '99+' : it.count}</span>
+                    </button>`).join('');
+
+                ov.innerHTML =
+                    '<div style="background:#fff;border-radius:20px;max-width:430px;width:100%;max-height:85vh;overflow:auto;padding:22px 18px 16px;box-sizing:border-box;box-shadow:0 25px 50px rgba(0,0,0,0.4);">'
+                  +   '<div style="font-size:19px;font-weight:800;color:#0f172a;">🔔 Des actions t\'attendent</div>'
+                  +   '<div style="font-size:13px;color:#64748b;margin:4px 0 14px;">Touche un module pour y aller directement.</div>'
+                  +   rows
+                  +   '<button type="button" id="planb-alerte-fermer" style="width:100%;padding:13px;margin-top:4px;background:#f1f5f9;border:none;border-radius:12px;font-size:15px;font-weight:600;color:#334155;cursor:pointer;-webkit-tap-highlight-color:transparent;">Plus tard</button>'
+                  + '</div>';
+
+                document.body.appendChild(ov);
+                ov.querySelectorAll('[data-alerte-idx]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const it = items[parseInt(btn.dataset.alerteIdx, 10)];
+                        if (it && it.module.url) window.location.href = it.module.url;
+                    });
+                });
+                ov.querySelector('#planb-alerte-fermer').addEventListener('click', () => {
+                    if (ov.parentNode) ov.parentNode.removeChild(ov);
+                });
+            } catch (e) { console.warn('Alerte actions:', e); }
         }
 
         function handleModuleClick(module) {
@@ -1630,6 +1696,10 @@
             pinDisplay.classList.remove('loading');
             pinDisplay.classList.add('success');
             currentUser = user;
+
+            // Alerte "actions requises" : armee a chaque connexion, consommee
+            // une fois les pastilles chargees sur le portail
+            try { sessionStorage.setItem('planb_alerte_actions', '1'); } catch (e) {}
 
                 // Device check for collaborateurs
                 const deviceToken = localStorage.getItem('planb_device_token');
@@ -2074,6 +2144,8 @@
                     if (remembered.device_id) {
                         currentDevice = { id: remembered.device_id, nom: remembered.device_nom };
                     }
+                    // Connexion memorisee = nouvelle connexion : on arme aussi l alerte
+                    try { sessionStorage.setItem('planb_alerte_actions', '1'); } catch (e) {}
                     await showDashboardOrBriefing();
                 } else {
                     showScreen(loginScreen);
