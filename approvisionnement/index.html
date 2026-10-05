@@ -3258,8 +3258,9 @@
                 let actions = '';
                 if (c.statut === 'demande' && emAdmin) actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'validee')">✓ Valider — lancer la préparation</button> `;
                 if (c.statut === 'demande' && (emAdmin || c.demande_par_id === currentUser.id)) actions += `<button class="btn-small btn-danger" onclick="emSetStatut('${c.id}', 'annulee')">Annuler</button>`;
-                if (c.statut === 'validee' && vue === 'preparer' && emMgr) actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'prete')">🍱 Marquer prête</button>`;
-                if (c.statut === 'prete' && vue === 'demandes' && emMgr) actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'recuperee')">🚗 Récupérée</button>`;
+                // Gestes physiques ouverts a toute l equipe (seule la VALIDATION est admin)
+                if (c.statut === 'validee' && vue === 'preparer') actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'prete')">🍱 Marquer prête</button>`;
+                if (c.statut === 'prete' && vue === 'demandes') actions += `<button class="btn-small btn-primary" onclick="emSetStatut('${c.id}', 'recuperee')">🚗 Récupérée</button>`;
                 const quand = new Date(c.created_at).toLocaleDateString('fr-FR');
                 const souhait = c.date_souhaitee ? ` · pour le ${new Date(c.date_souhaitee + 'T12:00:00').toLocaleDateString('fr-FR')}` : '';
                 return `<div style="background:white; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-bottom:10px;">
@@ -3280,7 +3281,7 @@
             const aPreparer = actives.filter(c => c.fournisseur_etab === currentEstablishment);
 
             let html = `<div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                ${emMgr ? `<button class="btn-main primary" onclick="emOpenNouvelle()">➕ Commander à ${nomEtab(autre)}</button>` : ''}
+                <button class="btn-main primary" onclick="emOpenNouvelle()">➕ Commander à ${nomEtab(autre)}</button>
                 ${emAdmin ? `<button class="btn-main secondary" onclick="emOpenProduits()">⚙️ Gérer les produits</button>` : ''}
             </div>`;
             html += `<div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
