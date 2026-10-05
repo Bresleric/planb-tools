@@ -1162,6 +1162,7 @@
                 role: user.role,
                 equipe: user.equipe || null,
                 acces_modules: user.acces_modules || null,
+                etablissements: user.etablissements || [establishment],
                 etablissement: establishment,
                 device_id: currentDevice ? currentDevice.id : null,
                 device_nom: currentDevice ? currentDevice.nom : null,
@@ -1174,8 +1175,27 @@
             try {
                 if (user.role === 'admin' && sessionStorage.getItem('planb_remember_pending') === '1') {
                     localStorage.setItem('planb_remember', JSON.stringify(sessionData));
+                } else if (user.role === 'admin') {
+                    // Garder la connexion memorisee en phase (ex: bascule d etablissement)
+                    const rem = JSON.parse(localStorage.getItem('planb_remember') || 'null');
+                    if (rem && rem.id === user.id) localStorage.setItem('planb_remember', JSON.stringify(sessionData));
                 }
             } catch (e) {}
+        }
+
+        // ============= Bascule d etablissement sans deconnexion =============
+        // Pour les comptes ayant acces aux deux maisons (Eric, Valerie...) :
+        // un tap sur l etiquette d etablissement du portail bascule la session.
+        function switchEstablishment() {
+            const etabs = (currentUser && currentUser.etablissements) || [];
+            if (etabs.length < 2) return;
+            const next = etabs.find(e => e !== currentEstablishment) || etabs[0];
+            currentEstablishment = next;
+            storeSession(currentUser, next);
+            updateHeader();
+            renderModules();
+            loadModuleBadges();
+            showToast('Basculé sur ' + getEstablishmentDisplayName(next));
         }
 
         // ============= Mode Developpement (admin uniquement) =============
@@ -1249,7 +1269,11 @@
             if (currentUser && currentEstablishment) {
                 headerUser.textContent = currentUser.nom;
                 const estName = getEstablishmentDisplayName(currentEstablishment);
-                headerEstablishment.textContent = estName;
+                const multiEtab = (currentUser.etablissements || []).length > 1;
+                headerEstablishment.textContent = multiEtab ? estName + ' ⇄' : estName;
+                headerEstablishment.style.cursor = multiEtab ? 'pointer' : '';
+                headerEstablishment.title = multiEtab ? 'Changer d établissement' : '';
+                headerEstablishment.onclick = multiEtab ? switchEstablishment : null;
             }
         }
 
