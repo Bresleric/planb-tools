@@ -1895,8 +1895,15 @@
                 for (const [grp, members] of Object.entries(groups)) {
                     eqHtml += `<div class="bo-equipe-group" style="color:${colors[grp]||'#6b7280'};">${labels[grp]||grp} (${members.length})</div>`;
                     members.forEach(m => {
-                        eqHtml += `<div class="bo-equipe-member"><span class="bo-equipe-initiales" style="color:${colors[grp]||'#6b7280'};">${esc(m.initiales||'?')}</span> ${esc(m.nom)} <span style="color:#9ca3af; margin-left:auto; font-size:10px;">${esc(m.horaire||'')}</span></div>`;
+                        // Rangs de salle (Freddy) : badges oranges apres le nom
+                        const rangs = [m.rang1, m.rang2].filter(Boolean);
+                        const badges = rangs.map(r => `<span style="display:inline-block; background:#fff7ed; color:#c2410c; font-size:9px; font-weight:700; padding:0 6px; border-radius:8px; margin-left:4px; vertical-align:1px;">${esc(r)}</span>`).join('');
+                        const obs = m.observation ? `<div style="color:#9ca3af; font-size:10px; margin-left:26px;">${esc(m.observation)}</div>` : '';
+                        eqHtml += `<div class="bo-equipe-member"><span class="bo-equipe-initiales" style="color:${colors[grp]||'#6b7280'};">${esc(m.initiales||'?')}</span> ${esc(m.nom)}${badges} <span style="color:#9ca3af; margin-left:auto; font-size:10px;">${esc(m.horaire||'')}</span></div>${obs}`;
                     });
+                }
+                if (b.equipes_observation) {
+                    eqHtml += `<div style="margin-top:6px; font-size:11px; color:#4b5563; background:#f9fafb; border-radius:6px; padding:5px 8px;">📝 ${esc(b.equipes_observation)}</div>`;
                 }
                 html += `<div class="bo-section"><div class="bo-section-header">👥 Equipes (${b.equipes.length})</div><div class="bo-section-body">${eqHtml}</div></div>`;
             }
