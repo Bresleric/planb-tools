@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>PlanB Tools - Approvisionnement</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
     <style>
@@ -974,12 +974,13 @@
             to { transform: rotate(360deg); }
         }
     
-        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
-           La barre translucide flotte par-dessus les PWA ; on repousse les
-           en-tetes sous la zone sure declaree par le systeme. */
+        /* iOS 26 Liquid Glass : ce module est une app plein ecran (body 100vh,
+           defilement interieur) - l en-tete occupe le sommet du viewport et la
+           bande de verre systeme le delave. Remede : decaler TOUT le corps de
+           page sous la zone sure, le verre ne floute plus que du fond vide. */
         @supports (padding: env(safe-area-inset-top)) {
-            header, .header {
-                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            body {
+                padding-top: env(safe-area-inset-top);
             }
         }
     </style>
