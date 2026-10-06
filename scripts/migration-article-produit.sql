@@ -1,0 +1,22 @@
+-- ============================================================================
+-- Migration : entree en stock des produits fabriques (06/10/2026)
+--
+-- CONSTAT : fiches_techniques.article_id existait DEJA pour "cette fiche
+-- produit l article" (selecteur dans l editeur de fiche). Une colonne
+-- article_produit_id a ete creee par erreur (doublon) puis son DROP a gele
+-- (timeout DDL Supabase connu). A REJOUER si la colonne existe encore :
+--
+--   ALTER TABLE fiches_techniques DROP COLUMN IF EXISTS article_produit_id;
+--
+-- Verification : SELECT column_name FROM information_schema.columns
+--   WHERE table_name = 'fiches_techniques' AND column_name = 'article_produit_id';
+--   (doit renvoyer 0 ligne apres le drop)
+--
+-- Mapping deja en place (fait par la conversation Fiches techniques) :
+--   Lardons/Oignons pour Munsterflette  -> article "Lardons/Oignons Munsterflette (PI)"
+--   Munsterflette                        -> article "Munsterflette poche S/V (PI)"
+--   Munster taille pour Munsterflette    -> article "Munster taille Munsterflette (PI)"
+--
+-- Aucune autre migration necessaire : l entree en stock utilise les tables
+-- existantes (scans, scan_tracabilite, stock_mouvements) et la vue stock_par_lot.
+-- ============================================================================

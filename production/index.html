@@ -3267,7 +3267,7 @@ function openProductionModal() {
       if (fiche) {
         document.getElementById('p-nom').value = fiche.nom;
         document.getElementById('p-quantite').value = fiche.rendement_quantite || '';
-        document.getElementById('p-unite').value = fiche.rendement_unite || 'kg';
+        setUniteSelectValue('p-unite', fiche.rendement_unite, 'kg');
 
         // Set category
         document.querySelectorAll('#p-categorie .chip').forEach(chip => {
@@ -3391,6 +3391,23 @@ function updateDlcAutoDisplay(fiche) {
   document.getElementById('p-dlc-manual').value = formatDateTimeLocal(dlcDate);
 }
 
+// Selectionne une valeur dans un <select> d unites en AJOUTANT l option si elle
+// manque. Sans ca, select.value = 'poches' (ou 'portions', 'morceaux'...) echoue
+// en silence et la production est enregistree avec la mauvaise unite (ex. kg).
+function setUniteSelectValue(selectId, value, fallback) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const v = value || fallback;
+  if (!v) return;
+  if (!Array.from(sel.options).some(o => o.value === v)) {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  }
+  sel.value = v;
+}
+
 function formatDateTimeLocal(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -3398,6 +3415,70 @@ function formatDateTimeLocal(date) {
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
   return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+// ============= ENTREE EN STOCK DES PRODUITS FABRIQUES =============
+// Si la fiche declare l article qu elle produit (fiches_techniques.article_id,
+// selecteur "Cette fiche produit l article" de l editeur), chaque production
+// cree le trio scans -> scan_tracabilite -> mouvement ENTREE : le lot fabrique
+// apparait dans stock_par_lot et devient scannable comme ingredient (FEFO)
+// dans les fiches qui le consomment (ex. : LOMU scanne au demarrage de MUFL).
+// Echec NON bloquant : la production reste valide, on previent par toast.
+async function createStockEntreeProduction(production, fiche, lot) {
+  if (!production || !fiche || !fiche.article_id || !lot) return;
+  try {
+    const nowISO = new Date().toISOString();
+    const { data: scan, error: e1 } = await sb.from('scans').insert({
+      etablissement: currentEtablissement,
+      type_document: 'etiquette_produit',
+      voie_capture: 'camera_inapp',
+      storage_path: 'production/' + production.id, // lot interne : pas de photo
+      nb_pages: 1,
+      statut: 'valide',
+      observation: 'Entree auto en stock : production ' + (lot.numero_lot || production.nom_produit),
+      valide_par_id: currentUser.id,
+      valide_par_nom: currentUser.nom,
+      date_validation: nowISO,
+      created_by_id: currentUser.id,
+      created_by_nom: currentUser.nom,
+      created_by_initiales: currentUser.initiales || null,
+    }).select().single();
+    if (e1) throw e1;
+
+    const { data: trac, error: e2 } = await sb.from('scan_tracabilite').insert({
+      scan_id: scan.id,
+      produit: production.nom_produit,
+      lot: lot.numero_lot || null,
+      dlc: production.dlc ? production.dlc.substring(0, 10) : null,
+      poids_net_kg: (production.unite === 'kg') ? production.quantite_produite : null,
+      article_id: fiche.article_id,
+      match_par_id: currentUser.id,
+      match_par_nom: currentUser.nom,
+      match_at: nowISO,
+      confiance: 100,
+    }).select().single();
+    if (e2) throw e2;
+
+    const { error: e3 } = await sb.from('stock_mouvements').insert({
+      type: 'ENTREE',
+      article_id: fiche.article_id,
+      scan_tracabilite_id: trac.id,
+      quantite: production.quantite_produite,
+      unite: production.unite || null,
+      etablissement: currentEtablissement,
+      motif: 'Production ' + (lot.numero_lot || production.nom_produit),
+      source_table: 'productions',
+      source_id: production.id,
+      created_by_id: currentUser.id,
+      created_by_nom: currentUser.nom,
+      created_by_initiales: currentUser.initiales || null,
+    });
+    if (e3) throw e3;
+    showToast('📦 Lot ' + (lot.numero_lot || '') + ' entré en stock', 'success');
+  } catch (e) {
+    console.error('[Entree stock production]', e);
+    showToast('Production OK mais entrée en stock échouée : ' + e.message, 'error');
+  }
 }
 
 function clearDlcManual() {
@@ -3503,6 +3584,9 @@ async function saveProduction() {
     };
 
     const saved = await DB.createProduction(production);
+
+    // Entree en stock du produit fabrique (si la fiche declare son article)
+    await createStockEntreeProduction(saved, fiche, lot);
 
     // Logger les actions post-production cochées/sautées
     if (apLogEntries.length > 0) {
@@ -3756,7 +3840,7 @@ async function editFiche(id) {
   document.getElementById('code-court-status').textContent = fiche.code_court ? '✓ Code existant' : '';
   document.getElementById('f-sous-cat').value = fiche.sous_categorie || '';
   document.getElementById('f-rendement-qty').value = fiche.rendement_quantite || '';
-  document.getElementById('f-rendement-unite').value = fiche.rendement_unite || 'portions';
+  setUniteSelectValue('f-rendement-unite', fiche.rendement_unite, 'portions');
   document.getElementById('f-temps-prep').value = fiche.temps_preparation || '';
   document.getElementById('f-temps-cuisson').value = fiche.temps_cuisson || '';
   document.getElementById('f-temps-repos').value = fiche.temps_repos || '';
@@ -4351,6 +4435,22 @@ async function dlcExtend(productionId) {
 }
 
 // ============= ÉTIQUETTE AMÉLIORÉE =============
+// Unites "contenant denombrable" : le nombre d etiquettes propose par defaut
+// est alors la quantite produite (ex. : 5 poches de Munsterflette -> 5 etiquettes).
+const UNITES_CONTENANT = ['poche', 'poches', 'pièce', 'pièces', 'piece', 'pieces', 'portion', 'portions', 'sachet', 'sachets', 'barquette', 'barquettes', 'bac', 'bacs', 'boîte', 'boites', 'morceau', 'morceaux'];
+function nbEtiquettesParDefaut(production) {
+  const u = (production.unite || '').toLowerCase().trim();
+  if (!UNITES_CONTENANT.includes(u)) return 1;
+  const q = Math.round(parseFloat(production.quantite_produite));
+  return (q >= 1 && q <= 50) ? q : 1;
+}
+function etiNbStep(delta) {
+  const input = document.getElementById('eti-nb');
+  if (!input) return;
+  const v = Math.max(1, Math.min(50, (parseInt(input.value, 10) || 1) + delta));
+  input.value = v;
+}
+
 function showEtiquette(production) {
   const dlcInfo = getDlcLevel(production.dlc);
   const lot = allLots.find(l => l.id === production.lot_id);
@@ -4395,6 +4495,12 @@ function showEtiquette(production) {
             <div class="lbl">DATE LIMITE DE CONSOMMATION</div>
             <div class="val">${dlcStr}</div>
           </div>` : ''}
+        </div>
+        <div style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 14px 0;">
+          <span style="font-size:13px; font-weight:600; color:#374151;">Nombre d'étiquettes</span>
+          <button type="button" onclick="etiNbStep(-1)" style="width:36px; height:36px; border:1px solid #d1d5db; background:#f9fafb; border-radius:8px; font-size:18px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;">−</button>
+          <input type="number" id="eti-nb" value="${nbEtiquettesParDefaut(production)}" min="1" max="50" inputmode="numeric" style="width:54px; height:36px; text-align:center; font-size:16px; font-weight:700; border:1px solid #d1d5db; border-radius:8px;">
+          <button type="button" onclick="etiNbStep(1)" style="width:36px; height:36px; border:1px solid #d1d5db; background:#f9fafb; border-radius:8px; font-size:18px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;">+</button>
         </div>
         <div class="etiquette-actions">
           <button class="etiquette-btn close" onclick="closeEtiquette()">Fermer</button>
@@ -4517,6 +4623,11 @@ function printEtiquette(productionId) {
   const production = allProductions.find(p => p.id === productionId);
   if (!production) { showToast('Production introuvable', 'error'); return; }
 
+  // Nombre d etiquettes choisi dans la fenetre etiquette (1 par defaut)
+  const nbInput = document.getElementById('eti-nb');
+  const nbCopies = Math.max(1, Math.min(50, parseInt(nbInput && nbInput.value, 10) || nbEtiquettesParDefaut(production)));
+  const btnLabel = nbCopies > 1 ? ('🖨 Imprimer les ' + nbCopies + ' étiquettes') : "🖨 Imprimer l'étiquette";
+
   const lot = allLots.find(l => l.id === production.lot_id);
   const lotNum = lot?.numero_lot || '—';
   const etabNames = { freddy: 'FR', liesel: 'LI' };
@@ -4555,7 +4666,7 @@ function printEtiquette(productionId) {
   const formatClass = 'format-' + labelFormat.mode;
 
   // Données pour la génération PDF (utilisée par le bouton "Imprimer")
-  const pdfData = { dayName, dayClass, etabShort, produit, lotNum, qte, unite, producteur, prodDateStr, dlcStr };
+  const pdfData = { dayName, dayClass, etabShort, produit, lotNum, qte, unite, producteur, prodDateStr, dlcStr, nbCopies };
   // On expose la fonction de génération à la page imprimable (capture des data via fermeture)
   window.__currentPdfData = pdfData;
 
@@ -4739,7 +4850,7 @@ function printEtiquette(productionId) {
 </head>
 <body class="${formatClass}">
   <div class="screen-wrap">
-    <h1>Aperçu étiquette ${labelFormat.mode === 'large-rotated' ? '(grand format pivoté 62×100mm)' : '(62×29mm)'}</h1>
+    <h1>Aperçu étiquette ${labelFormat.mode === 'large-rotated' ? '(grand format pivoté 62×100mm)' : '(62×29mm)'}${nbCopies > 1 ? ' — ' + nbCopies + ' exemplaires' : ''}</h1>
     <div class="preview-frame">
       <div class="label">
         ${labelFormat.mode === 'large-rotated' ? '<div class="rotated-wrap">' : ''}
@@ -4761,7 +4872,7 @@ function printEtiquette(productionId) {
       </div>
     </div>
     <div class="screen-actions">
-      <button id="btnPrintPdf" class="screen-btn print" onclick="genererEtImprimerPdf()">🖨 Imprimer l'étiquette</button>
+      <button id="btnPrintPdf" class="screen-btn print" onclick="genererEtImprimerPdf()">${escapeHtml(btnLabel)}</button>
       <button class="screen-btn back" onclick="history.back()">← Retour</button>
     </div>
   </div>
@@ -4783,8 +4894,18 @@ function printEtiquette(productionId) {
     function genererPdfBlob(d) {
       // Format paysage 89×62mm pour DK-22251 (rouleau continu 62mm, longueur de coupe 89mm).
       // Destiné à être imprimé via Brother iPrint&Label (Partager → iPrint&Label).
+      // d.nbCopies > 1 : N pages identiques = N étiquettes (ex. 5 poches Munsterflette).
       var jsPDF = window.jspdf.jsPDF;
       var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [62, 89] });
+      var copies = Math.max(1, parseInt(d.nbCopies, 10) || 1);
+      for (var c = 0; c < copies; c++) {
+        if (c > 0) doc.addPage([62, 89], 'landscape');
+        dessinerEtiquette(doc, d);
+      }
+      return doc.output('blob');
+    }
+
+    function dessinerEtiquette(doc, d) {
       var W = 89, H = 62, PAD = 3;
 
       // Layout vertical (jsPDF top-down, y croissant vers le bas)
@@ -4865,8 +4986,6 @@ function printEtiquette(productionId) {
       doc.setFontSize(8);
       var dlcLabelW = doc.getTextWidth('DLC');
       doc.text('DLC', dlcX - dlcLabelW - 1, row3BaseY - 2);
-
-      return doc.output('blob');
     }
 
     async function genererEtImprimerPdf() {
@@ -4888,7 +5007,7 @@ function printEtiquette(productionId) {
           window.location.href = URL.createObjectURL(genererPdfBlob(pdfData));
         } catch (e) {
           btn.disabled = false;
-          btn.textContent = '🖨 Imprimer l\\'étiquette';
+          btn.textContent = ${JSON.stringify(btnLabel)};
           alert('Erreur génération PDF : ' + e.message);
         }
         return;
@@ -4896,7 +5015,7 @@ function printEtiquette(productionId) {
       // jsPDF pret : generation synchrone DANS le geste, puis partage direct.
       try {
         var blob = genererPdfBlob(pdfData);
-        var file = new File([blob], 'etiquette.pdf', { type: 'application/pdf' });
+        var file = new File([blob], ${JSON.stringify(nbCopies > 1 ? 'etiquettes-x' + nbCopies + '.pdf' : 'etiquette.pdf')}, { type: 'application/pdf' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file] });
         } else {
@@ -4915,7 +5034,7 @@ function printEtiquette(productionId) {
     // sinon il reste fige sur "Generation PDF..." et parait inutile.
     window.addEventListener('pageshow', function () {
       var b = document.getElementById('btnPrintPdf');
-      if (b) { b.disabled = false; b.textContent = '🖨 Imprimer l\\'étiquette'; }
+      if (b) { b.disabled = false; b.textContent = ${JSON.stringify(btnLabel)}; }
     });
     // Prechargement jsPDF des l'ouverture de l'apercu (hors geste utilisateur) :
     // indispensable pour que navigator.share() soit appelable dans le geste au tap.
@@ -5818,7 +5937,7 @@ async function pdOpenProductionModalForFiche(fiche, task) {
   ficheSelect.disabled = true; // pas de changement de fiche en cours de production
   document.getElementById('p-nom').value = fiche.nom;
   document.getElementById('p-quantite').value = fiche.rendement_quantite || '';
-  document.getElementById('p-unite').value = fiche.rendement_unite || 'kg';
+  setUniteSelectValue('p-unite', fiche.rendement_unite, 'kg');
   document.getElementById('p-observation').value = '';
   document.getElementById('p-dlc-manual').value = '';
   document.getElementById('p-dlc-auto').style.display = 'none';
@@ -6841,6 +6960,8 @@ try { saveProduction = async function pdSaveProductionWrapper() {
         observation: observation || null,
         etablissement: currentEtablissement
       });
+      // Entree en stock du produit fabrique (si la fiche declare son article)
+      if (!isACreer) await createStockEntreeProduction(saved, fiche, lot);
     }
 
     // Actions post-production
