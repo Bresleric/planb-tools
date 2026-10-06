@@ -3,14 +3,14 @@
 --
 -- CONSTAT : fiches_techniques.article_id existait DEJA pour "cette fiche
 -- produit l article" (selecteur dans l editeur de fiche). Une colonne
--- article_produit_id a ete creee par erreur (doublon) puis son DROP a gele
--- (timeout DDL Supabase connu). A REJOUER si la colonne existe encore :
+-- article_produit_id avait ete creee par erreur (doublon).
 --
---   ALTER TABLE fiches_techniques DROP COLUMN IF EXISTS article_produit_id;
---
--- Verification : SELECT column_name FROM information_schema.columns
---   WHERE table_name = 'fiches_techniques' AND column_name = 'article_produit_id';
---   (doit renvoyer 0 ligne apres le drop)
+-- RESOLU le 06/10/2026 : DROP applique via pg_cron (job one-shot puis
+-- unschedule). ASTUCE REUTILISABLE contre le gel DDL : quand un ALTER gele
+-- cote client (timeout 60s MCP), le faire executer cote serveur :
+--   SELECT cron.schedule('job-temporaire', '* * * * *', 'ALTER TABLE ...;');
+--   -- attendre 1 min, verifier, puis :
+--   SELECT cron.unschedule('job-temporaire');
 --
 -- Mapping deja en place (fait par la conversation Fiches techniques) :
 --   Lardons/Oignons pour Munsterflette  -> article "Lardons/Oignons Munsterflette (PI)"
