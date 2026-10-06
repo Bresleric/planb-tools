@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v92';   // bump a chaque mise a jour du SW (v92 : prevision du temps d execution des taches TAF 06/10/2026)
+const CACHE_NAME = 'planb-tools-v93';   // bump a chaque mise a jour du SW (v93 : duree estimee saisissable sur taches et recurrences TAF 06/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

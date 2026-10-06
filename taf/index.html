@@ -1731,6 +1731,8 @@
   }
 
   function estimationTache(t) {
+    // Priorite : duree saisie a la main > historique des chronos > fiche technique
+    if (t.duree_estimee_minutes > 0) return { secondes: t.duree_estimee_minutes * 60, source: 'durée saisie sur la tâche' };
     const h = dureesHistorique && dureesHistorique[normTache(t.tache)];
     if (h) return { secondes: h.mediane, source: `médiane de ${h.n} chrono${h.n > 1 ? 's' : ''} sur 120 j` };
     if (t.fiche_id) {
@@ -1876,6 +1878,7 @@
           creneau: rec.creneau,
           priorite: rec.priorite || 3,
           categorie: rec.categorie || null,
+          duree_estimee_minutes: rec.duree_estimee_minutes || null,
           observation: rec.observation || '',
           echeance: today,
           date_creation: new Date().toISOString(),
@@ -3467,6 +3470,10 @@
           <textarea class="form-textarea" id="edit-task-obs" style="min-height:50px">${esc(task.observation || '')}</textarea>
         </div>
         <div class="form-group" style="margin:0">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Durée estimée (minutes)</label>
+          <input class="form-input" type="number" inputmode="numeric" min="1" max="480" id="edit-task-duree" value="${task.duree_estimee_minutes || ''}" placeholder="Vide = estimation automatique (chronos passés)">
+        </div>
+        <div class="form-group" style="margin:0">
           <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px">Échéance</label>
           <input class="form-input" type="date" id="edit-task-date" value="${task.echeance || dateStr(filterDate)}">
         </div>
@@ -3591,6 +3598,7 @@
         priorite: priorite,
         categorie: categorie,
         observation: obs || null,
+        duree_estimee_minutes: parseInt(document.getElementById('edit-task-duree')?.value) || null,
         echeance: echeance || dateStr(filterDate),
         attribue_a_id: editAssignee ? editAssignee.id : null,
         attribue_a_nom: editAssignee ? editAssignee.nom : null,
@@ -3698,6 +3706,12 @@
         <div class="form-group">
           <label>Observation</label>
           <textarea class="form-textarea" id="create-obs" placeholder="Notes, quantités, détails..."></textarea>
+        </div>
+
+        <!-- Duree estimee (previsions de charge) -->
+        <div class="form-group">
+          <label>Durée estimée (minutes)</label>
+          <input class="form-input" type="number" inputmode="numeric" min="1" max="480" id="create-duree" placeholder="Vide = estimation automatique (chronos passés)">
         </div>
 
         <!-- Échéance -->
@@ -3958,6 +3972,7 @@
         priorite,
         categorie,
         observation: obs || null,
+        duree_estimee_minutes: parseInt(document.getElementById('create-duree')?.value) || null,
         echeance: echeance || dateStr(filterDate),
         date_creation: new Date().toISOString(),
         etablissement: currentEtablissement,
@@ -5242,6 +5257,10 @@
         <input class="form-input" id="rec-nom" placeholder="Ex: Nettoyer les plaques">
       </div>
       <div class="form-group">
+        <label>Durée estimée (minutes)</label>
+        <input class="form-input" type="number" inputmode="numeric" min="1" max="480" id="rec-duree" placeholder="Vide = estimation automatique (chronos passés)">
+      </div>
+      <div class="form-group">
         <label>Équipe</label>
         <select class="form-select" id="rec-equipe">
           ${EQUIPES.map(e => `<option value="${e}">${e.charAt(0).toUpperCase() + e.slice(1)}</option>`).join('')}
@@ -5347,6 +5366,7 @@
         priorite: parseInt(document.getElementById('rec-priorite').value),
         frequence_type: type,
         frequence_valeur: valeur,
+        duree_estimee_minutes: parseInt(document.getElementById('rec-duree')?.value) || null,
         observation: document.getElementById('rec-obs').value.trim() || null,
         date_debut: document.getElementById('rec-debut').value || dateStr(new Date()),
         etablissement: currentEtablissement,
