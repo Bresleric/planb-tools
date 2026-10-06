@@ -996,7 +996,7 @@
             },
             {
                 id: 'notes-service',
-                name: 'Notes de service',
+                name: 'Notes de service & Informations',
                 icon: '📌',
                 description: 'Informations officielles + signature de lecture',
                 minRole: 'collaborateur',
@@ -1074,14 +1074,9 @@
                 minRole: 'collaborateur',
                 url: './howto/index.html?v=1'
             },
-            {
-                id: 'information',
-                name: 'Information',
-                icon: '📰',
-                description: 'Journal d\'entreprise',
-                minRole: 'collaborateur',
-                url: './information/index.html?v=1'
-            },
+            // Module Information retire le 06/10/2026 (doublon avec Notes de
+            // service, renomme "Notes de service & Informations"). Le dossier
+            // information/ et ses tables restent en place : reversible.
             {
                 id: 'admin',
                 name: 'Administration',
@@ -1497,16 +1492,7 @@
                 }
             } catch (e) { console.warn('Badge Briefings error:', e); }
 
-            try {
-                // 5. Information : infos publiees ciblant le user et non lues
-                const { data: cnt, error: errInfo } = await supabaseClient.rpc('info_count_non_lues', {
-                    p_user_id: currentUser.id,
-                    p_etablissement: currentEstablishment,
-                    p_equipe: currentUser.equipe || null
-                });
-                if (errInfo) throw errInfo;
-                setBadge('information', cnt || 0);
-            } catch (e) { console.warn('Badge Information error:', e); }
+            // (Badge du module Information retire le 06/10/2026 avec le module)
 
             // Toutes les pastilles sont chargees : alerte de connexion si besoin
             maybeShowActionsAlert(badgeCounts);
@@ -1521,8 +1507,7 @@
             'liaison':      'message(s) à lire dans le cahier',
             'checklist':    'check-list(s) à compléter',
             'temperatures': 'relevé(s) de température à faire',
-            'briefings':    'briefing(s) à lire',
-            'information':  'info(s) à lire'
+            'briefings':    'briefing(s) à lire'
         };
         function maybeShowActionsAlert(badgeCounts) {
             try {
