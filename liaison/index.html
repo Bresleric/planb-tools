@@ -189,7 +189,7 @@
                     .or(`created_at.gte.${depuis},epingle.eq.true`)
                     .order('created_at', { ascending: false })
                     .limit(200),
-                sb.from('users').select('id, nom, initiales')
+                sb.from('users').select('id, nom, initiales, equipe')
                     .eq('actif', true).eq('etablissement', currentEstablishment).order('nom'),
             ]);
             if (msgRes.error) {
@@ -366,17 +366,44 @@
         }
 
         // ============ COMPOSER ============
+        // Boutons d equipe (demande Eric 06/10) : un tap coche d un coup tous les
+        // membres de l equipe, puis on peut decocher individuellement (ex. :
+        // cagnotte surprise -> selectionner Salle et retirer l interesse).
+        const EQUIPE_LABELS = { cuisine: '🍳 Cuisine', salle: '🍽 Salle', plonge: '🧽 Plonge', autre: '👤 Autres' };
+        function membresEquipe(eq) { return equipe.filter(u => (u.equipe || 'autre') === eq); }
+        function toggleEquipe(eq) {
+            const membres = membresEquipe(eq);
+            if (membres.length === 0) return;
+            const tousCoches = membres.every(m => destSelection.has(m.id));
+            membres.forEach(m => { if (tousCoches) destSelection.delete(m.id); else destSelection.add(m.id); });
+            renderDestChips();
+        }
+
         function renderDestChips() {
             const row = document.getElementById('dest-row');
             row.querySelectorAll('.dest-chip:not(#dest-tous)').forEach(c => c.remove());
+            // Chips d equipe : dans l ordre metier, seulement celles qui ont des membres
+            ['cuisine', 'salle', 'plonge', 'autre'].forEach(eq => {
+                const membres = membresEquipe(eq);
+                if (membres.length === 0) return;
+                const chip = document.createElement('span');
+                const tousCoches = membres.every(m => destSelection.has(m.id));
+                chip.className = 'dest-chip' + (tousCoches ? ' on' : '');
+                chip.style.borderStyle = 'dashed';
+                chip.style.fontWeight = '700';
+                chip.textContent = EQUIPE_LABELS[eq] || eq;
+                chip.title = membres.map(m => m.nom.split(' ')[0]).join(', ');
+                chip.onclick = () => toggleEquipe(eq);
+                row.appendChild(chip);
+            });
             equipe.forEach(u => {
                 const chip = document.createElement('span');
                 chip.className = 'dest-chip' + (destSelection.has(u.id) ? ' on' : '');
                 chip.textContent = u.nom.split(' ')[0];
                 chip.onclick = () => {
                     if (destSelection.has(u.id)) destSelection.delete(u.id); else destSelection.add(u.id);
-                    document.getElementById('dest-tous').classList.toggle('on', destSelection.size === 0);
-                    chip.classList.toggle('on');
+                    // Re-render complet : l etat des chips d equipe depend des membres coches
+                    renderDestChips();
                 };
                 row.appendChild(chip);
             });
