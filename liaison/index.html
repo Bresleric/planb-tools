@@ -91,6 +91,16 @@
         <div class="composer">
             <input type="text" id="compose-titre" placeholder="Titre (optionnel) — ex : Choucroute, Parking, Passation midi→soir" style="width:100%; padding:9px 10px; font-size:14px; font-weight:600; border:1px solid var(--gray-200); border-radius:10px; background:var(--gray-50); margin-bottom:6px;">
             <textarea id="compose-texte" placeholder="Consigne, info de service, passation entre équipes..."></textarea>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                <label class="btn-small" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📷 Photo
+                    <input type="file" accept="image/*" multiple style="display:none;" onchange="onPiecesChoisies(event, 'composer')">
+                </label>
+                <label class="btn-small" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📎 Fichier
+                    <input type="file" style="display:none;" onchange="onPiecesChoisies(event, 'composer')">
+                </label>
+                <span style="font-size:11px; color:var(--gray-400);">photo compressée automatiquement</span>
+            </div>
+            <div id="pj-preview-composer" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;"></div>
             <div class="dest-row" id="dest-row">
                 <span class="dest-label">À l'attention de :</span>
                 <span class="dest-chip on" id="dest-tous" onclick="resetDest()">👥 Toute l'équipe</span>
@@ -208,6 +218,153 @@
             renderFeed();
         }
 
+        // ============ PIECES JOINTES (photos + fichiers) ============
+        // Les fichiers choisis sont stockes en memoire par contexte ('composer'
+        // ou l id du message parent pour une reponse), compresses s il s agit
+        // d images, puis uploades vers le bucket public 'liaison-images' au
+        // moment de la publication (apres signature PIN). Les metadonnees sont
+        // enregistrees dans liaison_messages.pieces_jointes (jsonb) : la piece
+        // jointe suit donc exactement la visibilite de son message.
+        const BUCKET_LIAISON = 'liaison-images';
+        let pendingPJ = { composer: [] };
+
+        function pjUrl(path) {
+            return sb.storage.from(BUCKET_LIAISON).getPublicUrl(path).data.publicUrl;
+        }
+        function tailleLisible(octets) {
+            if (!octets) return '';
+            if (octets < 1024 * 1024) return Math.round(octets / 1024) + ' Ko';
+            return (octets / (1024 * 1024)).toFixed(1) + ' Mo';
+        }
+
+        // Redimensionne a 1600px max + JPEG qualite 0.8 : une photo iPhone de
+        // plusieurs Mo descend vers ~300 Ko. En cas de pepin on garde l original.
+        async function compresserImage(file) {
+            if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
+            try {
+                const url = URL.createObjectURL(file);
+                const img = await new Promise((res, rej) => {
+                    const i = new Image();
+                    i.onload = () => res(i);
+                    i.onerror = rej;
+                    i.src = url;
+                });
+                const MAX = 1600;
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (Math.max(w, h) > MAX) {
+                    const k = MAX / Math.max(w, h);
+                    w = Math.round(w * k); h = Math.round(h * k);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+                URL.revokeObjectURL(url);
+                if (!blob || blob.size >= file.size) return file;
+                const nom = (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg';
+                return new File([blob], nom, { type: 'image/jpeg' });
+            } catch (e) { console.warn('Compression image:', e); return file; }
+        }
+
+        async function onPiecesChoisies(event, cle) {
+            const files = Array.from(event.target.files || []);
+            event.target.value = '';
+            if (files.length === 0) return;
+            if (!pendingPJ[cle]) pendingPJ[cle] = [];
+            for (const f of files) {
+                const estImage = f.type.startsWith('image/');
+                if (!estImage && f.size > 20 * 1024 * 1024) { showToast(`${f.name} dépasse 20 Mo`, 'error'); continue; }
+                const file = estImage ? await compresserImage(f) : f;
+                if (estImage && file.size > 5 * 1024 * 1024) { showToast(`${f.name} reste trop lourde apres compression`, 'error'); continue; }
+                pendingPJ[cle].push({
+                    file,
+                    nom: f.name || file.name,
+                    estImage,
+                    previewUrl: estImage ? URL.createObjectURL(file) : null,
+                });
+            }
+            renderPjPreview(cle);
+        }
+
+        function retirerPJ(cle, idx) {
+            const list = pendingPJ[cle] || [];
+            const p = list[idx];
+            if (p && p.previewUrl) try { URL.revokeObjectURL(p.previewUrl); } catch (e) {}
+            list.splice(idx, 1);
+            renderPjPreview(cle);
+        }
+
+        function renderPjPreview(cle) {
+            const zone = document.getElementById('pj-preview-' + cle);
+            if (!zone) return;
+            const list = pendingPJ[cle] || [];
+            zone.innerHTML = list.map((p, i) => p.estImage
+                ? `<span style="position:relative; display:inline-block;">
+                       <img src="${p.previewUrl}" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--gray-200);">
+                       <button onclick="retirerPJ('${cle}', ${i})" style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; border:none; background:var(--red); color:white; font-size:13px; font-weight:700; cursor:pointer; line-height:1;">×</button>
+                   </span>`
+                : `<span class="badge gray" style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px;">📎 ${esc(p.nom)} <span style="color:var(--gray-400);">${tailleLisible(p.file.size)}</span>
+                       <button onclick="retirerPJ('${cle}', ${i})" style="border:none; background:none; color:var(--red); font-size:14px; font-weight:700; cursor:pointer; padding:0;">×</button>
+                   </span>`).join('');
+        }
+
+        // Upload de toutes les pieces en attente d un contexte. Renvoie le tableau
+        // a stocker dans pieces_jointes. En cas d echec, on supprime ce qui a deja
+        // ete envoye pour ne pas laisser d orphelins, puis on relance l erreur.
+        async function uploadPJ(cle) {
+            const list = pendingPJ[cle] || [];
+            const out = [];
+            const envoyes = [];
+            try {
+                for (const p of list) {
+                    const ext = ((p.file.name || '').split('.').pop() || 'bin').toLowerCase();
+                    const path = `${currentEstablishment}/${crypto.randomUUID()}.${ext}`;
+                    const { error } = await sb.storage.from(BUCKET_LIAISON).upload(path, p.file, { contentType: p.file.type });
+                    if (error) throw error;
+                    envoyes.push(path);
+                    out.push({ type: p.estImage ? 'image' : 'fichier', path, nom: p.nom, mime: p.file.type, taille: p.file.size });
+                }
+                return out;
+            } catch (e) {
+                if (envoyes.length) try { await sb.storage.from(BUCKET_LIAISON).remove(envoyes); } catch (e2) {}
+                throw e;
+            }
+        }
+
+        function viderPJ(cle) {
+            (pendingPJ[cle] || []).forEach(p => { if (p.previewUrl) try { URL.revokeObjectURL(p.previewUrl); } catch (e) {} });
+            pendingPJ[cle] = [];
+            renderPjPreview(cle);
+        }
+
+        function ouvrirLightbox(url) {
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:300; display:flex; align-items:center; justify-content:center; padding:12px;';
+            ov.innerHTML = `<img src="${url}" style="max-width:100%; max-height:100%; border-radius:8px; object-fit:contain;">`;
+            ov.onclick = () => ov.remove();
+            document.body.appendChild(ov);
+        }
+
+        // HTML des pieces jointes d un message (miniatures cliquables + fichiers)
+        function pjHtml(m) {
+            const pjs = Array.isArray(m.pieces_jointes) ? m.pieces_jointes : [];
+            if (pjs.length === 0) return '';
+            let html = '';
+            const imgs = pjs.filter(p => p.type === 'image');
+            const fichiers = pjs.filter(p => p.type !== 'image');
+            if (imgs.length) {
+                html += '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">' + imgs.map(p => {
+                    const u = pjUrl(p.path);
+                    return `<img src="${u}" loading="lazy" onclick="ouvrirLightbox('${u}')" style="width:110px; height:110px; object-fit:cover; border-radius:10px; border:1px solid var(--gray-200); cursor:pointer;">`;
+                }).join('') + '</div>';
+            }
+            if (fichiers.length) {
+                html += fichiers.map(p =>
+                    `<div style="margin-top:6px;"><a href="${pjUrl(p.path)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--blue); text-decoration:none; font-weight:600;">📎 ${esc(p.nom)} <span style="color:var(--gray-400); font-size:11px; font-weight:400;">(${tailleLisible(p.taille)})</span></a></div>`).join('');
+            }
+            return html;
+        }
+
         // ============ COMPOSER ============
         function renderDestChips() {
             const row = document.getElementById('dest-row');
@@ -234,24 +391,30 @@
         function envoyerMessage() {
             const texte = document.getElementById('compose-texte').value.trim();
             const titre = document.getElementById('compose-titre').value.trim();
-            if (!texte) { showToast('Écris un message d abord', 'error'); return; }
+            const aPJ = (pendingPJ.composer || []).length > 0;
+            // Une photo seule suffit (ex. : "regarde-moi ce four"), texte optionnel
+            if (!texte && !aPJ) { showToast('Écris un message ou joins une photo d abord', 'error'); return; }
             askPIN('✍️ Signer le message', async (u) => {
                 try {
+                    const pj = await uploadPJ('composer');
                     const dests = equipe.filter(x => destSelection.has(x.id)).map(x => ({ id: x.id, nom: x.nom }));
-                    const { error } = await sb.from('liaison_messages').insert({
+                    const row = {
                         etablissement: currentEstablishment,
-                        texte,
+                        texte: texte || '',
                         titre: titre || null,
                         auteur_id: u.id, auteur_nom: u.nom, auteur_initiales: u.initiales,
                         destinataires: dests,
-                    });
+                    };
+                    if (pj.length > 0) row.pieces_jointes = pj;
+                    const { error } = await sb.from('liaison_messages').insert(row);
                     if (error) throw error;
                     document.getElementById('compose-texte').value = '';
                     document.getElementById('compose-titre').value = '';
+                    viderPJ('composer');
                     resetDest();
                     showToast(`Publié — signé ${u.nom.split(' ')[0]} ✓`, 'success');
                     await loadData();
-                } catch (e) { console.error(e); showToast('Erreur de publication', 'error'); }
+                } catch (e) { console.error(e); showToast('Erreur de publication : ' + (e.message || e), 'error'); }
             });
         }
 
@@ -279,6 +442,10 @@
         }
 
         function renderFeed() {
+            // Le re-rendu reconstruit les zones de reponse : on purge les pieces
+            // en attente des reponses (le composer, hors feed, est conserve)
+            Object.keys(pendingPJ).forEach(k => { if (k !== 'composer') viderPJ(k); });
+            pendingPJ = { composer: pendingPJ.composer || [] };
             const feed = document.getElementById('feed');
             if (messages.filter(m => !m.reponse_a && threadVisible(m)).length === 0) {
                 feed.innerHTML = '<div class="empty">Aucun message pour toi. 📒</div>';
@@ -322,12 +489,14 @@
             // Vue reduite : une seule ligne avec l essentiel (titre ou debut du texte,
             // auteur, heure, nombre de reponses) - un tap pour redeployer
             if (!estReponse && getReduits().has(m.id)) {
-                const resume = m.titre || (m.texte || '').slice(0, 60) + ((m.texte || '').length > 60 ? '…' : '');
+                const resume = m.titre || (m.texte || '').slice(0, 60) + ((m.texte || '').length > 60 ? '…' : '') || '📷 Photo';
                 const nbRep = (reponses || []).length;
+                const nbImg = (Array.isArray(m.pieces_jointes) ? m.pieces_jointes : []).filter(p => p.type === 'image').length;
                 return `<div class="msg${m.epingle ? ' epingle' : ''}" onclick="toggleReduit('${m.id}')" style="cursor:pointer; padding:8px 14px;">
                     <div style="display:flex; align-items:baseline; gap:8px;">
                         <span style="color:var(--gray-400);">▸</span>
                         <span style="font-weight:700; font-size:13px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(resume)}</span>
+                        ${nbImg ? `<span class="badge gray">📷 ${nbImg}</span>` : ''}
                         ${nbRep ? `<span class="badge gray">↩ ${nbRep}</span>` : ''}
                         <span class="msg-heure">${esc((m.auteur_initiales || m.auteur_nom || '?'))} · ${heure}</span>
                     </div>
@@ -359,14 +528,21 @@
                 repHtml += (reponses || []).map(r => renderMsg(r, [], true)).join('');
                 repHtml += `<div id="repbox-${m.id}" style="display:none; margin:8px 0 2px 18px;">
                     <textarea id="reptxt-${m.id}" placeholder="Ta réponse..." style="width:100%; min-height:44px; padding:8px; font-size:13px; border:1px solid var(--gray-200); border-radius:8px; background:var(--gray-50); resize:vertical; font-family:inherit;"></textarea>
-                    <button class="btn-small btn-lu" style="margin-top:4px;" onclick="envoyerReponse('${m.id}')">↩ Répondre (signé par PIN)</button>
+                    <div id="pj-preview-${m.id}" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;"></div>
+                    <div style="display:flex; gap:6px; margin-top:4px; align-items:center;">
+                        <button class="btn-small btn-lu" onclick="envoyerReponse('${m.id}')">↩ Répondre (signé par PIN)</button>
+                        <label class="btn-small" style="cursor:pointer;">📷
+                            <input type="file" accept="image/*" multiple style="display:none;" onchange="onPiecesChoisies(event, '${m.id}')">
+                        </label>
+                    </div>
                 </div>`;
             }
 
             return `<div class="msg${m.epingle && !estReponse ? ' epingle' : ''}"${estReponse ? ' style="margin:8px 0 2px 18px; background:var(--gray-50); box-shadow:none; border-left:3px solid var(--orange);"' : ''}>
                 <div class="msg-head">${estReponse ? '<span style="color:var(--gray-400); font-size:12px;">↩</span>' : ''}<span class="msg-auteur">${esc(m.auteur_nom || '?')}</span><span class="msg-heure">${heure}</span>${!estReponse ? `<button onclick="toggleReduit('${m.id}')" title="Réduire" style="margin-left:auto; background:none; border:none; color:var(--gray-400); font-size:13px; cursor:pointer; padding:2px 6px;">▾</button>` : ''}</div>
                 ${m.titre && !estReponse ? `<div style="font-weight:800; font-size:14px; margin-top:2px;">${esc(m.titre)}</div>` : ''}
-                <div class="msg-texte">${esc(m.texte)}</div>
+                ${m.texte ? `<div class="msg-texte">${esc(m.texte)}</div>` : ''}
+                ${pjHtml(m)}
                 ${destHtml}
                 <div class="msg-footer"><span class="lu-info">${luInfo}</span><span class="msg-actions">${actions}</span></div>
                 ${repHtml}
@@ -382,24 +558,29 @@
 
         function envoyerReponse(parentId) {
             const texte = (document.getElementById(`reptxt-${parentId}`)?.value || '').trim();
-            if (!texte) { showToast('Écris ta réponse d abord', 'error'); return; }
+            const aPJ = (pendingPJ[parentId] || []).length > 0;
+            if (!texte && !aPJ) { showToast('Écris ta réponse ou joins une photo d abord', 'error'); return; }
             const parent = messages.find(m => m.id === parentId);
             askPIN('↩ Signer la réponse', async (u) => {
                 try {
+                    const pj = await uploadPJ(parentId);
                     // La reponse est automatiquement a l attention de l auteur de la question
                     const dests = (parent && parent.auteur_id && parent.auteur_id !== u.id)
                         ? [{ id: parent.auteur_id, nom: parent.auteur_nom || '' }] : [];
-                    const { error } = await sb.from('liaison_messages').insert({
+                    const row = {
                         etablissement: currentEstablishment,
-                        texte,
+                        texte: texte || '',
                         auteur_id: u.id, auteur_nom: u.nom, auteur_initiales: u.initiales,
                         destinataires: dests,
                         reponse_a: parentId,
-                    });
+                    };
+                    if (pj.length > 0) row.pieces_jointes = pj;
+                    const { error } = await sb.from('liaison_messages').insert(row);
                     if (error) throw error;
+                    viderPJ(parentId);
                     showToast(`Réponse publiée — signée ${u.nom.split(' ')[0]} ✓`, 'success');
                     await loadData();
-                } catch (e) { console.error(e); showToast('Erreur de publication', 'error'); }
+                } catch (e) { console.error(e); showToast('Erreur de publication : ' + (e.message || e), 'error'); }
             });
         }
 
