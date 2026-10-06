@@ -290,6 +290,15 @@
     .task-chrono-live::before { content: '⏱'; font-size: 0.75rem; }
     .task-chrono-paused { color: var(--gray-500); background: var(--gray-100); border: 1px solid var(--gray-200); }
     .task-chrono-paused::before { content: '⏸'; font-size: 0.75rem; }
+    .task-duree-estimee {
+      font-size: 0.7rem; color: var(--gray-400); font-style: italic;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .charge-banner {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
+      padding: 8px 14px; margin-bottom: 10px; font-size: 0.85rem; color: #1e40af;
+    }
+    .charge-banner .charge-detail { color: #60a5fa; font-size: 0.78rem; }
     .task-duree-final {
       font-size: 0.65rem; color: var(--gray-500);
       font-variant-numeric: tabular-nums; display: block;
@@ -1180,6 +1189,7 @@
   let assignToAll = false;
   let productionLots = []; // lots du jour en cache
   let productionFiches = []; // fiches techniques en cache
+  let dureesHistorique = null; // previsions : mediane des chronos par intitule de tache
   let sortColumn = 'default'; // colonne de tri active
   let sortDir = 'asc'; // 'asc' ou 'desc'
   let selectionMode = false; // mode sélection multiple (managers+)
@@ -1668,11 +1678,73 @@
       tasks = await DB.getTasks(filterDate);
       // Attribution automatique depuis le planning Combo (personne seule en poste)
       await autoAssignFromPlanning();
+      // Previsions de duree (1 chargement par session)
+      await loadDureesHistorique();
       renderCurrentTab();
     } catch (e) {
       console.error('Erreur chargement:', e);
       showToast('Erreur de chargement', 'error');
     }
+  }
+
+  // ====== PREVISION DES DUREES ======
+  // Prevision du temps d execution d une tache (demande Eric 06/10/2026) :
+  // mediane des durees chronometrees (tasks.duree_secondes) des 120 derniers
+  // jours portant le meme intitule, les deux etablissements confondus (les
+  // recettes partagees ont les memes temps). La mediane resiste aux chronos
+  // aberrants (pause oubliee, double service...). Bornes de vraisemblance :
+  // on ignore les chronos < 1 min (fausse manip) et > 6 h (chrono oublie).
+  // Repli si aucun historique : temps de preparation de la fiche technique.
+  function normTache(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  async function loadDureesHistorique() {
+    if (dureesHistorique) return;
+    try {
+      const depuis = dateStr(new Date(Date.now() - 120 * 86400000));
+      const { data } = await supabaseClient.from('tasks')
+        .select('tache, duree_secondes')
+        .not('fait_par_id', 'is', null)
+        .gt('duree_secondes', 59)
+        .lt('duree_secondes', 6 * 3600)
+        .gte('echeance', depuis)
+        .limit(3000);
+      const parNom = {};
+      (data || []).forEach(r => {
+        const k = normTache(r.tache);
+        if (!k) return;
+        (parNom[k] = parNom[k] || []).push(r.duree_secondes);
+      });
+      dureesHistorique = {};
+      Object.keys(parNom).forEach(k => {
+        const arr = parNom[k].sort((a, b) => a - b);
+        const mid = Math.floor(arr.length / 2);
+        const med = arr.length % 2 ? arr[mid] : Math.round((arr[mid - 1] + arr[mid]) / 2);
+        dureesHistorique[k] = { mediane: med, n: arr.length };
+      });
+      // Les fiches servent de repli (temps de preparation) : cache si absent
+      if (!productionFiches.length) {
+        try { productionFiches = await DB.getFiches(currentEtablissement); } catch (e) {}
+      }
+    } catch (e) { console.warn('Historique durees:', e); dureesHistorique = {}; }
+  }
+
+  function estimationTache(t) {
+    const h = dureesHistorique && dureesHistorique[normTache(t.tache)];
+    if (h) return { secondes: h.mediane, source: `médiane de ${h.n} chrono${h.n > 1 ? 's' : ''} sur 120 j` };
+    if (t.fiche_id) {
+      const f = (productionFiches || []).find(x => x.id === t.fiche_id);
+      if (f && f.temps_preparation > 0) return { secondes: f.temps_preparation * 60, source: 'temps de préparation de la fiche technique' };
+    }
+    return null;
+  }
+
+  function formatDureeEstimee(sec) {
+    const min = Math.round(sec / 60);
+    if (min < 1) return '< 1 min';
+    if (min < 60) return min + ' min';
+    return Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0');
   }
 
   // Vérifie si la date fournie correspond à aujourd'hui
@@ -2070,6 +2142,9 @@
             // En pause : afficher la durée accumulée figée
             return `<span class="task-chrono-paused" title="Chrono en pause">${formatDureeLive(acc)}</span>`;
           }
+          // Tache a faire sans chrono : prevision de duree (historique ou fiche)
+          const est = estimationTache(t);
+          if (est) return `<span class="task-duree-estimee" title="Prévision : ${esc(est.source)}">≈ ${formatDureeEstimee(est.secondes)}</span>`;
           return '';
         })()}</div>
         <div class="task-cell">${creator ? `<span class="task-initials creator" title="Créé par ${esc(t.createur_nom)}${createdDay ? ' ' + createdDay : ''}">${creator}</span>${createdDay ? `<span style="font-size:0.65rem;color:var(--gray-400);display:block;text-align:center;margin-top:-2px">${createdDay}</span>` : ''}` : ''}</div>
@@ -2091,6 +2166,27 @@
     html += `<div class="task-row-add" onclick="switchTab('creer')" title="Créer une nouvelle tâche">
       <span class="add-icon">+</span> Ajouter une tâche
     </div>`;
+
+    // Bandeau de charge estimee : somme des previsions des taches RESTANTES
+    // de la vue filtree, avec detail par creneau
+    (() => {
+      const restantes = filtered.filter(t => !t.fait_par_id);
+      let totalSec = 0, sansEstim = 0;
+      const parCreneau = {};
+      restantes.forEach(t => {
+        const est = estimationTache(t);
+        if (est) { totalSec += est.secondes; parCreneau[t.creneau] = (parCreneau[t.creneau] || 0) + est.secondes; }
+        else sansEstim++;
+      });
+      if (totalSec > 0) {
+        const detail = ['Matin', 'Midi', 'Soir'].filter(c => parCreneau[c])
+          .map(c => `${cIcons[c] || ''} ${c} ≈ ${formatDureeEstimee(parCreneau[c])}`).join(' · ');
+        html = `<div class="charge-banner">⏱ Charge de travail restante estimée : <b>≈ ${formatDureeEstimee(totalSec)}</b>
+          ${detail ? `<span class="charge-detail"> — ${detail}</span>` : ''}
+          ${sansEstim ? `<span class="charge-detail"> · ${sansEstim} tâche${sansEstim > 1 ? 's' : ''} sans historique (non comptée${sansEstim > 1 ? 's' : ''})</span>` : ''}
+        </div>` + html;
+      }
+    })();
 
     mc.innerHTML = html;
     // Synchroniser la checkbox "tout sélectionner" (état mixte/coché)
