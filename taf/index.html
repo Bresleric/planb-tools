@@ -1735,14 +1735,34 @@
     const usersByNorm = {};
     users.forEach(u => { usersByNorm[normNomPlanning(u.nom)] = u; });
 
+    // Qui est eligible pour une tache ? Les personnes de la MEME equipe dont le
+    // planning Combo couvre le creneau de la tache :
+    //   Matin -> embauche avant 12:00 (Combo n a pas de service "matin")
+    //   Midi  -> service midi ou journee
+    //   Soir  -> service soir ou journee
+    // ATTENTION casse : tasks.creneau = "Matin"/"Midi"/"Soir", planning.service
+    // = "midi"/"soir"/"journee" -> on normalise en minuscules.
+    const eligiblesPourTache = (t) => {
+      const creneau = (t.creneau || '').toLowerCase();
+      return planningToday.filter(p => {
+        if (p.equipe !== t.equipe) return false;
+        if (creneau === 'matin') return String(p.heure_debut || '99') < '12:00:00';
+        if (creneau === 'midi') return p.service === 'midi' || p.service === 'journee';
+        if (creneau === 'soir') return p.service === 'soir' || p.service === 'journee';
+        return false;
+      });
+    };
+
     let nb = 0;
     const noms = new Set();
     for (const t of aAttribuer) {
-      const enPoste = [...new Set(planningToday
-        .filter(p => p.equipe === t.equipe && (p.service === t.creneau || p.service === 'journee'))
-        .map(p => p.employe_nom))];
-      if (enPoste.length !== 1) continue;           // ambigu ou personne : on laisse en manuel
-      const u = usersByNorm[normNomPlanning(enPoste[0])];
+      // Regle Eric (06/10/2026) : la tache revient a celui qui ARRIVE LE PREMIER
+      // sur le creneau (plus petite heure d embauche parmi les eligibles).
+      const eligibles = eligiblesPourTache(t)
+        .slice()
+        .sort((a, b) => String(a.heure_debut || '99').localeCompare(String(b.heure_debut || '99')));
+      if (eligibles.length === 0) continue;          // personne au planning : on laisse en manuel
+      const u = usersByNorm[normNomPlanning(eligibles[0].employe_nom)];
       if (!u) continue;                              // pas de compte utilisateur correspondant
       try {
         await DB.updateTask(t.id, { attribue_a_id: u.id, attribue_a_nom: u.nom, attribue_a_initiales: u.initiales });
