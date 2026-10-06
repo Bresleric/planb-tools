@@ -57,7 +57,11 @@ le BILAN ; J+1 = « aujourd'hui » (TAF, CA attendu, équipe) ; J+2 = « demain 
 ## Synchro des pointages Combo (mise en place le 04/10/2026)
 
 - Edge function `combo-pointages` (supabase/functions/combo-pointages) appelée par
-  pg_cron `combo-pointages-sync` à 03h45 et 08h45 UTC (après le veilleur).
+  pg_cron `combo-pointages-sync`. HORAIRES (demande Eric 06/10, il est matinal) :
+  veilleur `0 0,1,9 * * *`, pointages `5 0,1,9 * * *` (GMT). pg_cron est en GMT sans
+  heure d'été : le double passage 0h+1h GMT garantit un passage à 2h00 à Strasbourg
+  toute l'année ; 9h GMT = passage de rattrapage des corrections managers.
+  Trace : scripts/migration-combo-horaires-2h.sql.
   Par défaut : J-2 et J-1. Rattrapage : `?start=AAAA-MM-JJ&end=AAAA-MM-JJ`.
   Historique chargé depuis le 01/09/2026. Trace : scripts/migration-combo-pointages-cron.sql.
 - Source : GET /api/v1/plannings (même endpoint que le veilleur). Champs par shift :
