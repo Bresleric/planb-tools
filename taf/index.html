@@ -1312,7 +1312,9 @@
     },
 
     async getUsers(etab) {
-      const { data } = await supabaseClient.from('users').select('*')
+      // SECURITE : liste de colonnes explicite, sans le code PIN
+      const { data } = await supabaseClient.from('users')
+        .select('id, nom, initiales, role, equipe, etablissement, acces_etablissements, acces_modules, actif')
         .eq('actif', true).order('nom');
       // Filter by establishment access
       return (data || []).filter(u =>
@@ -1510,23 +1512,31 @@
 
   async function attemptLogin() {
     try {
-      const { data } = await supabaseClient.from('users').select('*')
-        .eq('code', pinCode).eq('actif', true);
-      if (!data?.length) {
-        if (pinCode.length >= 6) {
-          document.getElementById('login-error').textContent = 'Code incorrect';
-          document.getElementById('login-error').style.display = 'block';
-          pinClear();
-        }
+      // SECURITE phase 2 (07/10/2026) : connexion via pbt_login (PIN hache,
+      // anti force brute, appareil exige cote serveur pour les collaborateurs).
+      // On ne tente qu a 6 chiffres pour ne pas consommer le quota d essais.
+      if (pinCode.length < 6) return;
+      try { const sa = await supabaseClient.auth.getSession();
+        if (!sa.data.session) await supabaseClient.auth.signInAnonymously(); } catch (e) {}
+      const { data: pbtRes, error: pbtErr } = await supabaseClient.rpc('pbt_login', {
+        p_pin: pinCode,
+        p_device_token: localStorage.getItem('planb_device_token') || null,
+        p_memoriser: false
+      });
+      if (pbtErr || !pbtRes || !pbtRes.user) {
+        const m = (pbtErr && pbtErr.message) || '';
+        document.getElementById('login-error').textContent =
+          /Trop de tentatives|Appareil non autorise/i.test(m) ? m : 'Code incorrect';
+        document.getElementById('login-error').style.display = 'block';
+        pinClear();
         return;
       }
-      const u = data[0];
+      const u = pbtRes.user;
       currentUser = {
         id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
         equipe: u.equipe || 'cuisine',
         acces_modules: u.acces_modules || null,
-        etablissements: u.acces_etablissements?.length > 0
-          ? u.acces_etablissements : [u.etablissement]
+        etablissements: u.etablissements || []
       };
       if (currentUser.etablissements.length === 1) {
         currentEtablissement = currentUser.etablissements[0];
@@ -6411,17 +6421,20 @@
     var pin = __planbInactPin;
     var sc = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
     if (!sc) { __planbInactShowError('Connexion indisponible'); return; }
-    sc.from('users').select('id').eq('code', pin).eq('actif', true).then(function(res){
+    // SECURITE phase 2 (07/10/2026) : verification par RPC, PIN hache cote
+    // serveur. On ne verifie qu a 6 chiffres saisis, pour ne pas consommer le
+    // quota anti force brute sur des codes incomplets.
+    if (pin.length < 6) return;
+    sc.rpc('pbt_verifier_pin', { p_pin: pin }).then(function(res){
       if (pin !== __planbInactPin) return; // réponse obsolète, l'utilisateur a continué à taper
-      var data = res && res.data;
-      if (data && data.length && data[0].id === expectedId) {
+      var u = res && res.data;
+      if (u && u.id === expectedId) {
         __planbInactHide();
         resetInactivity();
-      } else if (pin.length >= 6) {
+      } else {
         __planbInactShowError('Code incorrect');
       }
-      // sinon : longueur intermédiaire, on attend silencieusement la suite
-    }).catch(function(){ if (pin === __planbInactPin && pin.length >= 6) __planbInactShowError('Erreur de vérification'); });
+    }).catch(function(){ if (pin === __planbInactPin) __planbInactShowError('Erreur de vérification'); });
   }
 
   function __planbInactShow() {

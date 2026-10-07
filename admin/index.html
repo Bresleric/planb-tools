@@ -737,9 +737,12 @@
                     <div class="hint">2-3 caractères pour identifier sur les tâches</div>
                 </div>
                 <div class="form-group">
-                    <label for="user-code">Code PIN</label>
-                    <input type="text" id="user-code" placeholder="4-6 chiffres" maxlength="6" inputmode="numeric">
-                    <div class="hint">4 à 6 chiffres (le rôle est défini séparément)</div>
+                    <label>Code PIN</label>
+                    <div class="hint">Les codes ne sont plus visibles : ils sont chiffrés en base (sécurité 07/10/2026). À la création, un code provisoire est généré et affiché UNE seule fois.</div>
+                    <div id="zone-actions-pin" style="display:none; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                        <button type="button" onclick="reinitialiserPin()" style="padding:9px 14px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">🔑 Réinitialiser le code</button>
+                        <button type="button" onclick="voirComme()" style="padding:9px 14px; background:#7c3aed; color:white; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">👁 Voir l'appli comme cette personne</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="user-role">Rôle</label>
@@ -935,7 +938,7 @@
                 try {
                     const { data, error } = await supabaseClient
                         .from('users')
-                        .select('*')
+                        .select('id, nom, initiales, role, equipe, etablissement, acces_etablissements, acces_modules, actif')
                         .order('nom');
                     if (error) throw error;
                     users = data || [];
@@ -1131,7 +1134,7 @@
             document.getElementById('modal-title').textContent = 'Nouvel utilisateur';
             document.getElementById('user-nom').value = '';
             document.getElementById('user-initiales').value = '';
-            document.getElementById('user-code').value = '';
+            document.getElementById('zone-actions-pin').style.display = 'none';
             document.getElementById('user-role').value = 'collaborateur';
             document.getElementById('user-equipe').value = 'autre';
             document.getElementById('user-etablissement').value = 'freddy';
@@ -1145,7 +1148,7 @@
             document.getElementById('modal-title').textContent = 'Modifier ' + user.nom;
             document.getElementById('user-nom').value = user.nom;
             document.getElementById('user-initiales').value = user.initiales;
-            document.getElementById('user-code').value = user.code;
+            document.getElementById('zone-actions-pin').style.display = 'flex';
             document.getElementById('user-role').value = user.role;
             document.getElementById('user-equipe').value = user.equipe || 'autre';
             document.getElementById('user-etablissement').value = user.etablissement;
@@ -1166,7 +1169,7 @@
         async function saveUser() {
             const nom = document.getElementById('user-nom').value.trim();
             const initiales = document.getElementById('user-initiales').value.trim().toUpperCase();
-            const code = document.getElementById('user-code').value.trim();
+
             const role = document.getElementById('user-role').value;
             const equipe = document.getElementById('user-equipe').value;
             const etablissement = document.getElementById('user-etablissement').value;
@@ -1179,26 +1182,14 @@
                 showToast('Veuillez remplir tous les champs', 'error');
                 return;
             }
-            if (!/^\d{4,6}$/.test(code)) {
-                showToast('Le code PIN doit contenir 4 à 6 chiffres', 'error');
-                return;
-            }
             if (initiales.length < 2 || initiales.length > 3) {
                 showToast('Les initiales doivent avoir 2-3 caractères', 'error');
-                return;
-            }
-
-            // Check code uniqueness
-            const existing = users.find(u => u.code === code && (!editingUser || u.id !== editingUser.id));
-            if (existing) {
-                showToast('Ce code PIN est déjà utilisé', 'error');
                 return;
             }
 
             const userData = {
                 nom,
                 initiales,
-                code,
                 role,
                 etablissement,
                 acces_etablissements: accesEtabs,
@@ -1237,12 +1228,67 @@
                     if (error) throw error;
                     if (data && data[0]) users.push(data[0]);
                     showToast('Utilisateur ajouté', 'success');
+                    // Code provisoire genere cote serveur, affiche UNE seule fois
+                    if (data && data[0]) await genererEtAfficherPin(data[0].id, data[0].nom);
                 }
                 closeModal();
                 renderUsers();
             } catch (e) {
                 console.error('Erreur sauvegarde:', e);
                 showToast('Erreur: ' + (e.message || 'sauvegarde échouée'), 'error');
+            }
+        }
+
+        // ============= Securite : PIN et "voir comme" (phase 2, 07/10/2026) =============
+        // Genere un code provisoire cote serveur et l affiche UNE seule fois.
+        async function genererEtAfficherPin(userId, nom) {
+            try {
+                const { data, error } = await supabaseClient.rpc('pbt_admin_reinitialiser_pin', { p_user_id: userId });
+                if (error) throw error;
+                const pin = data && data.pin_provisoire;
+                if (!pin) throw new Error('reponse inattendue');
+                const ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.95);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+                ov.innerHTML = '<div style="background:white;border-radius:16px;padding:26px 22px;max-width:360px;width:100%;text-align:center;box-sizing:border-box;">'
+                  + '<div style="font-size:17px;font-weight:700;margin-bottom:6px;">🔑 Code provisoire de ' + (nom || '').split(' ')[0] + '</div>'
+                  + '<div style="font-size:34px;font-weight:800;letter-spacing:8px;font-variant-numeric:tabular-nums;margin:12px 0;color:#b45309;">' + pin + '</div>'
+                  + '<div style="font-size:13px;color:#6b7280;line-height:1.45;">Note-le MAINTENANT : il ne sera plus jamais affiché.<br>La personne devra choisir son propre code à sa première connexion.</div>'
+                  + '<button onclick="this.closest(\'div\').parentNode.remove()" style="margin-top:16px;width:100%;padding:13px;background:#1f2937;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">J\'ai noté le code</button>'
+                  + '</div>';
+                document.body.appendChild(ov);
+            } catch (e) {
+                console.error(e);
+                showToast('Generation du code impossible : ' + (e.message || e), 'error');
+            }
+        }
+
+        async function reinitialiserPin() {
+            if (!editingUser) return;
+            if (!confirm('Réinitialiser le code de ' + editingUser.nom + ' ?\n\nSon ancien code ne fonctionnera plus, un code provisoire sera affiché une seule fois.')) return;
+            await genererEtAfficherPin(editingUser.id, editingUser.nom);
+        }
+
+        // Bascule la session sur l utilisateur cible (journalise cote serveur).
+        // Le bandeau "voir comme" et le retour se gerent sur le portail.
+        async function voirComme() {
+            if (!editingUser) return;
+            try {
+                const { data, error } = await supabaseClient.rpc('pbt_admin_voir_comme', { p_user_id: editingUser.id });
+                if (error) throw error;
+                const cible = data;
+                const admin = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+                sessionStorage.setItem('planb_impersonation', JSON.stringify({ admin_nom: (admin && admin.nom) || 'Admin' }));
+                sessionStorage.setItem('planb_user', JSON.stringify({
+                    id: cible.id, nom: cible.nom, initiales: cible.initiales,
+                    role: cible.role, equipe: cible.equipe,
+                    etablissement: sessionStorage.getItem('planb_etablissement'),
+                    etablissements: [sessionStorage.getItem('planb_etablissement')],
+                    timestamp: Date.now()
+                }));
+                window.location.href = '../';
+            } catch (e) {
+                console.error(e);
+                showToast('Voir comme impossible : ' + (e.message || e), 'error');
             }
         }
 
@@ -1269,14 +1315,7 @@
             if (e.target.id === 'user-modal') closeModal();
         });
 
-        // Auto-fill role based on PIN length
-        document.getElementById('user-code').addEventListener('input', (e) => {
-            const len = e.target.value.length;
-            const roleSelect = document.getElementById('user-role');
-            if (len === 4) roleSelect.value = 'collaborateur';
-            else if (len === 5) roleSelect.value = 'responsable';
-            else if (len === 6) roleSelect.value = 'admin';
-        });
+
 
         // Filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -1940,17 +1979,20 @@
     var pin = __planbInactPin;
     var sc = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
     if (!sc) { __planbInactShowError('Connexion indisponible'); return; }
-    sc.from('users').select('id').eq('code', pin).eq('actif', true).then(function(res){
+    // SECURITE phase 2 (07/10/2026) : verification par RPC, PIN hache cote
+    // serveur. On ne verifie qu a 6 chiffres saisis, pour ne pas consommer le
+    // quota anti force brute sur des codes incomplets.
+    if (pin.length < 6) return;
+    sc.rpc('pbt_verifier_pin', { p_pin: pin }).then(function(res){
       if (pin !== __planbInactPin) return; // réponse obsolète, l'utilisateur a continué à taper
-      var data = res && res.data;
-      if (data && data.length && data[0].id === expectedId) {
+      var u = res && res.data;
+      if (u && u.id === expectedId) {
         __planbInactHide();
         resetInactivity();
-      } else if (pin.length >= 6) {
+      } else {
         __planbInactShowError('Code incorrect');
       }
-      // sinon : longueur intermédiaire, on attend silencieusement la suite
-    }).catch(function(){ if (pin === __planbInactPin && pin.length >= 6) __planbInactShowError('Erreur de vérification'); });
+    }).catch(function(){ if (pin === __planbInactPin) __planbInactShowError('Erreur de vérification'); });
   }
 
   function __planbInactShow() {

@@ -13,6 +13,7 @@
     <title>PlanB Tools</title>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="js/planb-common.js"></script>
     <style>
         :root {
             --orange: #f97316;
@@ -792,33 +793,20 @@
                 return true;
             },
 
+            // SECURITE phase 2 (07/10/2026) : la connexion passe par pbt_login
+            // (PIN hache cote serveur, anti force brute, exigence appareil pour
+            // les collaborateurs). Renvoie { user, doit_changer_code, device }
+            // ou { erreur } pour piloter l ecran suivant.
             async verifyPin(pin) {
                 if (DEMO_MODE) {
-                    return this.getDemoUser(pin);
+                    return { user: this.getDemoUser(pin), doit_changer_code: false, device: null };
                 }
-                // Production: query Supabase
                 try {
-                    const { data, error } = await supabaseClient
-                        .from('users')
-                        .select('*')
-                        .eq('code', pin)
-                        .eq('actif', true);
-                    if (error || !data || data.length === 0) return null;
-                    const u = data[0];
-                    return {
-                        id: u.id,
-                        nom: u.nom,
-                        initiales: u.initiales,
-                        role: u.role,
-                        equipe: u.equipe || null,
-                        acces_modules: u.acces_modules || null,
-                        etablissements: u.acces_etablissements && u.acces_etablissements.length > 0
-                            ? u.acces_etablissements
-                            : [u.etablissement]
-                    };
+                    const deviceToken = localStorage.getItem('planb_device_token');
+                    const res = await PLANB.login(pin, deviceToken, false);
+                    return res; // { user, doit_changer_code, device, expire_le }
                 } catch (e) {
-                    console.error('Erreur Supabase:', e);
-                    return null;
+                    return { erreur: String(e.message || e) };
                 }
             },
 
@@ -875,24 +863,11 @@
                 } catch (e) { console.error('checkDeviceToken error:', e); return null; }
             },
 
+            // SECURITE phase 2 : activation via RPC (tentatives limitees cote serveur)
             async activateDevice(code) {
                 if (DEMO_MODE) return { id: 'demo-device', nom: 'iPad Demo', device_token: 'demo-token-123', actif: true };
                 try {
-                    const { data, error } = await supabaseClient
-                        .from('devices')
-                        .select('*')
-                        .eq('code_activation', code)
-                        .single();
-                    if (error || !data) return null;
-                    if (data.date_enregistrement) return { error: 'already_activated' };
-                    // Mark as registered
-                    const { data: updated, error: updateError } = await supabaseClient
-                        .from('devices')
-                        .update({ date_enregistrement: new Date().toISOString(), derniere_connexion: new Date().toISOString() })
-                        .eq('id', data.id)
-                        .select()
-                        .single();
-                    return updated || data;
+                    return await PLANB.activerAppareil(code);
                 } catch (e) { console.error('activateDevice error:', e); return null; }
             },
 
@@ -1236,6 +1211,44 @@
             });
         }
 
+        // ============= Changement de code obligatoire (securite phase 2) =============
+        // Premiere connexion apres la bascule securisee : chaque personne choisit
+        // son nouveau code a 6 chiffres. Pas d echappatoire (pas de bouton fermer).
+        function forcerChangementCode(ancienPin, nom) {
+            return new Promise(function(resolve) {
+                var ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.97);z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,system-ui,sans-serif;color:#fff;';
+                ov.innerHTML =
+                    '<div style="background:#1e293b;padding:26px 22px;border-radius:18px;width:min(380px,92vw);box-sizing:border-box;">'
+                  +   '<h2 style="margin:0 0 6px;font-size:19px;">🔐 Nouveau code personnel</h2>'
+                  +   '<div style="font-size:13px;color:#94a3b8;line-height:1.45;margin-bottom:16px;">' + (nom ? nom.split(' ')[0] + ', p' : 'P') + 'our renforcer la sécurité, choisis ton nouveau code à <b>6 chiffres</b>. Il remplace ton ancien code dès maintenant.</div>'
+                  +   '<input type="password" id="fcc-nouveau" inputmode="numeric" maxlength="6" placeholder="Nouveau code (6 chiffres)" style="width:100%;padding:13px;font-size:20px;text-align:center;letter-spacing:6px;border:none;border-radius:10px;margin-bottom:10px;box-sizing:border-box;">'
+                  +   '<input type="password" id="fcc-confirme" inputmode="numeric" maxlength="6" placeholder="Confirme le code" style="width:100%;padding:13px;font-size:20px;text-align:center;letter-spacing:6px;border:none;border-radius:10px;box-sizing:border-box;">'
+                  +   '<div id="fcc-erreur" style="color:#f87171;font-size:13px;min-height:18px;margin-top:8px;"></div>'
+                  +   '<button id="fcc-ok" type="button" style="width:100%;padding:14px;margin-top:8px;background:#0ea5e9;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Enregistrer mon code</button>'
+                  + '</div>';
+                document.body.appendChild(ov);
+                var btn = ov.querySelector('#fcc-ok');
+                btn.onclick = async function() {
+                    var n = ov.querySelector('#fcc-nouveau').value.trim();
+                    var c = ov.querySelector('#fcc-confirme').value.trim();
+                    var err = ov.querySelector('#fcc-erreur');
+                    if (!/^[0-9]{6}$/.test(n)) { err.textContent = 'Le code doit faire exactement 6 chiffres.'; return; }
+                    if (n !== c) { err.textContent = 'Les deux saisies ne correspondent pas.'; return; }
+                    btn.disabled = true; btn.textContent = 'Enregistrement…';
+                    try {
+                        await PLANB.changerPin(ancienPin, n);
+                        ov.remove();
+                        showToast('Nouveau code enregistré ✓', 'success');
+                        resolve(n);
+                    } catch (e) {
+                        err.textContent = String(e.message || e);
+                        btn.disabled = false; btn.textContent = 'Enregistrer mon code';
+                    }
+                };
+            });
+        }
+
         function getSession() {
             const userJson = sessionStorage.getItem('planb_user');
             if (!userJson) return null;
@@ -1259,7 +1272,44 @@
             currentEstablishment = null;
         }
 
+        // ============= Bandeau "voir comme" (securite phase 2) =============
+        // Pose par admin/index.html quand l admin bascule sur un autre compte.
+        function majBandeauImpersonation() {
+            let imp = null;
+            try { imp = JSON.parse(sessionStorage.getItem('planb_impersonation') || 'null'); } catch (e) {}
+            let b = document.getElementById('bandeau-voir-comme');
+            if (!imp) { if (b) b.remove(); return; }
+            if (!b) {
+                b = document.createElement('div');
+                b.id = 'bandeau-voir-comme';
+                b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#7c3aed;color:white;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:600;box-shadow:0 -2px 8px rgba(0,0,0,0.25);';
+                document.body.appendChild(b);
+            }
+            b.innerHTML = `👁 Tu vois l'appli comme <b>${(currentUser && currentUser.nom) || '?'}</b>
+                <button onclick="quitterVoirComme()" style="background:white;color:#7c3aed;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;">Revenir à mon compte</button>`;
+        }
+        async function quitterVoirComme() {
+            try {
+                await supabaseClient.rpc('pbt_admin_revenir');
+                const { data: srv } = await supabaseClient.rpc('pbt_ma_session');
+                sessionStorage.removeItem('planb_impersonation');
+                if (srv && srv.user) {
+                    const u = srv.user;
+                    const etab = sessionStorage.getItem('planb_etablissement') || 'freddy';
+                    sessionStorage.setItem('planb_user', JSON.stringify({
+                        id: u.id, nom: u.nom, initiales: u.initiales, role: u.role,
+                        equipe: u.equipe, acces_modules: u.acces_modules,
+                        etablissement: etab, etablissements: [etab], timestamp: Date.now()
+                    }));
+                }
+                window.location.reload();
+            } catch (e) {
+                showToast('Retour impossible : ' + (e.message || e), 'error');
+            }
+        }
+
         function updateHeader() {
+            majBandeauImpersonation();
             if (currentUser && currentEstablishment) {
                 headerUser.textContent = currentUser.nom;
                 const estName = getEstablishmentDisplayName(currentEstablishment);
@@ -1619,11 +1669,33 @@
 
                 // Store token in localStorage (persists)
                 localStorage.setItem('planb_device_token', device.device_token);
-                currentDevice = device;
+                currentDevice = { id: device.id, nom: device.nom };
                 showToast('Appareil activé : ' + device.nom, 'success');
+                deviceCodeInput.value = '';
+
+                // SECURITE phase 2 : le login a ete refuse serveur faute d appareil.
+                // Maintenant que l iPad est active, on rejoue la connexion avec le PIN
+                // saisi juste avant (sinon, retour a l ecran code).
+                if (!currentUser && currentPin) {
+                    try {
+                        const res = await PLANB.login(currentPin, device.device_token, false);
+                        currentUser = res.user;
+                        if (res.doit_changer_code) await forcerChangementCode(currentPin, res.user.nom);
+                        try { sessionStorage.setItem('planb_alerte_actions', '1'); } catch (e) {}
+                    } catch (e) {
+                        showToast('Appareil activé — ressaisis ton code', 'success');
+                        currentPin = ''; updatePinDisplay(); submitBtn.disabled = true;
+                        showScreen(loginScreen);
+                        return;
+                    }
+                }
+                if (!currentUser) {
+                    currentPin = ''; updatePinDisplay(); submitBtn.disabled = true;
+                    showScreen(loginScreen);
+                    return;
+                }
 
                 // Continue login flow
-                deviceCodeInput.value = '';
                 if (currentUser.etablissements.length === 1) {
                     currentEstablishment = currentUser.etablissements[0];
                     storeSession(currentUser, currentEstablishment);
@@ -1663,63 +1735,55 @@
             submitBtn.disabled = true;
             pinDisplay.classList.add('loading');
 
-            const user = await db.verifyPin(currentPin);
+            const res = await db.verifyPin(currentPin);
 
-            if (!user) {
+            if (!res || res.erreur) {
                 pinDisplay.classList.remove('loading');
+                const msg = (res && res.erreur) || 'Code incorrect';
+                // PIN correct mais iPad non active : le serveur exige un appareil
+                // enregistre pour les collaborateurs -> ecran d activation
+                if (/Appareil non autorise/i.test(msg)) {
+                    localStorage.removeItem('planb_device_token');
+                    showScreen(deviceScreen);
+                    submitBtn.disabled = false;
+                    return;
+                }
                 pinDisplay.classList.add('error');
                 setTimeout(() => {
                     pinDisplay.classList.remove('error');
                 }, 500);
-                showToast('Code incorrect', 'error');
+                showToast(/Trop de tentatives/i.test(msg) ? msg : 'Code incorrect', 'error');
                 currentPin = '';
                 updatePinDisplay();
                 submitBtn.disabled = true;
                 return;
             }
 
+            const user = res.user;
+            let pinActuel = currentPin;
             pinDisplay.classList.remove('loading');
             pinDisplay.classList.add('success');
             currentUser = user;
+            currentDevice = res.device ? { id: res.device.id, nom: res.device.nom } : null;
 
             // Alerte "actions requises" : armee a chaque connexion, consommee
             // une fois les pastilles chargees sur le portail
             try { sessionStorage.setItem('planb_alerte_actions', '1'); } catch (e) {}
 
-                // Device check for collaborateurs
-                const deviceToken = localStorage.getItem('planb_device_token');
-                const needsDeviceCheck = (user.role === 'collaborateur');
-
-                if (needsDeviceCheck) {
-                    if (deviceToken) {
-                        // Verify device token
-                        const device = await db.checkDeviceToken(deviceToken);
-                        if (!device) {
-                            // Token invalid - show activation screen
-                            localStorage.removeItem('planb_device_token');
-                            pinDisplay.classList.remove('loading');
-                            showScreen(deviceScreen);
-                            submitBtn.disabled = false;
-                            return;
-                        }
-                        currentDevice = device;
-                    } else {
-                        // No token - show activation screen
-                        pinDisplay.classList.remove('loading');
-                        showScreen(deviceScreen);
-                        submitBtn.disabled = false;
-                        return;
-                    }
-                } else {
-                    // Responsables & Admins: check device if token exists (for tracking) but don't block
-                    if (deviceToken) {
-                        const device = await db.checkDeviceToken(deviceToken);
-                        if (device) currentDevice = device;
-                    }
+                // Premier login securise : changement de code OBLIGATOIRE
+                if (res.doit_changer_code && !DEMO_MODE) {
+                    const nouveau = await forcerChangementCode(pinActuel, user.nom);
+                    if (nouveau) pinActuel = nouveau;
                 }
 
                 // Admin : choix Mode developpement / Utilisation normale (pose le drapeau planb_dev_nolock)
                 await askDevModeIfAdmin(user);
+
+                // "Rester connecte" admin : re-signer avec p_memoriser pour une
+                // session serveur de 30 jours (sinon 14 h)
+                if (user.role === 'admin' && sessionStorage.getItem('planb_remember_pending') === '1' && !DEMO_MODE) {
+                    try { await PLANB.login(pinActuel, localStorage.getItem('planb_device_token'), true); } catch (e) {}
+                }
 
                 setTimeout(async () => {
                     if (user.etablissements.length === 1) {
@@ -1848,27 +1912,19 @@
 
             confirmBtn.onclick = async function() {
                 const pin = pinInput.value;
-                // Verifier que le PIN correspond a l'utilisateur connecte
-                if (pin !== currentUser.code && pin !== currentUser.id?.toString()) {
-                    // Verifier via la base
-                    try {
-                        const { data: checkUser } = await supabaseClient
-                            .from('users')
-                            .select('id')
-                            .eq('code', pin)
-                            .eq('id', currentUser.id)
-                            .limit(1);
-                        if (!checkUser || checkUser.length === 0) {
-                            pinError.textContent = 'Code PIN incorrect. Saisissez votre propre code.';
-                            pinInput.value = '';
-                            confirmBtn.disabled = true;
-                            confirmBtn.style.opacity = '0.5';
-                            return;
-                        }
-                    } catch(e) {
-                        pinError.textContent = 'Erreur de verification.';
+                // SECURITE phase 2 : verification par RPC (PIN hache cote serveur)
+                try {
+                    const u = await PLANB.verifierPin(pin);
+                    if (!u || u.id !== currentUser.id) {
+                        pinError.textContent = 'Code PIN incorrect. Saisissez votre propre code.';
+                        pinInput.value = '';
+                        confirmBtn.disabled = true;
+                        confirmBtn.style.opacity = '0.5';
                         return;
                     }
+                } catch(e) {
+                    pinError.textContent = String(e.message || 'Erreur de verification.');
+                    return;
                 }
 
                 // PIN valide => enregistrer la lecture
@@ -2085,7 +2141,9 @@
 
         // ============= Event Listeners: Logout =============
         logoutBtn.addEventListener('click', () => {
-            // Deconnexion explicite : efface aussi la connexion memorisee de l appareil
+            // Deconnexion explicite : revoque la session serveur + efface la
+            // connexion memorisee de l appareil
+            try { PLANB.logout(); } catch (e) {}
             try { localStorage.removeItem('planb_remember'); } catch (e) {}
             clearSession();
             currentPin = '';
@@ -2104,6 +2162,9 @@
         // ============= Initialization =============
         async function init() {
             await db.init();
+            // SECURITE phase 2 : pre-ouvrir la connexion anonyme Supabase
+            // (socle des sessions pbt) sans bloquer l affichage
+            if (!DEMO_MODE && window.PLANB) PLANB.assurerSession().catch(() => {});
 
             // Check for existing session
             const session = getSession();
@@ -2120,6 +2181,14 @@
                 // protege par Face ID, on restaure la session sans redemander le PIN
                 let remembered = null;
                 try { remembered = JSON.parse(localStorage.getItem('planb_remember') || 'null'); } catch (e) {}
+                // SECURITE phase 2 : la memorisation locale ne suffit plus, la
+                // session serveur (pbt_ma_session) doit etre encore valide
+                if (remembered && remembered.role === 'admin' && !DEMO_MODE) {
+                    try {
+                        const srv = await PLANB.maSession();
+                        if (!srv || !srv.user || srv.user.id !== remembered.id) remembered = null;
+                    } catch (e) { remembered = null; }
+                }
                 if (remembered && remembered.role === 'admin' && remembered.etablissement) {
                     remembered.timestamp = Date.now();
                     sessionStorage.setItem('planb_user', JSON.stringify(remembered));
@@ -2273,17 +2342,20 @@
     var pin = __planbInactPin;
     var sc = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
     if (!sc) { __planbInactShowError('Connexion indisponible'); return; }
-    sc.from('users').select('id').eq('code', pin).eq('actif', true).then(function(res){
+    // SECURITE phase 2 (07/10/2026) : verification par RPC, PIN hache cote
+    // serveur. On ne verifie qu a 6 chiffres saisis, pour ne pas consommer le
+    // quota anti force brute sur des codes incomplets.
+    if (pin.length < 6) return;
+    sc.rpc('pbt_verifier_pin', { p_pin: pin }).then(function(res){
       if (pin !== __planbInactPin) return; // réponse obsolète, l'utilisateur a continué à taper
-      var data = res && res.data;
-      if (data && data.length && data[0].id === expectedId) {
+      var u = res && res.data;
+      if (u && u.id === expectedId) {
         __planbInactHide();
         resetInactivity();
-      } else if (pin.length >= 6) {
+      } else {
         __planbInactShowError('Code incorrect');
       }
-      // sinon : longueur intermédiaire, on attend silencieusement la suite
-    }).catch(function(){ if (pin === __planbInactPin && pin.length >= 6) __planbInactShowError('Erreur de vérification'); });
+    }).catch(function(){ if (pin === __planbInactPin) __planbInactShowError('Erreur de vérification'); });
   }
 
   function __planbInactShow() {

@@ -1563,14 +1563,13 @@
     const btn = $('btn-confirm-validate');
     btn.innerHTML = '<span class="spinner"></span> Vérification…'; btn.disabled = true;
 
-    const { data: users, error } = await sb.from('users')
-      .select('id, nom, role, actif').eq('code', pin).eq('actif', true);
+    // SECURITE phase 2 (07/10/2026) : verification par RPC, PIN hache
+    const { data: adm, error } = await sb.rpc('pbt_verifier_pin', { p_pin: pin });
     if (error) { showToast('Erreur : ' + error.message, 'error'); btn.innerHTML = '✓ Valider'; btn.disabled = false; return; }
-    if (!users || users.length === 0 || users[0].role !== 'admin') {
+    if (!adm || adm.role !== 'admin') {
       showToast('Code refusé (admin uniquement)', 'error');
       btn.innerHTML = '✓ Valider'; btn.disabled = false; return;
     }
-    const adm = users[0];
 
     const { error: upErr } = await sb.from('scan_sessions').update({
       statut: 'validee',

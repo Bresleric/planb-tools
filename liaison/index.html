@@ -163,14 +163,12 @@
                 const code = (input.value || '').trim();
                 if (code.length < 4) { err.textContent = 'Code invalide'; return; }
                 try {
-                    const { data, error } = await sb.from('users')
-                        .select('id, nom, initiales, role, etablissement, acces_etablissements, actif')
-                        .eq('code', code).eq('actif', true);
+                    // SECURITE phase 2 (07/10/2026) : verification par RPC, PIN hache
+                    const { data: u0, error } = await sb.rpc('pbt_verifier_pin', { p_pin: code });
                     if (error) throw error;
-                    const u = (data || []).find(x =>
-                        x.etablissement === currentEstablishment ||
-                        (x.acces_etablissements || []).includes(currentEstablishment) ||
-                        x.role === 'admin');
+                    const u = (u0 && (u0.etablissement === currentEstablishment ||
+                        (u0.acces_etablissements || []).includes(currentEstablishment) ||
+                        u0.role === 'admin')) ? u0 : null;
                     if (!u) { err.textContent = 'Code inconnu pour cet établissement'; input.value = ''; return; }
                     close();
                     callback(u);

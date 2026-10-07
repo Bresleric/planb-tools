@@ -1,5 +1,6 @@
 -- ============================================================================
 -- SECURITE Phase 1/3 : fondations des sessions securisees (07/10/2026)
+-- APPLIQUEE le 07/10/2026 (via MCP, trigger users via pg_cron).
 -- Idempotent. NE TOUCHE A AUCUNE POLICY EXISTANTE : l appli actuelle
 -- continue de fonctionner a l identique pendant cette phase.
 --
@@ -81,13 +82,16 @@ RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
         'inconnue');
 $$;
 
--- Anti brute-force : vrai si la fenetre de 15 min depasse 5 echecs pour cette
--- IP ou 40 echecs toutes IP confondues (pour ce type de tentative)
+-- Anti brute-force : vrai si la fenetre de 15 min depasse le seuil d echecs
+-- pour cette IP (15 pour les verifications de signature 'verif' car les
+-- restaurants partagent UNE IP publique, 5 pour login/activation) ou 40
+-- echecs toutes IP confondues.
 CREATE OR REPLACE FUNCTION pbt_private.trop_de_tentatives(p_type text, p_ip text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
     SELECT (SELECT count(*) FROM pbt_private.tentatives
             WHERE type = p_type AND succes = false AND ip = p_ip
-              AND quand > now() - interval '15 minutes') >= 5
+              AND quand > now() - interval '15 minutes')
+           >= CASE WHEN p_type = 'verif' THEN 15 ELSE 5 END
         OR (SELECT count(*) FROM pbt_private.tentatives
             WHERE type = p_type AND succes = false
               AND quand > now() - interval '15 minutes') >= 40;
