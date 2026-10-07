@@ -116,3 +116,23 @@ recopier une formule ailleurs.
   GitHub Pages) — Eric a validé ce flux en continu.
 - Un chantier = une conversation à la fois (éviter deux sessions qui éditent les
   mêmes fichiers en parallèle).
+
+## À reporter depuis le commit sauvegardé `1aa81fc` (07/10/2026)
+
+Un rapport v1 enrichi a été développé EN PARALLÈLE sur le MacMini d'Eric le
+03/10 (avant la refonte v2 du 04/10) et n'a jamais été poussé. Le commit est
+conservé sur la branche `origin/sauvegarde/rapport-local-03-10` (SW v57,
+`git show 1aa81fc -- rapport/index.html` pour le code). Décision Eric 07/10 :
+on garde origin/main (v2.1) et on REPORTE les idées utiles. Non couvertes
+par la v2.1 à ce jour :
+
+- **Synthèse « backlog » en tête** : caisses à valider (14 j glissants), scans
+  en attente de validation (30 j), productions sans fiche avec motif a_creer
+  (30 j), besoins appro anciens — la v2.1 ne montre que l'état de J/J+1.
+- **Tableau « travail des équipes sur 7 jours »** : TAF faites/prévues,
+  productions, relevés frigos, étiquettes scannées, par jour.
+- **Bloc « Messages des équipes »** : incidents regroupés par description
+  (le briefing les duplique chaque jour), tâches signalées, rappels actifs.
+- Informations proposées (statut à valider) en tête de page.
+
+À réimplémenter sur la structure v2.1 (ne pas transplanter le code v1 tel quel).
