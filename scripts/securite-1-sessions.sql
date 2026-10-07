@@ -198,8 +198,11 @@ BEGIN
         RAISE EXCEPTION 'Code incorrect';
     END IF;
 
-    IF p_device_token IS NOT NULL THEN
-        SELECT * INTO v_dev FROM public.devices WHERE device_token = p_device_token AND actif = true;
+    -- FIX 07/10 15:45 : devices.device_token est un uuid -> cast text, sinon
+    -- la comparaison plante pour tout appareil envoyant son jeton (iPads)
+    IF p_device_token IS NOT NULL AND p_device_token <> '' THEN
+        SELECT * INTO v_dev FROM public.devices
+        WHERE device_token::text = p_device_token AND actif = true;
     END IF;
     -- Exigence serveur (jusque-la seulement cote navigateur) :
     -- un collaborateur ne se connecte que depuis un appareil active
