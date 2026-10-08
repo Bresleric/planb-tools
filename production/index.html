@@ -4634,7 +4634,7 @@ function printEtiquette(productionId) {
   const etabShort = etabNames[currentEtablissement] || currentEtablissement.substring(0, 2).toUpperCase();
 
   const prodDate = new Date(production.date_production || production.created_at);
-  const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+  const JOURS = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];  // 3 caracteres (demande Eric 08/10) : badge toujours en gros
   const dayName = JOURS[prodDate.getDay()];
   const dayClass = prodDate.getDay() % 2 === 0 ? 'day-red' : 'day-black';
   const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -4913,7 +4913,7 @@ function printEtiquette(productionId) {
       var SEP1_Y = 10.2, SEP2_Y = 19.4;
 
       // === Rangee 1 : badge jour + produit + etablissement ===
-      var badgeW = 17, badgeH = 6.2, badgeX = PAD, badgeY = 1.8;
+      var badgeW = 13, badgeH = 6.4, badgeX = PAD, badgeY = 1.7;
       if (d.dayClass === 'day-red') {
         doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.35);
         doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 0.8, 0.8, 'S');
@@ -4924,7 +4924,7 @@ function printEtiquette(productionId) {
         doc.setTextColor(255, 255, 255);
       }
       // Police du jour auto-ajustee : MERCREDI/VENDREDI tiennent dans le badge
-      var jSize = 11;
+      var jSize = 13;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(jSize);
       while (jSize > 6 && doc.getTextWidth(d.dayName) > badgeW - 1.6) { jSize -= 0.5; doc.setFontSize(jSize); }
       doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 1.4, { align: 'center' });
@@ -5045,7 +5045,7 @@ function buildEtiquettePdfData(production, lot) {
   const etabNames = { freddy: 'FR', liesel: 'LI' };
   const etabShort = etabNames[currentEtablissement] || currentEtablissement.substring(0, 2).toUpperCase();
   const prodDate = new Date(production.date_production || production.created_at);
-  const JOURS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+  const JOURS = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];  // 3 caracteres (demande Eric 08/10) : badge toujours en gros
   const dayName = JOURS[prodDate.getDay()];
   const dayClass = prodDate.getDay() % 2 === 0 ? 'day-red' : 'day-black';
   const prodDateStr = prodDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -5124,7 +5124,7 @@ function printEtiquettesMulti(entries) {
       var SEP1_Y = 10.2, SEP2_Y = 19.4;
 
       // === Rangee 1 : badge jour + produit + etablissement ===
-      var badgeW = 17, badgeH = 6.2, badgeX = PAD, badgeY = 1.8;
+      var badgeW = 13, badgeH = 6.4, badgeX = PAD, badgeY = 1.7;
       if (d.dayClass === 'day-red') {
         doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.35);
         doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 0.8, 0.8, 'S');
@@ -5135,7 +5135,7 @@ function printEtiquettesMulti(entries) {
         doc.setTextColor(255, 255, 255);
       }
       // Police du jour auto-ajustee : MERCREDI/VENDREDI tiennent dans le badge
-      var jSize = 11;
+      var jSize = 13;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(jSize);
       while (jSize > 6 && doc.getTextWidth(d.dayName) > badgeW - 1.6) { jSize -= 0.5; doc.setFontSize(jSize); }
       doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 1.4, { align: 'center' });

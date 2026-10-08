@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v103';  // bump a chaque mise a jour du SW (v103 : badge du jour auto-ajuste - MERCREDI tient dans son cadre 08/10/2026)
+const CACHE_NAME = 'planb-tools-v104';  // bump a chaque mise a jour du SW (v104 : jour en 3 lettres sur les etiquettes, badge compact 08/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
