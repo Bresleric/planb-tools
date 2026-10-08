@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v99';   // bump a chaque mise a jour du SW (v99 : etiquettes au format reel 62x100 pivote - pleine surface 08/10/2026)
+const CACHE_NAME = 'planb-tools-v100';  // bump a chaque mise a jour du SW (v100 : retour etiquettes v98 - incident scan en service 08/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

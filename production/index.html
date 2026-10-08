@@ -4896,74 +4896,95 @@ function printEtiquette(productionId) {
       // Destiné à être imprimé via Brother iPrint&Label (Partager → iPrint&Label).
       // d.nbCopies > 1 : N pages identiques = N étiquettes (ex. 5 poches Munsterflette).
       var jsPDF = window.jspdf.jsPDF;
-      var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 100] });
+      var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [62, 89] });
       var copies = Math.max(1, parseInt(d.nbCopies, 10) || 1);
       for (var c = 0; c < copies; c++) {
-        if (c > 0) doc.addPage([62, 100], 'portrait');
+        if (c > 0) doc.addPage([62, 89], 'landscape');
         dessinerEtiquette(doc, d);
       }
       return doc.output('blob');
     }
 
     function dessinerEtiquette(doc, d) {
-      // Page PHYSIQUE 62x100 mm PORTRAIT : le rouleau fait 62 mm de large et
-      // iOS/AirPrint impose 100 mm de long sur la QL-820NWB. Le contenu est
-      // dessine PIVOTE de 90 degres dans un repere logique paysage 100x62 :
-      // il occupe ainsi toute l etiquette (l ancienne page 89x62 etait reduite
-      // a ~70% par l impression - constat Eric 08/10, texte sur ~50% du support).
-      var W = 100, H = 62, PAD = 3;
-      function T(txt, x, y, opts) {
-        var o = Object.assign({ angle: 90 }, opts || {});
-        doc.text(txt, y, W - x, o);
-      }
-      function L(x1, y1, x2, y2) { doc.line(y1, W - x1, y2, W - x2); }
-      function RR(x, y, w, h, style) { doc.roundedRect(y, W - x - w, h, w, 1.2, 1.2, style); }
+      var W = 89, H = 62, PAD = 3;
 
-      var ROW1_TOP = PAD, SEP1_Y = 24, ROW2_TOP = 24, SEP2_Y = 42, ROW3_TOP = 42, ROW3_BOT = H - PAD;
-      var badgeW = 38, badgeH = 13, badgeX = PAD;
+      // Layout vertical (jsPDF top-down, y croissant vers le bas)
+      var ROW1_TOP = PAD;       // 3
+      var SEP1_Y   = 24;        // row1 occupe y=3..24
+      var ROW2_TOP = SEP1_Y;
+      var SEP2_Y   = 42;        // row2 occupe y=24..42
+      var ROW3_TOP = SEP2_Y;
+      var ROW3_BOT = H - PAD;   // 59
+
+      // === ROW 1 : badge MERCREDI + produit + LI ===
+      var badgeW = 38, badgeH = 13;
+      var badgeX = PAD;
       var badgeY = ROW1_TOP + ((SEP1_Y - ROW1_TOP) - badgeH) / 2;
+
       if (d.dayClass === 'day-red') {
         doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.5);
-        RR(badgeX, badgeY, badgeW, badgeH, 'S');
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'S');
         doc.setTextColor(221, 0, 0);
       } else {
         doc.setFillColor(0, 0, 0);
-        RR(badgeX, badgeY, badgeW, badgeH, 'F');
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
         doc.setTextColor(255, 255, 255);
       }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-      T(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2.6, { align: 'center' });
-      doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-      T(d.etabShort, W - PAD, badgeY + badgeH / 2 + 2.3, { align: 'right' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2.4, { align: 'center' });
+
+      // Étab à droite
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 2.2, { align: 'right' });
       var etabW = doc.getTextWidth(d.etabShort);
-      // Produit : police ADAPTATIVE (24 -> 12) avant de tronquer en dernier recours
-      var productX = badgeX + badgeW + 2.5;
-      var productMaxW = (W - PAD - etabW - 2.5) - productX;
-      var pSize = 24;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(pSize);
-      while (pSize > 12 && doc.getTextWidth(d.produit) > productMaxW) { pSize -= 1; doc.setFontSize(pSize); }
+
+      // Produit (entre badge et étab, tronqué si trop long)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
       var productText = d.produit;
-      while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) productText = productText.slice(0, -1);
-      T(productText, productX, badgeY + badgeH / 2 + 3);
-      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5); L(PAD, SEP1_Y, W - PAD, SEP1_Y);
+      var productX = badgeX + badgeW + 2;
+      var productMaxW = (W - PAD - etabW - 2) - productX;
+      while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) {
+        productText = productText.slice(0, -1);
+      }
+      doc.text(productText, productX, badgeY + badgeH / 2 + 2.9);
+
+      // Trait sous row1
+      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
+      doc.line(PAD, SEP1_Y, W - PAD, SEP1_Y);
+
+      // === ROW 2 : Lot + qté + producteur ===
       var row2BaseY = ROW2_TOP + (SEP2_Y - ROW2_TOP) / 2 + 2;
-      doc.setFont('courier', 'bold'); doc.setFontSize(15); doc.setTextColor(0, 0, 0);
+
+      doc.setFont('courier', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
       var lotText = 'Lot:' + d.lotNum;
-      T(lotText, PAD, row2BaseY);
+      doc.text(lotText, PAD, row2BaseY);
       var lotW = doc.getTextWidth(lotText);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-      T('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-      T(d.producteur, W - PAD, row2BaseY, { align: 'right' });
-      doc.setLineWidth(0.5); L(PAD, SEP2_Y, W - PAD, SEP2_Y);
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(d.producteur, W - PAD, row2BaseY, { align: 'right' });
+
+      // Trait sous row2
+      doc.setLineWidth(0.5);
+      doc.line(PAD, SEP2_Y, W - PAD, SEP2_Y);
+
+      // === ROW 3 : P-date + DLC en gros (rouge) ===
       var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 4;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
-      T('P:' + d.prodDateStr, PAD, row3BaseY);
-      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(24);
-      var dlcW = doc.getTextWidth(d.dlcStr); var dlcX = W - PAD - dlcW;
-      T(d.dlcStr, dlcX, row3BaseY);
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(0, 0, 0);
+      doc.text('P:' + d.prodDateStr, PAD, row3BaseY);
+
+      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
+      var dlcW = doc.getTextWidth(d.dlcStr);
+      var dlcX = W - PAD - dlcW;
+      doc.text(d.dlcStr, dlcX, row3BaseY);
+
+      // Label "DLC" en petit, à gauche de la date
       doc.setFontSize(10);
-      T('DLC', dlcX, row3BaseY - 9);
+      doc.text('DLC', dlcX, row3BaseY - 8.5);
     }
 
     async function genererEtImprimerPdf() {
@@ -5112,71 +5133,54 @@ function printEtiquettesMulti(entries) {
 
     // Dessine une etiquette 89x62mm (paysage) dans le doc fourni — meme layout que le mono.
     function drawLabel(doc, d) {
-      // Page PHYSIQUE 62x100 mm PORTRAIT : le rouleau fait 62 mm de large et
-      // iOS/AirPrint impose 100 mm de long sur la QL-820NWB. Le contenu est
-      // dessine PIVOTE de 90 degres dans un repere logique paysage 100x62 :
-      // il occupe ainsi toute l etiquette (l ancienne page 89x62 etait reduite
-      // a ~70% par l impression - constat Eric 08/10, texte sur ~50% du support).
-      var W = 100, H = 62, PAD = 3;
-      function T(txt, x, y, opts) {
-        var o = Object.assign({ angle: 90 }, opts || {});
-        doc.text(txt, y, W - x, o);
-      }
-      function L(x1, y1, x2, y2) { doc.line(y1, W - x1, y2, W - x2); }
-      function RR(x, y, w, h, style) { doc.roundedRect(y, W - x - w, h, w, 1.2, 1.2, style); }
-
+      var W = 89, H = 62, PAD = 3;
       var ROW1_TOP = PAD, SEP1_Y = 24, ROW2_TOP = 24, SEP2_Y = 42, ROW3_TOP = 42, ROW3_BOT = H - PAD;
       var badgeW = 38, badgeH = 13, badgeX = PAD;
       var badgeY = ROW1_TOP + ((SEP1_Y - ROW1_TOP) - badgeH) / 2;
       if (d.dayClass === 'day-red') {
         doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.5);
-        RR(badgeX, badgeY, badgeW, badgeH, 'S');
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'S');
         doc.setTextColor(221, 0, 0);
       } else {
         doc.setFillColor(0, 0, 0);
-        RR(badgeX, badgeY, badgeW, badgeH, 'F');
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
         doc.setTextColor(255, 255, 255);
       }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-      T(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2.6, { align: 'center' });
-      doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-      T(d.etabShort, W - PAD, badgeY + badgeH / 2 + 2.3, { align: 'right' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2.4, { align: 'center' });
+      doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 2.2, { align: 'right' });
       var etabW = doc.getTextWidth(d.etabShort);
-      // Produit : police ADAPTATIVE (24 -> 12) avant de tronquer en dernier recours
-      var productX = badgeX + badgeW + 2.5;
-      var productMaxW = (W - PAD - etabW - 2.5) - productX;
-      var pSize = 24;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(pSize);
-      while (pSize > 12 && doc.getTextWidth(d.produit) > productMaxW) { pSize -= 1; doc.setFontSize(pSize); }
-      var productText = d.produit;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
+      var productText = d.produit; var productX = badgeX + badgeW + 2;
+      var productMaxW = (W - PAD - etabW - 2) - productX;
       while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) productText = productText.slice(0, -1);
-      T(productText, productX, badgeY + badgeH / 2 + 3);
-      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5); L(PAD, SEP1_Y, W - PAD, SEP1_Y);
+      doc.text(productText, productX, badgeY + badgeH / 2 + 2.9);
+      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5); doc.line(PAD, SEP1_Y, W - PAD, SEP1_Y);
       var row2BaseY = ROW2_TOP + (SEP2_Y - ROW2_TOP) / 2 + 2;
-      doc.setFont('courier', 'bold'); doc.setFontSize(15); doc.setTextColor(0, 0, 0);
-      var lotText = 'Lot:' + d.lotNum;
-      T(lotText, PAD, row2BaseY);
+      doc.setFont('courier', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
+      var lotText = 'Lot:' + d.lotNum; doc.text(lotText, PAD, row2BaseY);
       var lotW = doc.getTextWidth(lotText);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-      T('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-      T(d.producteur, W - PAD, row2BaseY, { align: 'right' });
-      doc.setLineWidth(0.5); L(PAD, SEP2_Y, W - PAD, SEP2_Y);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(d.producteur, W - PAD, row2BaseY, { align: 'right' });
+      doc.setLineWidth(0.5); doc.line(PAD, SEP2_Y, W - PAD, SEP2_Y);
       var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 4;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
-      T('P:' + d.prodDateStr, PAD, row3BaseY);
-      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(0, 0, 0);
+      doc.text('P:' + d.prodDateStr, PAD, row3BaseY);
+      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
       var dlcW = doc.getTextWidth(d.dlcStr); var dlcX = W - PAD - dlcW;
-      T(d.dlcStr, dlcX, row3BaseY);
+      doc.text(d.dlcStr, dlcX, row3BaseY);
       doc.setFontSize(10);
-      T('DLC', dlcX, row3BaseY - 9);
+      doc.text('DLC', dlcX, row3BaseY - 8.5);
     }
 
     function genererPdfBlob(liste) {
       var jsPDF = window.jspdf.jsPDF;
-      var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 100] });
+      var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [62, 89] });
       for (var i = 0; i < liste.length; i++) {
-        if (i > 0) doc.addPage([62, 100], 'portrait');
+        if (i > 0) doc.addPage([62, 89], 'landscape');
         drawLabel(doc, liste[i]);
       }
       return doc.output('blob');
