@@ -212,6 +212,7 @@
                 const { data: l } = await sb.from('liaison_lectures').select('*').in('message_id', ids);
                 lectures = l || [];
             }
+            await signerPjUrls();
             renderDestChips();
             renderFeed();
         }
@@ -225,9 +226,27 @@
         // jointe suit donc exactement la visibilite de son message.
         const BUCKET_LIAISON = 'liaison-images';
         let pendingPJ = { composer: [] };
+        // SECURITE phase 3 : URLs SIGNEES (2 h), calculees en lot au chargement.
+        // Fonctionne bucket public OU prive -> pret pour le verrouillage.
+        let pjUrlsSignees = {};
 
         function pjUrl(path) {
-            return sb.storage.from(BUCKET_LIAISON).getPublicUrl(path).data.publicUrl;
+            return pjUrlsSignees[path]
+                || sb.storage.from(BUCKET_LIAISON).getPublicUrl(path).data.publicUrl;
+        }
+
+        async function signerPjUrls() {
+            try {
+                const paths = [...new Set(messages.flatMap(m =>
+                    (Array.isArray(m.pieces_jointes) ? m.pieces_jointes : []).map(p => p.path)))];
+                if (paths.length === 0) return;
+                const { data, error } = await sb.storage.from(BUCKET_LIAISON).createSignedUrls(paths, 7200);
+                if (error) throw error;
+                (data || []).forEach(d => {
+                    const u = d.signedUrl || d.signedURL;
+                    if (d.path && u) pjUrlsSignees[d.path] = u;
+                });
+            } catch (e) { console.warn('Signature URLs PJ:', e); }
         }
         function tailleLisible(octets) {
             if (!octets) return '';

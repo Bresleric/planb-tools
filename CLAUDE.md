@@ -69,13 +69,14 @@ Ces règles existent à cause d'incidents passés. Ne jamais les enfreindre.
 
 ## 8. Pièges connus à éviter
 
-- **RLS sur toute nouvelle table** : créer une table sans policy = RLS active par défaut bloque TOUT (INSERT *et* SELECT) pour le rôle `anon` → erreur « new row violates row-level security policy », et lectures vides silencieuses. **Règle PBT** : toute nouvelle table doit avoir `ENABLE ROW LEVEL SECURITY` **+** une policy permissive `FOR ALL TO anon USING (true) WITH CHECK (true)` (même pattern que `fiche_ingredients`, `fiches_techniques_actions_post`). Modèle :
+- **RLS sur toute nouvelle table — NOUVEAU MODELE (sécurité 08-09/10/2026)** : les policies permissives `TO anon USING (true)` sont désormais **INTERDITES** (elles exposaient toute la base via la clé publique — audit externe du 07/10). Toute nouvelle table doit avoir `ENABLE ROW LEVEL SECURITY` **+** la policy `pbt_session` (accès réservé aux sessions applicatives, créées par `pbt_login` / lien magique rapport). Modèle :
   ```sql
   ALTER TABLE ma_table ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS ma_table_anon_all ON ma_table;   -- CREATE POLICY IF NOT EXISTS n'existe pas en Postgres
-  CREATE POLICY ma_table_anon_all ON ma_table AS PERMISSIVE FOR ALL TO anon USING (true) WITH CHECK (true);
+  DROP POLICY IF EXISTS pbt_session ON ma_table;   -- CREATE POLICY IF NOT EXISTS n'existe pas en Postgres
+  CREATE POLICY pbt_session ON ma_table FOR ALL TO authenticated
+    USING ((select public.pbt_session_ok())) WITH CHECK ((select public.pbt_session_ok()));
   ```
-  Toujours inclure ce bloc dans la migration de création de table. Vérif post-migration : `SELECT tablename, policyname FROM pg_policies WHERE tablename = 'ma_table';` (incident du 31/05/2026 : `fiches_techniques_sous_produits` créée sans policy → mode multi sous-produits jamais déclenché).
+  AUCUNE policy pour `anon`. Les edge functions et pg_cron utilisent le service role (non concerné par RLS). Les PIN vivent HACHÉS dans `pbt_private.user_pins` (jamais de PIN en clair : ni colonne, ni log, ni affichage — réinitialisation via Admin). Vérif post-migration : `SELECT tablename, policyname FROM pg_policies WHERE tablename = 'ma_table';` (incident du 31/05/2026 : table créée sans policy → fonctionnalité jamais déclenchée ; incident du 07/10/2026 : policies `TO anon` seules → modules morts pour les sessions authentifiées).
 - **`</script>` dans un template literal** ferme le tag parent HTML. Toujours échapper en `<\/script>`.
 - **`read -p` dans les scripts bash** : ne marche pas en zsh. Utiliser `read -r REPLY` (sans `-p`) puis afficher le prompt séparément.
 - **Path mapping bash sandbox ↔ Mac d'Eric** : si tu vois `/sessions/.../mnt/planb-tools/`, c'est le chemin de la VM Cowork. Sur le Mac d'Eric c'est `~/planb-tools/` ou `/Users/eric/planb-tools/`. **Toujours donner à Eric les chemins en `~/planb-tools/`** dans les scripts et les messages.
