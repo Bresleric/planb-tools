@@ -136,3 +136,13 @@ par la v2.1 à ce jour :
 - Informations proposées (statut à valider) en tête de page.
 
 À réimplémenter sur la structure v2.1 (ne pas transplanter le code v1 tel quel).
+
+## Securite 08/10/2026 — lien magique branche sur les sessions pbt
+
+checkAccess() de rapport/index.html ouvre desormais une session serveur via
+rpc pbt_login_rapport(token) (PLANB.assurerSession + rpc), avec repli sur
+l ancienne verification simple tant que la base n est pas verrouillee.
+NE PAS retirer cet appel : apres la phase 3 (RLS verrouille), c est lui qui
+permet au rapport de lire les donnees. rapport_acces porte maintenant un
+user_id (Eric). Toute nouvelle requete ajoutee au rapport fonctionnera tant
+que la session pbt est ouverte — rien d autre a faire.

@@ -139,6 +139,15 @@
             const k = new URLSearchParams(location.search).get('k');
             if (k) {
                 try {
+                    // SECURITE phase 2c (08/10/2026) : le lien magique ouvre une vraie
+                    // session serveur (pbt_login_rapport) - indispensable pour que la
+                    // lecture des donnees survive au verrouillage RLS de la phase 3
+                    await PLANB.assurerSession();
+                    const { data, error } = await sb.rpc('pbt_login_rapport', { p_token: k });
+                    if (!error && data) return true;
+                } catch (e) { console.error(e); }
+                // Repli transitoire (avant verrouillage) : simple verification du token
+                try {
                     const { data } = await sb.from('rapport_acces').select('nom').eq('token', k).eq('actif', true).maybeSingle();
                     if (data) return true;
                 } catch (e) { console.error(e); }

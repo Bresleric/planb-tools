@@ -5,7 +5,8 @@
 //   A. NOUVEAUX COLLABORATEURS
 //      - interroge l API Combo (locations puis contrats actifs du jour)
 //      - compare aux utilisateurs PlanB-Tools (nom normalise, mots tries)
-//      - cree les manquants (role collaborateur, PIN genere) + journal
+//      - cree les manquants (role collaborateur, SANS code : securite 08/10,
+//        le code provisoire se genere dans Admin > Reinitialiser) + journal
 //   B. PLANNINGS (forces en presence)
 //      - recupere les shifts Combo du jour et du lendemain
 //      - remplace les lignes correspondantes de planning_equipes
@@ -28,14 +29,6 @@ function normName(s: string): string {
 
 function makeInitiales(firstname: string, lastname: string): string {
   return ((firstname[0] || "") + (lastname[0] || "")).toUpperCase();
-}
-
-function genPin(taken: Set<string>): string {
-  for (let i = 0; i < 200; i++) {
-    const pin = String(Math.floor(1000 + Math.random() * 9000));
-    if (!taken.has(pin)) { taken.add(pin); return pin; }
-  }
-  throw new Error("Impossible de generer un PIN libre");
 }
 
 function mapEtab(locationName: string): string | null {
@@ -100,10 +93,9 @@ Deno.serve(async (_req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: users, error: uErr } = await supabase.from("users").select("nom, code");
+    const { data: users, error: uErr } = await supabase.from("users").select("nom");
     if (uErr) throw uErr;
     const knownNames = new Set((users || []).map((u) => normName(u.nom || "")));
-    const takenPins = new Set((users || []).map((u) => String(u.code || "")));
 
     const locations = (await comboGet("/api/v1/locations")) as Array<{ id: string; name: string }>;
     summary.locations = locations.length;
@@ -139,11 +131,11 @@ Deno.serve(async (_req) => {
           continue;
         }
 
-        const pin = genPin(takenPins);
+        // SECURITE 08/10/2026 : plus de PIN genere ni stocke en clair.
+        // Eric genere le code provisoire via Admin > Reinitialiser le code.
         const { data: created, error: cErr } = await supabase.from("users").insert({
           nom: fullname,
           initiales: makeInitiales(c.firstname || "", c.lastname || ""),
-          code: pin,
           role: "collaborateur",
           etablissement: etab,
           acces_etablissements: [etab],
@@ -153,8 +145,8 @@ Deno.serve(async (_req) => {
         knownNames.add(key);
         await supabase.from("combo_veilleur_log").insert({
           nom: fullname, etablissement: etab, statut: "cree",
-          user_id: created?.[0]?.id || null, pin: pin,
-          detail: `Cree depuis Combo (${loc.name})`,
+          user_id: created?.[0]?.id || null,
+          detail: `Cree depuis Combo (${loc.name}) - code a generer via Admin > Reinitialiser`,
         });
         summary.crees.push(`${fullname} (${etab})`);
       }

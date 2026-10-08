@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v94';   // bump a chaque mise a jour du SW (v94 : securite phase 2 - sessions pbt sur tout le front 07/10/2026)
+const CACHE_NAME = 'planb-tools-v95';   // bump a chaque mise a jour du SW (v95 : lien magique rapport sur session pbt, veilleur combo sans PIN 08/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
