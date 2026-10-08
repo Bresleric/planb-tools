@@ -977,6 +977,15 @@
             window.location.href = '../';
         }
 
+        // Attribution fine (08/10/2026) : la redaction est ouverte aux roles
+        // responsable+ OU a toute personne ayant "briefings-redaction" dans ses
+        // attributions (case a cocher dans Admin > fiche utilisateur > Modules)
+        function peutRediger() {
+            if (!currentUser) return false;
+            if (['responsable', 'manager', 'admin'].includes(currentUser.role)) return true;
+            return (currentUser.acces_modules || []).includes('briefings-redaction');
+        }
+
         function updateTabVisibility() {
             const role = currentUser ? currentUser.role : 'collaborateur';
             // Matrice d'accès aux onglets :
@@ -996,7 +1005,8 @@
             Object.entries(tabAccess).forEach(([tab, roles]) => {
                 const el = document.querySelector(`[data-tab="${tab}"]`);
                 if (el) {
-                    el.style.display = roles.includes(role) ? '' : 'none';
+                    const autorise = roles.includes(role) || (tab === 'creation' && peutRediger());
+                    el.style.display = autorise ? '' : 'none';
                 }
             });
         }
@@ -1565,8 +1575,8 @@
         async function loadCreation() {
             const container = document.getElementById('tab-creation');
 
-            if (!['responsable', 'manager', 'admin'].includes(currentUser.role)) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Acces reserve aux responsables, managers et admins</div></div>';
+            if (!peutRediger()) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128274;</div><div class="empty-state-title">Acces restreint</div><div class="empty-state-text">Acces reserve aux responsables, managers, admins et aux personnes habilitees</div></div>';
                 return;
             }
 
