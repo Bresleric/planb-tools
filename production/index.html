@@ -4910,14 +4910,14 @@ function printEtiquette(productionId) {
 
       // Layout vertical (jsPDF top-down, y croissant vers le bas)
       var ROW1_TOP = PAD;       // 3
-      var SEP1_Y   = 22;        // row1 occupe y=3..22
+      var SEP1_Y   = 24;        // row1 occupe y=3..24
       var ROW2_TOP = SEP1_Y;
-      var SEP2_Y   = 40;        // row2 occupe y=22..40
+      var SEP2_Y   = 42;        // row2 occupe y=24..42
       var ROW3_TOP = SEP2_Y;
       var ROW3_BOT = H - PAD;   // 59
 
       // === ROW 1 : badge MERCREDI + produit + LI ===
-      var badgeW = 30, badgeH = 11;
+      var badgeW = 38, badgeH = 13;
       var badgeX = PAD;
       var badgeY = ROW1_TOP + ((SEP1_Y - ROW1_TOP) - badgeH) / 2;
 
@@ -4930,24 +4930,24 @@ function printEtiquette(productionId) {
         doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
         doc.setTextColor(255, 255, 255);
       }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2, { align: 'center' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2.4, { align: 'center' });
 
       // Étab à droite
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 1.8, { align: 'right' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 2.2, { align: 'right' });
       var etabW = doc.getTextWidth(d.etabShort);
 
       // Produit (entre badge et étab, tronqué si trop long)
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
       var productText = d.produit;
       var productX = badgeX + badgeW + 2;
       var productMaxW = (W - PAD - etabW - 2) - productX;
       while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) {
         productText = productText.slice(0, -1);
       }
-      doc.text(productText, productX, badgeY + badgeH / 2 + 2.5);
+      doc.text(productText, productX, badgeY + badgeH / 2 + 2.9);
 
       // Trait sous row1
       doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
@@ -4956,15 +4956,15 @@ function printEtiquette(productionId) {
       // === ROW 2 : Lot + qté + producteur ===
       var row2BaseY = ROW2_TOP + (SEP2_Y - ROW2_TOP) / 2 + 2;
 
-      doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      doc.setFont('courier', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
       var lotText = 'Lot:' + d.lotNum;
       doc.text(lotText, PAD, row2BaseY);
       var lotW = doc.getTextWidth(lotText);
 
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
       doc.text('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
 
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
       doc.text(d.producteur, W - PAD, row2BaseY, { align: 'right' });
 
       // Trait sous row2
@@ -4972,20 +4972,19 @@ function printEtiquette(productionId) {
       doc.line(PAD, SEP2_Y, W - PAD, SEP2_Y);
 
       // === ROW 3 : P-date + DLC en gros (rouge) ===
-      var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 3;
+      var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 4;
 
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(0, 0, 0);
       doc.text('P:' + d.prodDateStr, PAD, row3BaseY);
 
-      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
       var dlcW = doc.getTextWidth(d.dlcStr);
       var dlcX = W - PAD - dlcW;
       doc.text(d.dlcStr, dlcX, row3BaseY);
 
       // Label "DLC" en petit, à gauche de la date
-      doc.setFontSize(8);
-      var dlcLabelW = doc.getTextWidth('DLC');
-      doc.text('DLC', dlcX - dlcLabelW - 1, row3BaseY - 2);
+      doc.setFontSize(10);
+      doc.text('DLC', dlcX, row3BaseY - 8.5);
     }
 
     async function genererEtImprimerPdf() {
@@ -5135,8 +5134,8 @@ function printEtiquettesMulti(entries) {
     // Dessine une etiquette 89x62mm (paysage) dans le doc fourni — meme layout que le mono.
     function drawLabel(doc, d) {
       var W = 89, H = 62, PAD = 3;
-      var ROW1_TOP = PAD, SEP1_Y = 22, ROW2_TOP = 22, SEP2_Y = 40, ROW3_TOP = 40, ROW3_BOT = H - PAD;
-      var badgeW = 30, badgeH = 11, badgeX = PAD;
+      var ROW1_TOP = PAD, SEP1_Y = 24, ROW2_TOP = 24, SEP2_Y = 42, ROW3_TOP = 42, ROW3_BOT = H - PAD;
+      var badgeW = 38, badgeH = 13, badgeX = PAD;
       var badgeY = ROW1_TOP + ((SEP1_Y - ROW1_TOP) - badgeH) / 2;
       if (d.dayClass === 'day-red') {
         doc.setDrawColor(221, 0, 0); doc.setLineWidth(0.5);
@@ -5147,34 +5146,34 @@ function printEtiquettesMulti(entries) {
         doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
         doc.setTextColor(255, 255, 255);
       }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2, { align: 'center' });
-      doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 1.8, { align: 'right' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text(d.dayName, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2.4, { align: 'center' });
+      doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(d.etabShort, W - PAD, badgeY + badgeH / 2 + 2.2, { align: 'right' });
       var etabW = doc.getTextWidth(d.etabShort);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
       var productText = d.produit; var productX = badgeX + badgeW + 2;
       var productMaxW = (W - PAD - etabW - 2) - productX;
       while (productText.length > 1 && doc.getTextWidth(productText) > productMaxW) productText = productText.slice(0, -1);
-      doc.text(productText, productX, badgeY + badgeH / 2 + 2.5);
+      doc.text(productText, productX, badgeY + badgeH / 2 + 2.9);
       doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5); doc.line(PAD, SEP1_Y, W - PAD, SEP1_Y);
       var row2BaseY = ROW2_TOP + (SEP2_Y - ROW2_TOP) / 2 + 2;
-      doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      doc.setFont('courier', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
       var lotText = 'Lot:' + d.lotNum; doc.text(lotText, PAD, row2BaseY);
       var lotW = doc.getTextWidth(lotText);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
       doc.text('' + d.qte + d.unite, PAD + lotW + 4, row2BaseY);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
       doc.text(d.producteur, W - PAD, row2BaseY, { align: 'right' });
       doc.setLineWidth(0.5); doc.line(PAD, SEP2_Y, W - PAD, SEP2_Y);
-      var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 3;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      var row3BaseY = ROW3_TOP + (ROW3_BOT - ROW3_TOP) / 2 + 4;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(0, 0, 0);
       doc.text('P:' + d.prodDateStr, PAD, row3BaseY);
-      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.setTextColor(221, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
       var dlcW = doc.getTextWidth(d.dlcStr); var dlcX = W - PAD - dlcW;
       doc.text(d.dlcStr, dlcX, row3BaseY);
-      doc.setFontSize(8); var dlcLabelW = doc.getTextWidth('DLC');
-      doc.text('DLC', dlcX - dlcLabelW - 1, row3BaseY - 2);
+      doc.setFontSize(10);
+      doc.text('DLC', dlcX, row3BaseY - 8.5);
     }
 
     function genererPdfBlob(liste) {
