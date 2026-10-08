@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v102';  // bump a chaque mise a jour du SW (v102 : etiquettes au format reel 62x29 predecoupe DK-11209 08/10/2026)
+const CACHE_NAME = 'planb-tools-v103';  // bump a chaque mise a jour du SW (v103 : badge du jour auto-ajuste - MERCREDI tient dans son cadre 08/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
