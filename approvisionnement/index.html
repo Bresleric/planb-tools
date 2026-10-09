@@ -1810,7 +1810,16 @@
             );
         }
 
+        // Verrou anti-rafale (incident du 08/10 : 8 doublons Arome Vanilline en
+        // 72 ms) : findBesoinActif ne voit le doublon qu APRES la reponse de
+        // l insert, donc des taps repetes passaient tous le controle. Le Set
+        // bloque tout nouvel ajout du meme article tant que l insert est en vol.
+        const besoinsEnCoursAjout = new Set();
+
         async function addBesoin(ingredientId, ingredientName, unite) {
+            const cleAjout = ingredientId || ingredientName;
+            if (besoinsEnCoursAjout.has(cleAjout)) return;
+            besoinsEnCoursAjout.add(cleAjout);
             try {
                 // Garde-fou anti-doublon : un meme produit ne peut etre saisi qu une fois
                 if (findBesoinActif(ingredientId, ingredientName)) {
@@ -1857,6 +1866,8 @@
             } catch (e) {
                 console.error('Error adding besoin:', e);
                 showToast('Erreur lors de l\'ajout', 'error');
+            } finally {
+                besoinsEnCoursAjout.delete(cleAjout);
             }
         }
 
