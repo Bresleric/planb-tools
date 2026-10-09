@@ -231,6 +231,20 @@
         }
 
         /* Comptage */
+        /* Verrou Controle CA (incident 08/10) : tant que le controle n est
+           pas a zero, les blocs Mouvements/Cloture sont masques et remplaces
+           par un bandeau rouge, l onglet Comptage est grise. La classe
+           ca-bloque est posee sur <body> par updateCalculations(). */
+        .bloc-verrou { display: none; }
+        body.ca-bloque .bloc-verrouillable .field-grid { display: none; }
+        body.ca-bloque .bloc-verrouillable .bloc-verrou {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: #fef2f2; border: 1.5px solid #fca5a5; color: #b91c1c;
+            border-radius: 12px; padding: 16px; margin-bottom: 14px;
+            font-weight: 700; font-size: 14px; cursor: pointer;
+        }
+        body.ca-bloque .tab[data-tab="comptage"] { opacity: 0.4; }
+
         .comptage-grid {
             display: grid; grid-template-columns: 1fr 80px 100px;
             gap: 0; margin-top: 10px;
@@ -724,6 +738,7 @@ function changeMonth(delta) {
 // TABS
 // ============================================
 function switchTab(tab) {
+    if (tab === 'comptage' && isCaBloque()) { toastCaBloque(); return; }
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-' + tab));
 
@@ -815,6 +830,13 @@ async function loadDay() {
     renderForm(cashDebut);
     renderComptage();
     updateCalculations(cashDebut);
+
+    // Verrou Controle CA : si on arrive sur un jour bloque alors que l onglet
+    // Comptage est ouvert, retour automatique a la Saisie
+    const comptageActif = document.getElementById('tab-comptage').classList.contains('active');
+    if (comptageActif && isCaBloque()) {
+        switchTab('saisie');
+    }
 }
 
 // ============================================
@@ -855,10 +877,13 @@ function renderForm(cashDebut) {
     </div>`;
     html += title('Autres encaissements') + grid(sec);
 
-    // Mouvements de caisse
+    // Mouvements de caisse (verrouillable tant que Controle CA != 0)
     sec = '';
     fields.mouvements.forEach(f => { sec += renderFieldCard(f); });
-    html += title('Mouvements de caisse') + grid(sec);
+    html += title('Mouvements de caisse')
+        + `<div class="bloc-verrouillable">`
+        + `<div class="bloc-verrou" onclick="toastCaBloque()">🔒 Bloqué : Contrôle CA n'est pas à zéro</div>`
+        + grid(sec) + `</div>`;
 
     // Clôture : comptage saisissable + théorique + écart (calculés)
     padOrderFields.push('comptage_caisse');
@@ -875,7 +900,10 @@ function renderForm(cashDebut) {
         <div class="fc-label">Écart de caisse</div>
         <div class="fc-value ok" id="calc-ecart">0,00</div>
     </div>`;
-    html += title('Clôture') + grid(sec);
+    html += title('Clôture')
+        + `<div class="bloc-verrouillable">`
+        + `<div class="bloc-verrou" onclick="toastCaBloque()">🔒 Bloqué : Contrôle CA n'est pas à zéro</div>`
+        + grid(sec) + `</div>`;
 
     document.getElementById('form-container').innerHTML = html;
 
@@ -916,7 +944,31 @@ function clearPadSelection() {
     padTarget = null; padBuffer = null;
 }
 
+// ===== Verrou Controle CA (09/10/2026) =====
+// Incident du 08/10 : cloture validee chez Freddy avec 870,03 EUR d ecart au
+// Controle CA. Tant que ce controle n est pas a zero (ecart >= 0,01 EUR),
+// les Mouvements, la Cloture, l onglet Comptage et Terminer la cloture sont
+// bloques. Enregistrer reste toujours disponible.
+function isCaBloque() {
+    try {
+        const controleCA = FIELDS[currentEtab].calcControleCA(formData);
+        return Math.abs(controleCA) >= 0.01;
+    } catch (e) { return false; }
+}
+
+function isChampVerrouille(key) {
+    if (!isCaBloque()) return false;
+    if (key === 'comptage_caisse') return true;
+    try { return FIELDS[currentEtab].mouvements.some(f => f.key === key); }
+    catch (e) { return false; }
+}
+
+function toastCaBloque() {
+    showToast('Bloqué : Contrôle CA n\'est pas à zéro');
+}
+
 function selectField(key) {
+    if (isChampVerrouille(key)) { toastCaBloque(); return; }
     clearPadSelection();
     padTarget = { kind: 'field', key };
     padBuffer = null;
@@ -1015,7 +1067,13 @@ function padNext() {
     if (padTarget.kind === 'field') {
         const idx = padOrderFields.indexOf(padTarget.key);
         if (idx >= 0 && idx < padOrderFields.length - 1) {
-            selectField(padOrderFields[idx + 1]);
+            const suivant = padOrderFields[idx + 1];
+            if (isChampVerrouille(suivant)) {
+                clearPadSelection();
+                toastCaBloque();
+                return;
+            }
+            selectField(suivant);
         } else {
             clearPadSelection();
             showToast('Fin de la saisie — pense à Enregistrer');
@@ -1049,6 +1107,12 @@ function updateCalculations(cashDebut) {
     if (elControle) {
         elControle.textContent = fmtMontant(controleCA) + ' €';
         elControle.className = 'fc-value ' + (Math.abs(controleCA) < 0.01 ? 'ok' : 'error');
+    }
+    // Verrou Controle CA : masque Mouvements/Cloture et grise Comptage via CSS
+    document.body.classList.toggle('ca-bloque', Math.abs(controleCA) >= 0.01);
+    // Si la cible du pave est devenue verrouillee, on la relache
+    if (padTarget && padTarget.kind === 'field' && isChampVerrouille(padTarget.key)) {
+        clearPadSelection();
     }
 
     // Caisse théorique
@@ -1219,6 +1283,9 @@ async function saveData() {
 // TERMINER LA CLÔTURE (validation + alerte écart)
 // ============================================
 async function terminerCloture() {
+    // Verrou Controle CA : c est ce bouton qui a laisse passer l ecart de
+    // 870,03 EUR du 08/10 - plus de cloture tant que le controle n est pas a zero
+    if (isCaBloque()) { toastCaBloque(); return; }
     const fields = FIELDS[currentEtab];
     const cashDebut = currentCashDebut;
     const totalCompte = calcComptageTotal(); // total dans l'onglet Comptage
