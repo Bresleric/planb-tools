@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v105';  // bump a chaque mise a jour du SW (v105 : verrou anti-rafale sur l ajout de besoins appro 09/10/2026)
+const CACHE_NAME = 'planb-tools-v106';  // bump a chaque mise a jour du SW (v106 : verrous anti double-tap sur Enregistrer production (TAF et module Production) 09/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 

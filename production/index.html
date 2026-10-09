@@ -7040,6 +7040,24 @@ try { saveProduction = async function pdSaveProductionWrapper() {
   showLoading(false);
 }; } catch (e) { console.warn('[PD] wrap saveProduction:', e); }
 
+// Verrou anti double-tap (incident 08/10, meme famille que le TAF) : le bouton
+// Enregistrer appelle saveProduction(), dont les await laissaient passer deux
+// executions paralleles -> productions et lots en double. On enveloppe la
+// version finale (wrapper PD compris) avec un verrou try/finally.
+try {
+  const _saveProductionAvecPd = saveProduction;
+  let _saveProductionEnCours = false;
+  saveProduction = async function saveProductionVerrouillee() {
+    if (_saveProductionEnCours) return;
+    _saveProductionEnCours = true;
+    try {
+      return await _saveProductionAvecPd.apply(this, arguments);
+    } finally {
+      _saveProductionEnCours = false;
+    }
+  };
+} catch (e) { console.warn('[Verrou] wrap saveProduction:', e); }
+
 // Wrap closeProductionModal pour demander confirmation + supprimer la task
 // spontanée si on annule la production directe
 let _pdOriginalCloseProductionModal;

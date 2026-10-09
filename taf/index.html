@@ -4911,7 +4911,21 @@
     return words.slice(0, 4).map(w => w[0]).join('').substring(0, 4);
   }
 
+  // Verrou anti double-tap (incident 08/10 : Boeuf Bourguignon enregistre 2x
+  // a 0,7 s d intervalle -> lots BOBO-023 et 024 ; 25 cas sur 60 jours).
+  // Les await internes laissaient passer deux executions paralleles.
+  let tafSaveProductionEnCours = false;
   async function saveProductionFromTaf() {
+    if (tafSaveProductionEnCours) return;
+    tafSaveProductionEnCours = true;
+    try {
+      await saveProductionFromTafSansVerrou();
+    } finally {
+      tafSaveProductionEnCours = false;
+    }
+  }
+
+  async function saveProductionFromTafSansVerrou() {
     const taskId = document.getElementById('prod-task-id').value;
     const nom = document.getElementById('prod-nom').value.trim();
     const quantite = parseFloat(document.getElementById('prod-quantite').value);
