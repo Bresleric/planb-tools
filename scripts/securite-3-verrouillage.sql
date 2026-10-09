@@ -1,6 +1,10 @@
 -- ============================================================================
--- SECURITE Phase 3/3 : VERROUILLAGE COMPLET — SCRIPT A COLLER TEL QUEL
--- dans Supabase > SQL Editor > Run (09/10/2026).
+-- SECURITE Phase 3/3 : VERROUILLAGE COMPLET — APPLIQUEE le 09/10/2026 a 06h40
+-- (collage Eric dans SQL Editor apres echec de la moulinette automatique).
+-- BANC DE TEST : sans session = 0 ligne partout + ecritures refusees ;
+-- avec session = lectures/ecritures OK sur toutes les tables cles ;
+-- API REST avec cle anon seule = [] sur users et briefings ;
+-- advisors : plus aucune alerte RLS ouverte.
 --
 -- La moulinette automatique de 02h00 a ete empechee par la couche d acces
 -- distante (annulation systematique a 60 s de tout DDL de masse cette nuit,
