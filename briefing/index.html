@@ -1145,32 +1145,32 @@
                 }
                 // Enrichir avec les reservations TheFork : les compteurs ne sont
                 // remplis QUE s ils sont vides (jamais ecraser une saisie manuelle)
-                if (briefing) {
-                    const resasTF = await fetchReservationsTheFork(consultDate, currentEstablishment);
-                    if (resasTF) {
-                        briefing._thefork = resasTF;
-                        const scope = (briefing.type === 'service' && briefing.service)
-                            ? resasTF.filter(r => r.service === briefing.service)
-                            : resasTF;
-                        if (scope.length > 0) {
-                            if (!briefing.chiffres) briefing.chiffres = {};
-                            if (!briefing.chiffres.reservations) {
-                                briefing.chiffres.reservations = scope.length;
-                            }
-                            if (!briefing.chiffres.couverts_attendus) {
-                                briefing.chiffres.couverts_attendus = scope.reduce((s, r) => s + (r.couverts || 0), 0);
-                            }
+                const resasTF = await fetchReservationsTheFork(consultDate, currentEstablishment);
+                if (briefing && resasTF) {
+                    briefing._thefork = resasTF;
+                    const scope = (briefing.type === 'service' && briefing.service)
+                        ? resasTF.filter(r => r.service === briefing.service)
+                        : resasTF;
+                    if (scope.length > 0) {
+                        if (!briefing.chiffres) briefing.chiffres = {};
+                        if (!briefing.chiffres.reservations) {
+                            briefing.chiffres.reservations = scope.length;
+                        }
+                        if (!briefing.chiffres.couverts_attendus) {
+                            briefing.chiffres.couverts_attendus = scope.reduce((s, r) => s + (r.couverts || 0), 0);
                         }
                     }
                 }
 
                 if (!briefing) {
+                    // Pas de briefing publie : on affiche quand meme les
+                    // reservations TheFork du jour si on en a
                     container.innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon">&#128227;</div>
                             <div class="empty-state-title">Pas de briefing</div>
                             <div class="empty-state-text">Aucun briefing publie pour ${formatDateFr(consultDate)}${consultService !== 'jour' ? ' - ' + (consultService === 'midi' ? 'Midi' : 'Soir') : ''}</div>
-                        </div>`;
+                        </div>` + (resasTF ? renderTheForkSection(resasTF) : '');
                     document.getElementById('lecture-bar').classList.add('hidden');
                     return;
                 }
@@ -1223,6 +1223,48 @@
             } catch (e) {
                 console.warn('Badge briefing error:', e);
             }
+        }
+
+        // Section Reservations TheFork : utilisee dans le briefing publie ET
+        // seule quand aucun briefing n est publie (les resas existent quand meme)
+        function renderTheForkSection(tf) {
+            const fmtH = (h) => h ? String(h).slice(0, 5) : '';
+            const sumCouv = (arr) => arr.reduce((s, r) => s + (r.couverts || 0), 0);
+            const midi = tf.filter(r => r.service === 'midi');
+            const soir = tf.filter(r => r.service === 'soir');
+            let tfHtml = `<div class="kpi-grid" style="margin-bottom:8px;">
+                <div class="kpi-card">
+                    <div class="kpi-label">Midi</div>
+                    <div class="kpi-value">${midi.length} resa${midi.length > 1 ? 's' : ''}</div>
+                    <div style="font-size:11px; color:var(--gray-500);">${sumCouv(midi)} couverts</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Soir</div>
+                    <div class="kpi-value">${soir.length} resa${soir.length > 1 ? 's' : ''}</div>
+                    <div style="font-size:11px; color:var(--gray-500);">${sumCouv(soir)} couverts</div>
+                </div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Total jour</div>
+                    <div class="kpi-value">${tf.length} resas</div>
+                    <div style="font-size:11px; color:var(--gray-500);">${sumCouv(tf)} couverts</div>
+                </div>
+            </div>`;
+            const attention = tf.filter(r => r.allergies || r.commentaire);
+            attention.forEach(r => {
+                tfHtml += `
+                    <div class="brief-item">
+                        <div class="brief-item-icon">${r.allergies ? '&#9888;&#65039;' : '&#128172;'}</div>
+                        <div class="brief-item-content">
+                            <div class="brief-item-title">${fmtH(r.heure)} — ${escapeHtml(r.nom_client || 'Client')} (${r.couverts || '?'} couv.)</div>
+                            <div class="brief-item-subtitle">${r.allergies ? 'Allergies : ' + escapeHtml(r.allergies) : ''}${r.allergies && r.commentaire ? ' — ' : ''}${r.commentaire ? escapeHtml(r.commentaire) : ''}</div>
+                        </div>
+                        ${r.allergies ? '<span class="brief-item-badge badge-urgent">Allergie</span>' : `<span class="brief-item-badge badge-info">${r.service === 'midi' ? 'Midi' : 'Soir'}</span>`}
+                    </div>`;
+            });
+            if (attention.length === 0) {
+                tfHtml += `<div style="font-size:13px; color:var(--gray-400); font-style:italic;">Aucune allergie ni demande particuliere signalee</div>`;
+            }
+            return renderSection('&#127860;', 'Reservations TheFork', tf.length, tfHtml, true);
         }
 
         function renderBriefing(container, b) {
@@ -1350,42 +1392,7 @@
 
             // Section: Reservations TheFork (synchro automatique toutes les heures)
             if (b._thefork && b._thefork.length > 0) {
-                const tf = b._thefork;
-                const fmtH = (h) => h ? String(h).slice(0, 5) : '';
-                const sumCouv = (arr) => arr.reduce((s, r) => s + (r.couverts || 0), 0);
-                const midi = tf.filter(r => r.service === 'midi');
-                const soir = tf.filter(r => r.service === 'soir');
-                let tfHtml = `<div class="kpi-grid" style="margin-bottom:8px;">
-                    <div class="kpi-card">
-                        <div class="kpi-label">Midi</div>
-                        <div class="kpi-value">${midi.length} resa${midi.length > 1 ? 's' : ''}</div>
-                        <div style="font-size:11px; color:var(--gray-500);">${sumCouv(midi)} couverts</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label">Soir</div>
-                        <div class="kpi-value">${soir.length} resa${soir.length > 1 ? 's' : ''}</div>
-                        <div style="font-size:11px; color:var(--gray-500);">${sumCouv(soir)} couverts</div>
-                    </div>
-                    <div class="kpi-card highlight">
-                        <div class="kpi-label">Total jour</div>
-                        <div class="kpi-value">${tf.length} resas</div>
-                        <div style="font-size:11px; color:var(--gray-500);">${sumCouv(tf)} couverts</div>
-                    </div>
-                </div>`;
-                const attention = tf.filter(r => r.allergies || r.commentaire);
-                attention.forEach(r => {
-                    tfHtml += `
-                        <div class="brief-item">
-                            <div class="brief-item-icon">${r.allergies ? '&#9888;&#65039;' : '&#128172;'}</div>
-                            <div class="brief-item-content">
-                                <div class="brief-item-title">${fmtH(r.heure)} — ${escapeHtml(r.nom_client || 'Client')} (${r.couverts || '?'} couv.)</div>
-                                <div class="brief-item-subtitle">${r.allergies ? 'Allergies : ' + escapeHtml(r.allergies) : ''}${r.allergies && r.commentaire ? ' — ' : ''}${r.commentaire ? escapeHtml(r.commentaire) : ''}</div>
-                            </div>
-                            ${r.allergies ? '<span class="brief-item-badge badge-urgent">Allergie</span>' : `<span class="brief-item-badge badge-info">${r.service === 'midi' ? 'Midi' : 'Soir'}</span>`}
-                        </div>`;
-                });
-                if (attention.length === 0) tfHtml += emptyTxt('Aucune allergie ni demande particuliere signalee');
-                html += renderSection('&#127860;', 'Reservations TheFork', tf.length, tfHtml, true);
+                html += renderTheForkSection(b._thefork);
             }
 
             // Section: Plats du jour / Suggestions
