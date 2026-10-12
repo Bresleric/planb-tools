@@ -76,6 +76,30 @@
         .footer-note { text-align: center; font-size: 11px; color: var(--gray-400); margin-top: 18px; }
         #loading { text-align: center; padding: 40px; color: var(--gray-400); }
 
+        /* ---- Vues L Addition : CA live + Stock ---- */
+        .vue-tabs { flex-wrap: wrap; }
+        .vue-tabs .tab-btn { flex: 1 1 140px; }
+        .live-meta { font-size: 11px; font-weight: 600; opacity: 0.9; margin-top: 2px; }
+        .live-warn { background: var(--orange-light); color: #9a3412; font-size: 12px; font-weight: 600; padding: 8px 14px; }
+        .live-err { background: var(--red-light); color: var(--red); font-size: 12px; font-weight: 600; padding: 8px 14px; }
+        .item-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; border-bottom: 1px dashed var(--gray-100); }
+        .item-row:last-child { border-bottom: none; }
+        .item-row .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .item-row .qte { color: var(--gray-500); font-size: 12px; white-space: nowrap; min-width: 34px; text-align: right; }
+        .item-row .ca { font-weight: 700; white-space: nowrap; min-width: 66px; text-align: right; }
+        .item-bar { height: 4px; background: var(--blue-light); border-radius: 2px; margin-top: 3px; }
+        .item-bar > div { height: 4px; background: var(--blue); border-radius: 2px; }
+        .stk-num { font-weight: 800; min-width: 38px; text-align: right; }
+        .stk-delta { font-size: 11px; color: var(--gray-500); min-width: 34px; text-align: right; }
+        .sous-tabs { display: flex; gap: 6px; max-width: 760px; margin: 10px auto 0; padding: 0 12px; flex-wrap: wrap; }
+        .sous-tabs .tab-btn { flex: 1 1 100px; }
+        .opt-line { max-width: 760px; margin: 8px auto 0; padding: 0 14px; font-size: 12px; color: var(--gray-500); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        details.plus summary { font-size: 12px; color: var(--blue); font-weight: 700; cursor: pointer; padding: 6px 0 2px; list-style: none; }
+        details.plus summary::-webkit-details-marker { display: none; }
+        .spark { width: 100%; height: 70px; display: block; }
+        .legende { font-size: 11px; color: var(--gray-500); display: flex; gap: 12px; margin-top: 2px; }
+        .legende i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+
         @supports (padding: env(safe-area-inset-top)) {
             header { padding-top: calc(12px + env(safe-area-inset-top)) !important; }
         }
@@ -93,6 +117,8 @@
     <div class="tabs vue-tabs">
         <button class="tab-btn active" data-vue="bord" onclick="setVue('bord')">📊 Tableau de bord</button>
         <button class="tab-btn" data-vue="activite" onclick="setVue('activite')">👤 Activité</button>
+        <button class="tab-btn" data-vue="live" onclick="setVue('live')">💶 CA live</button>
+        <button class="tab-btn" data-vue="stock" onclick="setVue('stock')">📦 Stock</button>
     </div>
 
     <div class="tabs">
@@ -107,9 +133,27 @@
         <button onclick="changeActDate(1)" id="act-btn-next">›</button>
     </div>
 
+    <div class="sous-tabs" id="stock-tabs" style="display:none;">
+        <button class="tab-btn active" data-stk="solide" onclick="setStockVue('solide')">🍽️ Solides</button>
+        <button class="tab-btn" data-stk="liquide" onclick="setStockVue('liquide')">🍷 Liquides</button>
+        <button class="tab-btn" data-stk="top" onclick="setStockVue('top')">🔥 Top 20 ventes</button>
+    </div>
+    <div class="opt-line" id="stock-opts" style="display:none;">
+        <label id="opt-periode" style="display:none;">Période :
+            <select id="top-periode" onchange="renderStock()">
+                <option value="1">Aujourd'hui</option>
+                <option value="7" selected>7 derniers jours</option>
+                <option value="30">30 derniers jours</option>
+            </select>
+        </label>
+        <label><input type="checkbox" id="opt-non-suivis" onchange="renderStock()"> Afficher les articles non suivis (compteur ≥ 1000)</label>
+    </div>
+
     <main>
         <div id="etabs-zone"><div id="loading">Chargement…</div></div>
         <div id="activite-zone" style="display:none;"></div>
+        <div id="live-zone" style="display:none;"></div>
+        <div id="stock-zone" style="display:none;"></div>
         <a class="lien-rapport" href="../rapport/">📋 Ouvrir le Rapport journalier</a>
         <div class="footer-note" id="gen-note"></div>
     </main>
@@ -337,7 +381,14 @@
             document.getElementById('etabs-zone').style.display = v === 'bord' ? '' : 'none';
             document.getElementById('activite-zone').style.display = v === 'activite' ? '' : 'none';
             document.getElementById('act-date-nav').style.display = v === 'activite' ? 'flex' : 'none';
+            document.getElementById('live-zone').style.display = v === 'live' ? '' : 'none';
+            document.getElementById('stock-zone').style.display = v === 'stock' ? '' : 'none';
+            document.getElementById('stock-tabs').style.display = v === 'stock' ? 'flex' : 'none';
+            document.getElementById('stock-opts').style.display = v === 'stock' ? 'flex' : 'none';
             if (v === 'activite' && !actCharge) refreshActivite();
+            if ((v === 'live' || v === 'stock') && !ladd) refreshLaddition();
+            else if (v === 'live') renderLive();
+            else if (v === 'stock') renderStock();
         }
         function changeActDate(delta) { actDate = addDays(actDate, delta); refreshActivite(); }
 
@@ -494,7 +545,281 @@
             }
         }
 
-        function actualiser() { if (vue === 'activite') refreshActivite(); else refresh(); }
+        // ============ VUES L ADDITION LIVE : CA live + Stock caisse ============
+        // Donnees poussees toutes les 30 min par l edge function laddition-live.
+        let ladd = null;          // { live: {freddy, liesel}, ventes: [...], ruptures: [...], types: Map }
+        let stockVue = 'solide';
+        const NON_SUIVI = 1000;   // compteur de stock caisse qui tourne a vide (cafes, eaux...)
+        const TYPES_LIQUIDES = ['Vin', 'Spiritueux', 'Bière', 'Soda', 'Cocktail', 'Autre boisson froide', 'Café', 'Eau', 'Autre boisson chaude'];
+        // Repli quand l article n est pas dans le catalogue produits_vendus (stock = souvent bouteilles/futs)
+        const SOLIDE_RE = /tarte|g[aâ]teau|glac|br[uû]l[eé]e|cr[eè]me framboise|r[oô]ti|compot|confiture|cake|strudel|charlotte|brownie|baba|kouglo|kougel|nougat|vacherin|verrine|k[aä]s+e?kuch|riewele|meringu|dessert/i;
+        const LIQUIDE_RE = /\d+\s?cl\b|\d+([,.]\d+)?\s?l\b|litre|f[uû]t|bouteille|\bbt\b|bi[eè]re|\bvin\b|verre|pinot|riesling|gew[uü]r|edelzwicker|cr[eé]mant|muscat|klevener|sylvaner|bordeaux|m[eé]doc|rh[oô]ne|crozes|[eé]milion|beaujolais|bourgogne|ch[aâ]teau|domaine|cola|limonade|lisbeth|perrier|\beau\b|\bjus\b|sirop|\bth[eé]\b|infusion|caf[eé]|expresso|cappuc|\btea\b|tonic|spritz|schorle|ap[eé]rol|armagnac|cognac|whisk|ricard|picon|martini|suze|porto|rhum|\bgin\b|kirsch|\bmarc\b|mirabelle|quetsch|poire william|framboise|coing|prune|\bamer\b|liqueur|chartreuse|marnier|amaretto|diabolo|crodino|liness|celtic|m[eé]t[eé]or|m[eé]li|\bedv\b|black papillon|pas si vite/i;
+
+        function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase(); }
+        function typeArticle(nom, etab) {
+            const t = ladd.types.get(etab + '|' + norm(nom));
+            if (t) return TYPES_LIQUIDES.includes(t) ? 'liquide' : 'solide';
+            if (SOLIDE_RE.test(nom)) return 'solide';
+            if (LIQUIDE_RE.test(nom) || /\sL\s*$/.test(nom)) return 'liquide';
+            return 'solide';
+        }
+        function nb(v) { return Number(v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }); }
+        function ilYa(iso) {
+            if (!iso) return '';
+            const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+            return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : `il y a ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
+        }
+
+        async function fetchTout(table, cols) {
+            let all = [], from = 0;
+            for (;;) {
+                const { data, error } = await sb.from(table).select(cols).range(from, from + 999);
+                if (error) throw error;
+                all = all.concat(data || []);
+                if (!data || data.length < 1000) break;
+                from += 1000;
+            }
+            return all;
+        }
+
+        async function loadLaddition() {
+            const depuis = dstr(addDays(dayStart(new Date()), -30));
+            const q = await Promise.all([
+                sb.from('laddition_live').select('*'),
+                sb.from('laddition_ventes_jour').select('etablissement, date_service, produits').gte('date_service', depuis),
+                sb.from('laddition_ruptures').select('etablissement, date_service, produit, epuise_vers').gte('date_service', dstr(addDays(dayStart(new Date()), -1))),
+            ]);
+            const err = q.find(r => r.error);
+            if (err) throw err.error;
+            const catalogue = await fetchTout('produits_vendus', 'etablissement, nom, type_produit');
+            const types = new Map();
+            catalogue.forEach(p => { if (p.type_produit) types.set(String(p.etablissement).toLowerCase() + '|' + norm(p.nom), p.type_produit); });
+            const live = {};
+            (q[0].data || []).forEach(l => { live[l.etablissement] = l; });
+            return { live, ventes: q[1].data || [], ruptures: q[2].data || [], types };
+        }
+
+        async function refreshLaddition() {
+            const zones = ['live-zone', 'stock-zone'].map(id => document.getElementById(id));
+            zones.forEach(z => { z.innerHTML = '<div id="loading">Chargement…</div>'; });
+            try {
+                await PLANB.assurerSession();
+                ladd = await loadLaddition();
+                renderLive();
+                renderStock();
+                document.getElementById('gen-note').textContent = 'Actualisé le ' + new Date().toLocaleString('fr-FR');
+            } catch (e) {
+                console.error(e);
+                zones.forEach(z => { z.innerHTML = '<div class="empty" style="text-align:center; padding:30px;">Erreur de chargement — vérifie la connexion.</div>'; });
+            }
+        }
+
+        // En-tete commun : nom, heure de la derniere photo caisse, alertes de fraicheur
+        function enteteLive(l, etabDef) {
+            let h = `<div class="etab-head ${etabDef.code}">${etabDef.label}`;
+            if (l && l.maj_caisse) h += `<div class="live-meta">Service ouvert ${l.date_service === dstr(new Date()) ? 'à ' + hhmm(l.service_ouvert) : 'le ' + jourCourt(new Date(l.date_service + 'T12:00:00'))} · caisse mise à jour ${hhmm(l.maj_caisse)} (${ilYa(l.maj_caisse)})</div>`;
+            h += `</div>`;
+            if (l && l.erreur) h += `<div class="live-err">⚠️ Synchro L'Addition en échec (${ilYa(l.erreur_le)}) : ${esc(l.erreur)}</div>`;
+            else if (l && l.synchro_le && Date.now() - new Date(l.synchro_le).getTime() > 75 * 60000) h += `<div class="live-warn">⏳ Pas de synchro depuis ${ilYa(l.synchro_le).replace('il y a ', '')} — données peut-être en retard.</div>`;
+            if (l && l.date_service && l.date_service !== dstr(new Date())) h += `<div class="live-warn">Pas de service ouvert aujourd'hui : ce sont les derniers chiffres connus.</div>`;
+            return h;
+        }
+
+        // Courbe CA / encaisse du service (photos L Addition)
+        function sparkline(evo) {
+            const pts = (evo || []).filter(p => p.t);
+            if (pts.length < 2) return '';
+            const t0 = new Date(pts[0].t).getTime(), t1 = new Date(pts[pts.length - 1].t).getTime() || t0 + 1;
+            const max = Math.max(...pts.map(p => Math.max(p.ca || 0, p.enc || 0)), 1);
+            const W = 300, H = 70;
+            const xy = k => pts.map(p => `${((new Date(p.t).getTime() - t0) / Math.max(t1 - t0, 1) * W).toFixed(1)},${(H - 4 - (p[k] || 0) / max * (H - 10)).toFixed(1)}`).join(' ');
+            return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+                <polyline points="${xy('ca')}" fill="none" stroke="var(--blue)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                <polyline points="${xy('enc')}" fill="none" stroke="var(--green)" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="legende"><span><i style="background:var(--blue)"></i>CA</span><span><i style="background:var(--green)"></i>Encaissé</span><span style="margin-left:auto;">${hhmm(pts[0].t)} → ${hhmm(pts[pts.length - 1].t)}</span></div>`;
+        }
+
+        function listeItems(items, nbVisibles) {
+            if (!items.length) return '<div class="empty">Aucune vente.</div>';
+            const max = Math.max(...items.map(p => p.ca), 1);
+            const ligne = p => `<div class="item-row"><span class="nom">${esc(p.nom)}<div class="item-bar"><div style="width:${(p.ca / max * 100).toFixed(0)}%"></div></div></span><span class="qte">× ${nb(p.qte)}</span><span class="ca">${money(p.ca)}</span></div>`;
+            let h = items.slice(0, nbVisibles).map(ligne).join('');
+            if (items.length > nbVisibles) h += `<details class="plus"><summary>▾ Voir les ${items.length - nbVisibles} autres</summary>${items.slice(nbVisibles).map(ligne).join('')}</details>`;
+            return h;
+        }
+
+        function renderLive() {
+            if (!ladd) return;
+            const zone = document.getElementById('live-zone');
+            const lignes = ETABS.map(e => ladd.live[e.code]).filter(l => l && l.maj_caisse);
+            if (!lignes.length) {
+                const errs = ETABS.map(e => ladd.live[e.code]).filter(l => l && l.erreur);
+                zone.innerHTML = `<div class="empty" style="text-align:center; padding:30px;">Aucune donnée L'Addition pour l'instant.${errs.length ? '<br><br><span style="color:var(--red)">' + esc(errs[0].erreur) + '</span>' : '<br>La synchro tourne toutes les 30 min.'}</div>`;
+                return;
+            }
+            let html = '';
+            // Total groupe (visible seulement en filtre Groupe)
+            const duJour = lignes.filter(l => l.date_service === dstr(new Date()));
+            if (duJour.length > 1) {
+                const t = k => duJour.reduce((s, l) => s + n(l[k]), 0);
+                html += `<div class="etab-card" data-etab="groupe"><div class="bloc"><div class="bloc-title">👥 Groupe — aujourd'hui</div><div class="money-grid">
+                    <div class="money-tile"><div class="lbl">CA</div><div class="val">${money0(t('ca'))}</div></div>
+                    <div class="money-tile"><div class="lbl">Encaissé</div><div class="val">${money0(t('encaisse'))}</div></div>
+                    <div class="money-tile"><div class="lbl">Couverts</div><div class="val">${t('couverts')}</div></div>
+                </div></div></div>`;
+            }
+            ETABS.forEach(e => {
+                const l = ladd.live[e.code];
+                html += `<div class="etab-card" data-etab="${e.code}">${enteteLive(l, e)}`;
+                if (!l || !l.maj_caisse) { html += `<div class="bloc"><div class="empty">Pas encore de données pour ce restaurant.</div></div></div>`; return; }
+
+                // Chiffres
+                html += `<div class="bloc"><div class="bloc-title">💰 Chiffres du service</div><div class="money-grid">
+                    <div class="money-tile"><div class="lbl">CA</div><div class="val">${money0(l.ca)}</div><div class="sub">encaissé ${money0(l.encaisse)}</div></div>
+                    <div class="money-tile"><div class="lbl">Couverts</div><div class="val">${l.couverts || 0}</div><div class="sub">${money(l.moyenne_couvert)} / couvert</div></div>
+                    <div class="money-tile"><div class="lbl">Ticket moyen</div><div class="val">${money0(l.ticket_moyen)}</div><div class="sub">${l.additions || 0} additions</div></div>
+                </div>`;
+                const ann = n(l.annulations && l.annulations.total);
+                html += `<div class="chips" style="margin-top:8px;">
+                    <div class="chip">Remises : <b class="${n(l.remise) ? 'neg' : ''}">${money(l.remise)}</b></div>
+                    <div class="chip">Offerts : <b class="${n(l.offert) ? 'neg' : ''}">${money(l.offert)}</b></div>
+                    <div class="chip">Annulés : <b class="${ann ? 'neg' : ''}">${money(ann)}</b></div>
+                </div>`;
+                html += sparkline(l.evolution);
+                html += `</div>`;
+
+                // Principaux items : plats et boissons separes
+                const produits = (l.produits || []).slice().sort((a, b) => b.ca - a.ca);
+                const plats = produits.filter(p => typeArticle(p.nom, e.code) === 'solide');
+                const boissons = produits.filter(p => typeArticle(p.nom, e.code) === 'liquide');
+                html += `<div class="bloc"><div class="bloc-title">🍽️ Principaux plats</div>${listeItems(plats, 10)}</div>`;
+                html += `<div class="bloc"><div class="bloc-title">🍷 Principales boissons</div>${listeItems(boissons, 10)}</div>`;
+                const menus = (l.menus || []).concat(l.options || []).filter(m => m.qte);
+                if (menus.length) html += `<div class="bloc"><div class="bloc-title">➕ Menus et suppléments</div>${listeItems(menus.sort((a, b) => b.ca - a.ca), 5)}</div>`;
+
+                // Serveurs et salles
+                const serveurs = (l.serveurs || []).slice().sort((a, b) => b.ca - a.ca);
+                if (serveurs.length) {
+                    html += `<div class="bloc"><div class="bloc-title">🧑‍🍳 Par serveur</div>`;
+                    serveurs.forEach(s => { html += `<div class="row"><span class="grow">${esc(s.nom)}<div class="small">${s.couverts} couv. · ${s.additions} additions${n(s.remise) || n(s.offert) ? ` · remises/offerts ${money(n(s.remise) + n(s.offert))}` : ''}</div></span><span class="meta" style="font-weight:700; color:var(--gray-800);">${money(s.ca)}</span></div>`; });
+                    html += `</div>`;
+                }
+                const salles = (l.salles || []).slice().sort((a, b) => b.ca - a.ca);
+                if (salles.length > 1) {
+                    html += `<div class="bloc"><div class="bloc-title">🪑 Par salle</div>`;
+                    salles.forEach(s => { html += `<div class="row"><span class="grow">${esc(s.nom)}</span><span class="meta" style="font-weight:700; color:var(--gray-800);">${money(s.ca)}</span></div>`; });
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            });
+            zone.innerHTML = html;
+            appliquerFiltre();
+        }
+
+        function setStockVue(v) {
+            stockVue = v;
+            document.querySelectorAll('[data-stk]').forEach(b => b.classList.toggle('active', b.dataset.stk === v));
+            document.getElementById('opt-periode').style.display = v === 'top' ? '' : 'none';
+            renderStock();
+        }
+
+        function ligneStock(s, extra) {
+            const q = n(s.qte);
+            const cls = q <= 0 ? 'neg' : '';
+            const coul = q <= 0 ? 'var(--red)' : q <= 5 ? 'var(--orange)' : 'var(--gray-800)';
+            const delta = s.qte_ouv !== null && s.qte_ouv !== undefined && n(s.qte_ouv) !== q ? (q - n(s.qte_ouv) > 0 ? '+' : '') + nb(q - n(s.qte_ouv)) : '';
+            return `<div class="item-row"><span class="nom">${esc(s.cle || s.nom)}${extra ? `<div class="small">${extra}</div>` : ''}</span><span class="stk-delta" title="depuis l'ouverture">${delta}</span><span class="stk-num ${cls}" style="color:${coul}">${nb(q)}</span></div>`;
+        }
+
+        function renderStock() {
+            if (!ladd) return;
+            const zone = document.getElementById('stock-zone');
+            const voirNonSuivis = document.getElementById('opt-non-suivis').checked;
+            let html = '';
+            ETABS.forEach(e => {
+                const l = ladd.live[e.code];
+                html += `<div class="etab-card" data-etab="${e.code}">${enteteLive(l, e)}`;
+                if (!l || !l.stocks) { html += `<div class="bloc"><div class="empty">Pas encore de données de stock.</div></div></div>`; return; }
+                const rupt = new Map(ladd.ruptures.filter(r => r.etablissement === e.code && r.date_service === l.date_service).map(r => [r.produit, r.epuise_vers]));
+
+                if (stockVue === 'top') {
+                    html += renderTop20(e.code, l, voirNonSuivis);
+                    html += `</div>`;
+                    return;
+                }
+                const tous = l.stocks.filter(s => typeArticle(s.nom, e.code) === stockVue);
+                const nonSuivis = tous.filter(s => n(s.qte) >= NON_SUIVI);
+                const suivis = tous.filter(s => n(s.qte) < NON_SUIVI).sort((a, b) => n(a.qte) - n(b.qte) || a.nom.localeCompare(b.nom));
+                const epuisesAuj = suivis.filter(s => n(s.qte) <= 0 && (rupt.has(s.cle || s.nom) || n(s.qte_ouv) > 0));
+                const dejaZero = suivis.filter(s => n(s.qte) <= 0 && !epuisesAuj.includes(s));
+                const tranches = [
+                    ['🟠 Stock bas (1 à 5)', s => n(s.qte) > 0 && n(s.qte) <= 5],
+                    ['6 à 10', s => n(s.qte) > 5 && n(s.qte) <= 10],
+                    ['11 à 30', s => n(s.qte) > 10 && n(s.qte) <= 30],
+                    ['31 et plus', s => n(s.qte) > 30],
+                ];
+                html += `<div class="bloc"><div class="chips"><div class="chip">Articles suivis : <b>${suivis.length}</b></div><div class="chip">À zéro : <b class="${epuisesAuj.length + dejaZero.length ? 'neg' : ''}">${epuisesAuj.length + dejaZero.length}</b></div><div class="chip">Stock bas : <b>${suivis.filter(tranches[0][1]).length}</b></div></div></div>`;
+                html += `<div class="bloc"><div class="bloc-title">🔴 Épuisés pendant le service</div>`;
+                html += epuisesAuj.length ? epuisesAuj.map(s => ligneStock(s, rupt.get(s.cle || s.nom) ? 'épuisé vers ' + hhmm(rupt.get(s.cle || s.nom)) : '')).join('') : '<div class="empty">Aucune rupture pendant le service. ✨</div>';
+                if (dejaZero.length) html += `<details class="plus"><summary>▾ ${dejaZero.length} article${dejaZero.length > 1 ? 's' : ''} déjà à 0 à l'ouverture</summary>${dejaZero.map(s => ligneStock(s)).join('')}</details>`;
+                html += `</div>`;
+                tranches.forEach(([titre, f], i) => {
+                    const liste = suivis.filter(f);
+                    if (!liste.length) return;
+                    html += `<div class="bloc"><div class="bloc-title">${titre} · ${liste.length}</div>`;
+                    const note = s => rupt.get(s.cle || s.nom) ? 'épuisé vers ' + hhmm(rupt.get(s.cle || s.nom)) + ', réassorti' : '';
+                    html += i === 0 ? liste.map(s => ligneStock(s, note(s))).join('') : `<details class="plus"${i === 1 ? ' open' : ''}><summary>▾ Afficher</summary>${liste.map(s => ligneStock(s, note(s))).join('')}</details>`;
+                    html += `</div>`;
+                });
+                if (nonSuivis.length) {
+                    html += `<div class="bloc"><div class="bloc-title">⚪ Non suivis · ${nonSuivis.length}</div>`;
+                    html += voirNonSuivis ? nonSuivis.map(s => ligneStock(s)).join('') : `<div class="empty">Compteurs ≥ ${NON_SUIVI} (cafés, eaux, vins au verre…) masqués — coche l'option en haut pour les voir.</div>`;
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            });
+            zone.innerHTML = html;
+            appliquerFiltre();
+        }
+
+        // Top 20 des ventes (en quantite) sur la periode, avec le stock caisse restant
+        function renderTop20(etab, l, voirNonSuivis) {
+            const jours = parseInt(document.getElementById('top-periode').value, 10);
+            const depuis = dstr(addDays(dayStart(new Date()), -(jours - 1)));
+            const cumul = new Map();
+            ladd.ventes.filter(v => v.etablissement === etab && v.date_service >= depuis).forEach(v => {
+                (v.produits || []).forEach(p => {
+                    const k = norm(p.nom);
+                    const c = cumul.get(k) || { nom: p.nom, qte: 0, ca: 0 };
+                    c.qte += n(p.qte); c.ca += n(p.ca);
+                    cumul.set(k, c);
+                });
+            });
+            const nbJours = new Set(ladd.ventes.filter(v => v.etablissement === etab && v.date_service >= depuis).map(v => v.date_service)).size;
+            const stockParNom = new Map();
+            (l.stocks || []).forEach(s => { if (!stockParNom.has(norm(s.nom))) stockParNom.set(norm(s.nom), s); });
+            const top = [...cumul.values()]
+                .filter(p => { const s = stockParNom.get(norm(p.nom)); return voirNonSuivis || !s || n(s.qte) < NON_SUIVI; })
+                .sort((a, b) => b.qte - a.qte || b.ca - a.ca).slice(0, 20);
+            let h = `<div class="bloc"><div class="bloc-title">🔥 Top 20 des ventes · ${nbJours} jour${nbJours > 1 ? 's' : ''} de données</div>`;
+            if (!top.length) return h + '<div class="empty">Pas encore de ventes enregistrées sur cette période.</div></div>';
+            if (nbJours < jours) h += `<div class="small" style="margin-bottom:6px;">L'historique se constitue depuis la mise en route de la synchro (${nbJours}/${jours} jours).</div>`;
+            top.forEach((p, i) => {
+                const s = stockParNom.get(norm(p.nom));
+                let stk = '<span class="badge gray">pas de stock caisse</span>';
+                if (s && n(s.qte) >= NON_SUIVI) stk = '<span class="badge gray">non suivi</span>';
+                else if (s) stk = `<span class="badge ${n(s.qte) <= 0 ? 'red' : n(s.qte) <= 5 ? 'orange' : 'green'}">stock ${nb(s.qte)}</span>`;
+                h += `<div class="item-row"><span class="qte" style="min-width:22px; text-align:left;">${i + 1}.</span><span class="nom">${esc(p.nom)}<div class="small">× ${nb(p.qte)} vendus · ${money(p.ca)}</div></span>${stk}</div>`;
+            });
+            return h + `</div>`;
+        }
+
+        function actualiser() {
+            if (vue === 'activite') refreshActivite();
+            else if (vue === 'live' || vue === 'stock') refreshLaddition();
+            else refresh();
+        }
 
         refresh();
     </script>

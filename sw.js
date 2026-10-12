@@ -12,8 +12,9 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v111';  // bump a chaque mise a jour du SW (v111 : Pilotage - vue Activite par collaborateur 12/10/2026)
-const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
+const CACHE_NAME = 'planb-tools-v113';  // bump a chaque mise a jour du SW (v113 : SW enfin enregistre + notifications push 12/10/2026)
+// Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
+const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
 
 // ----------------------------------------------------------------------------
@@ -76,10 +77,9 @@ self.addEventListener('fetch', (event) => {
 // {
 //   title:   "Températures matin Freddy",
 //   body:    "Aucun relevé enregistré. Pense à passer au frigo.",
-//   url:     "/temperatures/",            // page à ouvrir au clic
+//   url:     "temperatures/",             // page à ouvrir au clic (relative au site)
 //   tag:     "temp_matin_freddy",         // dedup : remplace la précédente
-//   icon:    "/icons/icon-192.png",       // (optionnel)
-//   badge:   "/icons/badge-72.png"        // (optionnel)
+//   requireInteraction: true             // (optionnel) reste affichée jusqu au clic
 // }
 // ----------------------------------------------------------------------------
 self.addEventListener('push', (event) => {
@@ -95,10 +95,8 @@ self.addEventListener('push', (event) => {
         body:        data.body || '',
         tag:         data.tag || 'planb-default',
         renotify:    true,                                 // re-notifie même si tag existe déjà
-        icon:        data.icon  || '/manifest-icon-192.png',
-        badge:       data.badge || '/manifest-icon-192.png',
         data: {
-            url: data.url || '/',
+            url: data.url || './',
             sentAt: Date.now()
         },
         requireInteraction: data.requireInteraction || false
@@ -113,7 +111,8 @@ self.addEventListener('push', (event) => {
 // ----------------------------------------------------------------------------
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+    // URL relative resolue sur le scope du SW (https://.../planb-tools/)
+    const targetUrl = new URL((event.notification.data && event.notification.data.url) || './', self.registration.scope).href;
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
@@ -133,10 +132,23 @@ self.addEventListener('notificationclick', (event) => {
 
 
 // ----------------------------------------------------------------------------
-// Subscription change : Apple a rotation l'endpoint, on doit re-subscribe
-// (Phase 4 : implémentation complète — pour Phase 0 on log juste)
+// Subscription change : Apple a fait tourner l endpoint -> on se re-abonne avec
+// la meme cle et on previent notif-push, qui met a jour push_subscriptions.
+// L ancien endpoint sert de preuve (pas de session PBT dans le SW).
 // ----------------------------------------------------------------------------
+const NOTIF_PUSH_URL = 'https://dzrherfavgiuygnimtux.supabase.co/functions/v1/notif-push';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmhlcmZhdmdpdXlnbmltdHV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDQ2MzYsImV4cCI6MjA5MDA4MDYzNn0.4LVwGERblZ0R5EP9EEql639TAojQEEyj2dV9K3sMxMQ';
+
 self.addEventListener('pushsubscriptionchange', (event) => {
-    // TODO Phase 4 : ré-abonner avec applicationServerKey + PATCH push_subscriptions
-    console.warn('[PBT-SW] pushsubscriptionchange — re-subscribe à implémenter en Phase 4');
+    const ancien = event.oldSubscription;
+    if (!ancien) return;
+    event.waitUntil(
+        self.registration.pushManager.subscribe(ancien.options)
+            .then((nouveau) => fetch(NOTIF_PUSH_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+                body: JSON.stringify({ action: 'renouveler', ancien_endpoint: ancien.endpoint, abonnement: nouveau.toJSON() })
+            }))
+            .catch((e) => console.warn('[PBT-SW] re-abonnement impossible', e))
+    );
 });
