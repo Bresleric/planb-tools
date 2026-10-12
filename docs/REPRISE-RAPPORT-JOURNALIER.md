@@ -109,6 +109,16 @@ recopier une formule ailleurs.
 - Heures pointées vs planifiées.
 - Relance des imports de ventes (sinon le N-1 s'assèche dès l'été 2027).
 
+## Décision du 12/10/2026 : le rapport reste dans PBT (PlanB-Pilote arrêté)
+
+Eric a envisagé de transférer le rapport vers PlanB-Pilote (repo `Bresleric/planb-pilote`,
+Next.js sur Vercel, auth Supabase par lien e-mail), puis y a RENONCÉ : le rapport
+journalier vit dans PBT (`rapport/`, lien magique) et Pilote est arrêté (Vercel coupé
+par Eric). Ne pas relancer ce transfert sans demande explicite.
+Restes de Pilote en base, laissés intacts pour l'instant : schéma `pilote` (6 vues
+v_*, SELECT pour `authenticated`) et 2 comptes Supabase Auth d'Eric. Nettoyage
+possible plus tard, uniquement sur demande d'Eric.
+
 ## Rappels de méthode (en plus de CLAUDE.md)
 
 - Toute modif front user-visible → bump CACHE_NAME dans sw.js (actuel : v60).
