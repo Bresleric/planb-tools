@@ -20,6 +20,27 @@
   `toastCaBloque()`, classe CSS `body.ca-bloque`. Freddy et Liesel.
 - **Ne pas retirer** sans décision explicite d'Eric.
 
+## 💶 L'Addition Live : CA et stock en direct dans Pilotage (v113, déployé le 12/10/2026)
+
+- **Quoi** : onglets « CA live » et « Stock » du module Pilotage, alimentés toutes les
+  30 min (pg_cron `laddition-live-30min`, 8h-23h30 UTC) par l'edge function
+  `laddition-live` qui lit live.laddition.com. Tables : `laddition_live` (état
+  courant), `laddition_ventes_jour` (historique), `laddition_ruptures` (horodatées).
+- **Authentification fragile par nature** : pas d'API officielle — on utilise le
+  refreshToken du compte d'Eric, collé dans `pbt_private.config`
+  (`laddition_refresh_token`) via `pbt_service_config_set`. **Jamais en clair** :
+  ni repo, ni logs, ni affichage. Si L'Addition casse la synchro (rotation,
+  changement d'API), l'erreur s'affiche dans Pilotage et il faut recoller un
+  jeton frais depuis le navigateur.
+- **Pièges gérés** : articles en double dans le stock caisse (clé « nom #2 »,
+  exclus des ruptures) ; compteurs ≥ 1000 = non suivis ; chaque photo contient
+  le total du restaurant (prendre la plus récente, même avec 3 iPads).
+- **Où** : `supabase/functions/laddition-live/index.ts`,
+  `scripts/migration-laddition-live.sql`, `pilotage/index.html`.
+- **Au passage** : le sw.js v113 embarque le correctif chemins relatifs et le
+  ré-abonnement du chantier « notifications push » (autre conversation) ; la
+  fonction `notif-push` qu'il référence restait à déployer au 12/10.
+
 ## 🍴 TheFork : réservations Freddy dans le Briefing (v108, déployé le 10/10/2026)
 
 - **Quoi** : table `reservations_thefork` alimentée toutes les heures (pg_cron
