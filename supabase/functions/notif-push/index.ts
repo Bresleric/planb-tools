@@ -26,8 +26,16 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") || "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:bresleric@planbcie.com";
 if (VAPID_PUBLIC && VAPID_PRIVATE) webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
+// CORS : le portail (bresleric.github.io) appelle cette fonction depuis le
+// navigateur (cle_publique, test). Sans ces en-tetes, Safari bloque l appel
+// avec un simple "Load failed".
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 const json = (obj: unknown, status = 200) =>
-  new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
+  new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", ...CORS } });
 
 type Abo = { id: number; endpoint: string; p256dh: string; auth: string; etablissement: string | null };
 
@@ -139,6 +147,7 @@ async function tick() {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   let body: any = {};
   try { body = await req.json(); } catch (_) { /* tick par defaut */ }
   const action = body.action || "tick";
