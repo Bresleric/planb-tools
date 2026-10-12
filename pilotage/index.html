@@ -60,6 +60,19 @@
         .sub-title:first-child { margin-top: 0; }
 
         .lien-rapport { display: block; max-width: 760px; margin: 4px auto 0; text-align: center; background: var(--blue-light); border: 1px solid #dbeafe; border-radius: 14px; padding: 13px; font-size: 14px; font-weight: 700; color: var(--blue); text-decoration: none; }
+        .vue-tabs { margin-top: 10px; }
+        .date-nav { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 760px; margin: 10px auto 0; padding: 0 12px; }
+        .date-nav button { width: 36px; height: 36px; border: 1px solid var(--gray-200); background: white; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .date-nav button:disabled { opacity: 0.35; }
+        #act-date-label { font-size: 13px; font-weight: 700; min-width: 150px; text-align: center; text-transform: capitalize; }
+        .pers-card { background: white; border-radius: 14px; margin-bottom: 12px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .pers-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .pers-ini { width: 34px; height: 34px; border-radius: 50%; background: var(--blue-light); color: var(--blue); font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pers-nom { font-weight: 800; font-size: 14px; }
+        .pers-sub { font-size: 11px; color: var(--gray-500); }
+        .pers-etab { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+        .pers-etab.freddy { background: #fef3e2; color: #b45309; }
+        .pers-etab.liesel { background: var(--green-light); color: #166534; }
         .footer-note { text-align: center; font-size: 11px; color: var(--gray-400); margin-top: 18px; }
         #loading { text-align: center; padding: 40px; color: var(--gray-400); }
 
@@ -73,9 +86,14 @@
         <div class="header-row">
             <a class="btn-retour" href="../index.html">← Portail</a>
             <h1>📊 Pilotage</h1>
-            <button class="btn-refresh" onclick="refresh()" title="Actualiser">↻</button>
+            <button class="btn-refresh" onclick="actualiser()" title="Actualiser">↻</button>
         </div>
     </header>
+
+    <div class="tabs vue-tabs">
+        <button class="tab-btn active" data-vue="bord" onclick="setVue('bord')">📊 Tableau de bord</button>
+        <button class="tab-btn" data-vue="activite" onclick="setVue('activite')">👤 Activité</button>
+    </div>
 
     <div class="tabs">
         <button class="tab-btn active" data-filtre="groupe" onclick="setFiltre('groupe')">Groupe</button>
@@ -83,8 +101,15 @@
         <button class="tab-btn" data-filtre="liesel" onclick="setFiltre('liesel')">Liesel</button>
     </div>
 
+    <div class="date-nav" id="act-date-nav" style="display:none;">
+        <button onclick="changeActDate(-1)">‹</button>
+        <div id="act-date-label"></div>
+        <button onclick="changeActDate(1)" id="act-btn-next">›</button>
+    </div>
+
     <main>
         <div id="etabs-zone"><div id="loading">Chargement…</div></div>
+        <div id="activite-zone" style="display:none;"></div>
         <a class="lien-rapport" href="../rapport/">📋 Ouvrir le Rapport journalier</a>
         <div class="footer-note" id="gen-note"></div>
     </main>
@@ -294,12 +319,165 @@
         }
 
         function appliquerFiltre() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.filtre === filtre));
-            document.querySelectorAll('.etab-card').forEach(c => {
+            document.querySelectorAll('[data-filtre]').forEach(b => b.classList.toggle('active', b.dataset.filtre === filtre));
+            document.querySelectorAll('.etab-card, .pers-card').forEach(c => {
                 c.style.display = (filtre === 'groupe' || c.dataset.etab === filtre) ? '' : 'none';
             });
         }
         function setFiltre(f) { filtre = f; appliquerFiltre(); }
+
+        // ============ VUE ACTIVITE : qui a fait quoi ce jour-la ============
+        let vue = 'bord';
+        let actDate = dayStart(new Date());
+        let actCharge = false;
+
+        function setVue(v) {
+            vue = v;
+            document.querySelectorAll('[data-vue]').forEach(b => b.classList.toggle('active', b.dataset.vue === v));
+            document.getElementById('etabs-zone').style.display = v === 'bord' ? '' : 'none';
+            document.getElementById('activite-zone').style.display = v === 'activite' ? '' : 'none';
+            document.getElementById('act-date-nav').style.display = v === 'activite' ? 'flex' : 'none';
+            if (v === 'activite' && !actCharge) refreshActivite();
+        }
+        function changeActDate(delta) { actDate = addDays(actDate, delta); refreshActivite(); }
+
+        async function loadActivite() {
+            const D = actDate, D1 = addDays(D, 1);
+            const ds = dstr(D), isoD = D.toISOString(), isoD1 = D1.toISOString();
+            const q = await Promise.all([
+                sb.from('users').select('id, nom, initiales, equipe, etablissement').eq('actif', true),
+                sb.from('tasks').select('tache, fait_par_id, fait_par_initiales, date_validation, etablissement').not('fait_par_id', 'is', null).gte('date_validation', isoD).lt('date_validation', isoD1),
+                sb.from('productions').select('nom_produit, quantite_produite, unite, producteur_id, producteur_nom, statut, date_production, etablissement').gte('date_production', isoD).lt('date_production', isoD1),
+                sb.from('scans').select('created_by_id, created_by_nom, created_at, session_id, etablissement').gte('created_at', isoD).lt('created_at', isoD1),
+                sb.from('scan_sessions').select('id, fournisseur_nom').gte('created_at', isoD).lt('created_at', isoD1),
+                sb.from('temp_releves').select('user_id, user_nom, created_at, etablissement').eq('date', ds),
+                sb.from('pointage_periodes_travail').select('user_id, user_nom, debut_service, fin_service, duree_travail_minutes, etablissement').eq('date_service', ds),
+                sb.from('caisse_controle').select('saisi_par_id, saisi_par_nom, updated_at, etablissement').eq('date', ds),
+                sb.from('liaison_messages').select('auteur_id, auteur_nom, titre, texte, created_at, etablissement').gte('created_at', isoD).lt('created_at', isoD1),
+            ]);
+            const err = q.find(r => r.error);
+            if (err) throw err.error;
+            return q.map(r => r.data || []);
+        }
+
+        function renderActivite([users, tasks, prods, scans, sessions, temps, pointages, caisses, liaisons]) {
+            const usersById = {};
+            users.forEach(u => { usersById[u.id] = u; });
+            const fournisseurs = {};
+            sessions.forEach(s => { fournisseurs[s.id] = s.fournisseur_nom; });
+
+            // Regroupe tout par personne (cle = user_id, repli sur le nom)
+            const pers = {};
+            function personne(id, nom, etab) {
+                const cle = id || 'n:' + (nom || '?');
+                if (!pers[cle]) {
+                    const u = id ? usersById[id] : null;
+                    pers[cle] = {
+                        nom: (u && u.nom) || nom || '?',
+                        initiales: (u && u.initiales) || '',
+                        equipe: (u && u.equipe) || '',
+                        etab: (u && u.etablissement) || etab || 'freddy',
+                        compte: {}, timeline: [],
+                    };
+                }
+                return pers[cle];
+            }
+            function ajout(p, type, quand, texte, badge) {
+                p.compte[type] = (p.compte[type] || 0) + 1;
+                p.timeline.push({ quand: quand ? new Date(quand).getTime() : 0, heure: quand ? hhmm(quand) : '', texte, badge: badge || null });
+            }
+
+            pointages.forEach(x => {
+                const p = personne(x.user_id, x.user_nom, x.etablissement);
+                const fin = x.fin_service ? hhmm(x.fin_service) : 'en cours';
+                const duree = x.duree_travail_minutes ? ' · ' + Math.floor(x.duree_travail_minutes / 60) + 'h' + String(x.duree_travail_minutes % 60).padStart(2, '0') : '';
+                p.compte.service = (p.compte.service || 0) + 1;
+                p.timeline.push({ quand: new Date(x.debut_service).getTime(), heure: hhmm(x.debut_service), texte: `⏱️ Service ${hhmm(x.debut_service)} → ${fin}${duree}`, badge: x.fin_service ? null : ['green', 'en service'] });
+            });
+            tasks.forEach(t => {
+                ajout(personne(t.fait_par_id, t.fait_par_initiales, t.etablissement), 'taf', t.date_validation, `✅ TAF : ${esc(t.tache)}`);
+            });
+            prods.forEach(x => {
+                const qte = x.quantite_produite ? ` (${n(x.quantite_produite).toLocaleString('fr-FR')} ${esc(x.unite || '')})` : '';
+                ajout(personne(x.producteur_id, x.producteur_nom, x.etablissement), 'prod', x.date_production, `🍳 Production : ${esc(x.nom_produit || '?')}${qte}`, x.statut === 'jete' ? ['red', 'jetée'] : null);
+            });
+            // Etiquettes : une ligne par session de scan (N etiquettes chez tel fournisseur)
+            const scanGroupes = {};
+            scans.forEach(s => {
+                const cle = (s.created_by_id || s.created_by_nom || '?') + '|' + (s.session_id || 'solo');
+                const g = scanGroupes[cle] = scanGroupes[cle] || { id: s.created_by_id, nom: s.created_by_nom, etab: s.etablissement, session: s.session_id, nb: 0, premier: s.created_at };
+                g.nb++;
+                if (s.created_at < g.premier) g.premier = s.created_at;
+            });
+            Object.values(scanGroupes).forEach(g => {
+                const p = personne(g.id, g.nom, g.etab);
+                p.compte.scan = (p.compte.scan || 0) + g.nb;
+                const fourn = fournisseurs[g.session] ? ' — ' + esc(fournisseurs[g.session]) : '';
+                p.timeline.push({ quand: new Date(g.premier).getTime(), heure: hhmm(g.premier), texte: `🏷️ ${g.nb} étiquette${g.nb > 1 ? 's' : ''} scannée${g.nb > 1 ? 's' : ''}${fourn}` });
+            });
+            // Temperatures : un passage par personne (premier -> dernier releve)
+            const tempGroupes = {};
+            temps.forEach(t => {
+                const cle = t.user_id || t.user_nom || '?';
+                const g = tempGroupes[cle] = tempGroupes[cle] || { id: t.user_id, nom: t.user_nom, etab: t.etablissement, nb: 0, premier: t.created_at };
+                g.nb++;
+                if (t.created_at < g.premier) g.premier = t.created_at;
+            });
+            Object.values(tempGroupes).forEach(g => {
+                const p = personne(g.id, g.nom, g.etab);
+                p.compte.temp = (p.compte.temp || 0) + g.nb;
+                p.timeline.push({ quand: new Date(g.premier).getTime(), heure: hhmm(g.premier), texte: `🌡️ ${g.nb} relevé${g.nb > 1 ? 's' : ''} de température` });
+            });
+            caisses.forEach(c => {
+                if (!c.saisi_par_id && !c.saisi_par_nom) return;
+                ajout(personne(c.saisi_par_id, c.saisi_par_nom, c.etablissement), 'caisse', c.updated_at, '💶 Caisse du jour saisie');
+            });
+            liaisons.forEach(m => {
+                const sujet = m.titre || (m.texte || '').slice(0, 40);
+                ajout(personne(m.auteur_id, m.auteur_nom, m.etablissement), 'liaison', m.created_at, `📒 Message : ${esc(sujet)}`);
+            });
+
+            const CHIP_LBL = { service: null, taf: 'TAF', prod: 'Productions', scan: 'Étiquettes', temp: 'Relevés T°', caisse: 'Caisse', liaison: 'Messages' };
+            const liste = Object.values(pers);
+            liste.forEach(p => { p.total = Object.entries(p.compte).filter(([k]) => k !== 'service').reduce((s, [, v]) => s + v, 0); });
+            liste.sort((a, b) => a.etab.localeCompare(b.etab) || b.total - a.total || a.nom.localeCompare(b.nom));
+
+            if (!liste.length) return '<div class="empty" style="text-align:center; padding:30px;">Aucune activité enregistrée ce jour-là.</div>';
+            let html = '';
+            liste.forEach(p => {
+                p.timeline.sort((x, y) => x.quand - y.quand);
+                const chips = Object.entries(p.compte).filter(([k, v]) => CHIP_LBL[k] && v).map(([k, v]) => `<div class="chip">${CHIP_LBL[k]} : <b>${v}</b></div>`).join('');
+                html += `<div class="pers-card" data-etab="${p.etab}">
+                    <div class="pers-head">
+                        <div class="pers-ini">${esc(p.initiales || p.nom.slice(0, 2).toUpperCase())}</div>
+                        <div><div class="pers-nom">${esc(p.nom)}</div>${p.equipe ? `<div class="pers-sub">${esc(p.equipe)}</div>` : ''}</div>
+                        <span class="pers-etab ${p.etab}">${p.etab === 'freddy' ? 'Freddy' : 'Liesel'}</span>
+                    </div>`;
+                if (chips) html += `<div class="chips" style="margin-bottom:6px;">${chips}</div>`;
+                p.timeline.forEach(ev => {
+                    html += `<div class="row"><span class="meta" style="min-width:42px;">${ev.heure}</span><span class="grow">${ev.texte}</span>${ev.badge ? `<span class="badge ${ev.badge[0]}">${ev.badge[1]}</span>` : ''}</div>`;
+                });
+                html += `</div>`;
+            });
+            return html;
+        }
+
+        async function refreshActivite() {
+            const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+            document.getElementById('act-date-label').textContent = actDate.toLocaleDateString('fr-FR', opts);
+            document.getElementById('act-btn-next').disabled = dstr(actDate) >= dstr(new Date());
+            const zone = document.getElementById('activite-zone');
+            zone.innerHTML = '<div id="loading">Chargement…</div>';
+            try {
+                await PLANB.assurerSession();
+                zone.innerHTML = renderActivite(await loadActivite());
+                appliquerFiltre();
+                actCharge = true;
+            } catch (e) {
+                console.error(e);
+                zone.innerHTML = '<div class="empty" style="text-align:center; padding:30px;">Erreur de chargement — vérifie la connexion.</div>';
+            }
+        }
 
         async function refresh() {
             const zone = document.getElementById('etabs-zone');
@@ -315,6 +493,8 @@
                 zone.innerHTML = '<div class="empty" style="text-align:center; padding:30px;">Erreur de chargement — vérifie la connexion.</div>';
             }
         }
+
+        function actualiser() { if (vue === 'activite') refreshActivite(); else refresh(); }
 
         refresh();
     </script>
