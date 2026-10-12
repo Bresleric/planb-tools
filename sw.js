@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v114';  // bump a chaque mise a jour du SW (v114 : moteur de notifications push + SW reellement enregistre 12/10/2026)
+const CACHE_NAME = 'planb-tools-v115';  // bump a chaque mise a jour du SW (v115 : tuile Pilotage sur le portail pour les admins 12/10/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
