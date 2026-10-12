@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Pilotage — PlanB Tools</title>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --blue: #2563eb; --blue-light: #eff6ff;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--blue); padding: 12px 16px; position: sticky; top: 0; z-index: 10; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; max-width: 760px; margin: 0 auto; }
+        h1 { font-size: 17px; color: var(--blue); white-space: nowrap; }
+        .btn-retour { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 7px 10px; font-size: 13px; cursor: pointer; color: var(--gray-600); text-decoration: none; }
+        .btn-refresh { width: 36px; height: 36px; border: 1px solid var(--gray-200); background: white; border-radius: 8px; font-size: 16px; cursor: pointer; }
+
+        .tabs { display: flex; gap: 6px; max-width: 760px; margin: 10px auto 0; padding: 0 12px; }
+        .tab-btn { flex: 1; padding: 8px 0; border: 1px solid var(--gray-200); background: white; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+        .tab-btn.active { background: var(--blue); border-color: var(--blue); color: white; }
+
+        main { max-width: 760px; margin: 0 auto; padding: 12px; }
+        .etab-card { background: white; border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .etab-head { padding: 10px 14px; font-weight: 800; font-size: 15px; color: white; }
+        .etab-head.freddy { background: #b45309; }
+        .etab-head.liesel { background: #166534; }
+        .bloc { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); }
+        .bloc:last-child { border-bottom: none; }
+        .bloc-title { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+        .money-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+        .money-tile { flex: 1; min-width: 100px; background: var(--gray-50); border-radius: 10px; padding: 8px 10px; text-align: center; }
+        .money-tile .val { font-size: 19px; font-weight: 800; }
+        .money-tile .lbl { font-size: 10px; color: var(--gray-500); font-weight: 600; text-transform: uppercase; }
+        .money-tile .sub { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+        .pos { color: var(--green); } .neg { color: var(--red); }
+
+        .row { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-size: 13px; border-bottom: 1px dashed var(--gray-100); }
+        .row:last-child { border-bottom: none; }
+        .row .grow { flex: 1; min-width: 0; }
+        .row .meta { color: var(--gray-500); font-size: 12px; white-space: nowrap; }
+        .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge.red { background: var(--red-light); color: var(--red); }
+        .badge.green { background: var(--green-light); color: var(--green); }
+        .badge.orange { background: var(--orange-light); color: var(--orange); }
+        .badge.gray { background: var(--gray-100); color: var(--gray-500); }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip { background: var(--gray-50); border-radius: 10px; padding: 7px 10px; font-size: 12px; font-weight: 600; }
+        .chip b { font-size: 14px; }
+        .empty { color: var(--gray-400); font-size: 12px; font-style: italic; }
+        .small { font-size: 12px; color: var(--gray-500); font-weight: 500; }
+        .sub-title { font-size: 12px; font-weight: 700; color: var(--gray-600); margin: 12px 0 4px; }
+        .sub-title:first-child { margin-top: 0; }
+
+        .lien-rapport { display: block; max-width: 760px; margin: 4px auto 0; text-align: center; background: var(--blue-light); border: 1px solid #dbeafe; border-radius: 14px; padding: 13px; font-size: 14px; font-weight: 700; color: var(--blue); text-decoration: none; }
+        .footer-note { text-align: center; font-size: 11px; color: var(--gray-400); margin-top: 18px; }
+        #loading { text-align: center; padding: 40px; color: var(--gray-400); }
+
+        @supports (padding: env(safe-area-inset-top)) {
+            header { padding-top: calc(12px + env(safe-area-inset-top)) !important; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <a class="btn-retour" href="../index.html">← Portail</a>
+            <h1>📊 Pilotage</h1>
+            <button class="btn-refresh" onclick="refresh()" title="Actualiser">↻</button>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-filtre="groupe" onclick="setFiltre('groupe')">Groupe</button>
+        <button class="tab-btn" data-filtre="freddy" onclick="setFiltre('freddy')">Freddy</button>
+        <button class="tab-btn" data-filtre="liesel" onclick="setFiltre('liesel')">Liesel</button>
+    </div>
+
+    <main>
+        <div id="etabs-zone"><div id="loading">Chargement…</div></div>
+        <a class="lien-rapport" href="../rapport/">📋 Ouvrir le Rapport journalier</a>
+        <div class="footer-note" id="gen-note"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script src="../js/caisse-calc.js"></script>
+    <script>
+        // ============ GARDE D ACCES : role admin uniquement ============
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        if (!currentUser || currentUser.role !== 'admin') {
+            window.location.href = '../index.html';
+        }
+
+        const sb = PLANB.client();
+        const ETABS = [
+            { code: 'freddy', label: '🏪 Freddy' },
+            { code: 'liesel', label: '🍽️ Chez Tante Liesel' },
+        ];
+        let filtre = 'groupe';
+
+        function dstr(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+        function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function dayStart(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+        function money(v) { return (v === null || v === undefined || isNaN(v)) ? '—' : Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+        function money0(v) { return (v === null || v === undefined || isNaN(v)) ? '—' : Math.round(v).toLocaleString('fr-FR') + ' €'; }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function n(v) { return parseFloat(v) || 0; }
+        function hhmm(iso) { return iso ? new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; }
+        function jourCourt(d) { return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }); }
+        function prenom(nom) { return (nom || '').split(' ')[0]; }
+        function pctBadge(pct, label) {
+            if (pct === null || !isFinite(pct)) return '';
+            return `<div class="sub ${pct >= 0 ? 'pos' : 'neg'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)} % ${label}</div>`;
+        }
+        // Lundi de la semaine de d
+        function lundiDe(d) { const x = dayStart(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+
+        // ============ CHARGEMENT D UN ETABLISSEMENT ============
+        async function loadEtab(etab) {
+            const auj = dayStart(new Date());
+            const hier = addDays(auj, -1);
+            const lundi = lundiDe(auj);
+            const debutMois = new Date(auj.getFullYear(), auj.getMonth(), 1);
+            // Caisse : depuis le plus ancien entre (debut du mois) et (lundi - 4 semaines),
+            // moins 1 jour pour le comptage de la veille (fond de caisse)
+            const debutCaisse = addDays(new Date(Math.min(debutMois, addDays(lundi, -28))), -1);
+            // N-1 : meme jour de semaine un an avant (-364), du debut de mois a hier
+            const n1Debut = dstr(addDays(debutMois, -364)), n1Fin = dstr(addDays(hier, -364));
+            const dsAuj = dstr(auj), dsHier = dstr(hier);
+            const isoAuj = auj.toISOString(), isoDemain = addDays(auj, 1).toISOString();
+            const iso48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+            const iso14j = addDays(auj, -14).toISOString();
+
+            const q = await Promise.all([
+                sb.from('caisse_controle').select('date, ca, vae, plus_cash, cb_sans_contact, cb_emv, cb_sans_contact_sg, cb_emv_sg, cm_cic, credit, titres_restaurant, amex, plus_tr, plus_chq_virement, pourboire_cb, click_collect, compte_client, acomptes_verse, achats_divers, prelevement, depense_caisse, ajout, pourboires, comptage_caisse, saisi_par_nom, valide').eq('etablissement', etab).gte('date', dstr(debutCaisse)).lte('date', dsAuj),
+                sb.from('ventes_journalieres').select('date, ca_ttc, couverts').eq('etablissement', etab).gte('date', n1Debut).lte('date', n1Fin),
+                sb.from('tasks').select('id, fait_par_id').eq('etablissement', etab).gte('echeance', dsAuj).lt('echeance', dstr(addDays(auj, 1))),
+                sb.from('productions').select('id').eq('etablissement', etab).gte('date_production', isoAuj).lt('date_production', isoDemain),
+                sb.from('pointage_periodes_travail').select('user_nom, poste_nom, debut_service').eq('etablissement', etab).eq('date_service', dsAuj).is('fin_service', null).order('debut_service'),
+                sb.from('reservations_thefork').select('heure, service, couverts, statut, nom_client, allergies, commentaire').eq('etablissement', etab).eq('date', dsAuj).order('heure'),
+                sb.from('appro_besoins').select('id, urgence').eq('etablissement', etab).eq('statut', 'demande'),
+                sb.from('liaison_messages').select('id, titre, texte, auteur_id, auteur_nom, destinataires, created_at').eq('etablissement', etab).eq('archive', false).is('reponse_a', null).not('destinataires', 'eq', '[]').gte('created_at', iso14j).lte('created_at', iso48h),
+            ]);
+            const err = q.find(r => r.error);
+            if (err) throw err.error;
+            const [caisse, ventesN1, tasks, productions, enService, resasTF, besoins, liaisonCibles] = q.map(r => r.data || []);
+            let liaisonLectures = [];
+            if (liaisonCibles.length) {
+                const { data, error } = await sb.from('liaison_lectures').select('message_id, user_id').in('message_id', liaisonCibles.map(m => m.id));
+                if (error) throw error;
+                liaisonLectures = data || [];
+            }
+            return { etab, auj, hier, lundi, debutMois, caisse, ventesN1, tasks, productions, enService, resasTF, besoins, liaisonCibles, liaisonLectures };
+        }
+
+        // ============ CALCULS ARGENT ============
+        function calcArgent(d) {
+            const byDate = {};
+            d.caisse.forEach(c => { byDate[c.date] = c; });
+            const caOf = c => n(c.ca) + n(c.vae);
+            const n1ByDate = {};
+            d.ventesN1.forEach(v => { n1ByDate[v.date] = (n1ByDate[v.date] || 0) + n(v.ca_ttc); });
+
+            // Hier
+            const cHier = byDate[dstr(d.hier)] || null;
+            const caHier = cHier ? caOf(cHier) : null;
+            const caHierN1 = n1ByDate[dstr(addDays(d.hier, -364))] || null;
+
+            // Semaine en cours (lundi -> hier, ou aujourd hui si la caisse du jour est deja saisie)
+            const finSemaine = byDate[dstr(d.auj)] ? d.auj : d.hier;
+            let semCA = 0, semJours = 0;
+            for (let x = new Date(d.lundi); x <= finSemaine; x = addDays(x, 1)) {
+                const c = byDate[dstr(x)];
+                if (c) { semCA += caOf(c); semJours++; }
+            }
+            // Moyenne des 4 semaines precedentes, meme portion de semaine (lundi -> meme jour)
+            const nbJoursPortion = Math.round((finSemaine - d.lundi) / 86400000) + 1;
+            let semAvg = null;
+            {
+                const totaux = [];
+                for (let k = 1; k <= 4; k++) {
+                    let tot = 0, jours = 0;
+                    for (let i = 0; i < nbJoursPortion; i++) {
+                        const c = byDate[dstr(addDays(d.lundi, -7 * k + i))];
+                        if (c) { tot += caOf(c); jours++; }
+                    }
+                    if (jours > 0) totaux.push(tot);
+                }
+                if (totaux.length) semAvg = totaux.reduce((s, t) => s + t, 0) / totaux.length;
+            }
+
+            // Mois en cours + comparaison N-1 a perimetre egal
+            let cumul = 0, nbJours = 0, cumulN1 = 0, caSurN1 = 0;
+            d.caisse.filter(x => x.date >= dstr(d.debutMois) && x.date <= dstr(d.hier)).forEach(x => {
+                const v = caOf(x);
+                cumul += v; nbJours++;
+                const dN1 = n1ByDate[dstr(addDays(new Date(x.date + 'T12:00:00'), -364))];
+                if (dN1) { cumulN1 += dN1; caSurN1 += v; }
+            });
+
+            // Ecarts de caisse des 7 derniers jours (meme formule que le module Caisse)
+            const ecarts = [];
+            for (let i = 7; i >= 1; i--) {
+                const jour = addDays(d.auj, -i);
+                const c = byDate[dstr(jour)];
+                if (!c || c.comptage_caisse === null || c.comptage_caisse === undefined) continue;
+                const veille = byDate[dstr(addDays(jour, -1))];
+                const ecart = CAISSE_CALC[d.etab].calcEcart(c, veille ? n(veille.comptage_caisse) : 0);
+                if (ecart !== null && Math.abs(ecart) >= 10) ecarts.push({ jour, ecart, valide: c.valide, par: c.saisi_par_nom });
+            }
+
+            return {
+                cHier, caHier, caHierN1,
+                semCA, semJours, semAvg,
+                cumul, nbJours, pctN1: cumulN1 ? ((caSurN1 - cumulN1) / cumulN1) * 100 : null,
+                ecarts,
+            };
+        }
+
+        // ============ RENDU ============
+        function renderEtab(d, etabDef) {
+            const a = calcArgent(d);
+            let html = `<div class="etab-card" data-etab="${d.etab}"><div class="etab-head ${d.etab}">${etabDef.label}</div>`;
+
+            // --- Bloc 1 : chiffres ---
+            html += `<div class="bloc"><div class="bloc-title">💰 Chiffres</div><div class="money-grid">`;
+            html += `<div class="money-tile"><div class="lbl">Hier (${jourCourt(d.hier)})</div><div class="val">${a.caHier !== null ? money0(a.caHier) : '—'}</div>${a.caHier !== null && a.caHierN1 ? pctBadge(((a.caHier - a.caHierN1) / a.caHierN1) * 100, 'vs N-1') : (a.caHier === null ? '<div class="sub">caisse non saisie</div>' : '')}</div>`;
+            html += `<div class="money-tile"><div class="lbl">Semaine (${a.semJours} j)</div><div class="val">${a.semJours ? money0(a.semCA) : '—'}</div>${a.semAvg ? pctBadge(((a.semCA - a.semAvg) / a.semAvg) * 100, 'vs moy. 4 sem.') : ''}</div>`;
+            const moisLbl = d.auj.toLocaleDateString('fr-FR', { month: 'long' });
+            html += `<div class="money-tile"><div class="lbl">${esc(moisLbl)} (${a.nbJours} j)</div><div class="val" style="font-size:16px;">${a.nbJours ? money0(a.cumul) : '—'}</div>${pctBadge(a.pctN1, 'vs N-1')}</div>`;
+            html += `</div></div>`;
+
+            // --- Bloc 2 : en ce moment / aujourd hui ---
+            html += `<div class="bloc"><div class="bloc-title">⏱️ Aujourd'hui en direct</div>`;
+            const faites = d.tasks.filter(t => t.fait_par_id).length;
+            html += `<div class="chips">`;
+            html += `<div class="chip">En service : <b>${d.enService.length}</b></div>`;
+            html += d.tasks.length ? `<div class="chip">TAF : <b>${faites}/${d.tasks.length}</b> faites</div>` : '';
+            html += d.productions.length ? `<div class="chip">Productions : <b>${d.productions.length}</b></div>` : '';
+            html += `</div>`;
+            if (d.enService.length) {
+                html += `<div class="sub-title">👥 En service maintenant</div>`;
+                d.enService.forEach(p => {
+                    html += `<div class="row"><span class="grow">${esc(p.user_nom)}${p.poste_nom ? ` <span class="small">— ${esc(p.poste_nom)}</span>` : ''}</span><span class="meta">depuis ${hhmm(p.debut_service)}</span></div>`;
+                });
+            }
+            // Reservations TheFork (Freddy)
+            const actifsTF = d.resasTF.filter(r => {
+                const u = String(r.statut || '').toUpperCase();
+                return !u.includes('CANCEL') && !u.includes('NO_SHOW') && !u.includes('NOSHOW');
+            });
+            if (actifsTF.length) {
+                const midi = actifsTF.filter(r => r.service === 'midi');
+                const soir = actifsTF.filter(r => r.service === 'soir');
+                const couv = arr => arr.reduce((s, r) => s + (r.couverts || 0), 0);
+                html += `<div class="sub-title">🍴 Réservations TheFork</div>`;
+                html += `<div class="chips"><div class="chip">Midi : <b>${midi.length}</b> <span class="small">· ${couv(midi)} couv.</span></div><div class="chip">Soir : <b>${soir.length}</b> <span class="small">· ${couv(soir)} couv.</span></div></div>`;
+                actifsTF.filter(r => r.allergies || r.commentaire).forEach(r => {
+                    html += `<div class="row"><span>${r.allergies ? '⚠️' : '💬'}</span><span class="grow">${String(r.heure || '').slice(0, 5)} — ${esc(r.nom_client || 'Client')} (${r.couverts || '?'} couv.)<div class="small">${r.allergies ? 'Allergies : ' + esc(r.allergies) : ''}${r.allergies && r.commentaire ? ' — ' : ''}${esc(r.commentaire || '')}</div></span>${r.allergies ? '<span class="badge red">Allergie</span>' : ''}</div>`;
+                });
+            }
+            html += `</div>`;
+
+            // --- Bloc 3 : alertes ---
+            html += `<div class="bloc"><div class="bloc-title">🔔 Alertes</div>`;
+            let alertes = '';
+            a.ecarts.forEach(e => {
+                alertes += `<div class="row"><span>💶</span><span class="grow">Écart de caisse du ${jourCourt(e.jour)}<div class="small">${e.par ? 'saisi par ' + esc(prenom(e.par)) : ''}${e.valide ? ' · validée' : ' · à valider'}</div></span><span class="badge red">${(e.ecart > 0 ? '+' : '−') + money(Math.abs(e.ecart))}</span></div>`;
+            });
+            // Messages cibles du cahier de liaison non lus depuis plus de 48 h
+            d.liaisonCibles.forEach(m => {
+                const dests = Array.isArray(m.destinataires) ? m.destinataires : [];
+                const lus = new Set(d.liaisonLectures.filter(l => l.message_id === m.id).map(l => l.user_id));
+                const nonLus = dests.filter(x => x.id !== m.auteur_id && !lus.has(x.id));
+                if (!nonLus.length) return;
+                const sujet = m.titre || (m.texte || '').slice(0, 45);
+                alertes += `<div class="row"><span>📒</span><span class="grow">${esc(sujet)}<div class="small">${esc(prenom(m.auteur_nom))}, ${jourCourt(new Date(m.created_at))} · pas lu : <span style="color:var(--red)">${esc(nonLus.map(x => prenom(x.nom)).join(', '))}</span></div></span></div>`;
+            });
+            if (d.besoins.length) {
+                const urgents = d.besoins.filter(b => b.urgence).length;
+                alertes += `<div class="row"><span>🛒</span><span class="grow">Besoins d'appro en attente</span>${urgents ? `<span class="badge red">${urgents} urgent${urgents > 1 ? 's' : ''}</span>` : ''}<span class="badge orange">${d.besoins.length}</span></div>`;
+            }
+            html += alertes || '<div class="empty">Rien à signaler. ✨</div>';
+            html += `</div></div>`;
+            return html;
+        }
+
+        function appliquerFiltre() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.filtre === filtre));
+            document.querySelectorAll('.etab-card').forEach(c => {
+                c.style.display = (filtre === 'groupe' || c.dataset.etab === filtre) ? '' : 'none';
+            });
+        }
+        function setFiltre(f) { filtre = f; appliquerFiltre(); }
+
+        async function refresh() {
+            const zone = document.getElementById('etabs-zone');
+            zone.innerHTML = '<div id="loading">Chargement…</div>';
+            try {
+                await PLANB.assurerSession();
+                const results = await Promise.all(ETABS.map(e => loadEtab(e.code)));
+                zone.innerHTML = results.map((d, i) => renderEtab(d, ETABS[i])).join('');
+                appliquerFiltre();
+                document.getElementById('gen-note').textContent = 'Actualisé le ' + new Date().toLocaleString('fr-FR');
+            } catch (e) {
+                console.error(e);
+                zone.innerHTML = '<div class="empty" style="text-align:center; padding:30px;">Erreur de chargement — vérifie la connexion.</div>';
+            }
+        }
+
+        refresh();
+    </script>
+</body>
+</html>

@@ -655,6 +655,11 @@
                     <h2 class="establishment-name">Liesel</h2>
                     <p class="establishment-description">Chez Tante Liesel</p>
                 </div>
+                <div class="establishment-card" id="pilotage-card" style="display:none;">
+                    <span class="establishment-icon">📊</span>
+                    <h2 class="establishment-name">Pilotage</h2>
+                    <p class="establishment-description">Tableau de bord direction</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1702,6 +1707,7 @@
                     showDashboardOrBriefing();
                 } else {
                     establishmentSubtitle.textContent = `Bienvenue, ${currentUser.nom}`;
+                    majCartePilotage(currentUser);
                     showScreen(establishmentScreen);
                 }
             });
@@ -1799,6 +1805,7 @@
                     } else {
                         // Show establishment selector
                         establishmentSubtitle.textContent = `Bienvenue, ${user.nom}`;
+                        majCartePilotage(user);
                         showScreen(establishmentScreen);
                     }
                 }, 500);
@@ -2125,9 +2132,23 @@
         }
 
         // ============= Event Listeners: Establishment =============
+        // Carte Pilotage : visible uniquement pour les admins, affichee en meme
+        // temps que le choix d etablissement. Ouvre le module pilotage/ avec une
+        // session posee sur le premier etablissement (le module montre les deux).
+        function majCartePilotage(user) {
+            const carte = document.getElementById('pilotage-card');
+            if (carte) carte.style.display = (user && user.role === 'admin') ? '' : 'none';
+        }
+        document.getElementById('pilotage-card').addEventListener('click', () => {
+            const etab = (currentUser && currentUser.etablissements && currentUser.etablissements[0]) || 'freddy';
+            currentEstablishment = etab;
+            storeSession(currentUser, etab);
+            window.location.href = 'pilotage/';
+        });
         document.querySelectorAll('.establishment-card').forEach(card => {
             card.addEventListener('click', async () => {
                 const establishment = card.dataset.establishment;
+                if (!establishment) return; // carte Pilotage : geree ci-dessus
                 currentEstablishment = establishment;
                 storeSession(currentUser, establishment);
                 // Check si premier login du jour → redirect Pointages (prioritaire)

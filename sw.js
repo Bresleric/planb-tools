@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v109';  // bump a chaque mise a jour du SW (v109 : briefing - section TheFork visible meme sans briefing publie 10/10/2026)
+const CACHE_NAME = 'planb-tools-v110';  // bump a chaque mise a jour du SW (v110 : nouveau module Pilotage admin + carte sur l ecran de choix d etablissement 12/10/2026)
 const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
 
 
