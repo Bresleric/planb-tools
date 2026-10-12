@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PlanB Tools">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23f97316' width='180' height='180'/><text x='90' y='100' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='system-ui'>🍴</text></svg>">
-    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22PlanB%20Tools%22,%22short_name%22:%22PlanB%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Crect%20fill='%23f97316'%20width='192'%20height='192'/%3E%3Ctext%20x='96'%20y='110'%20font-size='100'%20fill='white'%20text-anchor='middle'%20dominant-baseline='middle'%20font-family='system-ui'%3E🍴%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}],%22display%22:%22standalone%22,%22scope%22:%22/%22,%22start_url%22:%22/index.html%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%23f97316%22}">
+    <link rel="manifest" href="manifest.json">
     <title>PlanB Tools</title>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -698,7 +698,10 @@
                 <div class="header-user" id="header-user">Utilisateur</div>
                 <div class="header-establishment" id="header-establishment">Établissement</div>
             </div>
-            <button class="logout-btn" id="logout-btn">Déconnexion</button>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button class="logout-btn" id="btn-notifs" style="display:none; padding:8px 12px; font-size:16px;" onclick="activerNotifications()" title="Activer les notifications">🔕</button>
+                <button class="logout-btn" id="logout-btn">Déconnexion</button>
+            </div>
         </div>
         <div class="dashboard-content">
             <div class="modules-grid" id="modules-grid"></div>
@@ -2123,6 +2126,7 @@
         async function showDashboardOrBriefing() {
             updateHeader();
             showScreen(dashboardScreen);
+            synchroNotifsSilencieuse(); // abonnement push : rafraichi sans bloquer
             const blocked = await checkMandatoryBriefingOnLogin();
             if (!blocked) {
                 renderModules();
@@ -2231,39 +2235,99 @@
             submitBtn.disabled = true;
         }
 
-        // Service Worker Registration
+        // Service Worker : le VRAI fichier sw.js (l ancien SW inline en blob:
+        // etait refuse silencieusement par les navigateurs -> sw.js, son
+        // handler push et le cache ne tournaient JAMAIS. Corrige le 12/10/2026)
         if ('serviceWorker' in navigator) {
-            const swCode = `
-                const CACHE_NAME = 'planb-tools-v1';
-                const urlsToCache = ['/index.html'];
-
-                self.addEventListener('install', event => {
-                    event.waitUntil(
-                        caches.open(CACHE_NAME).then(cache => {
-                            return cache.addAll(urlsToCache);
-                        })
-                    );
-                });
-
-                self.addEventListener('fetch', event => {
-                    event.respondWith(
-                        caches.match(event.request).then(response => {
-                            return response || fetch(event.request);
-                        })
-                    );
-                });
-            `;
-
-            const swBlob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(swBlob);
-
-            navigator.serviceWorker.register(swUrl).catch(() => {
-                // Service worker registration failed, continue anyway
+            navigator.serviceWorker.register('sw.js').catch(() => {
+                // Echec non bloquant (vieux navigateur, mode prive...)
             });
+        }
+
+        // ============= Notifications push (Web Push, iPad ecran d accueil) =============
+        const NOTIF_FN_URL = SUPABASE_URL + '/functions/v1/notif-push';
+        function b64VersUint8(b64) {
+            const pad = '='.repeat((4 - b64.length % 4) % 4);
+            const brut = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+            return Uint8Array.from([...brut].map(c => c.charCodeAt(0)));
+        }
+        async function notifFn(body) {
+            const r = await fetch(NOTIF_FN_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+                body: JSON.stringify(body)
+            });
+            return await r.json();
+        }
+        function pushDisponible() {
+            return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+        }
+        async function enregistrerAbonnement(sub) {
+            // etablissement : celui du device (les appareils admin n en ont pas),
+            // sinon celui de la session en cours
+            let etab = null;
+            try {
+                if (currentDevice && currentDevice.id) {
+                    const { data } = await supabaseClient.from('devices').select('etablissement').eq('id', currentDevice.id).maybeSingle();
+                    etab = data ? data.etablissement : null;
+                }
+            } catch (e) {}
+            if (!etab) etab = sessionStorage.getItem('planb_etablissement') || currentEstablishment || 'freddy';
+            const j = sub.toJSON();
+            const { error } = await supabaseClient.from('push_subscriptions').upsert({
+                endpoint: sub.endpoint,
+                p256dh: j.keys.p256dh,
+                auth: j.keys.auth,
+                etablissement: etab,
+                device_id: (currentDevice && currentDevice.id) || null,
+                user_id: (currentUser && currentUser.id) || null,
+                user_agent: navigator.userAgent.slice(0, 200),
+                last_seen_at: new Date().toISOString(),
+                revoked_at: null
+            }, { onConflict: 'endpoint' });
+            if (error) throw error;
+        }
+        async function activerNotifications() {
+            try {
+                if (!pushDisponible()) { showToast('Ouvre PlanB depuis l icone de l ecran d accueil', 'error'); return; }
+                const perm = await Notification.requestPermission();
+                if (perm !== 'granted') { showToast('Notifications refusees dans les reglages', 'error'); return; }
+                const reg = await navigator.serviceWorker.ready;
+                let sub = await reg.pushManager.getSubscription();
+                if (!sub) {
+                    const { cle } = await notifFn({ action: 'cle_publique' });
+                    if (!cle) { showToast('Cle de notification absente (voir admin)', 'error'); return; }
+                    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64VersUint8(cle) });
+                }
+                await enregistrerAbonnement(sub);
+                majBoutonNotifs(true);
+                await notifFn({ action: 'test', endpoint: sub.endpoint });
+                showToast('Notifications activees sur cet appareil', 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('Activation impossible : ' + (e.message || e), 'error');
+            }
+        }
+        // Synchro silencieuse : si deja abonne, on rafraichit la ligne en base
+        async function synchroNotifsSilencieuse() {
+            try {
+                if (!pushDisponible() || Notification.permission !== 'granted') return;
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) { await enregistrerAbonnement(sub); majBoutonNotifs(true); }
+            } catch (e) {}
+        }
+        function majBoutonNotifs(abonne) {
+            const btn = document.getElementById('btn-notifs');
+            if (!btn) return;
+            btn.style.display = pushDisponible() ? '' : 'none';
+            btn.textContent = abonne ? '🔔' : '🔕';
+            btn.title = abonne ? 'Notifications actives' : 'Activer les notifications';
         }
 
         // Start app
         init();
+        majBoutonNotifs(false);
     </script>
 <!-- PORTAL INACTIVITY LOGOUT -->
 <script id="taf-portal-inactivity">
