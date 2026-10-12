@@ -139,6 +139,13 @@
         <button class="tab-btn" data-stk="top" onclick="setStockVue('top')">🔥 Top 20 ventes</button>
     </div>
     <div class="opt-line" id="stock-opts" style="display:none;">
+        <label id="opt-type" style="display:none;">Type :
+            <select id="top-type" onchange="renderStock()">
+                <option value="tous" selected>Tous</option>
+                <option value="solide">Solides</option>
+                <option value="liquide">Liquides</option>
+            </select>
+        </label>
         <label id="opt-periode" style="display:none;">Période :
             <select id="top-periode" onchange="renderStock()">
                 <option value="1">Aujourd'hui</option>
@@ -721,6 +728,7 @@
             stockVue = v;
             document.querySelectorAll('[data-stk]').forEach(b => b.classList.toggle('active', b.dataset.stk === v));
             document.getElementById('opt-periode').style.display = v === 'top' ? '' : 'none';
+            document.getElementById('opt-type').style.display = v === 'top' ? '' : 'none';
             renderStock();
         }
 
@@ -799,10 +807,13 @@
             const nbJours = new Set(ladd.ventes.filter(v => v.etablissement === etab && v.date_service >= depuis).map(v => v.date_service)).size;
             const stockParNom = new Map();
             (l.stocks || []).forEach(s => { if (!stockParNom.has(norm(s.nom))) stockParNom.set(norm(s.nom), s); });
+            const typeVoulu = document.getElementById('top-type').value;
             const top = [...cumul.values()]
                 .filter(p => { const s = stockParNom.get(norm(p.nom)); return voirNonSuivis || !s || n(s.qte) < NON_SUIVI; })
+                .filter(p => typeVoulu === 'tous' || typeArticle(p.nom, etab) === typeVoulu)
                 .sort((a, b) => b.qte - a.qte || b.ca - a.ca).slice(0, 20);
-            let h = `<div class="bloc"><div class="bloc-title">🔥 Top 20 des ventes · ${nbJours} jour${nbJours > 1 ? 's' : ''} de données</div>`;
+            const typeLbl = typeVoulu === 'solide' ? ' · solides' : (typeVoulu === 'liquide' ? ' · liquides' : '');
+            let h = `<div class="bloc"><div class="bloc-title">🔥 Top 20 des ventes${typeLbl} · ${nbJours} jour${nbJours > 1 ? 's' : ''} de données</div>`;
             if (!top.length) return h + '<div class="empty">Pas encore de ventes enregistrées sur cette période.</div></div>';
             if (nbJours < jours) h += `<div class="small" style="margin-bottom:6px;">L'historique se constitue depuis la mise en route de la synchro (${nbJours}/${jours} jours).</div>`;
             top.forEach((p, i) => {
