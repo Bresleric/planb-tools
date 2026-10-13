@@ -18,6 +18,11 @@
 -- VAPID_SUBJECT (mailto:...). Jamais dans le repo.
 -- ============================================================================
 
+-- 0. Ajustement de la table push_subscriptions (pre-existante, Phase 0) -------
+-- Les telephones personnels des admins ne sont pas des appareils enregistres
+-- dans devices : device_id doit accepter NULL (correctif 13/10/2026).
+ALTER TABLE push_subscriptions ALTER COLUMN device_id DROP NOT NULL;
+
 -- 1. Regles -------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS notification_regles (
   code            text PRIMARY KEY,
