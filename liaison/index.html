@@ -64,6 +64,24 @@
         #pin-ok { background: var(--orange); color: white; border: none; }
         #pin-cancel { background: white; border: 1px solid var(--gray-200); }
 
+        .liaison-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .liaison-tab { flex: 1; padding: 9px 0; border: 1px solid var(--gray-200); background: white; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+        .liaison-tab.active { background: var(--orange); border-color: var(--orange); color: white; }
+        .nl-table { background: white; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+        .nl-head, .nl-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+        .nl-head { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; background: var(--gray-50); }
+        .nl-row { border-top: 1px solid var(--gray-100); font-size: 14px; cursor: pointer; }
+        .nl-row:active { background: var(--gray-50); }
+        .nl-nom { flex: 1; min-width: 0; font-weight: 600; }
+        .nl-nb { width: 60px; text-align: center; font-weight: 800; }
+        .nl-age { width: 110px; text-align: right; font-size: 12px; color: var(--gray-500); }
+        .nl-pastille { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--red); margin-right: 5px; vertical-align: 1px; }
+        .nl-detail { background: var(--gray-50); padding: 4px 14px 8px 28px; }
+        .nl-msg { display: flex; gap: 8px; font-size: 12px; padding: 4px 0; border-bottom: 1px dashed var(--gray-200); }
+        .nl-msg:last-child { border-bottom: none; }
+        .nl-msg .t { flex: 1; min-width: 0; }
+        .nl-msg .m { color: var(--gray-500); white-space: nowrap; }
+
         #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
     
         /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut.
@@ -88,6 +106,12 @@
     </header>
 
     <main>
+        <div class="liaison-tabs" id="liaison-tabs" style="display:none;">
+            <button class="liaison-tab active" data-onglet="messages" onclick="setOnglet('messages')">📒 Messages</button>
+            <button class="liaison-tab" data-onglet="nonlus" onclick="setOnglet('nonlus')">👀 Non lus par personne</button>
+        </div>
+        <div id="nonlus-zone" style="display:none;"></div>
+        <div id="messages-zone">
         <div class="composer">
             <input type="text" id="compose-titre" placeholder="Titre (optionnel) — ex : Choucroute, Parking, Passation midi→soir" style="width:100%; padding:9px 10px; font-size:14px; font-weight:600; border:1px solid var(--gray-200); border-radius:10px; background:var(--gray-50); margin-bottom:6px;">
             <textarea id="compose-texte" placeholder="Consigne, info de service, passation entre équipes..."></textarea>
@@ -108,6 +132,7 @@
             <button class="btn-envoyer" onclick="envoyerMessage()">✍️ Publier (signé par PIN)</button>
         </div>
         <div id="feed"><div class="empty">Chargement…</div></div>
+        </div>
     </main>
 
     <div class="modal-overlay" id="edit-modal">
@@ -204,7 +229,7 @@
                     .or(`created_at.gte.${depuis},epingle.eq.true`)
                     .order('created_at', { ascending: false })
                     .limit(200),
-                sb.from('users').select('id, nom, initiales, equipe')
+                sb.from('users').select('id, nom, initiales, equipe, created_at')
                     .eq('actif', true).eq('etablissement', currentEstablishment).order('nom'),
             ]);
             if (msgRes.error) {
@@ -232,6 +257,7 @@
             await signerPjUrls();
             renderDestChips();
             renderFeed();
+            if (ongletActif === 'nonlus') chargerNonLus();
         }
 
         // ============ PIECES JOINTES (photos + fichiers) ============
@@ -779,8 +805,140 @@
             } catch (e) { showToast('Erreur', 'error'); }
         }
 
+        // ============ ONGLET "NON LUS PAR PERSONNE" (responsable+) ============
+        // Regle IDENTIQUE a la pastille du portail (index.html, aLirePourMoi),
+        // appliquee a chaque membre actif de l etablissement :
+        //   - meme periode : non archives, 14 jours glissants + epingles
+        //   - jamais ses propres messages
+        //   - messages a toute l equipe, messages qui lui sont adresses,
+        //     reponses dans les fils dont il est destinataire ou auteur
+        // Seul ecart voulu : un message "toute l equipe" publie avant l arrivee
+        // de la personne (users.created_at) ne lui est pas compte.
+        // Une lecture ne compte que pour la personne qui l a faite : un "Lu"
+        // pose par quelqu un de non concerne ne change aucun chiffre.
+        let ongletActif = 'messages';
+        let nonLusOuverts = new Set();
+        let nonLusDonnees = null;
+
+        function setOnglet(o) {
+            if (o === 'nonlus' && !isManager) return;
+            ongletActif = o;
+            document.querySelectorAll('.liaison-tab').forEach(b => b.classList.toggle('active', b.dataset.onglet === o));
+            document.getElementById('messages-zone').style.display = o === 'messages' ? '' : 'none';
+            document.getElementById('nonlus-zone').style.display = o === 'nonlus' ? '' : 'none';
+            if (o === 'nonlus') chargerNonLus();
+        }
+
+        async function chargerNonLus() {
+            const zone = document.getElementById('nonlus-zone');
+            if (!nonLusDonnees) zone.innerHTML = '<div class="empty">Chargement…</div>';
+            try {
+                const depuis = new Date(Date.now() - 14 * 86400000).toISOString();
+                const { data: msgs, error } = await sb.from('liaison_messages')
+                    .select('id, titre, texte, auteur_id, auteur_nom, destinataires, reponse_a, created_at, pieces_jointes')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('archive', false)
+                    .or(`created_at.gte.${depuis},epingle.eq.true`);
+                if (error) throw error;
+                const tous = msgs || [];
+                // Lectures de ces messages, par pages (la base plafonne a 1000 lignes)
+                let lect = [];
+                const ids = tous.map(m => m.id);
+                for (let i = 0; ids.length && i < ids.length; i += 80) {
+                    const lot = ids.slice(i, i + 80);
+                    for (let from = 0; ; from += 1000) {
+                        const { data, error: e2 } = await sb.from('liaison_lectures')
+                            .select('message_id, user_id').in('message_id', lot).range(from, from + 999);
+                        if (e2) throw e2;
+                        lect = lect.concat(data || []);
+                        if (!data || data.length < 1000) break;
+                    }
+                }
+                nonLusDonnees = { tous, lect };
+                renderNonLus();
+            } catch (e) {
+                console.error(e);
+                zone.innerHTML = '<div class="empty">Erreur de chargement — vérifie la connexion.</div>';
+            }
+        }
+
+        function calculerNonLus() {
+            const { tous, lect } = nonLusDonnees;
+            const parentById = {};
+            tous.filter(m => !m.reponse_a).forEach(m => { parentById[m.id] = m; });
+            const lus = new Set(lect.map(l => l.message_id + '|' + l.user_id));
+            const concerne = (m, u) => {
+                if (m.auteur_id === u.id) return false;
+                const p = m.reponse_a ? parentById[m.reponse_a] : m;
+                if (!p) return false;
+                const dests = Array.isArray(p.destinataires) ? p.destinataires : [];
+                if (dests.length === 0) {
+                    return !(u.created_at && new Date(m.created_at) < new Date(u.created_at));
+                }
+                return dests.some(d => d.id === u.id) || p.auteur_id === u.id;
+            };
+            return equipe.map(u => {
+                const liste = tous
+                    .filter(m => concerne(m, u) && !lus.has(m.id + '|' + u.id))
+                    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                return { u, liste, plusVieux: liste.length ? new Date(liste[0].created_at) : null };
+            }).sort((a, b) => b.liste.length - a.liste.length || a.u.nom.localeCompare(b.u.nom));
+        }
+
+        function depuisLibelle(d) {
+            const min = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+            if (min < 60) return `depuis ${min} min`;
+            const h = Math.floor(min / 60);
+            if (h < 24) return `depuis ${h} h`;
+            return `depuis ${Math.floor(h / 24)} j`;
+        }
+
+        function renderNonLus() {
+            const zone = document.getElementById('nonlus-zone');
+            const lignes = calculerNonLus();
+            // Le detail respecte la visibilite de CELUI QUI CONSULTE : un message
+            // cible qu il n a pas le droit de lire apparait sans titre ni auteur
+            // (ex. cagnotte surprise). Les chiffres, eux, restent complets.
+            const parentById = {};
+            nonLusDonnees.tous.filter(m => !m.reponse_a).forEach(m => { parentById[m.id] = m; });
+            const lisible = (m) => {
+                const p = m.reponse_a ? parentById[m.reponse_a] : m;
+                return !!p && threadVisible(p);
+            };
+            const total = lignes.reduce((s, l) => s + l.liste.length, 0);
+            let html = `<div style="font-size:12px; color:var(--gray-500); margin:0 4px 8px;">${total} lecture${total > 1 ? 's' : ''} en attente · 14 derniers jours + épinglés · un tap sur une ligne pour le détail</div>`;
+            html += `<div class="nl-table"><div class="nl-head"><span class="nl-nom">Personne</span><span class="nl-nb">Non lus</span><span class="nl-age">Plus ancien</span></div>`;
+            lignes.forEach(({ u, liste, plusVieux }) => {
+                const vieux = plusVieux && (Date.now() - plusVieux.getTime()) > 48 * 3600000;
+                const ouvert = nonLusOuverts.has(u.id);
+                html += `<div class="nl-row" onclick="toggleNonLus('${u.id}')">
+                    <span class="nl-nom">${liste.length ? (ouvert ? '▾ ' : '▸ ') : ''}${esc(u.nom)}</span>
+                    <span class="nl-nb" style="color:${liste.length ? 'var(--gray-800)' : 'var(--green)'}">${liste.length || '✓'}</span>
+                    <span class="nl-age">${plusVieux ? (vieux ? '<span class="nl-pastille"></span>' : '') + depuisLibelle(plusVieux) : 'à jour'}</span>
+                </div>`;
+                if (ouvert && liste.length) {
+                    html += `<div class="nl-detail">` + liste.map(m => {
+                        const quand = new Date(m.created_at).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+                        if (!lisible(m)) {
+                            return `<div class="nl-msg"><span class="t" style="color:var(--gray-400);">🔒 Message ciblé</span><span class="m">${quand}</span></div>`;
+                        }
+                        const resume = m.titre || (m.texte || '').slice(0, 60) + ((m.texte || '').length > 60 ? '…' : '') || '📷 Photo';
+                        return `<div class="nl-msg"><span class="t">${m.reponse_a ? '↩ ' : ''}${esc(resume)}</span><span class="m">${esc((m.auteur_nom || '?').split(' ')[0])} · ${quand}</span></div>`;
+                    }).join('') + `</div>`;
+                }
+            });
+            html += `</div>`;
+            zone.innerHTML = html;
+        }
+
+        function toggleNonLus(userId) {
+            if (nonLusOuverts.has(userId)) nonLusOuverts.delete(userId); else nonLusOuverts.add(userId);
+            renderNonLus();
+        }
+
         (async function init() {
             document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            if (isManager) document.getElementById('liaison-tabs').style.display = 'flex';
             try { await loadData(); } catch (e) { console.error(e); }
         })();
     </script>
