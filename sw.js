@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v116';  // bump a chaque mise a jour du SW (v116 : Pilotage Stock - filtre solides/liquides dans le Top 20 12/10/2026)
+const CACHE_NAME = 'planb-tools-v117';  // bump a chaque mise a jour du SW (v117 : liaison - modification des messages et ajout de destinataires 14/10/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 

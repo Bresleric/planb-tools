@@ -110,6 +110,23 @@
         <div id="feed"><div class="empty">Chargement…</div></div>
     </main>
 
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal" style="max-width:520px; text-align:left;">
+            <h2>✏️ Modifier le message</h2>
+            <div class="sub">Corrige le texte ou ajoute un destinataire oublié. Signature par PIN : l'auteur ou un responsable.</div>
+            <input type="text" id="edit-titre" placeholder="Titre (optionnel)" style="width:100%; padding:9px 10px; font-size:14px; font-weight:600; border:1px solid var(--gray-200); border-radius:10px; background:var(--gray-50); margin-bottom:6px;">
+            <textarea id="edit-texte" style="width:100%; min-height:90px; padding:10px; font-size:14px; line-height:1.45; border:1px solid var(--gray-200); border-radius:10px; background:var(--gray-50); resize:vertical; font-family:inherit;"></textarea>
+            <div class="dest-row" id="edit-dest-row">
+                <span class="dest-label">À l'attention de :</span>
+                <span class="dest-chip" id="edit-dest-tous" onclick="editResetDest()">👥 Toute l'équipe</span>
+            </div>
+            <div class="modal-btns">
+                <button onclick="fermerEdition()" style="background:white; border:1px solid var(--gray-200);">Annuler</button>
+                <button onclick="enregistrerEdition()" style="background:var(--orange); color:white; border:none;">✍️ Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="pin-modal">
         <div class="modal">
             <h2 id="pin-title">✍️ Signature</h2>
@@ -560,6 +577,7 @@
             let actions = `<button class="btn-small btn-lu" onclick="marquerLu('${m.id}')">✓ Lu</button>`;
             if (!estReponse) {
                 actions += ` <button class="btn-small" onclick="toggleReponse('${m.id}')" title="Répondre">↩ Répondre</button>`;
+                actions += ` <button class="btn-small" onclick="ouvrirEdition('${m.id}')" title="Modifier le message ou ajouter un destinataire">✏️</button>`;
             }
             if (isManager) {
                 if (!estReponse) actions += ` <button class="btn-small" onclick="togglePin('${m.id}', ${m.epingle})" title="Épingler">${m.epingle ? '📌✕' : '📌'}</button>`;
@@ -588,6 +606,7 @@
                 ${m.texte ? `<div class="msg-texte">${esc(m.texte)}</div>` : ''}
                 ${pjHtml(m)}
                 ${destHtml}
+                ${m.modifie_le ? `<div style="font-size:11px; color:var(--gray-400); font-style:italic; margin-top:4px;">✏️ modifié par ${esc((m.modifie_par_nom || '?').split(' ')[0])} le ${new Date(m.modifie_le).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
                 <div class="msg-footer"><span class="lu-info">${luInfo}</span><span class="msg-actions">${actions}</span></div>
                 ${repHtml}
             </div>`;
@@ -625,6 +644,104 @@
                     showToast(`Réponse publiée — signée ${u.nom.split(' ')[0]} ✓`, 'success');
                     await loadData();
                 } catch (e) { console.error(e); showToast('Erreur de publication : ' + (e.message || e), 'error'); }
+            });
+        }
+
+        // ============ MODIFICATION D UN MESSAGE (demande Eric 14/10) ============
+        // Corriger le texte ou ajouter un destinataire oublie. Validation par PIN :
+        // seul l auteur ou un responsable+ peut modifier. Les lectures deja
+        // enregistrees sont conservees ; un destinataire ajoute voit le message
+        // comme non lu.
+        let editMsgId = null;
+        let editSelection = new Set();
+        let editNoms = {}; // id -> nom, y compris d anciens destinataires hors equipe active
+
+        function ouvrirEdition(msgId) {
+            const m = messages.find(x => x.id === msgId);
+            if (!m) return;
+            editMsgId = msgId;
+            const dests = Array.isArray(m.destinataires) ? m.destinataires : [];
+            editSelection = new Set(dests.map(d => d.id));
+            editNoms = {};
+            dests.forEach(d => { editNoms[d.id] = d.nom; });
+            equipe.forEach(u => { editNoms[u.id] = u.nom; });
+            document.getElementById('edit-titre').value = m.titre || '';
+            document.getElementById('edit-texte').value = m.texte || '';
+            renderEditChips();
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+
+        function fermerEdition() {
+            document.getElementById('edit-modal').style.display = 'none';
+            editMsgId = null;
+        }
+
+        function editToggleEquipe(eq) {
+            const membres = membresEquipe(eq);
+            if (membres.length === 0) return;
+            const tousCoches = membres.every(m => editSelection.has(m.id));
+            membres.forEach(m => { if (tousCoches) editSelection.delete(m.id); else editSelection.add(m.id); });
+            renderEditChips();
+        }
+
+        function editResetDest() {
+            editSelection.clear();
+            renderEditChips();
+        }
+
+        function renderEditChips() {
+            const row = document.getElementById('edit-dest-row');
+            row.querySelectorAll('.dest-chip:not(#edit-dest-tous)').forEach(c => c.remove());
+            ['cuisine', 'salle', 'plonge', 'autre'].forEach(eq => {
+                const membres = membresEquipe(eq);
+                if (membres.length === 0) return;
+                const chip = document.createElement('span');
+                chip.className = 'dest-chip' + (membres.every(m => editSelection.has(m.id)) ? ' on' : '');
+                chip.style.borderStyle = 'dashed';
+                chip.style.fontWeight = '700';
+                chip.textContent = EQUIPE_LABELS[eq] || eq;
+                chip.onclick = () => editToggleEquipe(eq);
+                row.appendChild(chip);
+            });
+            // Equipe active + anciens destinataires qui n en font plus partie
+            const ids = [...equipe.map(u => u.id), ...[...editSelection].filter(id => !equipe.some(u => u.id === id))];
+            ids.forEach(id => {
+                const chip = document.createElement('span');
+                chip.className = 'dest-chip' + (editSelection.has(id) ? ' on' : '');
+                chip.textContent = (editNoms[id] || '?').split(' ')[0];
+                chip.onclick = () => {
+                    if (editSelection.has(id)) editSelection.delete(id); else editSelection.add(id);
+                    renderEditChips();
+                };
+                row.appendChild(chip);
+            });
+            document.getElementById('edit-dest-tous').classList.toggle('on', editSelection.size === 0);
+        }
+
+        function enregistrerEdition() {
+            const m = messages.find(x => x.id === editMsgId);
+            if (!m) return;
+            const texte = document.getElementById('edit-texte').value.trim();
+            const titre = document.getElementById('edit-titre').value.trim();
+            const aPJ = Array.isArray(m.pieces_jointes) && m.pieces_jointes.length > 0;
+            if (!texte && !aPJ) { showToast('Le message ne peut pas être vide', 'error'); return; }
+            askPIN('✏️ Signer la modification', async (u) => {
+                const autorise = u.id === m.auteur_id || ['responsable', 'manager', 'admin'].includes(u.role);
+                if (!autorise) { showToast('Seul l auteur du message ou un responsable peut le modifier', 'error'); return; }
+                try {
+                    const dests = [...editSelection].map(id => ({ id, nom: editNoms[id] || '' }));
+                    const { error } = await sb.from('liaison_messages').update({
+                        texte: texte || '',
+                        titre: titre || null,
+                        destinataires: dests,
+                        modifie_le: new Date().toISOString(),
+                        modifie_par_nom: u.nom,
+                    }).eq('id', m.id);
+                    if (error) throw error;
+                    fermerEdition();
+                    showToast(`Message modifié — signé ${u.nom.split(' ')[0]} ✓`, 'success');
+                    await loadData();
+                } catch (e) { console.error(e); showToast('Erreur de modification : ' + (e.message || e), 'error'); }
             });
         }
 
