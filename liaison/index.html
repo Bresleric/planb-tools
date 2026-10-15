@@ -64,8 +64,11 @@
         #pin-ok { background: var(--orange); color: white; border: none; }
         #pin-cancel { background: white; border: 1px solid var(--gray-200); }
 
-        .liaison-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-        .liaison-tab { flex: 1; padding: 9px 0; border: 1px solid var(--gray-200); background: white; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+        .fil-de { font-size: 12px; color: var(--gray-500); margin: 0 4px 6px; }
+        .fil-de b { color: var(--gray-800); }
+        .liaison-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .liaison-tab { flex: 1 1 120px; padding: 9px 4px; border: 1px solid var(--gray-200); background: white; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+        .archive-info { font-size: 11px; color: var(--gray-500); font-style: italic; margin-top: 4px; }
         .liaison-tab.active { background: var(--orange); border-color: var(--orange); color: white; }
         .nl-table { background: white; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
         .nl-head, .nl-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
@@ -106,13 +109,17 @@
     </header>
 
     <main>
-        <div class="liaison-tabs" id="liaison-tabs" style="display:none;">
+        <div class="fil-de" id="fil-de"></div>
+        <div class="liaison-tabs" id="liaison-tabs">
             <button class="liaison-tab active" data-onglet="messages" onclick="setOnglet('messages')">📒 Messages</button>
-            <button class="liaison-tab" data-onglet="nonlus" onclick="setOnglet('nonlus')">👀 Non lus par personne</button>
+            <button class="liaison-tab" data-onglet="lus" onclick="setOnglet('lus')">✓ Lus</button>
+            <button class="liaison-tab" data-onglet="archives" onclick="setOnglet('archives')">🗄 Archives</button>
+            <button class="liaison-tab" data-onglet="nonlus" onclick="setOnglet('nonlus')" id="tab-nonlus" style="display:none;">👀 Non lus par personne</button>
         </div>
         <div id="nonlus-zone" style="display:none;"></div>
+        <div id="archives-zone" style="display:none;"></div>
         <div id="messages-zone">
-        <div class="composer">
+        <div class="composer" id="composer">
             <input type="text" id="compose-titre" placeholder="Titre (optionnel) — ex : Choucroute, Parking, Passation midi→soir" style="width:100%; padding:9px 10px; font-size:14px; font-weight:600; border:1px solid var(--gray-200); border-radius:10px; background:var(--gray-50); margin-bottom:6px;">
             <textarea id="compose-texte" placeholder="Consigne, info de service, passation entre équipes..."></textarea>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
@@ -178,6 +185,9 @@
         const isManager = ['responsable', 'manager', 'admin'].includes(currentUser?.role);
         let messages = [];
         let lectures = [];
+        let donneesChargees = false;
+        let messagesArchives = null;   // charges a l ouverture de l onglet Archives
+        let lecturesArchives = [];
         let equipe = [];
         let destSelection = new Set(); // vide = toute l equipe
 
@@ -248,16 +258,32 @@
                     (reps || []).forEach(r => { if (!connus.has(r.id)) messages.push(r); });
                 }
             } catch (e) { console.warn('Reponses non chargees:', e); }
-            lectures = [];
-            const ids = messages.map(m => m.id);
-            if (ids.length > 0) {
-                const { data: l } = await sb.from('liaison_lectures').select('*').in('message_id', ids);
-                lectures = l || [];
-            }
-            await signerPjUrls();
+            lectures = await chargerLectures(messages.map(m => m.id), '*');
+            await signerPjUrls(messages);
+            donneesChargees = true;
             renderDestChips();
             renderFeed();
+            majCompteurs();
             if (ongletActif === 'nonlus') chargerNonLus();
+            if (ongletActif === 'archives') chargerArchives();
+        }
+
+        // Lectures d une liste de messages, par lots et par pages : la base
+        // plafonne chaque reponse a 1000 lignes, et une lecture manquante
+        // ferait reapparaitre un fil deja lu dans Messages.
+        async function chargerLectures(ids, colonnes) {
+            let tout = [];
+            for (let i = 0; i < ids.length; i += 80) {
+                const lot = ids.slice(i, i + 80);
+                for (let from = 0; ; from += 1000) {
+                    const { data, error } = await sb.from('liaison_lectures')
+                        .select(colonnes).in('message_id', lot).range(from, from + 999);
+                    if (error) throw error;
+                    tout = tout.concat(data || []);
+                    if (!data || data.length < 1000) break;
+                }
+            }
+            return tout;
         }
 
         // ============ PIECES JOINTES (photos + fichiers) ============
@@ -278,9 +304,9 @@
                 || sb.storage.from(BUCKET_LIAISON).getPublicUrl(path).data.publicUrl;
         }
 
-        async function signerPjUrls() {
+        async function signerPjUrls(liste) {
             try {
-                const paths = [...new Set(messages.flatMap(m =>
+                const paths = [...new Set((liste || []).flatMap(m =>
                     (Array.isArray(m.pieces_jointes) ? m.pieces_jointes : []).map(p => p.path)))];
                 if (paths.length === 0) return;
                 const { data, error } = await sb.storage.from(BUCKET_LIAISON).createSignedUrls(paths, 7200);
@@ -506,7 +532,10 @@
         }
 
         // ============ FEED ============
-        function lecturesDe(msgId) { return lectures.filter(l => l.message_id === msgId); }
+        function lecturesDe(msgId) {
+            return lectures.filter(l => l.message_id === msgId)
+                .concat(lecturesArchives.filter(l => l.message_id === msgId));
+        }
 
         // Visibilite (demande Eric 04/10) : un message cible n est visible que de
         // ses destinataires, de son auteur et de l admin ; un message a toute
@@ -528,21 +557,61 @@
             return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
         }
 
+        // ============ LU / NON LU POUR LA PERSONNE CONNECTEE ============
+        // Meme regle que la pastille du portail (index.html, aLirePourMoi) :
+        // jamais ses propres messages ; messages a toute l equipe ; messages qui
+        // lui sont adresses ; reponses dans les fils dont elle est destinataire
+        // ou auteur. Meme periode : 14 jours glissants + epingles (une vieille
+        // reponse chargee pour l affichage d un fil ne compte pas, comme pour
+        // la pastille).
+        // Un fil est LU quand la personne connectee a une lecture sur chacun de
+        // ses messages qui la concernent. Une nouvelle reponse non lue le fait
+        // revenir dans Messages. Base : currentUser (le verrou d inactivite
+        // garantit que c est bien la personne devant l ecran).
+        function dansPeriode(m) {
+            return m.epingle || new Date(m.created_at) >= new Date(Date.now() - 14 * 86400000);
+        }
+        function aLirePourMoi(m) {
+            if (m.auteur_id === currentUser.id) return false;
+            if (!dansPeriode(m)) return false;
+            const p = m.reponse_a ? messages.find(x => x.id === m.reponse_a) : m;
+            if (!p) return false;
+            const dests = Array.isArray(p.destinataires) ? p.destinataires : [];
+            if (dests.length === 0) return true;
+            return dests.some(d => d.id === currentUser.id) || p.auteur_id === currentUser.id;
+        }
+        function luParMoi(msgId) {
+            return lectures.some(l => l.message_id === msgId && l.user_id === currentUser.id);
+        }
+        function reponsesDe(id) {
+            return messages.filter(m => m.reponse_a === id)
+                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        }
+        function filLu(parent) {
+            return [parent, ...reponsesDe(parent.id)].every(m => !aLirePourMoi(m) || luParMoi(m.id));
+        }
+        function filsVisibles() {
+            return messages.filter(m => !m.reponse_a && threadVisible(m));
+        }
+        // Les epingles restent en haut de Messages, lus ou non (jamais en double dans Lus)
+        function filsMessages() { return filsVisibles().filter(p => p.epingle || !filLu(p)); }
+        function filsLus() { return filsVisibles().filter(p => !p.epingle && filLu(p)); }
+
         function renderFeed() {
             // Le re-rendu reconstruit les zones de reponse : on purge les pieces
             // en attente des reponses (le composer, hors feed, est conserve)
             Object.keys(pendingPJ).forEach(k => { if (k !== 'composer') viderPJ(k); });
             pendingPJ = { composer: pendingPJ.composer || [] };
             const feed = document.getElementById('feed');
-            if (messages.filter(m => !m.reponse_a && threadVisible(m)).length === 0) {
-                feed.innerHTML = '<div class="empty">Aucun message pour toi. 📒</div>';
+            const modeLus = ongletActif === 'lus';
+            const parents = modeLus ? filsLus() : filsMessages();
+            if (parents.length === 0) {
+                feed.innerHTML = modeLus
+                    ? '<div class="empty">Aucun message lu sur les 14 derniers jours.</div>'
+                    : '<div class="empty">Tout est lu ✨<br>Les messages déjà lus sont dans l’onglet « Lus ».</div>';
                 return;
             }
-            const parents = messages.filter(m => !m.reponse_a && threadVisible(m));
-            const reponsesDe = (id) => messages
-                .filter(m => m.reponse_a === id)
-                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-            const epingles = parents.filter(m => m.epingle);
+            const epingles = modeLus ? [] : parents.filter(m => m.epingle);
             const autres = parents.filter(m => !m.epingle);
             let html = '';
             if (epingles.length > 0) {
@@ -567,10 +636,12 @@
             const r = getReduits();
             if (r.has(msgId)) r.delete(msgId); else r.add(msgId);
             try { localStorage.setItem('planb_liaison_reduits', JSON.stringify([...r])); } catch (e) {}
-            renderFeed();
+            if (ongletActif === 'archives') renderArchives(); else renderFeed();
         }
 
-        function renderMsg(m, reponses, estReponse) {
+        // enArchive : affichage de l onglet Archives (lecture seule : ni Lu, ni
+        // Repondre, ni modification ; Desarchiver pour l admin)
+        function renderMsg(m, reponses, estReponse, enArchive) {
             const heure = new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
             // Vue reduite : une seule ligne avec l essentiel (titre ou debut du texte,
@@ -600,19 +671,29 @@
             const luInfo = lus.length > 0
                 ? `👁 Lu par ${lus.map(l => esc(l.user_initiales || l.user_nom)).join(', ')}`
                 : '<span style="color:var(--gray-300)">Pas encore lu</span>';
-            let actions = `<button class="btn-small btn-lu" onclick="marquerLu('${m.id}')">✓ Lu</button>`;
-            if (!estReponse) {
-                actions += ` <button class="btn-small" onclick="toggleReponse('${m.id}')" title="Répondre">↩ Répondre</button>`;
-                actions += ` <button class="btn-small" onclick="ouvrirEdition('${m.id}')" title="Modifier le message ou ajouter un destinataire">✏️</button>`;
+            const estAdmin = currentUser.role === 'admin';
+            let actions = '';
+            if (enArchive) {
+                if (estAdmin && !estReponse) actions += `<button class="btn-small" onclick="desarchiverMsg('${m.id}')" title="Remettre dans le cahier">↺ Désarchiver</button>`;
+            } else {
+                actions = `<button class="btn-small btn-lu" onclick="marquerLu('${m.id}')">✓ Lu</button>`;
+                if (!estReponse) {
+                    actions += ` <button class="btn-small" onclick="toggleReponse('${m.id}')" title="Répondre">↩ Répondre</button>`;
+                    actions += ` <button class="btn-small" onclick="ouvrirEdition('${m.id}')" title="Modifier le message ou ajouter un destinataire">✏️</button>`;
+                }
+                if (isManager && !estReponse) actions += ` <button class="btn-small" onclick="togglePin('${m.id}', ${m.epingle})" title="Épingler">${m.epingle ? '📌✕' : '📌'}</button>`;
+                // Archivage reserve a l admin (decision Eric 15/10)
+                if (estAdmin) actions += ` <button class="btn-small" onclick="archiverMsg('${m.id}')" title="Archiver">🗄</button>`;
             }
-            if (isManager) {
-                if (!estReponse) actions += ` <button class="btn-small" onclick="togglePin('${m.id}', ${m.epingle})" title="Épingler">${m.epingle ? '📌✕' : '📌'}</button>`;
-                actions += ` <button class="btn-small" onclick="archiverMsg('${m.id}')" title="Archiver">🗄</button>`;
-            }
+            const archiveInfo = (enArchive && !estReponse)
+                ? `<div class="archive-info">🗄 Archivé${m.archive_par_nom ? ' par ' + esc(m.archive_par_nom.split(' ')[0]) : ''}${m.archive_le ? ' le ' + new Date(m.archive_le).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''}</div>`
+                : '';
 
             // Reponses indentees sous le message + zone de reponse repliable
             let repHtml = '';
-            if (!estReponse) {
+            if (!estReponse && enArchive) {
+                repHtml += (reponses || []).map(r => renderMsg(r, [], true, true)).join('');
+            } else if (!estReponse) {
                 repHtml += (reponses || []).map(r => renderMsg(r, [], true)).join('');
                 repHtml += `<div id="repbox-${m.id}" style="display:none; margin:8px 0 2px 18px;">
                     <textarea id="reptxt-${m.id}" placeholder="Ta réponse..." style="width:100%; min-height:44px; padding:8px; font-size:13px; border:1px solid var(--gray-200); border-radius:8px; background:var(--gray-50); resize:vertical; font-family:inherit;"></textarea>
@@ -633,6 +714,7 @@
                 ${pjHtml(m)}
                 ${destHtml}
                 ${m.modifie_le ? `<div style="font-size:11px; color:var(--gray-400); font-style:italic; margin-top:4px;">✏️ modifié par ${esc((m.modifie_par_nom || '?').split(' ')[0])} le ${new Date(m.modifie_le).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                ${archiveInfo}
                 <div class="msg-footer"><span class="lu-info">${luInfo}</span><span class="msg-actions">${actions}</span></div>
                 ${repHtml}
             </div>`;
@@ -781,8 +863,19 @@
                         if (String(error.code) === '23505') { showToast(`${u.nom.split(' ')[0]} a déjà lu ce message 👍`, 'success'); return; }
                         throw error;
                     }
-                    showToast(`Lecture enregistrée — ${u.nom.split(' ')[0]} ✓`, 'success');
                     await loadData();
+                    // Le classement Messages / Lus suit la personne CONNECTEE ;
+                    // le signataire peut etre quelqu un d autre (iPad partage)
+                    const m = messages.find(x => x.id === msgId);
+                    const parent = m && m.reponse_a ? messages.find(x => x.id === m.reponse_a) : m;
+                    const prenomSignataire = u.nom.split(' ')[0];
+                    if (parent && !parent.epingle && filLu(parent) && u.id === currentUser.id) {
+                        showToast(`Lecture enregistrée ✓ — déplacé dans Lus`, 'success');
+                    } else if (parent && !filLu(parent) && u.id !== currentUser.id) {
+                        showToast(`Lecture de ${prenomSignataire} enregistrée ✓. Ce fil reste dans Messages tant que ${currentUser.nom.split(' ')[0]} ne l’a pas lu.`, 'success');
+                    } else {
+                        showToast(`Lecture enregistrée — ${prenomSignataire} ✓`, 'success');
+                    }
                 } catch (e) { console.error(e); showToast('Erreur', 'error'); }
             });
         }
@@ -795,14 +888,90 @@
             } catch (e) { showToast('Erreur', 'error'); }
         }
 
+        // Archivage reserve a l admin. Un fil part AVEC ses reponses (question +
+        // reponses archivees ensemble) ; on garde qui et quand.
         async function archiverMsg(msgId) {
+            if (currentUser.role !== 'admin') { showToast('Archivage réservé à l administrateur', 'error'); return; }
             if (!confirm('Archiver ce message ? Il disparaîtra du cahier (conservé en base).')) return;
             try {
-                const { error } = await sb.from('liaison_messages').update({ archive: true }).eq('id', msgId);
+                const m = messages.find(x => x.id === msgId);
+                const filtre = (m && !m.reponse_a) ? `id.eq.${msgId},reponse_a.eq.${msgId}` : `id.eq.${msgId}`;
+                const { error } = await sb.from('liaison_messages').update({
+                    archive: true,
+                    archive_par_id: currentUser.id,
+                    archive_par_nom: currentUser.nom,
+                    archive_le: new Date().toISOString(),
+                }).or(filtre);
                 if (error) throw error;
-                showToast('Message archivé', 'success');
+                showToast('Message archivé — visible dans l’onglet Archives', 'success');
+                messagesArchives = null; // a recharger a la prochaine ouverture
                 await loadData();
-            } catch (e) { showToast('Erreur', 'error'); }
+            } catch (e) { console.error(e); showToast('Erreur d archivage : ' + (e.message || e), 'error'); }
+        }
+
+        async function desarchiverMsg(msgId) {
+            if (currentUser.role !== 'admin') return;
+            if (!confirm('Remettre ce fil dans le cahier ?')) return;
+            try {
+                const { error } = await sb.from('liaison_messages').update({
+                    archive: false, archive_par_id: null, archive_par_nom: null, archive_le: null,
+                }).or(`id.eq.${msgId},reponse_a.eq.${msgId}`);
+                if (error) throw error;
+                showToast('Fil remis dans le cahier', 'success');
+                messagesArchives = null;
+                await loadData();
+            } catch (e) { console.error(e); showToast('Erreur : ' + (e.message || e), 'error'); }
+        }
+
+        // ============ ONGLET "ARCHIVES" (charge a la demande) ============
+        async function chargerArchives() {
+            const zone = document.getElementById('archives-zone');
+            if (!messagesArchives) zone.innerHTML = '<div class="empty">Chargement…</div>';
+            try {
+                const { data, error } = await sb.from('liaison_messages').select('*')
+                    .eq('etablissement', currentEstablishment)
+                    .eq('archive', true)
+                    .is('reponse_a', null)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (error) throw error;
+                const parents = (data || []).filter(threadVisible);
+                // Reponses de ces fils, archivees ou non (les fils archives avant le
+                // 15/10 n avaient que leur question marquee)
+                let reps = [];
+                const ids = parents.map(p => p.id);
+                for (let i = 0; i < ids.length; i += 80) {
+                    const { data: r, error: e2 } = await sb.from('liaison_messages').select('*')
+                        .in('reponse_a', ids.slice(i, i + 80));
+                    if (e2) throw e2;
+                    reps = reps.concat(r || []);
+                }
+                messagesArchives = { parents, reps };
+                const tous = parents.concat(reps);
+                lecturesArchives = await chargerLectures(tous.map(m => m.id), '*');
+                await signerPjUrls(tous);
+                renderArchives();
+                majCompteurs();
+            } catch (e) {
+                console.error(e);
+                zone.innerHTML = '<div class="empty">Erreur de chargement — vérifie la connexion.</div>';
+            }
+        }
+
+        function renderArchives() {
+            const zone = document.getElementById('archives-zone');
+            if (!messagesArchives) return;
+            const { parents, reps } = messagesArchives;
+            if (!parents.length) { zone.innerHTML = '<div class="empty">Aucun message archivé.</div>'; return; }
+            const repsDe = (id) => reps.filter(r => r.reponse_a === id)
+                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            let html = '', lastDay = '';
+            parents.forEach(m => {
+                const lbl = dayLabel(m.created_at);
+                if (lbl !== lastDay) { html += `<div class="day-sep">${lbl}</div>`; lastDay = lbl; }
+                html += renderMsg(m, repsDe(m.id), false, true);
+            });
+            zone.innerHTML = html;
         }
 
         // ============ ONGLET "NON LUS PAR PERSONNE" (responsable+) ============
@@ -820,13 +989,39 @@
         let nonLusOuverts = new Set();
         let nonLusDonnees = null;
 
+        const ONGLETS = ['messages', 'lus', 'archives', 'nonlus'];
         function setOnglet(o) {
-            if (o === 'nonlus' && !isManager) return;
+            if (!ONGLETS.includes(o)) o = 'messages';
+            if (o === 'nonlus' && !isManager) o = 'messages';
             ongletActif = o;
+            try { sessionStorage.setItem('planb_liaison_onglet', o); } catch (e) {}
             document.querySelectorAll('.liaison-tab').forEach(b => b.classList.toggle('active', b.dataset.onglet === o));
-            document.getElementById('messages-zone').style.display = o === 'messages' ? '' : 'none';
+            // Messages et Lus partagent le fil ; la redaction n est proposee que dans Messages
+            document.getElementById('messages-zone').style.display = (o === 'messages' || o === 'lus') ? '' : 'none';
+            document.getElementById('composer').style.display = o === 'messages' ? '' : 'none';
+            document.getElementById('archives-zone').style.display = o === 'archives' ? '' : 'none';
             document.getElementById('nonlus-zone').style.display = o === 'nonlus' ? '' : 'none';
+            // Avant le 1er chargement, loadData() s occupera de remplir l onglet choisi
+            if (!donneesChargees) return;
+            if (o === 'messages' || o === 'lus') renderFeed();
+            if (o === 'archives') chargerArchives();
             if (o === 'nonlus') chargerNonLus();
+        }
+
+        // Compteurs sur les onglets. Archives et Non lus par personne sont
+        // charges a la demande : leur compteur apparait apres la 1re ouverture.
+        function majCompteurs() {
+            const lbl = { messages: '📒 Messages', lus: '✓ Lus', archives: '🗄 Archives', nonlus: '👀 Non lus par personne' };
+            const nb = {
+                messages: filsVisibles().filter(p => !filLu(p)).length,
+                lus: filsLus().length,
+                archives: messagesArchives ? messagesArchives.parents.length : null,
+                nonlus: nonLusDonnees ? calculerNonLus().filter(l => l.liste.length > 0).length : null,
+            };
+            document.querySelectorAll('.liaison-tab').forEach(b => {
+                const k = b.dataset.onglet;
+                b.textContent = lbl[k] + (nb[k] !== null && nb[k] !== undefined ? ` (${nb[k]})` : '');
+            });
         }
 
         async function chargerNonLus() {
@@ -841,21 +1036,10 @@
                     .or(`created_at.gte.${depuis},epingle.eq.true`);
                 if (error) throw error;
                 const tous = msgs || [];
-                // Lectures de ces messages, par pages (la base plafonne a 1000 lignes)
-                let lect = [];
-                const ids = tous.map(m => m.id);
-                for (let i = 0; ids.length && i < ids.length; i += 80) {
-                    const lot = ids.slice(i, i + 80);
-                    for (let from = 0; ; from += 1000) {
-                        const { data, error: e2 } = await sb.from('liaison_lectures')
-                            .select('message_id, user_id').in('message_id', lot).range(from, from + 999);
-                        if (e2) throw e2;
-                        lect = lect.concat(data || []);
-                        if (!data || data.length < 1000) break;
-                    }
-                }
+                const lect = await chargerLectures(tous.map(m => m.id), 'message_id, user_id');
                 nonLusDonnees = { tous, lect };
                 renderNonLus();
+                majCompteurs();
             } catch (e) {
                 console.error(e);
                 zone.innerHTML = '<div class="empty">Erreur de chargement — vérifie la connexion.</div>';
@@ -938,9 +1122,168 @@
 
         (async function init() {
             document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
-            if (isManager) document.getElementById('liaison-tabs').style.display = 'flex';
+            // Le fil Messages / Lus est PERSONNEL : on affiche a qui il appartient
+            document.getElementById('fil-de').innerHTML = `Fil de : <b>${esc(currentUser.nom)}</b>`;
+            if (isManager) document.getElementById('tab-nonlus').style.display = '';
+            let memo = 'messages';
+            try { memo = sessionStorage.getItem('planb_liaison_onglet') || 'messages'; } catch (e) {}
+            setOnglet(memo);
             try { await loadData(); } catch (e) { console.error(e); }
         })();
     </script>
+<!-- LIAISON INACTIVITY LOCK (meme verrou que le portail, 15/10/2026) -->
+<script id="liaison-inactivity">
+(function() {
+  // ====== Inactivité 3 min → modal PIN (prolongation sur place) ======
+  var inactivityTimer = null;
+  var INACTIVITY_MS = 3 * 60 * 1000;
+  var __planbInactPin = '';
+  function __planbInactLogout() { try { sessionStorage.clear(); } catch(e){} window.location.href = '../'; }
+
+  function __planbInactInjectModal() {
+    if (document.getElementById('planb-inact-modal')) return;
+    var style = document.createElement('style');
+    style.textContent =
+      '#planb-inact-modal{position:fixed;inset:0;background:rgba(15,23,42,0.96);z-index:2147483647;display:none;align-items:center;justify-content:center;font-family:-apple-system,system-ui,"Segoe UI",sans-serif;color:#fff;}'
+      + '#planb-inact-modal.show{display:flex;}'
+      + '#planb-inact-card{background:#1e293b;padding:26px 22px;border-radius:18px;width:min(380px,92vw);box-shadow:0 25px 50px rgba(0,0,0,0.5);text-align:center;box-sizing:border-box;}'
+      + '#planb-inact-card h2{margin:0 0 6px;font-size:20px;font-weight:700;}'
+      + '#planb-inact-card .sub{margin-bottom:16px;font-size:13px;color:#94a3b8;line-height:1.4;}'
+      + '#planb-inact-dots{display:flex;justify-content:center;gap:10px;margin-bottom:12px;}'
+      + '.planb-inact-dot{width:13px;height:13px;border-radius:50%;background:#334155;transition:background .15s;}'
+      + '.planb-inact-dot.filled{background:#22c55e;}'
+      + '#planb-inact-error{color:#f87171;font-size:13px;margin-bottom:10px;min-height:18px;}'
+      + '#planb-inact-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:14px;}'
+      + '.planb-inact-key{padding:14px 0;background:#334155;border:none;border-radius:10px;color:#fff;font-size:19px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;}'
+      + '.planb-inact-key:active{background:#475569;}'
+      + '.planb-inact-key.action{background:#0f172a;font-size:13px;}'
+      + '#planb-inact-logout{width:100%;padding:12px;background:transparent;border:1px solid #dc2626;color:#fca5a5;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}'
+      + '#planb-inact-logout:active{background:rgba(220,38,38,0.15);}';
+    document.head.appendChild(style);
+
+    var modal = document.createElement('div');
+    modal.id = 'planb-inact-modal';
+    var pad = '';
+    [1,2,3,4,5,6,7,8,9].forEach(function(n){
+      pad += '<button type="button" class="planb-inact-key" data-k="'+n+'">'+n+'</button>';
+    });
+    pad += '<button type="button" class="planb-inact-key action" data-k="C">Effacer</button>';
+    pad += '<button type="button" class="planb-inact-key" data-k="0">0</button>';
+    pad += '<button type="button" class="planb-inact-key action" data-k="D">⌫</button>';
+
+    modal.innerHTML =
+        '<div id="planb-inact-card" role="dialog" aria-modal="true">'
+      +   '<h2>⏱ Session en pause</h2>'
+      +   '<div class="sub">Saisis ton code pour prolonger de 3 minutes<span id="planb-inact-username"></span></div>'
+      +   '<div id="planb-inact-dots"></div>'
+      +   '<div id="planb-inact-error">&nbsp;</div>'
+      +   '<div id="planb-inact-pad">'+pad+'</div>'
+      +   '<button id="planb-inact-logout" type="button">Se déconnecter</button>'
+      + '</div>';
+    document.body.appendChild(modal);
+
+    modal.querySelectorAll('.planb-inact-key').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var k = btn.getAttribute('data-k');
+        if (k === 'C') { __planbInactPin = ''; }
+        else if (k === 'D') { __planbInactPin = __planbInactPin.slice(0,-1); }
+        else if (__planbInactPin.length < 6) { __planbInactPin += k; }
+        __planbInactClearError();
+        __planbInactRenderDots();
+        if (__planbInactPin.length >= 4) __planbInactTryValidate();
+      });
+    });
+    document.getElementById('planb-inact-logout').addEventListener('click', function(){
+      __planbInactHide();
+      __planbInactLogout();
+    });
+  }
+
+  function __planbInactRenderDots() {
+    var c = document.getElementById('planb-inact-dots');
+    if (!c) return;
+    var html = '';
+    for (var i = 0; i < 6; i++) {
+      html += '<div class="planb-inact-dot'+(i < __planbInactPin.length ? ' filled' : '')+'"></div>';
+    }
+    c.innerHTML = html;
+  }
+
+  function __planbInactShowError(msg) {
+    var e = document.getElementById('planb-inact-error');
+    if (e) e.textContent = msg || 'Code incorrect';
+    __planbInactPin = '';
+    __planbInactRenderDots();
+  }
+
+  function __planbInactClearError() {
+    var e = document.getElementById('planb-inact-error');
+    if (e) e.innerHTML = '&nbsp;';
+  }
+
+  function __planbInactTryValidate() {
+    var sessionUser = null;
+    try { sessionUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null'); } catch(e){}
+    var expectedId = (sessionUser && sessionUser.id) || (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+    if (!expectedId) { __planbInactHide(); __planbInactLogout(); return; }
+    var pin = __planbInactPin;
+    var sc = (typeof sb !== 'undefined' && sb) ? sb : null;
+    if (!sc) { __planbInactShowError('Connexion indisponible'); return; }
+    // SECURITE phase 2 (07/10/2026) : verification par RPC, PIN hache cote
+    // serveur. On ne verifie qu a 6 chiffres saisis, pour ne pas consommer le
+    // quota anti force brute sur des codes incomplets.
+    if (pin.length < 6) return;
+    sc.rpc('pbt_verifier_pin', { p_pin: pin }).then(function(res){
+      if (pin !== __planbInactPin) return; // réponse obsolète, l'utilisateur a continué à taper
+      var u = res && res.data;
+      if (u && u.id === expectedId) {
+        __planbInactHide();
+        resetInactivity();
+      } else {
+        __planbInactShowError('Code incorrect');
+      }
+    }).catch(function(){ if (pin === __planbInactPin) __planbInactShowError('Erreur de vérification'); });
+  }
+
+  function __planbInactShow() {
+    __planbInactInjectModal();
+    __planbInactPin = '';
+    __planbInactClearError();
+    __planbInactRenderDots();
+    try {
+      var u = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+      var s = document.getElementById('planb-inact-username');
+      if (s) s.textContent = (u && u.nom) ? ', ' + u.nom : '';
+    } catch(e){}
+    document.getElementById('planb-inact-modal').classList.add('show');
+  }
+
+  function __planbInactHide() {
+    var m = document.getElementById('planb-inact-modal');
+    if (m) m.classList.remove('show');
+  }
+
+  function __planbInactIsOpen() {
+    var m = document.getElementById('planb-inact-modal');
+    return !!(m && m.classList.contains('show'));
+  }
+
+  function resetInactivity() {
+    // Mode developpement (admin) : pas de deconnexion auto pour cette session
+    try { if (sessionStorage.getItem('planb_dev_nolock') === '1') { if (inactivityTimer) clearTimeout(inactivityTimer); return; } } catch(e){}
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(__planbInactShow, INACTIVITY_MS);
+  }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(function(evt){
+    document.addEventListener(evt, function(){
+      if (__planbInactIsOpen()) return;
+      resetInactivity();
+    }, { passive: true, capture: true });
+  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", resetInactivity);
+  else resetInactivity();
+})();
+</script>
+
 </body>
 </html>
