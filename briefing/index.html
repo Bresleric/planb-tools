@@ -789,6 +789,59 @@
             }
         }
 
+        // ============ REPAS DU PERSO ============
+        // Les repas du personnel sont saisis comme des productions (Production
+        // directe) dont le nom ou l observation contient "perso". On liste celles
+        // encore en stock (ni consommees ni jetees) et dont la DLC n est pas
+        // depassee le jour du briefing. Pas de suivi de quantite entamee : la
+        // quantite affichee est celle produite, tant que le lot n est pas solde.
+        async function fetchRepasPerso(dateStr, etablissement) {
+            if (isDemo) return [];
+            try {
+                const { data, error } = await supabaseClient
+                    .from('productions')
+                    .select('id, nom_produit, observation, quantite_produite, unite, date_production, dlc, producteur_initiales')
+                    .eq('etablissement', etablissement)
+                    .in('statut', ['termine', 'etiquete', 'stocke'])
+                    .or('nom_produit.ilike.%perso%,observation.ilike.%perso%')
+                    .lte('date_production', dateStr + 'T23:59:59')
+                    .order('date_production', { ascending: false })
+                    .limit(50);
+                if (error) throw error;
+                const debutJour = new Date(dateStr + 'T00:00:00');
+                const ilYa3j = new Date(debutJour); ilYa3j.setDate(ilYa3j.getDate() - 3);
+                return (data || []).filter(p => p.dlc
+                    ? new Date(p.dlc) >= debutJour
+                    : new Date(p.date_production) >= ilYa3j);
+            } catch (err) {
+                console.warn('Repas perso fetch error:', err);
+                return [];
+            }
+        }
+
+        function renderRepasPersoBody(list) {
+            if (!list || list.length === 0) {
+                return `<div style="font-size:13px; color:var(--gray-400); font-style:italic;">Aucun repas du perso en stock</div>`;
+            }
+            const fmtD = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '—';
+            return list.map(p => {
+                // Nom affiche : l observation est souvent plus parlante ("Perso" + "Saumon et jambon")
+                let nom = p.nom_produit || 'Repas perso';
+                const obs = (p.observation || '').replace(/\s+/g, ' ').trim();
+                if (obs && obs.toLowerCase() !== nom.toLowerCase()) nom += ' — ' + obs;
+                const qte = p.quantite_produite != null ? `${Number(p.quantite_produite)} ${escapeHtml(p.unite || '')}` : '?';
+                return `
+                    <div class="brief-item">
+                        <div class="brief-item-icon">&#127858;</div>
+                        <div class="brief-item-content">
+                            <div class="brief-item-title">${escapeHtml(nom)}</div>
+                            <div class="brief-item-subtitle">Fab. ${fmtD(p.date_production)}${p.producteur_initiales ? ' (' + escapeHtml(p.producteur_initiales) + ')' : ''} — DLC ${fmtD(p.dlc)}</div>
+                        </div>
+                        <span class="brief-item-badge badge-info">${qte}</span>
+                    </div>`;
+            }).join('');
+        }
+
         async function fetchEffectifsFallback(dateStr, etablissement, service) {
             try {
                 const { data: usersData } = await supabaseClient
@@ -1145,7 +1198,11 @@
                 }
                 // Enrichir avec les reservations TheFork : les compteurs ne sont
                 // remplis QUE s ils sont vides (jamais ecraser une saisie manuelle)
-                const resasTF = await fetchReservationsTheFork(consultDate, currentEstablishment);
+                const [resasTF, repasPerso] = await Promise.all([
+                    fetchReservationsTheFork(consultDate, currentEstablishment),
+                    fetchRepasPerso(consultDate, currentEstablishment)
+                ]);
+                if (briefing) briefing._repas_perso = repasPerso;
                 if (briefing && resasTF) {
                     briefing._thefork = resasTF;
                     const scope = (briefing.type === 'service' && briefing.service)
@@ -1170,7 +1227,8 @@
                             <div class="empty-state-icon">&#128227;</div>
                             <div class="empty-state-title">Pas de briefing</div>
                             <div class="empty-state-text">Aucun briefing publie pour ${formatDateFr(consultDate)}${consultService !== 'jour' ? ' - ' + (consultService === 'midi' ? 'Midi' : 'Soir') : ''}</div>
-                        </div>` + (resasTF ? renderTheForkSection(resasTF) : '');
+                        </div>` + (resasTF ? renderTheForkSection(resasTF) : '')
+                        + renderSection('&#127858;', 'Repas du perso', repasPerso.length, renderRepasPersoBody(repasPerso), true);
                     document.getElementById('lecture-bar').classList.add('hidden');
                     return;
                 }
@@ -1228,6 +1286,10 @@
         // Section Reservations TheFork : utilisee dans le briefing publie ET
         // seule quand aucun briefing n est publie (les resas existent quand meme)
         function renderTheForkSection(tf) {
+            return renderSection('&#127860;', 'Reservations TheFork', tf.length, renderTheForkBody(tf), true);
+        }
+
+        function renderTheForkBody(tf) {
             const fmtH = (h) => h ? String(h).slice(0, 5) : '';
             const sumCouv = (arr) => arr.reduce((s, r) => s + (r.couverts || 0), 0);
             const midi = tf.filter(r => r.service === 'midi');
@@ -1264,7 +1326,7 @@
             if (attention.length === 0) {
                 tfHtml += `<div style="font-size:13px; color:var(--gray-400); font-style:italic;">Aucune allergie ni demande particuliere signalee</div>`;
             }
-            return renderSection('&#127860;', 'Reservations TheFork', tf.length, tfHtml, true);
+            return tfHtml;
         }
 
         function renderBriefing(container, b) {
@@ -1393,6 +1455,11 @@
             // Section: Reservations TheFork (synchro automatique toutes les heures)
             if (b._thefork && b._thefork.length > 0) {
                 html += renderTheForkSection(b._thefork);
+            }
+
+            // Section: Repas du perso (productions "perso" encore en stock)
+            if (b._repas_perso) {
+                html += renderSection('&#127858;', 'Repas du perso', b._repas_perso.length, renderRepasPersoBody(b._repas_perso), true);
             }
 
             // Section: Plats du jour / Suggestions
@@ -1796,9 +1863,11 @@
                 }
 
                 // === METEO & TENDANCES (en parallele) ===
-                const [meteoData, tendancesData] = await Promise.all([
+                const [meteoData, tendancesData, resasTF, repasPerso] = await Promise.all([
                     fetchMeteo(consultDate),
-                    fetchTendances(consultDate, currentEstablishment)
+                    fetchTendances(consultDate, currentEstablishment),
+                    fetchReservationsTheFork(consultDate, currentEstablishment),
+                    fetchRepasPerso(consultDate, currentEstablishment)
                 ]);
 
                 // Injecter dans briefing existant
@@ -1983,6 +2052,22 @@
                     };
                 }
 
+                // === RESERVATIONS THEFORK + REPAS DU PERSO (lecture seule) ===
+                // Comme en consultation : les compteurs ne sont remplis QUE s ils
+                // sont vides (jamais ecraser une saisie manuelle)
+                briefing._thefork = resasTF || null;
+                briefing._repas_perso = repasPerso || [];
+                if (resasTF) {
+                    const scope = service ? resasTF.filter(r => r.service === service) : resasTF;
+                    if (scope.length > 0) {
+                        if (!briefing.chiffres) briefing.chiffres = {};
+                        if (!briefing.chiffres.reservations) briefing.chiffres.reservations = scope.length;
+                        if (!briefing.chiffres.couverts_attendus) {
+                            briefing.chiffres.couverts_attendus = scope.reduce((s, r) => s + (r.couverts || 0), 0);
+                        }
+                    }
+                }
+
                 editingBriefing = briefing;
                 renderCreationForm(formContainer, briefing);
 
@@ -2043,6 +2128,32 @@
                         <div class="form-group"><label class="form-label">CA Prevu</label><input type="number" class="form-input" id="f-ca-prevu" value="${n(b.chiffres?.ca_prevu)}" inputmode="decimal" step="0.01"></div>
                     </div>
                 </div>
+            </div>`;
+
+            // Reservations TheFork (lecture seule, synchro toutes les heures)
+            {
+                const tf = b._thefork || [];
+                const tfBody = tf.length > 0
+                    ? renderTheForkBody(tf)
+                    : `<div style="font-size:13px; color:var(--gray-400); font-style:italic;">Aucune reservation TheFork pour ce jour</div>`;
+                html += `<div class="form-section">
+                    <div class="form-section-header" onclick="toggleFormSection(this)">
+                        <div class="section-icon">&#127860;</div>
+                        <div class="section-title">Reservations TheFork</div>
+                        <div class="section-chevron">&#9654;</div>
+                    </div>
+                    <div class="form-section-body open">${tfBody}</div>
+                </div>`;
+            }
+
+            // Repas du perso (lecture seule, productions "perso" en stock)
+            html += `<div class="form-section">
+                <div class="form-section-header" onclick="toggleFormSection(this)">
+                    <div class="section-icon">&#127858;</div>
+                    <div class="section-title">Repas du perso</div>
+                    <div class="section-chevron">&#9654;</div>
+                </div>
+                <div class="form-section-body open">${renderRepasPersoBody(b._repas_perso || [])}</div>
             </div>`;
 
             // Equipes section - tableau compact
