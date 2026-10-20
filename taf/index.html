@@ -3731,6 +3731,7 @@
         </div>
 
         <button class="btn-submit" id="btn-create" onclick="submitCreate()">Créer la tâche</button>
+        <div style="text-align:center;font-size:0.7rem;color:var(--gray-400);margin-top:6px">version v122</div>
       </div>
     `;
 
@@ -3965,6 +3966,11 @@
   }
 
   async function submitCreate() {
+    // Filet de securite : un libelle tape mais la ligne « + À créer » pas (ou mal) touchee
+    // -> on cree directement en « À créer » avec le texte saisi.
+    if (!selectedPredefined && (document.getElementById('search-predef')?.value || '').trim()) {
+      selectCustomTask();
+    }
     if (!selectedPredefined) { showToast('Choisissez une tâche', 'error'); return; }
     const categorieSel = document.querySelector('#create-categorie .chip.active')?.dataset.val || null;
     if (!categorieSel) { showToast('Choisissez une catégorie', 'error'); return; }

@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v121';  // bump a chaque mise a jour du SW (v121 : TAF - fix creation tache A creer avec apostrophe 20/10/2026)
+const CACHE_NAME = 'planb-tools-v122';  // bump a chaque mise a jour du SW (v122 : TAF - creer la tache A creer meme sans toucher la ligne orange 20/10/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
