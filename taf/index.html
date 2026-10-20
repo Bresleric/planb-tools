@@ -3796,7 +3796,7 @@
       ? `+ À créer : « ${esc(search)} » <span style="font-size:0.72rem;font-weight:400;color:#92400e">(sera revue par Admin)</span>`
       : `+ À créer (taper d'abord un libellé dans la recherche)`;
     const customDisabled = s ? '' : 'opacity:.5;cursor:not-allowed;';
-    list.innerHTML += `<div class="predef-item" onclick="${s ? `selectCustomTask('${esc(search)}')` : ''}"
+    list.innerHTML += `<div class="predef-item" onclick="${s ? 'selectCustomTask()' : ''}"
       style="color:#c2410c;font-weight:600;border-top:2px dashed #fb923c;margin-top:6px;padding-top:8px;${customDisabled}">
       ${customLabel}
     </div>`;
@@ -3852,7 +3852,11 @@
     }
   }
 
-  function selectCustomTask(name) {
+  function selectCustomTask() {
+    // Le libelle est relu dans le champ de recherche (et non passe dans le onclick)
+    // pour qu une apostrophe (ex. « Pâte à l'ail ») ne casse pas le clic.
+    const name = (document.getElementById('search-predef')?.value || '').trim();
+    if (!name) return;
     selectedPredefined = {
       source_type: 'a_creer',
       id: null,
