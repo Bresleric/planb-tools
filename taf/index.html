@@ -3731,6 +3731,7 @@
         </div>
 
         <button class="btn-submit" id="btn-create" onclick="submitCreate()">Créer la tâche</button>
+        <div style="text-align:center;font-size:0.7rem;color:var(--gray-400);margin-top:6px">version v123</div>
       </div>
     `;
 
@@ -3796,7 +3797,7 @@
       ? `+ À créer : « ${esc(search)} » <span style="font-size:0.72rem;font-weight:400;color:#92400e">(sera revue par Admin)</span>`
       : `+ À créer (taper d'abord un libellé dans la recherche)`;
     const customDisabled = s ? '' : 'opacity:.5;cursor:not-allowed;';
-    list.innerHTML += `<div class="predef-item" onclick="${s ? `selectCustomTask('${esc(search)}')` : ''}"
+    list.innerHTML += `<div class="predef-item" onclick="${s ? 'selectCustomTask()' : ''}"
       style="color:#c2410c;font-weight:600;border-top:2px dashed #fb923c;margin-top:6px;padding-top:8px;${customDisabled}">
       ${customLabel}
     </div>`;
@@ -3852,7 +3853,11 @@
     }
   }
 
-  function selectCustomTask(name) {
+  function selectCustomTask() {
+    // Le libelle est relu dans le champ de recherche (et non passe dans le onclick)
+    // pour qu une apostrophe (ex. « Pâte à l'ail ») ne casse pas le clic.
+    const name = (document.getElementById('search-predef')?.value || '').trim();
+    if (!name) return;
     selectedPredefined = {
       source_type: 'a_creer',
       id: null,
@@ -3884,12 +3889,8 @@
   function selectChip(el, groupId) {
     document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('active'));
     el.classList.add('active');
-    // Si on change d'équipe, rafraîchir la liste des tâches prédéfinies
-    if (groupId === 'create-equipe') {
-      clearPredefined();
-      const searchVal = document.getElementById('search-predef')?.value || '';
-      renderPredefinedList(searchVal);
-    }
+    // (Plus de reset sur changement d equipe : la liste des fiches ne depend pas de l equipe,
+    //  et le reset effacait la tache deja choisie.)
   }
 
   function filterUsersForAssign(search) {
@@ -3961,6 +3962,11 @@
   }
 
   async function submitCreate() {
+    // Filet de securite : un libelle tape mais la ligne « + À créer » pas (ou mal) touchee
+    // -> on cree directement en « À créer » avec le texte saisi.
+    if (!selectedPredefined && (document.getElementById('search-predef')?.value || '').trim()) {
+      selectCustomTask();
+    }
     if (!selectedPredefined) { showToast('Choisissez une tâche', 'error'); return; }
     const categorieSel = document.querySelector('#create-categorie .chip.active')?.dataset.val || null;
     if (!categorieSel) { showToast('Choisissez une catégorie', 'error'); return; }
