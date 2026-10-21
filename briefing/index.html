@@ -945,9 +945,6 @@
             plats_suggestions: [
                 { plat: 'Risotto aux cepes', prix: 12, commentaire: 'Nouveau plat, a pousser' }
             ],
-            repas_perso: [
-                { plat: 'Boeuf bourguignon', date_production: '2026-10-15', stock: 4, unite: 'portions' }
-            ],
             objectifs: [
                 { objectif: 'Proposer systematiquement l\'aperitif', priorite: 'haute' },
                 { objectif: 'Temps d\'attente entree < 15min', priorite: 'moyenne' }
@@ -1228,9 +1225,9 @@
             }
         }
 
-        // Corps de la section TheFork (KPI + lignes a signaler), sans emballage :
-        // reutilise par la consultation ET par la redaction, qui ont deux markups de section differents.
-        function theForkBodyHtml(tf) {
+        // Section Reservations TheFork : utilisee dans le briefing publie ET
+        // seule quand aucun briefing n est publie (les resas existent quand meme)
+        function renderTheForkSection(tf) {
             const fmtH = (h) => h ? String(h).slice(0, 5) : '';
             const sumCouv = (arr) => arr.reduce((s, r) => s + (r.couverts || 0), 0);
             const midi = tf.filter(r => r.service === 'midi');
@@ -1267,13 +1264,7 @@
             if (attention.length === 0) {
                 tfHtml += `<div style="font-size:13px; color:var(--gray-400); font-style:italic;">Aucune allergie ni demande particuliere signalee</div>`;
             }
-            return tfHtml;
-        }
-
-        // Section Reservations TheFork : utilisee dans le briefing publie ET
-        // seule quand aucun briefing n est publie (les resas existent quand meme)
-        function renderTheForkSection(tf) {
-            return renderSection('&#127860;', 'Reservations TheFork', tf.length, theForkBodyHtml(tf), true);
+            return renderSection('&#127860;', 'Reservations TheFork', tf.length, tfHtml, true);
         }
 
         function renderBriefing(container, b) {
@@ -1419,26 +1410,6 @@
                 });
                 if (!platsHtml) platsHtml = emptyTxt('Aucun plat ni suggestion');
                 html += renderSection('&#127869;', 'Plats / Suggestions (Quantites)', (b.plats_suggestions || []).length, platsHtml, true);
-            }
-
-            // Section: Repas perso
-            {
-                let rpHtml = '';
-                (b.repas_perso || []).forEach(r => {
-                    const prod = r.date_production ? 'Produit le ' + formatDateShort(r.date_production) : '';
-                    const dispo = r.stock ? r.stock + ' ' + escapeHtml(r.unite || 'portions') + ' dispo' : '';
-                    rpHtml += `
-                        <div class="brief-item">
-                            <div class="brief-item-icon">&#127858;</div>
-                            <div class="brief-item-content">
-                                <div class="brief-item-title">${escapeHtml(r.plat || '')}</div>
-                                <div class="brief-item-subtitle">${prod}${prod && dispo ? ' — ' : ''}${dispo}</div>
-                            </div>
-                            ${r.stock ? `<span class="brief-item-badge badge-info">${r.stock}</span>` : ''}
-                        </div>`;
-                });
-                if (!rpHtml) rpHtml = emptyTxt('Aucun repas perso signale');
-                html += renderSection('&#127858;', 'Repas perso', (b.repas_perso || []).length, rpHtml, true);
             }
 
             // Section: Produits limites
@@ -1990,7 +1961,7 @@
                     }
 
                     // === CONSTRUCTION DU BRIEFING avec continuite selective ===
-                    // On reporte UNIQUEMENT les produits limites, dates courtes et repas perso (infos persistantes)
+                    // On reporte UNIQUEMENT les produits limites et dates courtes (infos persistantes)
                     // Les evenements, plats, objectifs sont specifiques a chaque service => pas de report
                     // Enrichir prevData avec meteo et tendances
                     if (meteoData) prevData.meteo = meteoData;
@@ -2002,7 +1973,6 @@
                         equipes: planningEquipes.length > 0 ? planningEquipes : [],
                         chiffres: prevData,
                         produits_limites: prevBriefing?.produits_limites || [],
-                        repas_perso: prevBriefing?.repas_perso || [],
                         produits_dates_courtes: prevBriefing?.produits_dates_courtes || [],
                         incidents: recentIncidents,
                         rappels: randomRappels,
@@ -2011,12 +1981,6 @@
                         objectifs: [],
                         notes_libres: '', cree_par_id: currentUser.id, cree_par_nom: currentUser.nom
                     };
-                }
-
-                // Reservations TheFork du jour : information de cadrage pour le redacteur
-                // (lecture seule, non stockee dans le briefing - la source reste reservations_thefork)
-                if (!isDemo && briefing) {
-                    briefing._thefork = await fetchReservationsTheFork(consultDate, currentEstablishment);
                 }
 
                 editingBriefing = briefing;
@@ -2050,19 +2014,6 @@
                         <div class="section-chevron">&#9654;</div>
                     </div>
                     <div class="form-section-body">${renderTendancesCard(b.chiffres.tendances)}</div>
-                </div>`;
-            }
-
-            // Reservations TheFork (lecture seule, synchro horaire - Freddy uniquement)
-            if (b._thefork && b._thefork.length > 0) {
-                html += `<div class="form-section">
-                    <div class="form-section-header" onclick="toggleFormSection(this)">
-                        <div class="section-icon">&#127860;</div>
-                        <div class="section-title">Reservations TheFork</div>
-                        <span class="section-count">${b._thefork.length}</span>
-                        <div class="section-chevron">&#9654;</div>
-                    </div>
-                    <div class="form-section-body">${theForkBodyHtml(b._thefork)}</div>
                 </div>`;
             }
 
@@ -2111,9 +2062,6 @@
                 { key: 'prix', label: 'Qte', type: 'number', placeholder: '0', width: '60px' },
                 { key: 'commentaire', label: 'Commentaire', type: 'text', placeholder: 'A pousser...' }
             ]);
-
-            // Repas perso (archivable : le plat reste dispo d un service a l autre)
-            html += renderListEditorSection('&#127858;', 'Repas perso', 'repas_perso', b.repas_perso || [], getFieldConfigs('repas_perso'), true);
 
             // Produits limites (archivable : info persistante reprise du briefing precedent)
             html += renderListEditorSection('&#9888;&#65039;', 'Produits limites', 'produits_limites', b.produits_limites || [], [
@@ -2497,12 +2445,6 @@
                     { key: 'unite', label: 'Unite', type: 'text', placeholder: 'portions', width: '80px' },
                     { key: 'observation', label: 'Obs.', type: 'text', placeholder: '' }
                 ],
-                repas_perso: [
-                    { key: 'plat', label: 'Plat', type: 'text', placeholder: 'Nom du plat' },
-                    { key: 'date_production', label: 'Produit le', type: 'date' },
-                    { key: 'stock', label: 'Stock', type: 'number', placeholder: '0', width: '70px' },
-                    { key: 'unite', label: 'Unite', type: 'text', placeholder: 'portions', width: '80px' }
-                ],
                 produits_dates_courtes: [
                     { key: 'produit', label: 'Produit', type: 'text', placeholder: 'Produit' },
                     { key: 'date_limite', label: 'DLC', type: 'date' },
@@ -2579,7 +2521,7 @@
             if (!checkbox.checked) return;
             const row = checkbox.closest('.list-editor-item');
             const item = collectSingleItem(row);
-            const libelle = item.description || item.produit || item.message || item.plat || '';
+            const libelle = item.description || item.produit || item.message || '';
             if (!libelle) {
                 showToast('Rien a archiver sur cette ligne', 'error');
                 checkbox.checked = false;
@@ -2742,7 +2684,6 @@
                     sections_vues: Array.from(sectionsVues),
                     evenements: collectEditorData('evenements'),
                     plats_suggestions: collectEditorData('plats_suggestions'),
-                    repas_perso: collectEditorData('repas_perso'),
                     produits_limites: collectEditorData('produits_limites'),
                     produits_dates_courtes: collectEditorData('produits_dates_courtes'),
                     incidents: collectEditorData('incidents'),
