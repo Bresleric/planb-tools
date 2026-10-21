@@ -32,6 +32,13 @@
   ni repo, ni logs, ni affichage. Si L'Addition casse la synchro (rotation,
   changement d'API), l'erreur s'affiche dans Pilotage et il faut recoller un
   jeton frais depuis le navigateur.
+- **Durée de vie constatée du jeton : ~8 jours** (collé le 12/10 vers 16h30,
+  refusé le 20/10 à 18h30, recollé le 21/10). Panne suivante attendue vers le
+  28-29/10.
+- **Alerte Telegram (21/10/2026)** : au 1er échec de synchro, Eric reçoit sur
+  Telegram l'erreur + les 2 lignes SQL de réparation ; rappel toutes les 6 h
+  maximum tant que ça dure ; message « rétablie » au retour. État dans
+  `pbt_private.config` (`laddition_alerte_debut`, `laddition_alerte_le`).
 - **Pièges gérés** : articles en double dans le stock caisse (clé « nom #2 »,
   exclus des ruptures) ; compteurs ≥ 1000 = non suivis ; chaque photo contient
   le total du restaurant (prendre la plus récente, même avec 3 iPads).

@@ -11,7 +11,10 @@
 //   - laddition_live         : etat courant par etablissement (1 ligne / etab)
 //   - laddition_ventes_jour  : totaux + ventes produits du jour (historique)
 //   - laddition_ruptures     : heure a laquelle un article tombe a 0
-// En cas d echec, l erreur est notee dans laddition_live (Pilotage l affiche).
+// En cas d echec, l erreur est notee dans laddition_live (Pilotage l affiche)
+// et Eric est prevenu sur Telegram (alerte des le 1er echec, rappel toutes les
+// 6 h tant que ca dure, message "retablie" au retour). Secret requis :
+// TELEGRAM_BOT_TOKEN ; chat admin dans telegram_config (chat_id_admin).
 // ============================================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -29,6 +32,59 @@ async function cfgGet(cle: string): Promise<string | null> {
 async function cfgSet(cle: string, valeur: string) {
   const { error } = await supa.rpc("pbt_service_config_set", { p_cle: cle, p_valeur: valeur });
   if (error) throw new Error("config_set: " + error.message);
+}
+
+// ---- Alerte Telegram (le message ne contient jamais le jeton) ----
+const RAPPEL_ALERTE_MS = 6 * 3600 * 1000;
+
+async function telegramAdmin(texte: string): Promise<boolean> {
+  const bot = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  if (!bot) return false;
+  const { data } = await supa.from("telegram_config").select("valeur").eq("cle", "chat_id_admin").maybeSingle();
+  if (!data?.valeur) return false;
+  const r = await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: data.valeur, text: texte }),
+  }).catch(() => null);
+  return !!r?.ok;
+}
+
+function heureParis(d = new Date()): string {
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: PARIS, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
+}
+
+// Echec : alerte au 1er echec, puis rappel toutes les 6 h maximum
+async function alerterEchec(msg: string) {
+  try {
+    const debut = await cfgGet("laddition_alerte_debut");
+    const derniere = Number(await cfgGet("laddition_alerte_le")) || 0;
+    if (debut && Date.now() - derniere < RAPPEL_ALERTE_MS) return;
+    const depuis = debut ? heureParis(new Date(Number(debut))) : heureParis();
+    const jetonRefuse = /401|403|jeton/i.test(msg);
+    const texte = `⚠️ PlanB Tools — Synchro L'Addition en échec${debut ? " (rappel)" : ""}\n`
+      + `Depuis : ${depuis}\nErreur : ${msg}\n`
+      + (jetonRefuse
+        ? "\nPour réparer : live.laddition.com → outils développeur → cookie refreshToken → Supabase SQL Editor :\n"
+          + "SELECT public.pbt_service_config_set('laddition_refresh_token', 'COLLER_ICI');\n"
+          + "SELECT public.pbt_service_config_set('laddition_access_token', '');"
+        : "\nLe CA live et le stock de Pilotage ne sont plus mis à jour.");
+    if (await telegramAdmin(texte)) {
+      if (!debut) await cfgSet("laddition_alerte_debut", String(Date.now()));
+      await cfgSet("laddition_alerte_le", String(Date.now()));
+    }
+  } catch (e) { console.warn("alerte telegram impossible", String((e as Error)?.message || e)); }
+}
+
+// Retour a la normale apres une alerte : un seul message, puis remise a zero
+async function signalerRetablie() {
+  try {
+    const debut = await cfgGet("laddition_alerte_debut");
+    if (!debut) return;
+    await telegramAdmin(`✅ PlanB Tools — Synchro L'Addition rétablie (${heureParis()}).\nEn panne depuis ${heureParis(new Date(Number(debut)))}.`);
+    await cfgSet("laddition_alerte_debut", "");
+    await cfgSet("laddition_alerte_le", "");
+  } catch (e) { console.warn("message retablie impossible", String((e as Error)?.message || e)); }
 }
 
 // Recupere les cookies poses par une reponse (ex. refreshToken renouvele)
@@ -191,6 +247,7 @@ Deno.serve(async (_req) => {
       }
       resume.etabs.push(`${etab}: CA ${ligne.ca} / ${ligne.couverts} couv. (${snaps.length} photos)`);
     }
+    await signalerRetablie();
     return new Response(JSON.stringify(resume), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     const msg = String((e as Error)?.message || e);
@@ -199,6 +256,7 @@ Deno.serve(async (_req) => {
       [{ etablissement: "freddy", erreur: msg, erreur_le: maintenant }, { etablissement: "liesel", erreur: msg, erreur_le: maintenant }],
       { onConflict: "etablissement" },
     );
+    await alerterEchec(msg);
     return new Response(JSON.stringify(resume), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
