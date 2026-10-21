@@ -3731,7 +3731,7 @@
         </div>
 
         <button class="btn-submit" id="btn-create" onclick="submitCreate()">Créer la tâche</button>
-        <div style="text-align:center;font-size:0.7rem;color:var(--gray-400);margin-top:6px">version v122</div>
+        <div style="text-align:center;font-size:0.7rem;color:var(--gray-400);margin-top:6px">version v123</div>
       </div>
     `;
 
@@ -3889,12 +3889,8 @@
   function selectChip(el, groupId) {
     document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('active'));
     el.classList.add('active');
-    // Si on change d'équipe, rafraîchir la liste des tâches prédéfinies
-    if (groupId === 'create-equipe') {
-      clearPredefined();
-      const searchVal = document.getElementById('search-predef')?.value || '';
-      renderPredefinedList(searchVal);
-    }
+    // (Plus de reset sur changement d equipe : la liste des fiches ne depend pas de l equipe,
+    //  et le reset effacait la tache deja choisie.)
   }
 
   function filterUsersForAssign(search) {
