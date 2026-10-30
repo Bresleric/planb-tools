@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v124';  // bump a chaque mise a jour du SW (v124 : nouveau module Plan de nettoyage - suivi visuel du PMS 30/10/2026)
+const CACHE_NAME = 'planb-tools-v125';  // bump a chaque mise a jour du SW (v125 : TAF - nettoyage du soir attribue a celui qui part le dernier 30/10/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 

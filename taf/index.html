@@ -1837,14 +1837,26 @@
       });
     };
 
+    // Heure de fin comparable : une fin apres minuit (00:00-05:59) compte comme le lendemain
+    const finComparable = (p) => {
+      const h = String(p.heure_fin || '00:00:00');
+      return h < '06:00:00' ? '2' + h : '1' + h;
+    };
+
     let nb = 0;
     const noms = new Set();
     for (const t of aAttribuer) {
       // Regle Eric (06/10/2026) : la tache revient a celui qui ARRIVE LE PREMIER
       // sur le creneau (plus petite heure d embauche parmi les eligibles).
+      // Exception Eric (30/10/2026) : un NETTOYAGE du SOIR revient a celui qui
+      // PART LE DERNIER (plus grande heure de fin, puis embauche la plus tardive).
+      const nettoyageSoir = t.categorie === 'Nettoyage' && (t.creneau || '').toLowerCase() === 'soir';
       const eligibles = eligiblesPourTache(t)
         .slice()
-        .sort((a, b) => String(a.heure_debut || '99').localeCompare(String(b.heure_debut || '99')));
+        .sort(nettoyageSoir
+          ? (a, b) => finComparable(b).localeCompare(finComparable(a))
+              || String(b.heure_debut || '').localeCompare(String(a.heure_debut || ''))
+          : (a, b) => String(a.heure_debut || '99').localeCompare(String(b.heure_debut || '99')));
       if (eligibles.length === 0) continue;          // personne au planning : on laisse en manuel
       const u = usersByNorm[normNomPlanning(eligibles[0].employe_nom)];
       if (!u) continue;                              // pas de compte utilisateur correspondant
