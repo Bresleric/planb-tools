@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Plan de nettoyage — PlanB Tools</title>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #dcfce7;
+            --amber: #d97706; --amber-light: #fef3c7;
+            --red: #dc2626; --red-light: #fee2e2;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--orange); padding: 10px 16px; position: sticky; top: 0; z-index: 20; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; gap: 8px; }
+        h1 { font-size: 17px; color: var(--orange); white-space: nowrap; }
+        .etab-badge { background: var(--orange-light); color: var(--orange); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+        .btn-back { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+        main { max-width: 1400px; margin: 0 auto; padding: 12px; }
+
+        .pms-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+        .pms-nav { display: flex; align-items: center; gap: 8px; }
+        .pms-nav button { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 7px 12px; font-size: 14px; cursor: pointer; }
+        .pms-periode { font-size: 16px; font-weight: 800; min-width: 210px; text-align: center; }
+        .pms-seg { display: inline-flex; background: white; border: 1px solid var(--gray-200); border-radius: 9px; overflow: hidden; }
+        .pms-seg button { border: none; background: white; padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--gray-500); cursor: pointer; }
+        .pms-seg button.active { background: var(--orange); color: white; }
+        .btn-print { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+
+        .pms-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .pms-kpi { background: white; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .pms-kpi-label { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+        .pms-kpi-val { font-size: 26px; font-weight: 800; margin-top: 2px; }
+        .pms-kpi-sub { font-size: 11px; color: var(--gray-400); }
+
+        .pms-zones { background: white; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 12px; }
+        .pms-zones-title { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .pms-zone-line { display: grid; grid-template-columns: 130px 1fr 110px; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; cursor: pointer; border-radius: 6px; }
+        .pms-zone-line.active { background: var(--orange-light); }
+        .pms-zone-name { font-weight: 700; }
+        .pms-bar { height: 10px; background: var(--gray-100); border-radius: 5px; overflow: hidden; display: flex; }
+        .pms-bar span { display: block; height: 100%; }
+        .pms-zone-pct { text-align: right; font-weight: 700; font-size: 12px; }
+
+        .pms-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--gray-600); margin-bottom: 8px; }
+        .pms-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--gray-300); }
+
+        .pms-grid-wrap { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow-x: auto; }
+        table.pms-grid { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; }
+        .pms-grid th, .pms-grid td { border-bottom: 1px solid var(--gray-100); padding: 3px; text-align: center; }
+        .pms-grid thead th { position: sticky; top: 0; background: var(--gray-50); font-size: 11px; color: var(--gray-500); font-weight: 700; padding: 6px 3px; }
+        .pms-grid thead th.today { color: var(--orange); }
+        .pms-grid .col-tache { position: sticky; left: 0; background: white; text-align: left; padding: 6px 10px; min-width: 230px; max-width: 320px; z-index: 2; border-right: 1px solid var(--gray-200); }
+        .pms-grid thead .col-tache { background: var(--gray-50); z-index: 3; }
+        .pms-tache-nom { font-weight: 600; font-size: 13px; }
+        .pms-tache-freq { font-size: 11px; color: var(--gray-400); }
+        .pms-grid tr.zone-row td { background: var(--gray-50); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); text-align: left; padding: 7px 10px; }
+        .pms-grid tr.zone-row td.col-tache { background: var(--gray-50); }
+
+        .pms-cell { display: flex; align-items: center; justify-content: center; flex-direction: column; min-width: 26px; height: 32px; border-radius: 6px; font-size: 11px; font-weight: 700; line-height: 1.1; cursor: default; }
+        .vue-semaine .pms-cell { min-width: 70px; height: 38px; }
+        .pms-cell.clic { cursor: pointer; }
+        .pms-cell .h { font-size: 10px; font-weight: 500; opacity: 0.8; }
+        .st-fait { background: var(--green-light); color: var(--green); }
+        .st-retard { background: var(--amber-light); color: var(--amber); }
+        .st-manque { background: var(--red-light); color: var(--red); }
+        .st-jour { background: white; color: var(--orange); border: 2px solid var(--orange); }
+        .st-avenir { background: var(--gray-100); color: var(--gray-400); }
+        .st-vide { background: transparent; }
+
+        .empty { text-align: center; color: var(--gray-400); padding: 36px 10px; font-size: 13px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 16px; padding: 18px 20px; width: 100%; max-width: 420px; }
+        .modal h2 { font-size: 16px; margin-bottom: 10px; }
+        .modal-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 6px 0; border-bottom: 1px dashed var(--gray-100); }
+        .modal-line b { color: var(--gray-500); font-weight: 600; }
+        .modal-obs { font-size: 12px; color: var(--gray-600); line-height: 1.5; margin-top: 10px; white-space: pre-wrap; }
+        .modal-close { width: 100%; margin-top: 14px; background: var(--orange); color: white; border: none; border-radius: 10px; padding: 11px; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
+
+        .print-only { display: none; }
+        @media print {
+            @page { size: A4 landscape; margin: 8mm; }
+            body { background: white; padding: 0; }
+            header, .pms-toolbar, .no-print { display: none !important; }
+            .print-only { display: block; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+            main { max-width: none; padding: 0; }
+            .pms-grid-wrap, .pms-kpi, .pms-zones { box-shadow: none; border: 1px solid var(--gray-200); }
+            .pms-grid-wrap { overflow: visible; }
+            .pms-grid thead th, .pms-grid .col-tache { position: static; }
+            .pms-grid tr { break-inside: avoid; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <h1>🧽 Plan de nettoyage</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="etab-badge" id="etab-badge"></span>
+                <button class="btn-back" onclick="location.href='../'">← Portail</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="pms-toolbar">
+            <div class="pms-seg">
+                <button id="vue-semaine" class="active" onclick="setVue('semaine')">Semaine</button>
+                <button id="vue-mois" onclick="setVue('mois')">Mois</button>
+            </div>
+            <div class="pms-nav">
+                <button onclick="decaler(-1)">◀</button>
+                <div class="pms-periode" id="pms-periode"></div>
+                <button onclick="decaler(1)">▶</button>
+                <button onclick="allerAujourdhui()">Aujourd'hui</button>
+            </div>
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimer</button>
+        </div>
+        <div id="pms-contenu"><div class="empty">Chargement…</div></div>
+    </main>
+
+    <div class="modal-overlay" id="detail-modal" onclick="if (event.target === this) fermerDetail()">
+        <div class="modal">
+            <h2 id="detail-titre"></h2>
+            <div id="detail-corps"></div>
+            <button class="modal-close" onclick="fermerDetail()">Fermer</button>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        // Suivi visuel du plan de nettoyage (PMS) : lecture seule.
+        // Source = recurrences TAF de categorie Nettoyage + taches generees (tasks.recurrence_id).
+        // Une occurrence prevue mais jamais generee (TAF pas ouvert ce jour-la) compte comme non faite.
+        const sb = PLANB.client();
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        const currentEstablishment = sessionStorage.getItem('planb_etablissement');
+        if (!currentUser || !currentEstablishment) location.href = '../';
+
+        const JOURS_COURTS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+        const ORDRE_ZONES = ['local poubelle', 'cave', 'cuisine', 'salle/cuisine', 'labo', 'plonge'];
+
+        let vue = 'semaine';
+        let reference = new Date();
+        let recurrences = [];
+        let tachesParCle = {};
+        let filtreZone = null;
+        let cellules = {};
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? 'var(--red)' : (type === 'success' ? 'var(--green)' : 'var(--gray-800)');
+            t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200);
+        }
+
+        // ============ DATES (chaines YYYY-MM-DD en heure locale) ============
+        function ds(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        function parseDs(s) { const [y, m, j] = s.split('-').map(Number); return new Date(y, m - 1, j); }
+        function ecartJours(a, b) {
+            const [ya, ma, ja] = a.split('-').map(Number), [yb, mb, jb] = b.split('-').map(Number);
+            return Math.round((Date.UTC(yb, mb - 1, jb) - Date.UTC(ya, ma - 1, ja)) / 86400000);
+        }
+        function jourIso(s) { const j = parseDs(s).getDay(); return j === 0 ? 7 : j; }
+        function fmtLong(s) { return parseDs(s).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); }
+
+        function bornesPeriode() {
+            const r = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+            let debut, fin;
+            if (vue === 'semaine') {
+                const decal = (r.getDay() + 6) % 7;
+                debut = new Date(r); debut.setDate(r.getDate() - decal);
+                fin = new Date(debut); fin.setDate(debut.getDate() + 6);
+            } else {
+                debut = new Date(r.getFullYear(), r.getMonth(), 1);
+                fin = new Date(r.getFullYear(), r.getMonth() + 1, 0);
+            }
+            const jours = [];
+            for (let d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) jours.push(ds(d));
+            return { debut: ds(debut), fin: ds(fin), jours };
+        }
+
+        // Meme regle que matchesRecurrence() du TAF
+        function estPrevue(rec, jour) {
+            if (rec.date_debut && jour < rec.date_debut) return false;
+            if (rec.date_fin && jour > rec.date_fin) return false;
+            const val = rec.frequence_valeur;
+            if (rec.frequence_type === 'quotidien') return true;
+            if (rec.frequence_type === 'tous_x_jours') {
+                const diff = ecartJours(rec.date_debut, jour);
+                return diff >= 0 && diff % (val || 1) === 0;
+            }
+            if (rec.frequence_type === 'jours_semaine') return Array.isArray(val) && val.includes(jourIso(jour));
+            if (rec.frequence_type === 'jours_mois') return Array.isArray(val) && val.includes(parseDs(jour).getDate());
+            return false;
+        }
+
+        function libelleFrequence(rec) {
+            const v = rec.frequence_valeur;
+            if (rec.frequence_type === 'quotidien') return 'Tous les jours';
+            if (rec.frequence_type === 'tous_x_jours') return v % 7 === 0 ? `Toutes les ${v / 7} semaines` : `Tous les ${v} jours`;
+            if (rec.frequence_type === 'jours_semaine') return (v || []).map(d => JOURS_COURTS[d - 1]).join(', ');
+            if (rec.frequence_type === 'jours_mois') return `Le ${(v || []).join(', ')} du mois`;
+            return rec.frequence_type;
+        }
+
+        // "Nettoyage cuisine : Sols" -> zone "cuisine", libelle "Sols"
+        function decouperNom(nom) {
+            const m = /^nettoyage\s+(.+?)\s*:\s*(.+)$/i.exec(nom || '');
+            return m ? { zone: m[1].toLowerCase(), libelle: m[2] } : { zone: 'autre', libelle: nom };
+        }
+        function nomZone(z) { return z.charAt(0).toUpperCase() + z.slice(1); }
+
+        // ============ CHARGEMENT ============
+        async function charger() {
+            const p = bornesPeriode();
+            const { data: recs, error } = await sb.from('taches_recurrentes')
+                .select('*')
+                .or(`etablissement.eq.${currentEstablishment},partagee.eq.true`)
+                .eq('categorie', 'Nettoyage')
+                .eq('actif', true)
+                .order('nom');
+            if (error) throw error;
+            recurrences = (recs || []).map(r => ({ ...r, ...decouperNom(r.nom) }));
+
+            tachesParCle = {};
+            const ids = recurrences.map(r => r.id);
+            if (ids.length === 0) return;
+            const { data: taches, error: e2 } = await sb.from('tasks')
+                .select('id, recurrence_id, echeance, echeance_initiale, creneau, fait_par_id, fait_par_initiales, date_validation, debut_par_initiales, observation')
+                .eq('etablissement', currentEstablishment)
+                .in('recurrence_id', ids)
+                .or(`and(echeance.gte.${p.debut},echeance.lte.${p.fin}T23:59:59),and(echeance_initiale.gte.${p.debut},echeance_initiale.lte.${p.fin})`);
+            if (e2) throw e2;
+            // Une tache reportee reste rattachee a son jour prevu d origine (echeance_initiale)
+            (taches || []).forEach(t => {
+                const jour = t.echeance_initiale || String(t.echeance).slice(0, 10);
+                tachesParCle[t.recurrence_id + '|' + jour] = t;
+            });
+        }
+
+        // ============ ETAT D UNE CASE ============
+        function etatCase(rec, jour, aujourdhui) {
+            const t = tachesParCle[rec.id + '|' + jour];
+            if (!t && !estPrevue(rec, jour)) return { st: 'vide' };
+            if (t && t.fait_par_id) {
+                const jourFait = t.date_validation ? ds(new Date(t.date_validation)) : jour;
+                return { st: jourFait > jour ? 'retard' : 'fait', t, jourFait };
+            }
+            if (jour < aujourdhui) return { st: 'manque', t };
+            if (jour === aujourdhui) return { st: 'jour', t };
+            return { st: 'avenir', t };
+        }
+
+        // ============ RENDU ============
+        function render() {
+            const p = bornesPeriode();
+            const aujourdhui = ds(new Date());
+            const periode = document.getElementById('pms-periode');
+            if (vue === 'semaine') {
+                const d1 = parseDs(p.debut), d2 = parseDs(p.fin);
+                periode.textContent = `${d1.getDate()} ${d1.toLocaleDateString('fr-FR', { month: 'short' })} → ${d2.getDate()} ${d2.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}`;
+            } else {
+                const t = parseDs(p.debut).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+                periode.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+            }
+
+            const zone = document.getElementById('pms-contenu');
+            if (recurrences.length === 0) {
+                zone.innerHTML = '<div class="empty">Aucune tâche de nettoyage récurrente pour cet établissement.<br>Elles se créent dans TAF → Récurrences, catégorie Nettoyage.</div>';
+                return;
+            }
+
+            // Calcul des etats + statistiques par zone
+            cellules = {};
+            const stats = {};
+            const total = { fait: 0, retard: 0, manque: 0, jour: 0, avenir: 0 };
+            recurrences.forEach(rec => {
+                stats[rec.zone] = stats[rec.zone] || { fait: 0, retard: 0, manque: 0, jour: 0, avenir: 0 };
+                p.jours.forEach(j => {
+                    const e = etatCase(rec, j, aujourdhui);
+                    cellules[rec.id + '|' + j] = e;
+                    if (e.st !== 'vide') { stats[rec.zone][e.st]++; total[e.st]++; }
+                });
+            });
+
+            const zones = Object.keys(stats).sort((a, b) => {
+                const ia = ORDRE_ZONES.indexOf(a), ib = ORDRE_ZONES.indexOf(b);
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+            });
+            const taux = s => { const n = s.fait + s.retard + s.manque; return n ? Math.round((s.fait + s.retard) * 100 / n) : null; };
+            const tauxTotal = taux(total);
+            const couleurTaux = v => v == null ? 'var(--gray-400)' : (v >= 90 ? 'var(--green)' : (v >= 70 ? 'var(--amber)' : 'var(--red)'));
+
+            let html = `<div class="print-only">Plan de nettoyage — ${esc(document.getElementById('etab-badge').textContent)} — ${esc(periode.textContent)}</div>`;
+
+            html += `<div class="pms-kpis">
+                <div class="pms-kpi"><div class="pms-kpi-label">Taux de réalisation</div>
+                    <div class="pms-kpi-val" style="color:${couleurTaux(tauxTotal)}">${tauxTotal == null ? '—' : tauxTotal + ' %'}</div>
+                    <div class="pms-kpi-sub">sur les nettoyages déjà échus</div></div>
+                <div class="pms-kpi"><div class="pms-kpi-label">Faits</div>
+                    <div class="pms-kpi-val" style="color:var(--green)">${total.fait + total.retard}</div>
+                    <div class="pms-kpi-sub">dont ${total.retard} en retard</div></div>
+                <div class="pms-kpi"><div class="pms-kpi-label">Non faits</div>
+                    <div class="pms-kpi-val" style="color:var(--red)">${total.manque}</div>
+                    <div class="pms-kpi-sub">jours passés, non émargés</div></div>
+                <div class="pms-kpi"><div class="pms-kpi-label">À faire</div>
+                    <div class="pms-kpi-val" style="color:var(--orange)">${total.jour}</div>
+                    <div class="pms-kpi-sub">aujourd'hui · ${total.avenir} à venir</div></div>
+            </div>`;
+
+            html += `<div class="pms-zones"><div class="pms-zones-title">Par zone ${filtreZone ? '· <a href="#" onclick="filtrer(null);return false;" class="no-print">tout afficher</a>' : '(clic pour filtrer)'}</div>`;
+            zones.forEach(z => {
+                const s = stats[z], n = s.fait + s.retard + s.manque, t = taux(s);
+                const w = k => n ? (s[k] * 100 / n) : 0;
+                html += `<div class="pms-zone-line ${filtreZone === z ? 'active' : ''}" onclick="filtrer('${esc(z)}')">
+                    <div class="pms-zone-name">${esc(nomZone(z))}</div>
+                    <div class="pms-bar"><span style="width:${w('fait')}%;background:var(--green)"></span><span style="width:${w('retard')}%;background:var(--amber)"></span><span style="width:${w('manque')}%;background:var(--red)"></span></div>
+                    <div class="pms-zone-pct" style="color:${couleurTaux(t)}">${t == null ? '—' : t + ' %'} <span style="color:var(--gray-400);font-weight:500">(${s.fait + s.retard}/${n})</span></div>
+                </div>`;
+            });
+            html += '</div>';
+
+            html += `<div class="pms-legend">
+                <span><i class="st-fait"></i>Fait</span>
+                <span><i class="st-retard"></i>Fait en retard</span>
+                <span><i class="st-manque"></i>Non fait</span>
+                <span><i class="st-jour"></i>À faire aujourd'hui</span>
+                <span><i class="st-avenir"></i>À venir</span>
+            </div>`;
+
+            html += `<div class="pms-grid-wrap"><table class="pms-grid vue-${vue}"><thead><tr><th class="col-tache">Tâche</th>`;
+            p.jours.forEach(j => {
+                const d = parseDs(j);
+                html += `<th class="${j === aujourdhui ? 'today' : ''}">${JOURS_COURTS[jourIso(j) - 1]}<br>${d.getDate()}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            zones.filter(z => !filtreZone || z === filtreZone).forEach(z => {
+                html += `<tr class="zone-row"><td class="col-tache">${esc(nomZone(z))}</td><td colspan="${p.jours.length}"></td></tr>`;
+                recurrences.filter(r => r.zone === z).forEach(rec => {
+                    html += `<tr><td class="col-tache"><div class="pms-tache-nom">${esc(rec.libelle)}</div>
+                        <div class="pms-tache-freq">${esc(libelleFrequence(rec))} · ${esc(rec.creneau || '')}</div></td>`;
+                    p.jours.forEach(j => {
+                        const e = cellules[rec.id + '|' + j];
+                        let contenu = '';
+                        if (e.st === 'fait' || e.st === 'retard') {
+                            const h = e.t.date_validation ? new Date(e.t.date_validation).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+                            const sous = e.st === 'retard' ? `+${ecartJours(j, e.jourFait)} j` : h;
+                            contenu = `${esc(e.t.fait_par_initiales || '✓')}${vue === 'semaine' && sous ? `<span class="h">${sous}</span>` : ''}`;
+                        } else if (e.st === 'manque') contenu = '✕';
+                        else if (e.st === 'jour') contenu = '•';
+                        const clic = e.st !== 'vide' ? `clic" onclick="ouvrirDetail('${rec.id}','${j}')` : '';
+                        html += `<td><div class="pms-cell st-${e.st} ${clic}">${contenu}</div></td>`;
+                    });
+                    html += '</tr>';
+                });
+            });
+            html += '</tbody></table></div>';
+            zone.innerHTML = html;
+        }
+
+        // ============ DETAIL D UNE CASE ============
+        function ouvrirDetail(recId, jour) {
+            const rec = recurrences.find(r => r.id === recId);
+            const e = cellules[recId + '|' + jour];
+            if (!rec || !e) return;
+            const libelles = { fait: '✅ Fait', retard: '🟠 Fait en retard', manque: '❌ Non fait', jour: '⏳ À faire aujourd\'hui', avenir: '📅 À venir' };
+            const ligne = (k, v) => `<div class="modal-line"><b>${k}</b><span>${v}</span></div>`;
+            let corps = ligne('Zone', esc(nomZone(rec.zone))) + ligne('Prévu le', esc(fmtLong(jour))) +
+                ligne('Créneau', esc(rec.creneau || '—')) + ligne('Fréquence', esc(libelleFrequence(rec))) + ligne('État', libelles[e.st]);
+            if (e.t && e.t.fait_par_id) {
+                const quand = e.t.date_validation ? new Date(e.t.date_validation).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+                corps += ligne('Fait par', esc(e.t.fait_par_initiales || '—')) + ligne('Validé le', esc(quand));
+            } else if (e.st === 'manque' && !e.t) {
+                corps += ligne('Remarque', 'Tâche jamais affichée dans le TAF ce jour-là');
+            }
+            if (rec.observation) corps += `<div class="modal-obs">${esc(rec.observation)}</div>`;
+            document.getElementById('detail-titre').textContent = rec.libelle;
+            document.getElementById('detail-corps').innerHTML = corps;
+            document.getElementById('detail-modal').style.display = 'flex';
+        }
+        function fermerDetail() { document.getElementById('detail-modal').style.display = 'none'; }
+
+        // ============ NAVIGATION ============
+        async function rafraichir() {
+            try {
+                await charger();
+                render();
+            } catch (e) {
+                console.error(e);
+                if (PLANB.erreurAuth(e)) return;
+                showToast('Erreur de chargement du plan de nettoyage', 'error');
+            }
+        }
+        function setVue(v) {
+            vue = v;
+            document.getElementById('vue-semaine').classList.toggle('active', v === 'semaine');
+            document.getElementById('vue-mois').classList.toggle('active', v === 'mois');
+            rafraichir();
+        }
+        function decaler(sens) {
+            if (vue === 'semaine') reference.setDate(reference.getDate() + 7 * sens);
+            else reference = new Date(reference.getFullYear(), reference.getMonth() + sens, 1);
+            rafraichir();
+        }
+        function allerAujourdhui() { reference = new Date(); rafraichir(); }
+        function filtrer(z) { filtreZone = (z && filtreZone !== z) ? z : null; render(); }
+
+        (function init() {
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            rafraichir();
+        })();
+    </script>
+</body>
+</html>
