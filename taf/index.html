@@ -303,6 +303,13 @@
       font-size: 0.7rem; color: var(--gray-400); font-style: italic;
       font-variant-numeric: tabular-nums; white-space: nowrap;
     }
+    .cl-banner { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
+    .cl-banner-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; font-weight: 700; color: #166534; margin-bottom: 6px; }
+    .cl-banner-all { font-size: 0.78rem; font-weight: 600; color: #15803d; text-decoration: none; }
+    .cl-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cl-chip { display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #86efac; border-radius: 16px; padding: 6px 12px; font-size: 0.85rem; font-weight: 600; color: #14532d; text-decoration: none; }
+    .cl-chip:active { background: #dcfce7; }
+    .cl-chip-prog { background: #dcfce7; color: #166534; border-radius: 10px; padding: 1px 7px; font-size: 0.75rem; }
     .charge-banner {
       background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
       padding: 8px 14px; margin-bottom: 10px; font-size: 0.85rem; color: #1e40af;
@@ -1206,6 +1213,7 @@
   let dureesHistorique = null; // previsions : mediane des chronos par intitule de tache
   let sortColumn = 'default'; // colonne de tri active
   let sortDir = 'asc'; // 'asc' ou 'desc'
+  let checklistsAFaire = []; // check-lists du service en cours pas encore completes (bandeau)
   let selectionMode = false; // mode sélection multiple (managers+)
   let selectedTaskIds = new Set(); // ids des tâches sélectionnées
 
@@ -1739,11 +1747,100 @@
       await autoAssignFromPlanning();
       // Previsions de duree (1 chargement par session)
       await loadDureesHistorique();
+      await chargerChecklistsAFaire();
       renderCurrentTab();
     } catch (e) {
       console.error('Erreur chargement:', e);
       showToast('Erreur de chargement', 'error');
     }
+  }
+
+  // ====== CHECK-LISTS A FAIRE (bandeau en tete de TAF, demande Eric 31/10) ======
+  // Meme regle que l onglet Validation du module Check-lists (checklist/index.html,
+  // loadValidation + shouldShowChecklist + getChecklistCompletion) :
+  //   - service en cours : midi avant 16 h, soir apres ; check-list du service ou "tous"
+  //   - equipe : la sienne ou "tous" (manager/admin : toutes)
+  //   - frequence : service et journaliere tous les jours, hebdomadaire les jours
+  //     prevus, mensuelle les jours du mois prevus
+  //   - "a faire" = moins de points coches que de points dans la check-list,
+  //     pour la periode (jour, lundi de la semaine, mois) et le service en cours
+  // Seulement quand on regarde aujourd hui, et si la personne a acces au module.
+  function peutVoirChecklists() {
+    if (currentUser?.role === 'admin') return true;
+    const mods = currentUser?.acces_modules;
+    if (Array.isArray(mods) && mods.length > 0) return mods.includes('checklist');
+    return true; // pas de liste personnalisee : module ouvert a tous les roles
+  }
+
+  function periodeChecklist(cl) {
+    const today = new Date().toISOString().split('T')[0];
+    if (cl.frequence === 'hebdomadaire') {
+      const d = new Date(today);
+      d.setDate(d.getDate() - d.getDay() + 1);
+      return d.toISOString().split('T')[0];
+    }
+    if (cl.frequence === 'mensuelle') return today.substring(0, 7);
+    return today;
+  }
+
+  async function chargerChecklistsAFaire() {
+    checklistsAFaire = [];
+    if (!isToday(filterDate) || !peutVoirChecklists()) return;
+    try {
+      const service = new Date().getHours() < 16 ? 'midi' : 'soir';
+      const { data, error } = await supabaseClient
+        .from('checklists')
+        .select('id, nom, frequence, equipe, service, jours_semaine, jour_mois, checklist_items(id)')
+        .or(`etablissement.eq.${currentEtablissement},partagee.eq.true`)
+        .eq('actif', true)
+        .order('ordre');
+      if (error) throw error;
+      const now = new Date();
+      const jourSemaine = now.getDay() === 0 ? 7 : now.getDay();
+      const jourMois = now.getDate();
+      const voitTout = currentUser.role === 'manager' || currentUser.role === 'admin';
+      const dues = (data || []).filter(cl => {
+        const okEquipe = voitTout || cl.equipe === currentUser.equipe || cl.equipe === 'tous';
+        const okService = cl.service === service || cl.service === 'tous';
+        let okJour = false;
+        if (cl.frequence === 'service' || cl.frequence === 'journaliere') okJour = true;
+        else if (cl.frequence === 'hebdomadaire') okJour = Array.isArray(cl.jours_semaine) && cl.jours_semaine.includes(jourSemaine);
+        else if (cl.frequence === 'mensuelle') okJour = Array.isArray(cl.jour_mois) && cl.jour_mois.includes(jourMois);
+        return okEquipe && okService && okJour && (cl.checklist_items || []).length > 0;
+      });
+      if (!dues.length) return;
+      const periodes = [...new Set(dues.map(periodeChecklist))];
+      const { data: comp, error: e2 } = await supabaseClient
+        .from('checklist_completions')
+        .select('checklist_id, item_id, periode')
+        .eq('etablissement', currentEtablissement)
+        .eq('service', service)
+        .in('periode', periodes)
+        .in('checklist_id', dues.map(cl => cl.id));
+      if (e2) throw e2;
+      checklistsAFaire = dues.map(cl => {
+        const p = periodeChecklist(cl);
+        const faits = new Set((comp || []).filter(c => c.checklist_id === cl.id && c.periode === p).map(c => c.item_id));
+        return { id: cl.id, nom: cl.nom, service, faits: faits.size, total: cl.checklist_items.length };
+      }).filter(c => c.faits < c.total);
+    } catch (e) {
+      console.warn('Check-lists a faire non chargees :', e);
+      checklistsAFaire = [];
+    }
+  }
+
+  function htmlChecklistsAFaire() {
+    if (!checklistsAFaire.length) return '';
+    const chips = checklistsAFaire.map(c =>
+      `<a class="cl-chip" href="../checklist/?id=${encodeURIComponent(c.id)}&service=${c.service}&return=taf" title="Ouvrir cette check-list">
+        ${esc(c.nom)} <span class="cl-chip-prog">${c.faits}/${c.total}</span> ›
+      </a>`).join('');
+    return `<div class="cl-banner">
+      <div class="cl-banner-title">✅ Check-lists à faire — service ${checklistsAFaire[0].service === 'midi' ? 'du midi' : 'du soir'}
+        <a class="cl-banner-all" href="../checklist/?return=taf">Toutes les check-lists ›</a>
+      </div>
+      <div class="cl-chips">${chips}</div>
+    </div>`;
   }
 
   // ====== PREVISION DES DUREES ======
@@ -2151,7 +2248,7 @@
     const eIcons = { cuisine: '🍴', salle: '🍽', plonge: '🫧', autre: '📦' };
 
     if (!filtered.length) {
-      mc.innerHTML = `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune tâche</h3><p>Pas de tâche pour cette date et ces filtres</p></div>
+      mc.innerHTML = htmlChecklistsAFaire() + `<div class="empty-state"><div class="emoji">✅</div><h3>Aucune tâche</h3><p>Pas de tâche pour cette date et ces filtres</p></div>
         <div class="task-row-add" onclick="switchTab('creer')" title="Créer une nouvelle tâche">
           <span class="add-icon">+</span> Ajouter une tâche
         </div>`;
@@ -2280,6 +2377,9 @@
         </div>` + html;
       }
     })();
+
+    // Check-lists du service en cours pas encore terminees, tout en haut
+    html = htmlChecklistsAFaire() + html;
 
     mc.innerHTML = html;
     // Synchroniser la checkbox "tout sélectionner" (état mixte/coché)

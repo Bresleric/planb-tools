@@ -213,6 +213,8 @@
             transition: all 0.15s;
             touch-action: manipulation;
         }
+        /* Check-list ouverte depuis un lien TAF : mise en evidence 4 s */
+        .checklist-card.cible { box-shadow: 0 0 0 3px #f97316, var(--shadow); }
 
         .checklist-card:active {
             transform: scale(0.98);
@@ -1387,8 +1389,30 @@
             }
 
             updateHeader();
-            autoSelectService(); // déclenche déjà loadValidation() via selectService()
+            // Lien direct depuis TAF (31/10/2026) : ?id=<checklist>&service=midi|soir&return=taf
+            // -> ouvre le bon service et met la check-list en evidence.
+            const params = new URLSearchParams(location.search);
+            cibleChecklistId = params.get('id');
+            retourVers = params.get('return') === 'taf' ? '../taf/' : '../';
+            const serviceDemande = params.get('service');
+            if (serviceDemande === 'midi' || serviceDemande === 'soir') selectService(serviceDemande);
+            else autoSelectService(); // déclenche déjà loadValidation() via selectService()
             loadHistoryDate();
+        }
+
+        // Mise en evidence de la check-list demandee par le lien direct (une seule fois)
+        let cibleChecklistId = null;
+        let retourVers = '../';
+        function mettreEnEvidenceCible() {
+            if (!cibleChecklistId) return;
+            const card = document.querySelector(`.checklist-card[data-checklist-id="${cibleChecklistId}"]`);
+            cibleChecklistId = null;
+            if (!card) { showToast('Cette check-list n est pas prévue pour ce service', 'info'); return; }
+            card.classList.add('cible');
+            const items = card.querySelector('.checklist-items');
+            if (items) items.classList.add('expanded');
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => card.classList.remove('cible'), 4000);
         }
 
         // ============ HEADER & NAVIGATION ============
@@ -1404,6 +1428,8 @@
                 window.location.href = '../';
                 return;
             }
+            // Ouvert depuis TAF : le retour ramene a TAF (meme verrou PIN)
+            const destination = retourVers || '../';
             // Verrouillage : seul l'utilisateur qui a ouvert la session peut revenir.
             // Tout autre code valide → déconnexion forcée.
             askPIN({
@@ -1413,7 +1439,7 @@
             }, (user) => {
                 if (!user) return; // annulé
                 if (user.id === currentUser.id) {
-                    window.location.href = '../';
+                    window.location.href = destination;
                 } else {
                     showToast("Session différente : déconnexion", 'error');
                     setTimeout(logoutAndGoHome, 700);
@@ -1514,6 +1540,7 @@
                 }
 
                 updatePendingCount();
+                mettreEnEvidenceCible();
             } catch (err) {
                 console.error('Error loading validation:', err);
                 showToast('Erreur au chargement', 'error');
@@ -1542,6 +1569,7 @@
         function createChecklistCard(cl, completed) {
             const card = document.createElement('div');
             card.className = 'checklist-card';
+            card.dataset.checklistId = cl.id;
 
             const total = cl.checklist_items?.length || 0;
             const done = completed.length;

@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v129';  // bump a chaque mise a jour du SW (v129 : Admin - voir comme respecte les modules autorises 31/10/2026)
+const CACHE_NAME = 'planb-tools-v130';  // bump a chaque mise a jour du SW (v130 : TAF - bandeau des check-lists a faire avec lien direct 31/10/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
