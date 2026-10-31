@@ -214,6 +214,10 @@
     .task-row.done .task-name { text-decoration: line-through; color: var(--gray-400); }
     .task-name.editable { cursor: pointer; text-decoration-style: dotted; text-underline-offset: 3px; }
     .task-name.editable:hover { color: var(--orange); }
+    .task-verrou {
+      display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
+      background: var(--gray-100, #f3f4f6); color: var(--gray-500, #6b7280); font-size: 0.68rem; white-space: nowrap;
+    }
     .task-note-cell { min-width: 0; overflow: hidden; padding: 0 4px; }
     .task-note {
       font-size: 0.72rem; color: var(--gray-500); font-style: italic;
@@ -1958,6 +1962,7 @@
           priorite: rec.priorite || 3,
           categorie: rec.categorie || null,
           duree_estimee_minutes: rec.duree_estimee_minutes || null,
+          heure_min_validation: rec.heure_min_validation || null,
           observation: rec.observation || '',
           echeance: today,
           date_creation: new Date().toISOString(),
@@ -2209,6 +2214,7 @@
         ${selectionMode ? `<div class="select-all-wrap">${done ? '' : `<input type="checkbox" class="task-select-cb" data-id="${t.id}" ${isSelected ? 'checked' : ''} onclick="toggleTaskSelection('${t.id}')">`}</div>` : ''}
         <div class="task-main">
           <span class="task-name ${canEdit ? 'editable' : ''}" title="${canEdit ? 'Cliquer pour modifier' : esc(t.tache)}" ${canEdit ? `onclick="showEditTaskModal('${t.id}')"` : ''}>${t.is_production ? '🏭 ' : ''}${esc(t.tache)}</span>
+          ${!done && heureVerrouValidation(t) ? `<span class="task-verrou" title="Ne peut pas être cochée avant ${heureVerrouValidation(t)}">🔒 dès ${heureVerrouValidation(t)}</span>` : ''}
         </div>
         <div class="task-cell" style="text-align:center">${t.fiche_id ? `<button class="btn-action" style="background:#dbeafe;color:#1d4ed8" onclick="openFicheConsultModal('${t.fiche_id}')" title="Afficher la fiche technique">📖</button>` : `<span style="color:var(--gray-300);font-size:0.72rem">—</span>`}</div>
         <div class="task-cell"><span class="task-echeance" title="${echTitle}">${echShort}</span></div>
@@ -3145,10 +3151,36 @@
   }
 
   // ====== TASK ACTIONS ======
+  // Heure minimale de validation (ex. nettoyages de fin de service : pas avant 22:00).
+  // Renvoie 'HH:MM' tant que la tâche n'est pas encore cochable, sinon null.
+  // Une tâche reportée d'un jour précédent n'est plus verrouillée.
+  function heureVerrouValidation(task) {
+    if (!task || !task.heure_min_validation) return null;
+    const jour = task.echeance_initiale || (task.echeance || '').slice(0, 10);
+    if (!jour) return null;
+    const hhmm = String(task.heure_min_validation).slice(0, 5);
+    return new Date() < new Date(`${jour}T${hhmm}:00`) ? hhmm : null;
+  }
+
   // Confirmation avant toggle (sauf production : la modale de saisie sert déjà de confirmation)
   function confirmToggleTask(id, isDone) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
+    const verrou = !isDone && heureVerrouValidation(task);
+    if (verrou && !isAdmin()) {
+      showToast(`🔒 Cette tâche ne peut être cochée qu'à partir de ${verrou}`, 'error');
+      return;
+    }
+    if (verrou) {
+      openModal('Valider avant l\'heure ?', `
+        <p style="font-size:0.9rem">Cette tâche n'est normalement cochable qu'à partir de <strong>${verrou}</strong>.</p>
+        <p style="font-size:0.85rem;margin-top:8px"><strong>${esc(task.tache)}</strong></p>
+      `, [
+        { label: 'Annuler', action: 'closeModal()', cls: '' },
+        { label: 'Valider quand même', action: `closeModal(); toggleTask('${id}', false)`, cls: 'danger' }
+      ]);
+      return;
+    }
     // Production en attente : passer directement (modale de saisie va s'ouvrir)
     if (!isDone && task.is_production) {
       return toggleTask(id, isDone);
@@ -3166,6 +3198,7 @@
   }
 
   async function toggleTask(id, isDone) {
+    if (!isDone && !isAdmin() && heureVerrouValidation(tasks.find(t => t.id === id))) return;
     try {
       if (isDone) {
         // Réouverture : supprimer validation, durée et chrono (recommencer à zéro)
@@ -5315,6 +5348,8 @@
           ${(r.equipe || '').charAt(0).toUpperCase() + (r.equipe || '').slice(1)} ·
           ${r.creneau || 'Matin'} ·
           Priorité ${r.priorite || 3}
+          <button class="task-verrou" style="border:none;cursor:pointer" onclick="showHeureMinRecurrenceModal('${r.id}')"
+                  title="Heure à partir de laquelle la tâche peut être cochée">${r.heure_min_validation ? '🔒 dès ' + String(r.heure_min_validation).slice(0, 5) : '🕒 cochable à tout moment'}</button>
         </div>
       </div>
       <button class="recurrence-toggle ${r.actif ? 'active' : ''}"
@@ -5330,6 +5365,41 @@
       renderRecurrencesTab();
       showToast(newState ? 'Récurrence activée' : 'Récurrence désactivée', 'success');
     } catch (e) { showToast('Erreur', 'error'); }
+  }
+
+  function showHeureMinRecurrenceModal(id) {
+    const rec = recurrences.find(r => r.id === id);
+    if (!rec) return;
+    openModal('Heure de validation', `
+      <p style="font-size:0.85rem;margin-bottom:8px"><strong>${esc(rec.nom)}</strong></p>
+      <div class="form-group">
+        <label>Cochable à partir de</label>
+        <input class="form-input" type="time" id="rec-heure-min-edit" value="${rec.heure_min_validation ? String(rec.heure_min_validation).slice(0, 5) : ''}">
+        <div style="font-size:0.72rem;color:var(--gray-400);margin-top:4px">Vide = cochable à tout moment. S'applique aussi aux tâches déjà créées et non faites.</div>
+      </div>
+    `, [
+      { label: 'Annuler', action: 'closeModal()', cls: '' },
+      { label: 'Enregistrer', action: `saveHeureMinRecurrence('${id}')`, cls: 'primary' }
+    ]);
+  }
+
+  async function saveHeureMinRecurrence(id) {
+    const heure = document.getElementById('rec-heure-min-edit')?.value || null;
+    try {
+      await DB.updateRecurrence(id, { heure_min_validation: heure });
+      const { error } = await supabaseClient.from('tasks')
+        .update({ heure_min_validation: heure })
+        .eq('recurrence_id', id).is('fait_par_id', null).gte('echeance', dateStr(new Date()));
+      if (error) throw error;
+      recurrences = await DB.getRecurrences(currentEtablissement);
+      tasks = await DB.getTasks(filterDate);
+      closeModal();
+      renderRecurrencesTab();
+      showToast(heure ? `Cochable à partir de ${heure} ✓` : 'Cochable à tout moment ✓', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Erreur enregistrement', 'error');
+    }
   }
 
   function confirmDeleteRecurrence(id) {
@@ -5363,6 +5433,11 @@
       <div class="form-group">
         <label>Durée estimée (minutes)</label>
         <input class="form-input" type="number" inputmode="numeric" min="1" max="480" id="rec-duree" placeholder="Vide = estimation automatique (chronos passés)">
+      </div>
+      <div class="form-group">
+        <label>Cochable à partir de (optionnel)</label>
+        <input class="form-input" type="time" id="rec-heure-min">
+        <div style="font-size:0.72rem;color:var(--gray-400);margin-top:4px">Ex. 22:00 pour un nettoyage de fin de service. Vide = cochable à tout moment. Un admin peut toujours passer outre.</div>
       </div>
       <div class="form-group">
         <label>Équipe</label>
@@ -5471,6 +5546,7 @@
         frequence_type: type,
         frequence_valeur: valeur,
         duree_estimee_minutes: parseInt(document.getElementById('rec-duree')?.value) || null,
+        heure_min_validation: document.getElementById('rec-heure-min')?.value || null,
         observation: document.getElementById('rec-obs').value.trim() || null,
         date_debut: document.getElementById('rec-debut').value || dateStr(new Date()),
         etablissement: currentEtablissement,
