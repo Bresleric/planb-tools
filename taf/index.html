@@ -103,6 +103,11 @@
     .filter-right {
       margin-left: auto; display: flex; align-items: center; gap: 6px;
     }
+    .filter-collab {
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gray-200);
+      background: white; font-size: 0.75rem; color: var(--gray-600); max-width: 260px;
+    }
+    .filter-collab.active { background: var(--blue); color: white; border-color: var(--blue); }
     .toggle-completed {
       font-size: 0.75rem; color: var(--gray-400); cursor: pointer;
       display: flex; align-items: center; gap: 4px;
@@ -967,6 +972,10 @@
       <span class="filter-label">Équipe</span>
       <!-- Generated dynamically -->
     </div>
+    <div class="filter-row" id="collab-filter-row" style="display:none">
+      <span class="filter-label">Personne</span>
+      <select class="filter-collab" id="filter-collab" onchange="setFilterCollab(this.value)"></select>
+    </div>
   </div>
 
   <!-- TABS -->
@@ -1176,6 +1185,7 @@
   let filterDate = new Date();
   let filterCreneau = 'all';
   let filterEquipe = null; // null = user's team
+  let filterCollab = 'all'; // admin : 'all' | 'none' (non attribuées) | id utilisateur
   let showCompleted = false;
   let currentTab = 'taches';
   let tasks = [];
@@ -1655,6 +1665,41 @@
     renderFiltered();
   }
 
+  // Filtre par collaborateur (admin) : une personne = tâches qui lui sont
+  // attribuées ou qu'elle a faites. Liste construite à partir des tâches du jour.
+  function renderCollabFilter() {
+    const row = document.getElementById('collab-filter-row');
+    if (!row) return;
+    if (!isAdmin()) { row.style.display = 'none'; filterCollab = 'all'; return; }
+    row.style.display = '';
+    const personnes = new Map();
+    const ajouter = (id, nom) => {
+      if (!id) return;
+      if (!personnes.has(id)) personnes.set(id, { nom: nom || '?', aFaire: 0, faites: 0 });
+    };
+    tasks.forEach(t => {
+      ajouter(t.attribue_a_id, t.attribue_a_nom);
+      ajouter(t.fait_par_id, (users.find(u => u.id === t.fait_par_id) || {}).nom || t.fait_par_initiales);
+      if (t.fait_par_id) personnes.get(t.fait_par_id).faites++;
+      else if (t.attribue_a_id) personnes.get(t.attribue_a_id).aFaire++;
+    });
+    if (filterCollab !== 'all' && filterCollab !== 'none' && !personnes.has(filterCollab)) filterCollab = 'all';
+    const nonAttribuees = tasks.filter(t => !t.attribue_a_id && !t.fait_par_id).length;
+    const opt = (v, label) => `<option value="${v}" ${filterCollab === v ? 'selected' : ''}>${esc(label)}</option>`;
+    let html = opt('all', 'Tout le monde') + opt('none', `Non attribuées (${nonAttribuees})`);
+    [...personnes.entries()]
+      .sort((a, b) => a[1].nom.localeCompare(b[1].nom, 'fr'))
+      .forEach(([id, p]) => { html += opt(id, `${p.nom} — ${p.aFaire} à faire · ${p.faites} faite${p.faites > 1 ? 's' : ''}`); });
+    const sel = document.getElementById('filter-collab');
+    sel.innerHTML = html;
+    sel.classList.toggle('active', filterCollab !== 'all');
+  }
+
+  function setFilterCollab(v) {
+    filterCollab = v;
+    renderFiltered();
+  }
+
   function toggleShowCompleted() {
     showCompleted = document.getElementById('chk-completed').checked;
     renderFiltered();
@@ -1964,6 +2009,9 @@
       .filter(t => {
         if (filterCreneau !== 'all' && t.creneau !== filterCreneau) return false;
         if (filterEquipe !== 'all' && t.equipe !== filterEquipe) return false;
+        if (filterCollab === 'none' && (t.attribue_a_id || t.fait_par_id)) return false;
+        if (filterCollab !== 'all' && filterCollab !== 'none'
+            && t.attribue_a_id !== filterCollab && t.fait_par_id !== filterCollab) return false;
         if (!showCompleted && t.fait_par_id) return false;
         return true;
       })
@@ -2091,6 +2139,7 @@
   // ====== RENDER TASKS TAB ======
   function renderTasksTab() {
     const mc = document.getElementById('main-content');
+    renderCollabFilter();
     const filtered = getFilteredTasks();
     const pLabels = ['', '!', '!!', '!!!', '!!!!', '!!!!!'];
     const cIcons = { Matin: '☀️', Midi: '🌤', Soir: '🌙' };
