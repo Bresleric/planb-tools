@@ -1875,12 +1875,25 @@
   // ====== RECURRING TASK GENERATION ======
   async function generateRecurringTasks() {
     const today = dateStr(filterDate);
+    // Pas de génération rétroactive : consulter un jour passé ne doit rien créer
+    if (today < dateStr(new Date())) return;
     const activeRecurrences = recurrences.filter(r => r.actif);
 
-    for (const rec of activeRecurrences) {
-      // Check if already generated for this date
-      if (rec.derniere_generation === today) continue;
+    // Récurrences déjà générées pour ce jour, lues en base (et non dans `tasks`) :
+    // une tâche reportée vit à une autre date avec echeance_initiale = ce jour,
+    // et derniere_generation ne garde que le dernier jour consulté.
+    // Sans ce contrôle, chaque changement de date recréait des doublons.
+    const nextDay = new Date(filterDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const { data: dejaGenerees, error: errGen } = await supabaseClient.from('tasks')
+      .select('recurrence_id')
+      .eq('etablissement', currentEtablissement)
+      .not('recurrence_id', 'is', null)
+      .or(`and(echeance.gte.${today},echeance.lt.${dateStr(nextDay)}),echeance_initiale.eq.${today}`);
+    if (errGen) { console.error('Erreur contrôle récurrences:', errGen); return; }
+    const recDejaGenerees = new Set((dejaGenerees || []).map(t => t.recurrence_id));
 
+    for (const rec of activeRecurrences) {
       // Check if date is within range
       if (rec.date_debut && today < rec.date_debut) continue;
       if (rec.date_fin && today > rec.date_fin) continue;
@@ -1889,8 +1902,7 @@
       if (!matchesRecurrence(rec, filterDate)) continue;
 
       // Check if task already exists for this date + recurrence
-      const existing = tasks.find(t => t.recurrence_id === rec.id && t.echeance === today);
-      if (existing) continue;
+      if (recDejaGenerees.has(rec.id)) continue;
 
       // Generate the task
       try {
@@ -2126,8 +2138,9 @@
       // Permissions : est-ce que cette tâche concerne l'utilisateur courant ?
       const isMine = t.attribue_a_id === currentUser.id || t.createur_id === currentUser.id;
       const isUnassigned = !t.attribue_a_id;
-      // Un collaborateur ne peut agir que sur ses tâches (ou non attribuées)
-      const canAct = userRole() >= 2 || isMine || isUnassigned;
+      const isMyTeam = !!currentUser.equipe && t.equipe === currentUser.equipe;
+      // Un collaborateur peut agir sur ses tâches, les non attribuées et celles de son équipe
+      const canAct = userRole() >= 2 || isMine || isUnassigned || isMyTeam;
       // Droit de modifier (edit modal) : manager+ ou tâche à soi
       const canEdit = !done && (userRole() >= 3 || isMine);
       // Highlight "mes tâches"
