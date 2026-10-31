@@ -1283,6 +1283,9 @@
                 sessionStorage.setItem('planb_user', JSON.stringify({
                     id: cible.id, nom: cible.nom, initiales: cible.initiales,
                     role: cible.role, equipe: cible.equipe,
+                    // Sans cette liste, le portail retombe sur la regle par role
+                    // et montre des modules que la personne ne voit pas en vrai
+                    acces_modules: cible.acces_modules || null,
                     etablissement: sessionStorage.getItem('planb_etablissement'),
                     etablissements: [sessionStorage.getItem('planb_etablissement')],
                     timestamp: Date.now()
