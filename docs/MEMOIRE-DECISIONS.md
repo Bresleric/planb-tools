@@ -20,6 +20,33 @@
   `toastCaBloque()`, classe CSS `body.ca-bloque`. Freddy et Liesel.
 - **Ne pas retirer** sans décision explicite d'Eric.
 
+## 💶 Caisse : CA pré-rempli et verrouillé depuis L'Addition (étape 1, v131, déployé le 01/11/2026)
+
+- **Caisse : CA pré-rempli et verrouillé depuis L'Addition (étape 1), saisie
+  manuelle de secours si la synchro est en panne ; étape 2 à venir = moyens de
+  paiement.**
+- **Pourquoi** : sur 35 journées comparées (analyse du 01/11), 29 identiques au
+  centime, 4 fautes de frappe de l'équipe chez Freddy (0,01 à 0,23 €), et le
+  20/10 faux côté L'Addition (jeton expiré à 18h30, CA de l'après-midi seulement).
+  D'où la règle : **jamais de pré-remplissage à l'aveugle**.
+- **Règle de fraîcheur** : service encore ouvert pour ce jour (`laddition_live`)
+  → pris si pas d'erreur et synchro < 1 h ; jour passé (`laddition_ventes_jour`)
+  → pris seulement si la dernière synchro est **après minuit** (L'Addition garde
+  le service ouvert jusqu'à l'ouverture du lendemain ; le 20/10 est refusé).
+  Sinon : saisie manuelle du ticket Z, avertissement orange.
+- **Jour déjà enregistré avec un autre CA** : on garde l'enregistré, on affiche
+  les deux et on propose « Prendre le CA L'Addition » (jamais d'écrasement
+  silencieux). Lien « Saisir à la main » réservé à l'admin.
+- **Traçabilité** : `caisse_controle.ca_source` ('laddition' | 'manuel') et
+  `ca_laddition_le`. Les jours antérieurs au 01/11 sont à NULL.
+- **Bouton « Actualiser depuis L'Addition »** : appelle l'edge function
+  `laddition-live` depuis l'iPad (CORS ajouté) ; **anti-rafale 2 min** côté
+  serveur car la clé publique suffit pour l'appeler (protège le compte d'Eric).
+- **Inchangé** : verrou Contrôle CA (v107), paiements, CB par terminal,
+  mouvements, comptage (toujours saisis à la main). Freddy et Liesel.
+- **Où** : `caisse/index.html` (`chargerCaLaddition`, `appliquerCaLaddition`),
+  `supabase/functions/laddition-live/index.ts`, `scripts/migration-caisse-ca-laddition.sql`.
+
 ## 💶 L'Addition Live : CA et stock en direct dans Pilotage (v113, déployé le 12/10/2026)
 
 - **Quoi** : onglets « CA live » et « Stock » du module Pilotage, alimentés toutes les
