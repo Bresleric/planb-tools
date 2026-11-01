@@ -34,6 +34,27 @@ async function cfgSet(cle: string, valeur: string) {
   if (error) throw new Error("config_set: " + error.message);
 }
 
+// ---- Appel depuis le module Caisse (bouton "Actualiser depuis L Addition") ----
+// CORS : sans ces en-tetes, Safari bloque l appel du navigateur ("Load failed").
+// Anti-rafale : la cle publique suffit pour appeler cette fonction ; pour ne pas
+// marteler L Addition avec le compte d Eric, on ne la rappelle pas si une synchro
+// (reussie ou en echec) a eu lieu il y a moins de 2 minutes : on renvoie
+// simplement "skipped" et le front relit les tables.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const JSON_HEADERS = { "Content-Type": "application/json", ...CORS };
+const DELAI_MIN_MS = 2 * 60 * 1000;
+
+async function synchroTropRecente(): Promise<boolean> {
+  const { data } = await supa.from("laddition_live").select("synchro_le, erreur_le");
+  const derniere = Math.max(0, ...(data || []).flatMap((l: any) =>
+    [l.synchro_le, l.erreur_le].filter(Boolean).map((t: string) => new Date(t).getTime())));
+  return Date.now() - derniere < DELAI_MIN_MS;
+}
+
 // ---- Alerte Telegram (le message ne contient jamais le jeton) ----
 const RAPPEL_ALERTE_MS = 6 * 3600 * 1000;
 
@@ -159,10 +180,15 @@ const stocksDe = (d: any) => {
   });
 };
 
-Deno.serve(async (_req) => {
-  const resume = { etabs: [] as string[], ruptures: 0, erreurs: [] as string[] };
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  const resume = { etabs: [] as string[], ruptures: 0, erreurs: [] as string[], skipped: false };
   const maintenant = new Date().toISOString();
   try {
+    if (await synchroTropRecente()) {
+      resume.skipped = true;
+      return new Response(JSON.stringify(resume), { headers: JSON_HEADERS });
+    }
     const j = await lireData();
     const comptes: any[] = j.compte?.linked?.length ? j.compte.linked : [j.compte];
 
@@ -248,7 +274,7 @@ Deno.serve(async (_req) => {
       resume.etabs.push(`${etab}: CA ${ligne.ca} / ${ligne.couverts} couv. (${snaps.length} photos)`);
     }
     await signalerRetablie();
-    return new Response(JSON.stringify(resume), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(resume), { headers: JSON_HEADERS });
   } catch (e) {
     const msg = String((e as Error)?.message || e);
     resume.erreurs.push(msg);
@@ -257,6 +283,6 @@ Deno.serve(async (_req) => {
       { onConflict: "etablissement" },
     );
     await alerterEchec(msg);
-    return new Response(JSON.stringify(resume), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(resume), { status: 500, headers: JSON_HEADERS });
   }
 });

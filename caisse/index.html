@@ -159,6 +159,17 @@
             box-shadow: 0 0 0 2px rgba(249,115,22,0.2);
         }
         .field-card.readonly, .field-card.calc { background: var(--gray-50); cursor: default; }
+        /* CA repris de L Addition (etape 1, 01/11/2026) */
+        .ladd-mention { font-size: 10px; color: var(--gray-500); margin-top: 2px; line-height: 1.25; }
+        .ladd-zone { margin: 6px 0 10px; display: flex; flex-direction: column; gap: 6px; }
+        .ladd-warn { background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; }
+        .ladd-raison { font-weight: 400; font-size: 11px; }
+        .ladd-ecart { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; border-radius: 10px; padding: 8px 10px; font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .ladd-info { background: var(--gray-50); border-radius: 10px; padding: 6px 10px; font-size: 12px; color: var(--gray-500); }
+        .ladd-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .ladd-btn { border: 1px solid #d1d5db; background: white; border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .ladd-btn:disabled { opacity: 0.6; }
+        .ladd-link { border: none; background: none; color: var(--gray-500); font-size: 12px; text-decoration: underline; cursor: pointer; }
 
         /* Cellule quantité tappable (onglet Comptage) */
         .qty-cell {
@@ -581,6 +592,18 @@ let isDirty = false;
 let currentRecordId = null;
 let currentCashDebut = 0;
 
+// CA repris de L Addition (etape 1, 01/11/2026)
+//   caLadd   : { ok, ca, libelle, majCaisse, raison } pour le jour affiche
+//   caMode   : 'laddition' (case verrouillee sur le CA L Addition)
+//            | 'ecart'     (jour deja enregistre avec un autre CA : on garde
+//                           l enregistre, on propose de prendre L Addition)
+//            | 'manuel'    (synchro indisponible, ou deverrouillage admin)
+let caLadd = null;
+let caMode = 'manuel';
+let caForceManuel = false;       // deverrouillage par l admin (option B)
+let recordCaSource = null;       // origine du CA deja enregistre
+let recordCaLadditionLe = null;
+
 // Pavé numérique
 let padTarget = null;     // { kind: 'field' | 'denom', key }
 let padBuffer = null;     // chaine en cours de frappe (null = la prochaine touche remplace la valeur)
@@ -793,6 +816,7 @@ async function loadDay() {
 
     // Populate form data
     formData = {};
+    recordCaSource = null; recordCaLadditionLe = null;
     if (record) {
         currentRecordId = record.id;
         const fields = FIELDS[currentEtab];
@@ -800,7 +824,14 @@ async function loadDay() {
             formData[f.key] = record[f.key] || 0;
         });
         formData.comptage_caisse = record.comptage_caisse || 0;
+        recordCaSource = record.ca_source || null;
+        recordCaLadditionLe = record.ca_laddition_le || null;
     }
+
+    // CA L Addition du jour affiche (jamais pre-rempli a l aveugle : voir chargerCaLaddition)
+    caForceManuel = false;
+    caLadd = DEMO_MODE ? null : await chargerCaLaddition(isoDate);
+    appliquerCaLaddition(record);
 
     // Populate comptage data
     comptageData = {};
@@ -840,6 +871,158 @@ async function loadDay() {
 }
 
 // ============================================
+// CA DEPUIS L'ADDITION (etape 1, 01/11/2026)
+// ============================================
+// Regle de fraicheur (analyse du 01/11 : 29 jours sur 35 identiques au centime,
+// 4 fautes de frappe, et le 20/10 incomplet car le jeton a expire a 18h30) :
+//  1. Service encore ouvert dans L Addition pour ce jour (laddition_live) :
+//     chiffre pris s il n y a pas d erreur de synchro ET si la derniere synchro
+//     date de moins d 1 heure.
+//  2. Jour passe : laddition_ventes_jour, seulement si la derniere synchro de
+//     ce jour a eu lieu APRES minuit (L Addition garde le service ouvert jusqu a
+//     l ouverture du lendemain ; une synchro arretee le jour meme = journee
+//     incomplete, cas du 20/10). Une panne actuelle ne remet pas en cause un
+//     jour passe complet.
+//  3. Sinon : saisie manuelle du ticket Z (plan B).
+const LADD_FRAICHEUR_MS = 60 * 60 * 1000;
+
+function heureHM(iso) {
+    return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
+}
+
+async function chargerCaLaddition(isoDate) {
+    try {
+        const aujourdhui = dateToISO(new Date());
+        const { data: live } = await supabaseClient.from('laddition_live')
+            .select('date_service, ca, maj_caisse, synchro_le, erreur')
+            .eq('etablissement', currentEtab).maybeSingle();
+
+        // 1. Service encore ouvert pour ce jour, synchro fraiche et sans erreur
+        let raisonLive = null;
+        if (live && live.date_service === isoDate) {
+            const age = live.synchro_le ? Date.now() - new Date(live.synchro_le).getTime() : Infinity;
+            if (live.erreur) raisonLive = 'la synchro est en échec';
+            else if (age > LADD_FRAICHEUR_MS) raisonLive = `dernière synchro il y a ${Math.round(age / 60000)} min`;
+            else if (live.ca !== null && live.ca !== undefined) {
+                return { ok: true, ca: n(live.ca), majCaisse: live.maj_caisse,
+                    libelle: `L'Addition · caisse mise à jour à ${heureHM(live.maj_caisse || live.synchro_le)}` };
+            }
+        }
+
+        // 2. Jour passe complet (derniere synchro apres minuit)
+        if (isoDate < aujourdhui) {
+            const { data: v } = await supabaseClient.from('laddition_ventes_jour')
+                .select('ca, maj_le').eq('etablissement', currentEtab).eq('date_service', isoDate).maybeSingle();
+            if (v && v.maj_le && dateToISO(new Date(v.maj_le)) > isoDate) {
+                return { ok: true, ca: n(v.ca), majCaisse: v.maj_le,
+                    libelle: `L'Addition · chiffre définitif (synchro du ${new Date(v.maj_le).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${heureHM(v.maj_le)})` };
+            }
+            if (v) return { ok: false, raison: `journée incomplète dans L'Addition (dernière synchro le jour même à ${heureHM(v.maj_le)})` };
+        }
+        return { ok: false, raison: raisonLive || "aucun chiffre L'Addition pour ce jour" };
+    } catch (e) {
+        console.warn('CA L Addition non lu :', e);
+        return { ok: false, raison: "lecture des données L'Addition impossible" };
+    }
+}
+
+// Decide l etat de la case CA a partir du chiffre L Addition et du jour enregistre
+function appliquerCaLaddition(record) {
+    if (!caLadd || !caLadd.ok || caForceManuel) { caMode = 'manuel'; return; }
+    const caEnregistre = record ? n(record.ca) : 0;
+    if (!record || Math.abs(caEnregistre) < 0.005) {
+        caMode = 'laddition';
+        formData.ca = caLadd.ca;
+        if (record) isDirty = true; // jour enregistre sans CA : a enregistrer
+    } else if (Math.abs(caEnregistre - caLadd.ca) < 0.005) {
+        caMode = 'laddition';
+    } else {
+        caMode = 'ecart'; // on garde le CA enregistre, rien n est ecrase en silence
+    }
+}
+
+function caVerrouille() { return caMode === 'laddition' || caMode === 'ecart'; }
+
+function htmlZoneCaLaddition() {
+    const estAdmin = currentUser && currentUser.role === 'admin';
+    let h = '<div class="ladd-zone">';
+    if (caMode === 'ecart') {
+        h += `<div class="ladd-ecart">⚠️ CA enregistré <b>${fmtMontant(formData.ca)} €</b> · L'Addition <b>${fmtMontant(caLadd.ca)} €</b>
+            <button class="ladd-btn" onclick="prendreCaLaddition()">Prendre le CA L'Addition</button></div>`;
+    } else if (caMode === 'manuel' && !caForceManuel) {
+        h += `<div class="ladd-warn">⚠️ Synchro L'Addition indisponible : saisis le CA du ticket Z
+            <span class="ladd-raison">(${escapeHtmlCaisse(caLadd ? caLadd.raison : "pas de données")})</span></div>`;
+    } else if (caMode === 'manuel' && caForceManuel) {
+        h += `<div class="ladd-info">✏️ Saisie manuelle du CA (déverrouillée par l'administrateur)</div>`;
+    }
+    h += `<div class="ladd-actions">
+        <button class="ladd-btn" id="btn-ladd-refresh" onclick="actualiserCaLaddition()">↻ Actualiser depuis L'Addition</button>
+        ${estAdmin && caVerrouille() ? `<button class="ladd-link" onclick="deverrouillerCaAdmin()">🔓 Saisir à la main (admin)</button>` : ''}
+    </div></div>`;
+    return h;
+}
+
+function escapeHtmlCaisse(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+function rafraichirSaisie() {
+    renderForm(currentCashDebut);
+    updateCalculations(currentCashDebut);
+}
+
+// Bouton "Actualiser depuis L Addition" : relance la synchro (anti-rafale de
+// 2 min cote serveur), puis relit le CA du jour affiche
+async function actualiserCaLaddition() {
+    if (DEMO_MODE) return;
+    const btn = document.getElementById('btn-ladd-refresh');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Synchro L\'Addition…'; }
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('laddition-live', { body: { action: 'actualiser' } });
+        if (error && !(data && data.skipped)) console.warn('Synchro L Addition :', error);
+        const isoDate = dateToISO(currentDate);
+        caLadd = await chargerCaLaddition(isoDate);
+        if (!caForceManuel) {
+            if (caMode === 'laddition' && caLadd.ok) {
+                // Case deja sur L Addition : elle suit le dernier chiffre (fin de service)
+                if (Math.abs(n(formData.ca) - caLadd.ca) >= 0.005) { formData.ca = caLadd.ca; isDirty = true; }
+            } else {
+                let record = null;
+                if (currentRecordId) {
+                    const { data: r } = await supabaseClient.from('caisse_controle').select('ca')
+                        .eq('date', isoDate).eq('etablissement', currentEtab).maybeSingle();
+                    record = r;
+                }
+                appliquerCaLaddition(record);
+            }
+        }
+        rafraichirSaisie();
+        showToast(caLadd && caLadd.ok ? `CA L'Addition : ${fmtMontant(caLadd.ca)} €` : 'Synchro L\'Addition indisponible');
+    } catch (e) {
+        console.error(e);
+        showToast('Actualisation impossible');
+        rafraichirSaisie();
+    }
+}
+
+function prendreCaLaddition() {
+    if (!caLadd || !caLadd.ok) return;
+    if (!confirm(`Remplacer le CA enregistré (${fmtMontant(formData.ca)} €) par le CA L'Addition (${fmtMontant(caLadd.ca)} €) ?\nPense ensuite à Enregistrer.`)) return;
+    formData.ca = caLadd.ca;
+    caMode = 'laddition';
+    isDirty = true;
+    rafraichirSaisie();
+}
+
+// Option B : l admin peut debloquer la case pour un cas particulier
+function deverrouillerCaAdmin() {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!confirm('Déverrouiller la case CA pour une saisie manuelle ?\nLe CA ne viendra plus de L\'Addition pour ce jour.')) return;
+    caForceManuel = true;
+    caMode = 'manuel';
+    rafraichirSaisie();
+    selectField('ca');
+}
+
+// ============================================
 // RENDER FORM (SAISIE TAB)
 // ============================================
 function renderForm(cashDebut) {
@@ -858,6 +1041,7 @@ function renderForm(cashDebut) {
     </div>`;
     fields.ca.forEach(f => { sec += renderFieldCard(f); });
     html += title('Ouverture · Chiffre d\'affaires') + grid(sec);
+    if (!DEMO_MODE) html += htmlZoneCaLaddition();
 
     // Paiements CB + Total CB (calculé)
     sec = '';
@@ -915,6 +1099,16 @@ function renderForm(cashDebut) {
 }
 
 function renderFieldCard(f) {
+    // CA repris de L Addition : case grisee non modifiable, sautee par le pave
+    if (f.key === 'ca' && caVerrouille()) {
+        const val = n(formData.ca);
+        const mention = caMode === 'ecart' ? 'CA enregistré (différent de L\'Addition)' : (caLadd ? caLadd.libelle : '');
+        return `<div class="field-card calc" id="card-ca" onclick="showToast('CA repris de L\\'Addition : non modifiable')">
+            <div class="fc-label">${f.label}</div>
+            <div class="fc-value neutral" id="field-ca">${fmtMontant(val)}</div>
+            <div class="ladd-mention">${escapeHtmlCaisse(mention)}</div>
+        </div>`;
+    }
     padOrderFields.push(f.key);
     const val = n(formData[f.key]);
     const empty = Math.abs(val) < 0.005;
@@ -968,6 +1162,7 @@ function toastCaBloque() {
 }
 
 function selectField(key) {
+    if (key === 'ca' && caVerrouille()) { showToast('CA repris de L\'Addition : non modifiable'); return; }
     if (isChampVerrouille(key)) { toastCaBloque(); return; }
     clearPadSelection();
     padTarget = { kind: 'field', key };
@@ -1232,6 +1427,19 @@ async function saveData() {
         record[f.key] = n(formData[f.key]);
     });
     record.comptage_caisse = n(formData.comptage_caisse);
+
+    // Origine du CA (option A) : L Addition, saisie manuelle, ou inchangee si
+    // l equipe n a pas repris le CA L Addition sur un jour deja enregistre
+    if (caMode === 'laddition' && caLadd && caLadd.ok) {
+        record.ca_source = 'laddition';
+        record.ca_laddition_le = caLadd.majCaisse || null;
+    } else if (caMode === 'manuel') {
+        record.ca_source = 'manuel';
+        record.ca_laddition_le = null;
+    } else {
+        record.ca_source = recordCaSource;
+        record.ca_laddition_le = recordCaLadditionLe;
+    }
 
     // Save comptage
     const comptageRecord = {
