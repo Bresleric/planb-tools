@@ -149,6 +149,24 @@ corriger dans l'étape 2, sinon le phénomène se reproduira.
    par l'IA : à surveiller à l'étape 1 (rattachement express), avec un contrôle de
    vraisemblance (DLC entre aujourd'hui − 7 j et + 2 ans).
 
+## 7. Résultat de l'exécution (02/11/2026, validé par Eric : cas A, B et C)
+
+| | Freddy | Liesel |
+|---|---|---|
+| Cas A | 333 | 38 |
+| Cas B | 44 | 19 |
+| Cas C | 48 | 1 |
+| **Ajustements créés** | **425** | **58** |
+
+Vérification après coup : **0 lot** restant à DLC dépassée, en négatif ou sans DLC
+ancien. Script exécuté : `scripts/assainissement-stock-2026-11.sql`.
+
+**Reste en stock** : 21 lots, tous chez Freddy. 11 sont des produits intermédiaires
+fabriqués ces derniers jours (DLC du 02 au 07/11) et 10 sont des **lots scannés en
+mai-juin avec une DLC lue en 2028** (jambon Forêt-Noire 0,20 kg × 6, onglet, pièce
+du boucher, pommes de terre…) : DLC mal lue, à solder dans un second temps (cas D
+proposé : scanné il y a plus de 45 jours et DLC à plus d'un an).
+
 ## 6. Exécution prévue (après OK)
 
 Un seul script SQL, idempotent, qui insère pour chaque lot concerné une ligne

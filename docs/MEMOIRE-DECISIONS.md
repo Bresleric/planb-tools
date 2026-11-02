@@ -75,6 +75,30 @@
   ré-abonnement du chantier « notifications push » (autre conversation) ; la
   fonction `notif-push` qu'il référence restait à déployer au 12/10.
 
+## 📦 Stock matières premières : chantier « contrôle permanent » (démarré le 02/11/2026)
+
+- **Diagnostic** (02/11) : le stock affiché était faux. Entrées : depuis juillet,
+  ~900 étiquettes/mois scannées chez Freddy mais **non rattachées à un article**
+  (0 rattachement en juil./août/sept., 72 en oct.) → jamais entrées en stock.
+  Sorties : seulement le scan FEFO des productions (~150/mois pour 1 100
+  productions), rien pour la consommation en service. Liesel ne scanne pas
+  (1-2 étiquettes/semaine) mais fait des inventaires journaliers.
+- **Assainissement** (02/11, validé par Eric) : 483 lots ramenés à zéro par des
+  mouvements `AJUSTEMENT` (`source_table = 'assainissement'`, réversibles) —
+  371 à DLC dépassée, 63 sans DLC lisible scannés il y a > 45 j, 49 en négatif.
+  Liste : `docs/ASSAINISSEMENT-STOCK-2026-11.md`.
+- **Deux bugs à corriger avant toute consommation théorique** : (1) les produits
+  intermédiaires entrés en stock par Production (depuis le 10/10) n'ont **aucune
+  sortie** → fantômes chaque semaine ; (2) les sorties de production ont une
+  **erreur d'unité** (grammes de recette comptés en kilos : −13 t d'épaule d'agneau).
+- **Priorités d'Eric** : (A) savoir ce qu'il y a pour commander juste, puis (C)
+  traçabilité HACCP, puis (B) pertes/écarts. Périmètre : viandes, BOF, épicerie et
+  gros volumes (farine, vins de cuisine…). Les deux maisons ; Eric relance Liesel
+  sur l'usage de l'app.
+- **Plan** : étape 1 = réparer la porte d'entrée (rattachement express des
+  étiquettes, mémorisé) ; étape 2 = sorties réalistes (consommation théorique par
+  recettes + comptage périodique, PI compris) ; étape 3 = tableau de bord et alertes.
+
 ## 🍴 TheFork : réservations Freddy dans le Briefing (v108, déployé le 10/10/2026)
 
 - **Quoi** : table `reservations_thefork` alimentée toutes les heures (pg_cron
