@@ -646,6 +646,10 @@ const FIELDS = {
             { key: 'ajout', label: 'Ajout', type: 'input' },
             { key: 'pourboires', label: 'Pourboires (espèces)', type: 'input' },
         ],
+        // Pot commun partage dans le module Tipps (hors calculs de caisse)
+        tipps: [
+            { key: 'tipps_pot_commun', label: 'Tipps pot commun', type: 'input' },
+        ],
         denominations: [500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01],
         // Formules partagees avec le rapport journalier : voir js/caisse-calc.js
         calcControleCA: CAISSE_CALC.freddy.calcControleCA,
@@ -676,6 +680,10 @@ const FIELDS = {
             { key: 'prelevement', label: 'Prélèvement', type: 'input' },
             { key: 'ajout', label: 'Ajout', type: 'input' },
             { key: 'pourboires', label: 'Pourboires (espèces)', type: 'input' },
+        ],
+        // Pot commun partage dans le module Tipps (hors calculs de caisse)
+        tipps: [
+            { key: 'tipps_pot_commun', label: 'Tipps pot commun', type: 'input' },
         ],
         denominations: [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01],
         // Formules partagees avec le rapport journalier : voir js/caisse-calc.js
@@ -820,7 +828,7 @@ async function loadDay() {
     if (record) {
         currentRecordId = record.id;
         const fields = FIELDS[currentEtab];
-        [...fields.ca, ...fields.paiements, ...fields.autres, ...fields.mouvements].forEach(f => {
+        [...fields.ca, ...fields.paiements, ...fields.autres, ...fields.mouvements, ...fields.tipps].forEach(f => {
             formData[f.key] = record[f.key] || 0;
         });
         formData.comptage_caisse = record.comptage_caisse || 0;
@@ -1088,6 +1096,11 @@ function renderForm(cashDebut) {
         + `<div class="bloc-verrouillable">`
         + `<div class="bloc-verrou" onclick="toastCaBloque()">🔒 Bloqué : Contrôle CA n'est pas à zéro</div>`
         + grid(sec) + `</div>`;
+
+    // Tipps : montant du pot commun, partage ensuite dans le module Tipps
+    sec = '';
+    fields.tipps.forEach(f => { sec += renderFieldCard(f); });
+    html += title('Tipps · pot commun de l\'équipe') + grid(sec);
 
     document.getElementById('form-container').innerHTML = html;
 
@@ -1423,7 +1436,7 @@ async function saveData() {
     };
 
     // Add all field values
-    [...fields.ca, ...fields.paiements, ...fields.autres, ...fields.mouvements].forEach(f => {
+    [...fields.ca, ...fields.paiements, ...fields.autres, ...fields.mouvements, ...fields.tipps].forEach(f => {
         record[f.key] = n(formData[f.key]);
     });
     record.comptage_caisse = n(formData.comptage_caisse);
@@ -1716,6 +1729,7 @@ async function loadHistory() {
             ...fields.paiements.map(f => ({ ...f, group: 'Paiements CB' })),
             ...fields.autres.map(f => ({ ...f, group: 'Autres' })),
             ...fields.mouvements.map(f => ({ ...f, group: 'Mouvements' })),
+            ...fields.tipps.map(f => ({ ...f, group: 'Tipps' })),
         ];
 
         // Compte de colonnes par groupe (pour colspan)

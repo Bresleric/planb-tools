@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tipps — PlanB Tools</title>
+    <style>
+        :root {
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --blue: #2563eb; --blue-light: #eff6ff;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--orange); padding: 10px 16px; position: sticky; top: 0; z-index: 10; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 980px; margin: 0 auto; gap: 8px; }
+        h1 { font-size: 17px; color: var(--orange); white-space: nowrap; }
+        .etab-badge { background: var(--orange-light); color: var(--orange); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+        .btn-back { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+        main { max-width: 980px; margin: 0 auto; padding: 12px; }
+
+        .semaine-nav { display: flex; align-items: center; justify-content: space-between; background: white; border-radius: 14px; padding: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .semaine-nav button { border: 1px solid var(--gray-200); background: white; border-radius: 10px; width: 44px; height: 40px; font-size: 18px; cursor: pointer; }
+        .semaine-nav .lib { text-align: center; font-weight: 800; font-size: 15px; }
+        .semaine-nav .lib small { display: block; font-weight: 600; font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+        .tipps-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .tipps-kpi { background: white; border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .tipps-kpi .lbl { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+        .tipps-kpi .val { font-size: 22px; font-weight: 800; margin-top: 4px; }
+
+        .tipps-card { background: white; border-radius: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+        .tipps-card-head { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .tipps-card-head .sub { font-weight: 500; font-size: 11px; color: var(--gray-500); }
+        .tipps-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table.tipps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .tipps-table th { text-align: right; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-500); padding: 8px 10px; background: var(--gray-50); white-space: nowrap; }
+        .tipps-table td { text-align: right; padding: 9px 10px; border-top: 1px solid var(--gray-100); white-space: nowrap; }
+        .tipps-table th:first-child, .tipps-table td:first-child { text-align: left; }
+        .tipps-table td.nom { font-weight: 700; white-space: normal; min-width: 130px; }
+        .tipps-table td.final { font-weight: 800; color: var(--green); font-size: 14px; }
+        .tipps-table tr.total td { font-weight: 800; background: var(--gray-50); }
+        .tipps-table .neg { color: var(--red); }
+        .tipps-table .pos { color: var(--blue); }
+        .tipps-table .muted { color: var(--gray-400); }
+
+        .eq { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; margin-right: 3px; }
+        .eq.salle { background: var(--orange-light); color: var(--orange); }
+        .eq.cuisine { background: var(--blue-light); color: var(--blue); }
+        .eq.plonge { background: var(--gray-100); color: var(--gray-600); }
+
+        .btn-mino { border: 1px dashed var(--gray-300); background: white; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--gray-500); min-width: 54px; }
+        .btn-mino.active { border-style: solid; border-color: var(--red); color: var(--red); background: var(--red-light); }
+        .btn-mino:disabled { cursor: default; }
+
+        .tipps-alertes { background: var(--orange-light); border: 1px solid #fed7aa; border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; }
+        .tipps-alertes b { color: var(--orange); }
+        .tipps-banner { border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .tipps-banner.cloturee { background: var(--green-light); color: var(--green); border: 1px solid #bbf7d0; }
+        .tipps-banner.ouverte { background: var(--blue-light); color: var(--blue); border: 1px solid #bfdbfe; }
+
+        .tipps-regle { font-size: 11px; color: var(--gray-500); line-height: 1.6; padding: 10px 14px; }
+
+        .btn-primary { background: var(--orange); color: white; border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-small { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-danger { border: 1px solid var(--red); background: white; color: var(--red); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .actions-row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+
+        .empty { text-align: center; color: var(--gray-400); padding: 36px 10px; font-size: 13px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 16px; padding: 20px; width: 100%; max-width: 380px; }
+        .modal h2 { font-size: 16px; margin-bottom: 4px; }
+        .modal .sub { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; line-height: 1.5; }
+        .form-label { display: block; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 4px; }
+        .form-input { width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--gray-50); }
+        .mino-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .mino-presets button { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+        .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+        .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid var(--gray-200); background: white; }
+        .modal-btns button.primary { background: var(--orange); color: white; border: none; }
+        .modal-btns button.danger { background: var(--red); color: white; border: none; }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
+
+        @media print {
+            header .btn-back, .semaine-nav button, .actions-row, .tipps-banner .btn-small, .tipps-banner .btn-danger, #toast { display: none !important; }
+            body { background: white; }
+            header { position: static; }
+            .tipps-card, .tipps-kpi { box-shadow: none; border: 1px solid var(--gray-200); }
+            .tipps-scroll { overflow: visible; }
+        }
+
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <h1>💶 Tipps</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="etab-badge" id="etab-badge"></span>
+                <button class="btn-back" onclick="location.href='../'">← Portail</button>
+            </div>
+        </div>
+    </header>
+
+    <main id="main">
+        <div class="empty">Chargement…</div>
+    </main>
+
+    <!-- Modale minoration -->
+    <div class="modal-overlay" id="mino-modal">
+        <div class="modal">
+            <h2 id="mino-titre">Minoration</h2>
+            <div class="sub">Pourcentage retiré de la part de ce salarié pour cette semaine. La somme retenue est redistribuée aux autres membres de la même équipe, au prorata de leurs heures.</div>
+            <label class="form-label">Minoration (%)</label>
+            <input class="form-input" type="number" id="mino-pct" inputmode="decimal" min="0" max="100" step="1">
+            <div class="mino-presets">
+                <button onclick="setMinoPreset(0)">0 %</button>
+                <button onclick="setMinoPreset(10)">10 %</button>
+                <button onclick="setMinoPreset(25)">25 %</button>
+                <button onclick="setMinoPreset(50)">50 %</button>
+                <button onclick="setMinoPreset(100)">100 %</button>
+            </div>
+            <label class="form-label">Motif (optionnel)</label>
+            <input class="form-input" type="text" id="mino-motif" placeholder="Ex : période d essai, retards…">
+            <div class="modal-btns">
+                <button onclick="closeMinoModal()">Annuler</button>
+                <button class="primary" onclick="saveMinoration()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale generique de confirmation -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <h2 id="confirm-titre"></h2>
+            <div class="sub" id="confirm-texte"></div>
+            <div class="modal-btns" id="confirm-btns"></div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        const sb = PLANB.client();
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        const currentEstablishment = sessionStorage.getItem('planb_etablissement');
+        if (!currentUser || !currentEstablishment) location.href = '../';
+
+        // Minorations, cloture et reouverture : reservees a l administrateur.
+        // Les autres personnes qui ont acces au module consultent seulement.
+        const isAdmin = currentUser?.role === 'admin';
+
+        // Ponderation des heures par equipe (decision Eric 03/11/2026)
+        const COEF_EQUIPE = { salle: 1, cuisine: 0.75, plonge: 0.30 };
+        const LIB_EQUIPE = { salle: 'Salle', cuisine: 'Cuisine', plonge: 'Plonge' };
+
+        let semaineDebut = null;   // Date locale du lundi affiche
+        let resultat = null;       // calcul en direct de la semaine
+        let cloture = null;        // ligne tipps_clotures si la semaine est figee
+        let minorations = {};      // salarie_nom -> { pct, motif }
+        let minoSalarie = null;    // salarie en cours d edition dans la modale
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? 'var(--red)' : (type === 'success' ? 'var(--green)' : 'var(--gray-800)');
+            t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200);
+        }
+        function eur(v) { return (Math.round((v || 0) * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+        function hrs(v) { return (v || 0).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' h'; }
+
+        // Dates en heure locale (toISOString decalerait d un jour autour de minuit)
+        function isoLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        function lundiDe(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); const j = (x.getDay() + 6) % 7; x.setDate(x.getDate() - j); return x; }
+        function addJours(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function libJour(iso) { return new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }); }
+        function libSemaine() {
+            const fin = addJours(semaineDebut, 6);
+            const o = { day: 'numeric', month: 'long' };
+            return 'Semaine du ' + semaineDebut.toLocaleDateString('fr-FR', o) + ' au ' + fin.toLocaleDateString('fr-FR', { ...o, year: 'numeric' });
+        }
+
+        // ============ CHARGEMENT ============
+        async function loadSemaine() {
+            const d1 = isoLocal(semaineDebut);
+            const d2 = isoLocal(addJours(semaineDebut, 6));
+
+            const [rc, rp, rm, rk] = await Promise.all([
+                sb.from('tipps_clotures').select('*')
+                    .eq('etablissement', currentEstablishment).eq('semaine_debut', d1).maybeSingle(),
+                sb.from('combo_pointages')
+                    .select('date_service, collaborateur_nom_combo, user_id, equipe, duree_travail_minutes, debut_valide, fin_validee')
+                    .eq('etablissement', currentEstablishment).gte('date_service', d1).lte('date_service', d2),
+                sb.from('tipps_minorations').select('salarie_nom, pct, motif')
+                    .eq('etablissement', currentEstablishment).eq('semaine_debut', d1),
+                sb.from('caisse_controle').select('date, tipps_pot_commun')
+                    .eq('etablissement', currentEstablishment).gte('date', d1).lte('date', d2),
+            ]);
+            for (const r of [rc, rp, rm, rk]) if (r.error) throw r.error;
+
+            cloture = rc.data || null;
+            minorations = {};
+            (rm.data || []).forEach(m => { minorations[m.salarie_nom] = { pct: Number(m.pct) || 0, motif: m.motif || '' }; });
+            const pots = {};
+            (rk.data || []).forEach(c => { pots[c.date] = Number(c.tipps_pot_commun) || 0; });
+
+            resultat = calculerSemaine(d1, rp.data || [], pots, minorations);
+        }
+
+        // ============ CALCUL ============
+        // Jour par jour : pot du jour partage au prorata des heures ponderees du jour.
+        // Minoration : part retenue redistribuee aux autres membres de la meme
+        // equipe presents ce jour-la (au prorata de leurs heures ponderees).
+        // S il n y a personne d autre dans l equipe ce jour-la, la retenue va aux
+        // autres equipes ; s il n y a personne d autre du tout, elle reste au salarie.
+        function calculerSemaine(d1, pointages, pots, minos) {
+            const salaries = {};
+            const jours = [];
+            const alertes = [];
+            const pctDe = (nom) => (minos[nom] ? minos[nom].pct : 0);
+            const getSal = (p) => {
+                const nom = p.collaborateur_nom_combo;
+                if (!salaries[nom]) salaries[nom] = { nom, user_id: p.user_id || null, equipes: [], heures: 0, heures_pond: 0, brut: 0, retenue: 0, recu: 0, final: 0 };
+                if (!salaries[nom].user_id && p.user_id) salaries[nom].user_id = p.user_id;
+                return salaries[nom];
+            };
+
+            let nonValides = 0;
+            const equipesInconnues = new Set();
+
+            for (let i = 0; i < 7; i++) {
+                const date = isoLocal(addJours(new Date(d1 + 'T12:00:00'), i));
+                const pot = pots[date] || 0;
+
+                // Regroupe les services du jour par (salarie, equipe)
+                const unites = {};
+                pointages.filter(p => p.date_service === date).forEach(p => {
+                    if (!p.debut_valide || !p.fin_validee) { nonValides++; return; }
+                    if (!COEF_EQUIPE[p.equipe]) { equipesInconnues.add(p.collaborateur_nom_combo); return; }
+                    const cle = p.collaborateur_nom_combo + '|' + p.equipe;
+                    if (!unites[cle]) unites[cle] = { sal: getSal(p), equipe: p.equipe, minutes: 0 };
+                    unites[cle].minutes += Number(p.duree_travail_minutes) || 0;
+                });
+                const liste = Object.values(unites);
+                liste.forEach(u => {
+                    u.heures = u.minutes / 60;
+                    u.wh = u.heures * COEF_EQUIPE[u.equipe];
+                    u.recu = 0;
+                    if (!u.sal.equipes.includes(u.equipe)) u.sal.equipes.push(u.equipe);
+                    u.sal.heures += u.heures;
+                    u.sal.heures_pond += u.wh;
+                });
+                const totalWh = liste.reduce((s, u) => s + u.wh, 0);
+
+                // Part brute
+                liste.forEach(u => { u.base = totalWh > 0 ? pot * u.wh / totalWh : 0; });
+
+                // Minorations et redistribution
+                liste.forEach(u => {
+                    const pct = pctDe(u.sal.nom);
+                    u.retenue = pct > 0 ? u.base * pct / 100 : 0;
+                });
+                liste.forEach(u => {
+                    if (u.retenue <= 0) return;
+                    const autres = (filtre) => liste.filter(v => v.sal.nom !== u.sal.nom && pctDe(v.sal.nom) < 100 && v.wh > 0 && filtre(v));
+                    let dest = autres(v => v.equipe === u.equipe);
+                    if (dest.length === 0) dest = autres(() => true);
+                    if (dest.length === 0) {
+                        alertes.push(`${libJour(date)} : personne pour recevoir la minoration de ${u.sal.nom}, sa part lui reste.`);
+                        u.retenue = 0;
+                        return;
+                    }
+                    const whDest = dest.reduce((s, v) => s + v.wh, 0);
+                    dest.forEach(v => { v.recu += u.retenue * v.wh / whDest; });
+                });
+                liste.forEach(u => {
+                    u.sal.brut += u.base;
+                    u.sal.retenue += u.retenue;
+                    u.sal.recu += u.recu;
+                });
+
+                if (pot > 0 && totalWh === 0) alertes.push(`${libJour(date)} : ${eur(pot)} de Tipps saisis mais aucune heure validée dans Combo, montant non distribué.`);
+                jours.push({ date, pot, heures: liste.reduce((s, u) => s + u.heures, 0), heures_pond: totalWh, par_heure: totalWh > 0 ? pot / totalWh : 0, nb: new Set(liste.map(u => u.sal.nom)).size });
+            }
+
+            if (nonValides > 0) alertes.push(`${nonValides} service${nonValides > 1 ? 's' : ''} pas encore validé${nonValides > 1 ? 's' : ''} dans Combo, non pris en compte.`);
+            if (equipesInconnues.size > 0) alertes.push(`Équipe inconnue dans Combo pour : ${[...equipesInconnues].join(', ')} (heures ignorées).`);
+
+            const liste = Object.values(salaries).map(s => {
+                s.final = Math.round((s.brut - s.retenue + s.recu) * 100) / 100;
+                s.minoration_pct = pctDe(s.nom);
+                return s;
+            }).sort((a, b) => {
+                const ordre = (x) => Math.min(...x.equipes.map(e => Object.keys(COEF_EQUIPE).indexOf(e)));
+                return ordre(a) - ordre(b) || a.nom.localeCompare(b.nom, 'fr');
+            });
+            const totalPot = jours.reduce((s, j) => s + j.pot, 0);
+            const totalDistribue = liste.reduce((s, x) => s + x.final, 0);
+            return { salaries: liste, jours, alertes, total_pot: totalPot, total_distribue: totalDistribue };
+        }
+
+        // ============ AFFICHAGE ============
+        function render() {
+            const main = document.getElementById('main');
+            const fige = !!cloture;
+            const r = fige ? cloture.detail : resultat;
+            let html = `<div class="semaine-nav">
+                <button onclick="changerSemaine(-1)">‹</button>
+                <div class="lib">${libSemaine()}<small>Heures : pointages Combo validés · Pot : saisie du contrôle de caisse</small></div>
+                <button onclick="changerSemaine(1)">›</button>
+            </div>`;
+
+            if (fige) {
+                html += `<div class="tipps-banner cloturee"><span>🔒 Semaine clôturée le ${new Date(cloture.cloture_le).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${cloture.cloture_par_nom ? ' par ' + esc(cloture.cloture_par_nom) : ''}. Les montants sont figés.</span>
+                    ${isAdmin ? '<button class="btn-danger" onclick="demanderReouverture()">Rouvrir</button>' : ''}</div>`;
+            } else {
+                html += `<div class="tipps-banner ouverte"><span>Calcul en direct : il évolue tant que la semaine n est pas clôturée.</span></div>`;
+            }
+
+            const ecart = Math.round((r.total_pot - r.total_distribue) * 100) / 100;
+            const heuresPond = (r.jours || []).reduce((s, j) => s + j.heures_pond, 0);
+            html += `<div class="tipps-kpis">
+                <div class="tipps-kpi"><div class="lbl">Pot de la semaine</div><div class="val">${eur(r.total_pot)}</div></div>
+                <div class="tipps-kpi"><div class="lbl">Distribué</div><div class="val" style="color:var(--green)">${eur(r.total_distribue)}</div></div>
+                <div class="tipps-kpi"><div class="lbl">Heures pondérées</div><div class="val">${hrs(heuresPond)}</div></div>
+                <div class="tipps-kpi"><div class="lbl">Bénéficiaires</div><div class="val">${r.salaries.length}</div></div>
+            </div>`;
+
+            const alertes = [...(r.alertes || [])];
+            if (Math.abs(ecart) >= 0.01 && !alertes.some(a => a.includes('non distribué'))) alertes.push(`Écart d arrondi de ${eur(ecart)} entre le pot et le total distribué.`);
+            if (alertes.length) html += `<div class="tipps-alertes"><b>⚠️ À vérifier</b><br>${alertes.map(esc).join('<br>')}</div>`;
+
+            html += `<div class="actions-row">
+                <button class="btn-small" onclick="window.print()">🖨️ Imprimer</button>
+                ${isAdmin && !fige ? '<button class="btn-primary" onclick="demanderCloture()">🔒 Clôturer la semaine</button>' : ''}
+            </div>`;
+
+            // Tableau par salarie
+            html += `<div class="tipps-card">
+                <div class="tipps-card-head"><span>Répartition par salarié</span><span class="sub">Salle 100 % · Cuisine 75 % · Plonge 30 %</span></div>`;
+            if (r.salaries.length === 0) {
+                html += '<div class="empty">Aucune heure validée dans Combo pour cette semaine.</div>';
+            } else {
+                html += `<div class="tipps-scroll"><table class="tipps-table">
+                    <tr><th>Salarié</th><th>Heures</th><th>Pondérées</th><th>Part brute</th><th>Minoration</th><th>Retenue</th><th>Reçu</th><th>Part finale</th></tr>`;
+                r.salaries.forEach((s, i) => {
+                    const pct = s.minoration_pct || 0;
+                    const motif = !fige && minorations[s.nom] ? minorations[s.nom].motif : (s.minoration_motif || '');
+                    const peutModifier = isAdmin && !fige;
+                    html += `<tr>
+                        <td class="nom">${esc(s.nom)}<br>${s.equipes.map(e => `<span class="eq ${e}">${LIB_EQUIPE[e] || esc(e)}</span>`).join('')}</td>
+                        <td>${hrs(s.heures)}</td>
+                        <td>${hrs(s.heures_pond)}</td>
+                        <td>${eur(s.brut)}</td>
+                        <td><button class="btn-mino${pct > 0 ? ' active' : ''}" ${peutModifier ? `onclick="openMinoModal(${i})"` : 'disabled'} title="${esc(motif)}">${pct > 0 ? '−' + pct.toLocaleString('fr-FR') + ' %' : (peutModifier ? '+ %' : '—')}</button></td>
+                        <td class="${s.retenue > 0.004 ? 'neg' : 'muted'}">${s.retenue > 0.004 ? '−' + eur(s.retenue) : '—'}</td>
+                        <td class="${s.recu > 0.004 ? 'pos' : 'muted'}">${s.recu > 0.004 ? '+' + eur(s.recu) : '—'}</td>
+                        <td class="final">${eur(s.final)}</td>
+                    </tr>`;
+                });
+                const sum = (k) => r.salaries.reduce((t, s) => t + (s[k] || 0), 0);
+                html += `<tr class="total"><td>Total</td><td>${hrs(sum('heures'))}</td><td>${hrs(sum('heures_pond'))}</td><td>${eur(sum('brut'))}</td><td></td><td>${sum('retenue') > 0.004 ? '−' + eur(sum('retenue')) : '—'}</td><td>${sum('recu') > 0.004 ? '+' + eur(sum('recu')) : '—'}</td><td>${eur(r.total_distribue)}</td></tr>`;
+                html += '</table></div>';
+            }
+            html += '</div>';
+
+            // Detail jour par jour
+            html += `<div class="tipps-card">
+                <div class="tipps-card-head"><span>Détail jour par jour</span><span class="sub">Chaque jour est partagé entre les présents du jour</span></div>
+                <div class="tipps-scroll"><table class="tipps-table">
+                    <tr><th>Jour</th><th>Pot saisi</th><th>Présents</th><th>Heures</th><th>Pondérées</th><th>€ / h pondérée</th></tr>`;
+            (r.jours || []).forEach(j => {
+                html += `<tr>
+                    <td>${libJour(j.date)}</td>
+                    <td class="${j.pot > 0 ? '' : 'muted'}">${j.pot > 0 ? eur(j.pot) : '—'}</td>
+                    <td>${j.nb || '—'}</td>
+                    <td>${j.heures > 0 ? hrs(j.heures) : '—'}</td>
+                    <td>${j.heures_pond > 0 ? hrs(j.heures_pond) : '—'}</td>
+                    <td>${j.par_heure > 0 ? eur(j.par_heure) : '—'}</td>
+                </tr>`;
+            });
+            html += `</table></div>
+                <div class="tipps-regle">Le pot se saisit chaque soir dans le contrôle de caisse (champ « Tipps pot commun »). Pour corriger un montant, retourner dans la Caisse à la date concernée.
+                Une minoration retire un pourcentage de la part du salarié ; la somme est redistribuée aux autres membres de la même équipe présents le même jour, au prorata de leurs heures pondérées.</div>
+            </div>`;
+
+            main.innerHTML = html;
+        }
+
+        // ============ MINORATIONS ============
+        function openMinoModal(i) {
+            if (!isAdmin || cloture) return;
+            const s = resultat.salaries[i];
+            if (!s) return;
+            minoSalarie = s.nom;
+            const m = minorations[s.nom];
+            document.getElementById('mino-titre').textContent = 'Minoration — ' + s.nom;
+            document.getElementById('mino-pct').value = m ? m.pct : 0;
+            document.getElementById('mino-motif').value = m ? m.motif : '';
+            document.getElementById('mino-modal').style.display = 'flex';
+        }
+        function closeMinoModal() { document.getElementById('mino-modal').style.display = 'none'; minoSalarie = null; }
+        function setMinoPreset(v) { document.getElementById('mino-pct').value = v; }
+
+        async function saveMinoration() {
+            if (!isAdmin || cloture || !minoSalarie) return;
+            const pct = parseFloat(String(document.getElementById('mino-pct').value).replace(',', '.'));
+            if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Pourcentage entre 0 et 100', 'error'); return; }
+            const motif = document.getElementById('mino-motif').value.trim() || null;
+            const d1 = isoLocal(semaineDebut);
+            try {
+                if (pct === 0) {
+                    const { error } = await sb.from('tipps_minorations').delete()
+                        .eq('etablissement', currentEstablishment).eq('semaine_debut', d1).eq('salarie_nom', minoSalarie);
+                    if (error) throw error;
+                } else {
+                    const { error } = await sb.from('tipps_minorations').upsert({
+                        etablissement: currentEstablishment, semaine_debut: d1, salarie_nom: minoSalarie,
+                        pct, motif, saisi_par_id: currentUser.id, saisi_par_nom: currentUser.nom,
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: 'etablissement,semaine_debut,salarie_nom' });
+                    if (error) throw error;
+                }
+                showToast(pct === 0 ? 'Minoration retirée' : 'Minoration enregistrée', 'success');
+                closeMinoModal();
+                await recharger();
+            } catch (e) { console.error(e); showToast('Erreur d enregistrement de la minoration', 'error'); }
+        }
+
+        // ============ CLOTURE ============
+        function openConfirm(titre, texte, boutons) {
+            document.getElementById('confirm-titre').textContent = titre;
+            document.getElementById('confirm-texte').textContent = texte;
+            const zone = document.getElementById('confirm-btns');
+            zone.innerHTML = '';
+            const close = () => { document.getElementById('confirm-modal').style.display = 'none'; };
+            [{ label: 'Annuler', cls: '', action: null }, ...boutons].forEach(b => {
+                const btn = document.createElement('button');
+                btn.textContent = b.label;
+                if (b.cls) btn.className = b.cls;
+                btn.onclick = async () => { close(); if (b.action) await b.action(); };
+                zone.appendChild(btn);
+            });
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        function demanderCloture() {
+            if (!isAdmin || cloture) return;
+            if (resultat.salaries.length === 0) { showToast('Rien à clôturer : aucune heure validée', 'error'); return; }
+            openConfirm('Clôturer la semaine ?',
+                `${libSemaine()} : ${eur(resultat.total_distribue)} répartis entre ${resultat.salaries.length} salariés. Les montants seront figés, même si Combo ou la caisse changent ensuite.`,
+                [{ label: 'Clôturer', cls: 'primary', action: cloturer }]);
+        }
+
+        async function cloturer() {
+            try {
+                const detail = {
+                    ...resultat,
+                    salaries: resultat.salaries.map(s => ({ ...s, minoration_motif: minorations[s.nom] ? minorations[s.nom].motif : '' })),
+                    coefficients: COEF_EQUIPE,
+                };
+                const { error } = await sb.from('tipps_clotures').insert({
+                    etablissement: currentEstablishment, semaine_debut: isoLocal(semaineDebut),
+                    total_pot: Math.round(resultat.total_pot * 100) / 100, detail,
+                    cloture_par_id: currentUser.id, cloture_par_nom: currentUser.nom,
+                });
+                if (error) throw error;
+                showToast('Semaine clôturée 🔒', 'success');
+                await recharger();
+            } catch (e) { console.error(e); showToast('Erreur de clôture', 'error'); }
+        }
+
+        function demanderReouverture() {
+            if (!isAdmin || !cloture) return;
+            openConfirm('Rouvrir la semaine ?',
+                'Les montants figés seront supprimés et le calcul repassera en direct (heures Combo et caisse actuelles). À faire seulement si la paie n a pas encore été faite avec ces montants.',
+                [{ label: 'Rouvrir', cls: 'danger', action: rouvrir }]);
+        }
+
+        async function rouvrir() {
+            try {
+                const { error } = await sb.from('tipps_clotures').delete().eq('id', cloture.id);
+                if (error) throw error;
+                showToast('Semaine rouverte', 'success');
+                await recharger();
+            } catch (e) { console.error(e); showToast('Erreur de réouverture', 'error'); }
+        }
+
+        // ============ NAVIGATION ============
+        async function changerSemaine(delta) {
+            semaineDebut = addJours(semaineDebut, 7 * delta);
+            await recharger();
+        }
+
+        async function recharger() {
+            try {
+                await loadSemaine();
+                render();
+            } catch (e) {
+                console.error(e);
+                const msg = String(e && (e.message || e.code) || '');
+                document.getElementById('main').innerHTML = (msg.includes('tipps') || String(e.code) === '42P01' || String(e.code) === '42703')
+                    ? '<div class="empty">Module pas encore initialisé côté base de données.<br>(migration scripts/migration-tipps.sql à exécuter)</div>'
+                    : '<div class="empty">Erreur de chargement des données.</div>';
+                showToast('Erreur de chargement', 'error');
+            }
+        }
+
+        (async function init() {
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            // Par defaut : la semaine derniere (la plus probable a clôturer)
+            semaineDebut = addJours(lundiDe(new Date()), -7);
+            await recharger();
+        })();
+    </script>
+</body>
+</html>
