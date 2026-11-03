@@ -1125,9 +1125,15 @@
         // datent d avant leur creation et ne doivent pas les masquer).
         const MODULES_UNIVERSELS = ['liaison', 'notes-service'];
 
+        // Modules strictement reserves a l admin : jamais accordables via acces_modules
+        // (Tipps : montants individuels des pourboires, decision Eric 03/11/2026)
+        const MODULES_ADMIN_SEUL = ['tipps'];
+
         function canAccessModule(moduleId, minRole) {
             // Admin a toujours accès à tout (peu importe acces_modules)
             if (currentUser.role === 'admin') return true;
+
+            if (MODULES_ADMIN_SEUL.includes(moduleId)) return false;
 
             // Communication interne : jamais filtree par les listes personnalisees
             if (MODULES_UNIVERSELS.includes(moduleId)) return true;

@@ -159,10 +159,9 @@
         const sb = PLANB.client();
         const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
         const currentEstablishment = sessionStorage.getItem('planb_etablissement');
-        if (!currentUser || !currentEstablishment) location.href = '../';
-
-        // Minorations, cloture et reouverture : reservees a l administrateur.
-        // Les autres personnes qui ont acces au module consultent seulement.
+        // Module reserve a l administrateur (decision Eric 03/11/2026).
+        // La base bloque aussi les tables tipps_* pour les autres roles (policy pbt_admin).
+        if (!currentUser || !currentEstablishment || currentUser.role !== 'admin') location.replace('../');
         const isAdmin = currentUser?.role === 'admin';
 
         // Ponderation des heures par equipe (decision Eric 03/11/2026)
