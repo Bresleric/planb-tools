@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Équipe — PlanB Tools</title>
+    <style>
+        :root {
+            --accent: #4f46e5; --accent-light: #eef2ff;
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --blue: #2563eb; --blue-light: #eff6ff;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--accent); padding: 10px 16px; position: sticky; top: 0; z-index: 10; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 1080px; margin: 0 auto; gap: 8px; }
+        h1 { font-size: 17px; color: var(--accent); white-space: nowrap; }
+        .etab-badge { background: var(--accent-light); color: var(--accent); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+        .btn-back { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+        .equ-tabs { display: flex; gap: 6px; max-width: 1080px; margin: 10px auto 0; padding: 0 12px; }
+        .equ-tab { flex: 1; border: 1px solid var(--gray-200); background: white; border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+        .equ-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+        main { max-width: 1080px; margin: 0 auto; padding: 12px; }
+
+        .semaine-nav { display: flex; align-items: center; justify-content: space-between; background: white; border-radius: 14px; padding: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .semaine-nav button { border: 1px solid var(--gray-200); background: white; border-radius: 10px; width: 44px; height: 40px; font-size: 18px; cursor: pointer; }
+        .semaine-nav .lib { text-align: center; font-weight: 800; font-size: 15px; }
+        .semaine-nav .lib small { display: block; font-weight: 600; font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+        .equ-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .equ-kpi { background: white; border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .equ-kpi .lbl { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+        .equ-kpi .val { font-size: 22px; font-weight: 800; margin-top: 4px; }
+
+        .equ-card { background: white; border-radius: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+        .equ-card-head { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .equ-card-head .sub { font-weight: 500; font-size: 11px; color: var(--gray-500); }
+        .equ-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table.equ-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .equ-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-500); padding: 8px 10px; background: var(--gray-50); white-space: nowrap; }
+        .equ-table td { padding: 9px 10px; border-top: 1px solid var(--gray-100); white-space: nowrap; vertical-align: middle; }
+        .equ-table td.nom { font-weight: 700; white-space: normal; min-width: 130px; }
+        .equ-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .equ-table th.num { text-align: right; }
+        .equ-table tr.valide td { background: var(--green-light); }
+        .equ-table tr.absent td { background: var(--red-light); }
+        .equ-table .muted { color: var(--gray-400); }
+        .equ-table .neg { color: var(--red); font-weight: 700; }
+        .equ-table .pos { color: var(--blue); font-weight: 700; }
+        .equ-table .hm { font-variant-numeric: tabular-nums; }
+
+        .equ-alerte { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; margin: 2px 3px 0 0; background: var(--orange-light); color: var(--orange); white-space: nowrap; }
+        .equ-alerte.grave { background: var(--red-light); color: var(--red); }
+        .equ-statut { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .equ-statut.ok { background: var(--green-light); color: var(--green); }
+        .equ-statut.attente { background: var(--gray-100); color: var(--gray-600); }
+
+        .eq { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+        .eq.salle { background: var(--orange-light); color: var(--orange); }
+        .eq.cuisine { background: var(--blue-light); color: var(--blue); }
+        .eq.plonge, .eq.autre { background: var(--gray-100); color: var(--gray-600); }
+
+        .btn-primary { background: var(--accent); color: white; border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-primary:disabled { opacity: 0.4; cursor: default; }
+        .btn-small { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-ok { border: 1px solid var(--green); background: white; color: var(--green); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .btn-ok:disabled { border-color: var(--gray-200); color: var(--gray-400); cursor: default; }
+        .actions-row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+
+        .equ-info { background: var(--blue-light); border: 1px solid #bfdbfe; color: var(--blue); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; }
+        .empty { text-align: center; color: var(--gray-400); padding: 36px 10px; font-size: 13px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { font-size: 16px; margin-bottom: 4px; }
+        .modal .sub { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; line-height: 1.5; }
+        .form-label { display: block; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 4px; }
+        .form-input { width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--gray-50); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+        .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid var(--gray-200); background: white; }
+        .modal-btns button.primary { background: var(--accent); color: white; border: none; }
+        .modal-btns button.danger { background: var(--red); color: white; border: none; }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
+
+        @media print {
+            header .btn-back, .equ-tabs, .semaine-nav button, .actions-row, td.act, th.act, #toast { display: none !important; }
+            body { background: white; }
+            header { position: static; }
+            .equ-card, .equ-kpi { box-shadow: none; border: 1px solid var(--gray-200); }
+            .equ-scroll { overflow: visible; }
+        }
+
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <h1>👥 Équipe</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="etab-badge" id="etab-badge"></span>
+                <button class="btn-back" onclick="location.href='../'">← Portail</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="equ-tabs">
+        <button class="equ-tab active" id="tab-validation" onclick="changerOnglet('validation')">✅ Validation des heures</button>
+        <button class="equ-tab" id="tab-contrats" onclick="changerOnglet('contrats')">📄 Contrats</button>
+    </div>
+
+    <main id="main">
+        <div class="empty">Chargement…</div>
+    </main>
+
+    <!-- Modale : correction des heures retenues -->
+    <div class="modal-overlay" id="heures-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="heures-titre">Heures retenues</h2>
+            <div class="sub" id="heures-sub"></div>
+            <div class="form-row">
+                <div><label class="form-label">Début retenu</label><input class="form-input" type="time" id="h-debut"></div>
+                <div><label class="form-label">Fin retenue</label><input class="form-input" type="time" id="h-fin"></div>
+            </div>
+            <label class="form-label">Pauses (minutes)</label>
+            <input class="form-input" type="number" id="h-pauses" inputmode="numeric" min="0" step="5">
+            <label class="form-label">Commentaire (obligatoire si l heure badgée est corrigée)</label>
+            <input class="form-input" type="text" id="h-commentaire" placeholder="Ex : oubli de badge, arrivé à l heure prévue">
+            <div class="modal-btns">
+                <button onclick="fermerModale('heures-modal')">Annuler</button>
+                <button class="primary" onclick="enregistrerHeures()">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : contrat -->
+    <div class="modal-overlay" id="contrat-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="contrat-titre">Contrat</h2>
+            <div class="sub" id="contrat-sub"></div>
+            <div class="form-row">
+                <div>
+                    <label class="form-label">Type</label>
+                    <select class="form-input" id="c-type">
+                        <option value="cdi">CDI</option>
+                        <option value="cdd">CDD</option>
+                        <option value="extra">Extra</option>
+                        <option value="apprentissage">Apprentissage</option>
+                        <option value="stage">Stage</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Heures / semaine</label>
+                    <input class="form-input" type="number" id="c-heures" inputmode="decimal" min="0" max="48" step="0.5">
+                </div>
+            </div>
+            <div class="form-row">
+                <div>
+                    <label class="form-label">Équipe</label>
+                    <select class="form-input" id="c-equipe">
+                        <option value="salle">Salle</option>
+                        <option value="cuisine">Cuisine</option>
+                        <option value="plonge">Plonge</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Matricule Payfit</label>
+                    <input class="form-input" type="text" id="c-matricule" placeholder="Facultatif">
+                </div>
+            </div>
+            <div class="form-row">
+                <div><label class="form-label">Début du contrat</label><input class="form-input" type="date" id="c-debut"></div>
+                <div><label class="form-label">Fin (CDD, départ)</label><input class="form-input" type="date" id="c-fin"></div>
+            </div>
+            <label class="form-label">Notes</label>
+            <input class="form-input" type="text" id="c-notes" placeholder="Facultatif">
+            <div class="modal-btns">
+                <button onclick="fermerModale('contrat-modal')">Annuler</button>
+                <button class="primary" onclick="enregistrerContrat()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale generique de confirmation -->
+    <div class="modal-overlay" id="confirm-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="confirm-titre"></h2>
+            <div class="sub" id="confirm-texte"></div>
+            <div class="modal-btns" id="confirm-btns"></div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        const sb = PLANB.client();
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        const currentEstablishment = sessionStorage.getItem('planb_etablissement');
+        // Module de gestion : managers et admin (ou acces accorde dans Admin)
+        const peutGerer = !!currentUser && (['admin', 'manager'].includes(currentUser.role)
+            || (Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.includes('equipe')));
+        if (!currentUser || !currentEstablishment || !peutGerer) location.replace('../');
+        // Contrats : modifiables par l admin seulement (policy pbt_admin sur rh_contrats)
+        const isAdmin = currentUser?.role === 'admin';
+
+        const LIB_EQUIPE = { salle: 'Salle', cuisine: 'Cuisine', plonge: 'Plonge', autre: 'Autre' };
+        const LIB_CONTRAT = { cdi: 'CDI', cdd: 'CDD', extra: 'Extra', apprentissage: 'Apprenti', stage: 'Stage' };
+        // Seuils d alerte (a confirmer avec le cabinet paie / convention HCR)
+        const TOLERANCE_ECART_MIN = 15;     // ecart badge / prevu signale au-dela
+        const DUREE_LONGUE_MIN = 11 * 60;   // journee de travail longue
+        const PAUSE_REQUISE_APRES_MIN = 6 * 60;
+
+        let onglet = 'validation';
+        let semaineDebut = null;
+        let periodes = [];      // pointage_periodes_travail de la semaine
+        let prevus = [];        // combo_pointages (planning prevu) de la semaine
+        let contrats = [];      // rh_contrats
+        let users = [];         // users actifs
+        let lignes = [];        // lignes calculees de la semaine (validation)
+        let periodeEnCours = null;  // periode editee dans la modale heures
+        let contratEdition = null;  // { user, contrat|null, avenant: bool }
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? 'var(--red)' : (type === 'success' ? 'var(--green)' : 'var(--gray-800)');
+            t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200);
+        }
+        function fermerModale(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Dates en heure locale (toISOString decalerait d un jour autour de minuit)
+        function isoLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        function lundiDe(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); const j = (x.getDay() + 6) % 7; x.setDate(x.getDate() - j); return x; }
+        function addJours(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function libJour(iso) { return new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); }
+        function libSemaine() {
+            const fin = addJours(semaineDebut, 6);
+            const o = { day: 'numeric', month: 'long' };
+            return 'Semaine du ' + semaineDebut.toLocaleDateString('fr-FR', o) + ' au ' + fin.toLocaleDateString('fr-FR', { ...o, year: 'numeric' });
+        }
+        function hm(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        }
+        function duree(min) {
+            if (min == null) return '—';
+            const m = Math.round(min);
+            return Math.floor(m / 60) + 'h' + String(Math.abs(m) % 60).padStart(2, '0');
+        }
+        function hrs(min) { return ((min || 0) / 60).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' h'; }
+        function minutesEntre(a, b) { return Math.round((new Date(b) - new Date(a)) / 60000); }
+        // "HH:MM" saisi le jour du service -> ISO ; une fin avant le debut passe au lendemain
+        function versIso(dateService, heure, apresIso) {
+            const d = new Date(dateService + 'T' + heure + ':00');
+            if (apresIso && d <= new Date(apresIso)) d.setDate(d.getDate() + 1);
+            return d.toISOString();
+        }
+
+        function contratActif(userId, dateIso) {
+            return contrats
+                .filter(c => c.user_id === userId && c.date_debut <= dateIso && (!c.date_fin || c.date_fin >= dateIso))
+                .sort((a, b) => b.date_debut.localeCompare(a.date_debut))[0] || null;
+        }
+
+        // ============ CHARGEMENT ============
+        async function chargerSemaine() {
+            const d1 = isoLocal(semaineDebut);
+            const d2 = isoLocal(addJours(semaineDebut, 6));
+            const [rp, rc, rk, ru] = await Promise.all([
+                sb.from('pointage_periodes_travail')
+                    .select('id, user_id, user_nom, date_service, debut_service, fin_service, duree_pauses_minutes, duree_travail_minutes, statut, debut_valide, fin_validee, pauses_validees_minutes, duree_validee_minutes, notes, valide_manager_par_nom, valide_manager_le, commentaire_manager')
+                    .eq('etablissement', currentEstablishment).gte('date_service', d1).lte('date_service', d2)
+                    .order('debut_service'),
+                sb.from('combo_pointages')
+                    .select('date_service, user_id, collaborateur_nom_combo, equipe, debut_planifie, fin_planifiee, pauses_planifiees_minutes')
+                    .eq('etablissement', currentEstablishment).gte('date_service', d1).lte('date_service', d2),
+                sb.from('rh_contrats').select('*'),
+                sb.from('users').select('id, nom, equipe, etablissement, acces_etablissements').eq('actif', true).order('nom'),
+            ]);
+            for (const r of [rp, rc, rk, ru]) if (r.error) throw r.error;
+            periodes = rp.data || [];
+            prevus = (rc.data || []).filter(p => p.debut_planifie && p.fin_planifiee);
+            contrats = rk.data || [];
+            users = ru.data || [];
+            lignes = construireLignes(d1);
+        }
+
+        async function chargerContrats() {
+            const [rk, ru] = await Promise.all([
+                sb.from('rh_contrats').select('*').order('date_debut', { ascending: false }),
+                sb.from('users').select('id, nom, equipe, etablissement, acces_etablissements, role').eq('actif', true).order('nom'),
+            ]);
+            for (const r of [rk, ru]) if (r.error) throw r.error;
+            contrats = rk.data || [];
+            users = ru.data || [];
+        }
+
+        // ============ CALCUL DES LIGNES DE VALIDATION ============
+        // Une ligne par service badge, plus une ligne par service prevu non badge.
+        // Rapprochement badge <-> prevu : meme salarie, meme jour, debut le plus proche.
+        function construireLignes(d1) {
+            const res = [];
+            const aujourdHui = isoLocal(new Date());
+            const prevusLibres = prevus.map(p => ({ ...p, pris: false }));
+            const joursAvecPrevu = new Set(prevus.map(p => p.date_service));
+
+            for (const p of periodes) {
+                const candidats = prevusLibres.filter(x => !x.pris && x.user_id && x.user_id === p.user_id && x.date_service === p.date_service);
+                let prevu = null;
+                if (candidats.length) {
+                    prevu = candidats.sort((a, b) => Math.abs(minutesEntre(a.debut_planifie, p.debut_service)) - Math.abs(minutesEntre(b.debut_planifie, p.debut_service)))[0];
+                    prevu.pris = true;
+                }
+                const alertes = [];
+                const valide = !!(p.debut_valide && p.fin_validee);
+                const notes = p.notes || '';
+                if (!p.fin_service) {
+                    alertes.push(p.date_service === aujourdHui ? { t: 'En service', g: false } : { t: 'Fin non badgée', g: true });
+                } else if (notes.includes('[Auto') && !notes.includes('[Confirme')) {
+                    alertes.push({ t: 'Fin automatique 23:59', g: true });
+                }
+                if (prevu) {
+                    const ecD = minutesEntre(prevu.debut_planifie, p.debut_service);
+                    if (Math.abs(ecD) > TOLERANCE_ECART_MIN) alertes.push({ t: (ecD > 0 ? 'Arrivée +' : 'Arrivée ') + ecD + ' min', g: false });
+                    if (p.fin_service) {
+                        const ecF = minutesEntre(prevu.fin_planifiee, p.fin_service);
+                        if (Math.abs(ecF) > TOLERANCE_ECART_MIN) alertes.push({ t: (ecF > 0 ? 'Départ +' : 'Départ ') + ecF + ' min', g: false });
+                    }
+                } else if (joursAvecPrevu.has(p.date_service)) {
+                    alertes.push({ t: 'Non planifié', g: false });
+                }
+                const travail = p.duree_travail_minutes;
+                if (travail != null && travail > DUREE_LONGUE_MIN) alertes.push({ t: 'Plus de 11 h', g: true });
+                if (travail != null && travail > PAUSE_REQUISE_APRES_MIN && !(p.duree_pauses_minutes > 0)) alertes.push({ t: 'Sans pause (> 6 h)', g: false });
+
+                res.push({ type: 'badge', date: p.date_service, nom: p.user_nom, user_id: p.user_id, periode: p, prevu, alertes, valide });
+            }
+
+            // Services prevus sans badge (jours passes uniquement)
+            for (const x of prevusLibres) {
+                if (x.pris || x.date_service > aujourdHui) continue;
+                const u = x.user_id ? users.find(v => v.id === x.user_id) : null;
+                res.push({ type: 'absent', date: x.date_service, nom: u ? u.nom : x.collaborateur_nom_combo, user_id: x.user_id, periode: null, prevu: x,
+                    alertes: [{ t: x.date_service === aujourdHui ? 'Pas encore badgé' : 'Prévu, pas de badge', g: x.date_service !== aujourdHui }], valide: false });
+            }
+
+            res.sort((a, b) => a.date.localeCompare(b.date)
+                || String((a.periode && a.periode.debut_service) || (a.prevu && a.prevu.debut_planifie)).localeCompare(String((b.periode && b.periode.debut_service) || (b.prevu && b.prevu.debut_planifie)))
+                || a.nom.localeCompare(b.nom, 'fr'));
+            return res;
+        }
+
+        function peutValiderDirect(l) {
+            return l.type === 'badge' && !l.valide && l.periode.fin_service && !l.alertes.some(a => a.g);
+        }
+
+        // ============ AFFICHAGE : VALIDATION ============
+        function renderValidation() {
+            const main = document.getElementById('main');
+            let html = `<div class="semaine-nav">
+                <button onclick="changerSemaine(-1)">‹</button>
+                <div class="lib">${libSemaine()}<small>Badgé : iPad PlanB-Tools · Prévu : planning Combo (jusqu à la bascule)</small></div>
+                <button onclick="changerSemaine(1)">›</button>
+            </div>`;
+
+            const badges = lignes.filter(l => l.type === 'badge');
+            const nbValides = badges.filter(l => l.valide).length;
+            const directs = lignes.filter(peutValiderDirect);
+            const aRegarder = lignes.filter(l => !l.valide && l.alertes.some(a => a.g)).length;
+            html += `<div class="equ-kpis">
+                <div class="equ-kpi"><div class="lbl">Services badgés</div><div class="val">${badges.length}</div></div>
+                <div class="equ-kpi"><div class="lbl">Validés</div><div class="val" style="color:var(--green)">${nbValides}</div></div>
+                <div class="equ-kpi"><div class="lbl">Sans alerte, à valider</div><div class="val" style="color:var(--accent)">${directs.length}</div></div>
+                <div class="equ-kpi"><div class="lbl">À corriger</div><div class="val" style="color:var(--red)">${aRegarder}</div></div>
+            </div>`;
+
+            html += `<div class="equ-info">Valider une ligne retient les heures badgées. Si l heure badgée est fausse (oubli, badge en retard), corrige-la avec ✏️ : l heure badgée d origine reste conservée à côté. Pendant la période de test, Combo reste la référence pour la paie.</div>`;
+
+            html += `<div class="actions-row">
+                <button class="btn-small" onclick="window.print()">🖨️ Imprimer</button>
+                <button class="btn-primary" ${directs.length ? '' : 'disabled'} onclick="demanderValidationGroupee()">✅ Valider les ${directs.length} services sans alerte</button>
+            </div>`;
+
+            if (lignes.length === 0) {
+                html += '<div class="equ-card"><div class="empty">Aucun service badgé ou prévu cette semaine.</div></div>';
+            }
+
+            // Un bloc par jour
+            const jours = [...new Set(lignes.map(l => l.date))];
+            for (const jour of jours) {
+                const duJour = lignes.filter(l => l.date === jour);
+                html += `<div class="equ-card">
+                    <div class="equ-card-head"><span style="text-transform:capitalize">${libJour(jour)}</span><span class="sub">${duJour.filter(l => l.type === 'badge').length} service(s) badgé(s)</span></div>
+                    <div class="equ-scroll"><table class="equ-table">
+                    <tr><th>Salarié</th><th>Prévu</th><th>Badgé</th><th class="num">Pause</th><th>Retenu</th><th class="num">Durée</th><th>À vérifier</th><th class="act"></th></tr>`;
+                for (const l of duJour) {
+                    const i = lignes.indexOf(l);
+                    const p = l.periode;
+                    const prevu = l.prevu ? `${hm(l.prevu.debut_planifie)}–${hm(l.prevu.fin_planifiee)}` : '<span class="muted">—</span>';
+                    const alertes = l.alertes.map(a => `<span class="equ-alerte${a.g ? ' grave' : ''}">${esc(a.t)}</span>`).join('');
+                    if (l.type === 'absent') {
+                        html += `<tr class="absent"><td class="nom">${esc(l.nom)}</td><td class="hm">${prevu}</td><td class="muted">—</td><td class="num muted">—</td><td class="muted">—</td><td class="num muted">—</td><td>${alertes}</td><td class="act"></td></tr>`;
+                        continue;
+                    }
+                    const badge = `${hm(p.debut_service)}–${p.fin_service ? hm(p.fin_service) : '…'}`;
+                    const retenu = l.valide
+                        ? `<span class="equ-statut ok" title="${esc(p.valide_manager_par_nom || '')}">${hm(p.debut_valide)}–${hm(p.fin_validee)}</span>`
+                        : '<span class="equ-statut attente">à valider</span>';
+                    const dureeAff = l.valide ? duree(p.duree_validee_minutes) : duree(p.duree_travail_minutes);
+                    const pause = l.valide ? (p.pauses_validees_minutes || 0) : (p.duree_pauses_minutes || 0);
+                    const comm = l.valide && p.commentaire_manager ? `<br><span class="muted" style="font-size:11px">${esc(p.commentaire_manager)}</span>` : '';
+                    html += `<tr class="${l.valide ? 'valide' : ''}">
+                        <td class="nom">${esc(l.nom)}${comm}</td>
+                        <td class="hm">${prevu}</td>
+                        <td class="hm">${badge}</td>
+                        <td class="num">${pause} min</td>
+                        <td>${retenu}</td>
+                        <td class="num">${dureeAff}</td>
+                        <td style="white-space:normal">${alertes}</td>
+                        <td class="act" style="text-align:right">
+                            ${!l.valide ? `<button class="btn-ok" ${peutValiderDirect(l) ? '' : 'disabled'} onclick="validerDirect(${i})">✓</button>` : ''}
+                            <button class="btn-small" onclick="ouvrirHeures(${i})">✏️</button>
+                        </td>
+                    </tr>`;
+                }
+                html += '</table></div></div>';
+            }
+
+            html += renderRecapSemaine();
+            main.innerHTML = html;
+        }
+
+        // Recap par salarie : heures retenues (ou badgees si pas encore validees) vs contrat
+        function renderRecapSemaine() {
+            const parUser = {};
+            for (const l of lignes) {
+                if (l.type !== 'badge') continue;
+                const k = l.user_id || l.nom;
+                if (!parUser[k]) parUser[k] = { nom: l.nom, user_id: l.user_id, valide: 0, provisoire: 0 };
+                if (l.valide) parUser[k].valide += l.periode.duree_validee_minutes || 0;
+                else parUser[k].provisoire += l.periode.duree_travail_minutes || 0;
+            }
+            const liste = Object.values(parUser).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+            if (liste.length === 0) return '';
+            const milieu = isoLocal(addJours(semaineDebut, 3));
+            let html = `<div class="equ-card">
+                <div class="equ-card-head"><span>Récapitulatif de la semaine</span><span class="sub">Heures retenues comparées au contrat</span></div>
+                <div class="equ-scroll"><table class="equ-table">
+                <tr><th>Salarié</th><th class="num">Validées</th><th class="num">Pas encore validées</th><th class="num">Contrat</th><th class="num">Écart</th></tr>`;
+            for (const s of liste) {
+                const c = s.user_id ? contratActif(s.user_id, milieu) : null;
+                const total = s.valide + s.provisoire;
+                let ecart = '<span class="muted">contrat non saisi</span>';
+                if (c) {
+                    const e = total - Number(c.heures_hebdo) * 60;
+                    ecart = Math.abs(e) < 1 ? '0' : `<span class="${e > 0 ? 'pos' : 'neg'}">${e > 0 ? '+' : '−'}${duree(Math.abs(e))}</span>`;
+                }
+                html += `<tr>
+                    <td class="nom">${esc(s.nom)}</td>
+                    <td class="num">${hrs(s.valide)}</td>
+                    <td class="num ${s.provisoire ? '' : 'muted'}">${s.provisoire ? hrs(s.provisoire) : '—'}</td>
+                    <td class="num">${c ? Number(c.heures_hebdo).toLocaleString('fr-FR') + ' h' : '<span class="muted">—</span>'}</td>
+                    <td class="num">${ecart}</td>
+                </tr>`;
+            }
+            html += '</table></div></div>';
+            return html;
+        }
+
+        // ============ VALIDATION ============
+        function payloadValidation(debut, fin, pauses, commentaire) {
+            return {
+                debut_valide: debut, fin_validee: fin, pauses_validees_minutes: pauses,
+                statut: 'valide_manager',
+                valide_manager_par_id: currentUser.id, valide_manager_par_nom: currentUser.nom,
+                valide_manager_le: new Date().toISOString(),
+                commentaire_manager: commentaire || null,
+            };
+        }
+
+        async function validerDirect(i) {
+            const l = lignes[i];
+            if (!peutValiderDirect(l)) return;
+            const p = l.periode;
+            try {
+                const { error } = await sb.from('pointage_periodes_travail')
+                    .update(payloadValidation(p.debut_service, p.fin_service, p.duree_pauses_minutes || 0, null))
+                    .eq('id', p.id);
+                if (error) throw error;
+                showToast('Service validé', 'success');
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur de validation', 'error'); }
+        }
+
+        function demanderValidationGroupee() {
+            const directs = lignes.filter(peutValiderDirect);
+            if (!directs.length) return;
+            openConfirm('Valider ' + directs.length + ' services ?',
+                'Les heures badgées de tous les services sans alerte de la semaine seront retenues telles quelles. Les services avec une alerte restent à traiter un par un.',
+                [{ label: 'Valider', cls: 'primary', action: () => validerGroupe(directs) }]);
+        }
+
+        async function validerGroupe(directs) {
+            let ok = 0;
+            try {
+                for (const l of directs) {
+                    const p = l.periode;
+                    const { error } = await sb.from('pointage_periodes_travail')
+                        .update(payloadValidation(p.debut_service, p.fin_service, p.duree_pauses_minutes || 0, null))
+                        .eq('id', p.id);
+                    if (error) throw error;
+                    ok++;
+                }
+                showToast(ok + ' services validés', 'success');
+            } catch (e) {
+                console.error(e);
+                if (PLANB.erreurAuth(e)) return;
+                showToast('Erreur après ' + ok + ' validation(s)', 'error');
+            }
+            await recharger();
+        }
+
+        function ouvrirHeures(i) {
+            const l = lignes[i];
+            if (!l || l.type !== 'badge') return;
+            const p = l.periode;
+            periodeEnCours = p;
+            document.getElementById('heures-titre').textContent = l.nom;
+            const prevu = l.prevu ? ` · Prévu ${hm(l.prevu.debut_planifie)}–${hm(l.prevu.fin_planifiee)}` : '';
+            document.getElementById('heures-sub').textContent =
+                libJour(p.date_service) + ' · Badgé ' + hm(p.debut_service) + '–' + (p.fin_service ? hm(p.fin_service) : '…') + prevu;
+            const fin = p.fin_validee || p.fin_service || (l.prevu && l.prevu.fin_planifiee);
+            document.getElementById('h-debut').value = hm(p.debut_valide || p.debut_service);
+            document.getElementById('h-fin').value = fin ? hm(fin) : '';
+            document.getElementById('h-pauses').value = p.pauses_validees_minutes != null ? p.pauses_validees_minutes : (p.duree_pauses_minutes || 0);
+            document.getElementById('h-commentaire').value = p.commentaire_manager || '';
+            document.getElementById('heures-modal').style.display = 'flex';
+        }
+
+        async function enregistrerHeures() {
+            const p = periodeEnCours;
+            if (!p) return;
+            const hd = document.getElementById('h-debut').value;
+            const hf = document.getElementById('h-fin').value;
+            const pauses = parseInt(document.getElementById('h-pauses').value, 10) || 0;
+            const commentaire = document.getElementById('h-commentaire').value.trim();
+            if (!/^\d{2}:\d{2}$/.test(hd) || !/^\d{2}:\d{2}$/.test(hf)) { showToast('Heures de début et de fin obligatoires', 'error'); return; }
+            if (pauses < 0) { showToast('Pause invalide', 'error'); return; }
+            const debut = versIso(p.date_service, hd, null);
+            const fin = versIso(p.date_service, hf, debut);
+            const travail = minutesEntre(debut, fin) - pauses;
+            if (travail <= 0) { showToast('La durée retenue doit être positive', 'error'); return; }
+            const corrige = hd !== hm(p.debut_service) || !p.fin_service || hf !== hm(p.fin_service) || pauses !== (p.duree_pauses_minutes || 0);
+            if (corrige && !commentaire) { showToast('Indique pourquoi l heure badgée est corrigée', 'error'); return; }
+            try {
+                const { error } = await sb.from('pointage_periodes_travail')
+                    .update(payloadValidation(debut, fin, pauses, commentaire))
+                    .eq('id', p.id);
+                if (error) throw error;
+                fermerModale('heures-modal');
+                periodeEnCours = null;
+                showToast('Heures retenues : ' + duree(travail), 'success');
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur d enregistrement', 'error'); }
+        }
+
+        // ============ AFFICHAGE : CONTRATS ============
+        function usersDeLEtablissement() {
+            return users.filter(u => u.etablissement === currentEstablishment
+                || (Array.isArray(u.acces_etablissements) && u.acces_etablissements.includes(currentEstablishment)));
+        }
+
+        function renderContrats() {
+            const main = document.getElementById('main');
+            const auj = isoLocal(new Date());
+            const liste = usersDeLEtablissement();
+            const sansContrat = liste.filter(u => !contratActif(u.id, auj));
+            const aVerifier = contrats.filter(c => c.source === 'import_combo' && c.notes && c.notes.includes('a verifier'));
+
+            let html = `<div class="equ-kpis">
+                <div class="equ-kpi"><div class="lbl">Salariés actifs</div><div class="val">${liste.length}</div></div>
+                <div class="equ-kpi"><div class="lbl">Contrat en cours saisi</div><div class="val" style="color:var(--green)">${liste.length - sansContrat.length}</div></div>
+                <div class="equ-kpi"><div class="lbl">Sans contrat</div><div class="val" style="color:${sansContrat.length ? 'var(--red)' : 'var(--gray-400)'}">${sansContrat.length}</div></div>
+                <div class="equ-kpi"><div class="lbl">Repris de Combo, à vérifier</div><div class="val" style="color:var(--orange)">${aVerifier.length}</div></div>
+            </div>`;
+            html += `<div class="equ-info">Ici on ne garde que ce qui sert au planning et à la paie : type de contrat, heures par semaine, dates, matricule Payfit. Les informations personnelles (n° de sécu, adresse, IBAN, salaire) restent dans Payfit.${isAdmin ? '' : '<br><b>Lecture seule</b> : seul l administrateur modifie les contrats.'}</div>`;
+
+            html += `<div class="equ-card">
+                <div class="equ-card-head"><span>Contrats</span><span class="sub">${currentEstablishment === 'freddy' ? 'Freddy' : 'Chez Tante Liesel'}</span></div>
+                <div class="equ-scroll"><table class="equ-table">
+                <tr><th>Salarié</th><th>Équipe</th><th>Contrat</th><th class="num">H / sem.</th><th>Depuis</th><th>Fin</th><th>Matricule Payfit</th><th class="act"></th></tr>`;
+            if (liste.length === 0) html += '<tr><td colspan="8" class="empty">Aucun salarié actif.</td></tr>';
+            for (const u of liste) {
+                const c = contratActif(u.id, auj);
+                const ui = users.indexOf(u);
+                const histo = contrats.filter(x => x.user_id === u.id).length;
+                if (!c) {
+                    html += `<tr class="absent">
+                        <td class="nom">${esc(u.nom)}</td>
+                        <td>${u.equipe && LIB_EQUIPE[u.equipe] ? `<span class="eq ${u.equipe}">${LIB_EQUIPE[u.equipe]}</span>` : '<span class="muted">—</span>'}</td>
+                        <td colspan="5" class="muted">${histo ? 'Aucun contrat en cours (' + histo + ' terminé·s)' : 'Contrat non saisi'}</td>
+                        <td class="act" style="text-align:right">${isAdmin ? `<button class="btn-small" onclick="ouvrirContrat(${ui}, false)">+ Saisir</button>` : ''}</td>
+                    </tr>`;
+                    continue;
+                }
+                const importe = c.source === 'import_combo' && c.notes && c.notes.includes('a verifier');
+                html += `<tr>
+                    <td class="nom">${esc(u.nom)}${importe ? '<br><span class="equ-alerte">Repris de Combo, à vérifier</span>' : ''}</td>
+                    <td><span class="eq ${c.equipe}">${LIB_EQUIPE[c.equipe] || esc(c.equipe)}</span></td>
+                    <td>${LIB_CONTRAT[c.type_contrat] || esc(c.type_contrat)}</td>
+                    <td class="num">${Number(c.heures_hebdo).toLocaleString('fr-FR')} h</td>
+                    <td>${new Date(c.date_debut + 'T12:00:00').toLocaleDateString('fr-FR')}</td>
+                    <td>${c.date_fin ? new Date(c.date_fin + 'T12:00:00').toLocaleDateString('fr-FR') : '<span class="muted">—</span>'}</td>
+                    <td>${c.matricule_payfit ? esc(c.matricule_payfit) : '<span class="muted">—</span>'}</td>
+                    <td class="act" style="text-align:right">${isAdmin ? `<button class="btn-small" onclick="ouvrirContrat(${ui}, false)">✏️</button> <button class="btn-small" onclick="ouvrirContrat(${ui}, true)">+ Avenant</button>` : ''}</td>
+                </tr>`;
+            }
+            html += '</table></div></div>';
+            main.innerHTML = html;
+        }
+
+        function ouvrirContrat(ui, avenant) {
+            if (!isAdmin) return;
+            const u = users[ui];
+            if (!u) return;
+            const auj = isoLocal(new Date());
+            const actuel = contratActif(u.id, auj);
+            // Avenant : nouveau contrat pre-rempli, l ancien sera termine la veille
+            contratEdition = { user: u, contrat: avenant ? null : actuel, precedent: avenant ? actuel : null };
+            const base = actuel || {};
+            document.getElementById('contrat-titre').textContent = (avenant ? 'Avenant — ' : (actuel ? 'Contrat — ' : 'Nouveau contrat — ')) + u.nom;
+            document.getElementById('contrat-sub').textContent = avenant
+                ? 'Le contrat actuel sera terminé la veille de la date de début ci-dessous. Son historique est conservé.'
+                : (actuel ? 'Corrige une erreur de saisie. Pour un changement réel (nouvelles heures, passage en CDI), utilise plutôt « + Avenant ».' : '');
+            document.getElementById('c-type').value = base.type_contrat || 'cdi';
+            document.getElementById('c-heures').value = base.heures_hebdo != null ? base.heures_hebdo : 39;
+            document.getElementById('c-equipe').value = base.equipe || (LIB_EQUIPE[u.equipe] ? u.equipe : 'salle');
+            document.getElementById('c-matricule').value = base.matricule_payfit || '';
+            document.getElementById('c-debut').value = avenant ? auj : (base.date_debut || '');
+            document.getElementById('c-fin').value = avenant ? '' : (base.date_fin || '');
+            document.getElementById('c-notes').value = avenant ? '' : (base.notes || '').replace('Repris de Combo, a verifier', '').trim();
+            document.getElementById('contrat-modal').style.display = 'flex';
+        }
+
+        async function enregistrerContrat() {
+            const ed = contratEdition;
+            if (!ed || !isAdmin) return;
+            const heures = parseFloat(String(document.getElementById('c-heures').value).replace(',', '.'));
+            const debut = document.getElementById('c-debut').value;
+            const fin = document.getElementById('c-fin').value || null;
+            if (isNaN(heures) || heures < 0 || heures > 48) { showToast('Heures par semaine entre 0 et 48', 'error'); return; }
+            if (!debut) { showToast('Date de début obligatoire', 'error'); return; }
+            if (fin && fin < debut) { showToast('La fin doit être après le début', 'error'); return; }
+            if (ed.precedent && debut <= ed.precedent.date_debut) { showToast('L avenant doit commencer après le contrat actuel', 'error'); return; }
+            const ligne = {
+                user_id: ed.user.id,
+                etablissement: currentEstablishment,
+                equipe: document.getElementById('c-equipe').value,
+                type_contrat: document.getElementById('c-type').value,
+                heures_hebdo: heures,
+                date_debut: debut,
+                date_fin: fin,
+                matricule_payfit: document.getElementById('c-matricule').value.trim() || null,
+                notes: document.getElementById('c-notes').value.trim() || null,
+                saisi_par_id: currentUser.id,
+                saisi_par_nom: currentUser.nom,
+                updated_at: new Date().toISOString(),
+            };
+            try {
+                if (ed.contrat) {
+                    // Correction : l etablissement d origine du contrat est conserve
+                    delete ligne.etablissement;
+                    const { error } = await sb.from('rh_contrats').update(ligne).eq('id', ed.contrat.id);
+                    if (error) throw error;
+                } else {
+                    if (ed.precedent) {
+                        const veille = isoLocal(addJours(new Date(debut + 'T12:00:00'), -1));
+                        const { error: e1 } = await sb.from('rh_contrats')
+                            .update({ date_fin: veille, updated_at: new Date().toISOString() }).eq('id', ed.precedent.id);
+                        if (e1) throw e1;
+                    }
+                    const { error } = await sb.from('rh_contrats').insert(ligne);
+                    if (error) throw error;
+                }
+                fermerModale('contrat-modal');
+                contratEdition = null;
+                showToast('Contrat enregistré', 'success');
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur d enregistrement du contrat', 'error'); }
+        }
+
+        // ============ COMMUN ============
+        function openConfirm(titre, texte, boutons) {
+            document.getElementById('confirm-titre').textContent = titre;
+            document.getElementById('confirm-texte').textContent = texte;
+            const zone = document.getElementById('confirm-btns');
+            zone.innerHTML = '';
+            const close = () => { document.getElementById('confirm-modal').style.display = 'none'; };
+            [{ label: 'Annuler', cls: '', action: null }, ...boutons].forEach(b => {
+                const btn = document.createElement('button');
+                btn.textContent = b.label;
+                if (b.cls) btn.className = b.cls;
+                btn.onclick = async () => { close(); if (b.action) await b.action(); };
+                zone.appendChild(btn);
+            });
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        async function changerSemaine(delta) {
+            semaineDebut = addJours(semaineDebut, 7 * delta);
+            await recharger();
+        }
+
+        function changerOnglet(o) {
+            onglet = o;
+            document.getElementById('tab-validation').classList.toggle('active', o === 'validation');
+            document.getElementById('tab-contrats').classList.toggle('active', o === 'contrats');
+            try { sessionStorage.setItem('equipe_onglet', o); } catch (e) {}
+            recharger();
+        }
+
+        async function recharger() {
+            try {
+                if (onglet === 'validation') { await chargerSemaine(); renderValidation(); }
+                else { await chargerContrats(); renderContrats(); }
+            } catch (e) {
+                console.error(e);
+                if (PLANB.erreurAuth(e)) return;
+                const msg = String(e && (e.message || e.code) || '');
+                document.getElementById('main').innerHTML = (msg.includes('rh_contrats') || msg.includes('valide') || String(e.code) === '42P01' || String(e.code) === '42703')
+                    ? '<div class="empty">Module pas encore initialisé côté base de données.<br>(migration scripts/migration-equipe-phase1.sql à exécuter)</div>'
+                    : '<div class="empty">Erreur de chargement des données.</div>';
+                showToast('Erreur de chargement', 'error');
+            }
+        }
+
+        (async function init() {
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            semaineDebut = lundiDe(new Date());
+            let o = 'validation';
+            try { o = sessionStorage.getItem('equipe_onglet') || 'validation'; } catch (e) {}
+            changerOnglet(o === 'contrats' ? 'contrats' : 'validation');
+        })();
+    </script>
+</body>
+</html>
