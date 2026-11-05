@@ -112,6 +112,19 @@
         .statut.attente { background: var(--gray-100); color: var(--gray-600); }
         .statut.refaire { background: var(--orange-light); color: var(--orange); }
 
+        /* Recap des pointages */
+        table.pt-table { min-width: 680px; }
+        .pt-ligne { cursor: pointer; }
+        .pt-ligne:hover td { background: var(--gray-50); }
+        .pt-nom { font-weight: 700; }
+        .pt-nom small { display: block; font-weight: 500; font-size: 11px; color: var(--gray-500); }
+        .pt-groupe td { background: var(--gray-100); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600); padding: 5px 12px; }
+        .liste td.pt-detail { background: var(--gray-50); padding: 0; }
+        .pt-jours { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+        .pt-jours th { text-align: left; font-size: 10px; color: var(--gray-500); padding: 6px 12px; }
+        .pt-jours td { padding: 6px 12px; border-top: 1px solid var(--gray-200); }
+        .pt-jours td:first-child { text-transform: capitalize; font-weight: 600; }
+
         .moi-jour { display: flex; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--gray-100); align-items: baseline; }
         .moi-jour .j { width: 118px; flex-shrink: 0; font-weight: 700; font-size: 13px; text-transform: capitalize; }
         .moi-jour .d { flex: 1; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -339,6 +352,9 @@
         let users = [];
         let reservations = [];
         let signatures = [];
+        let pointages = [];     // combo_pointages de la semaine, tous etablissements
+        let ptListe = [];       // recap affiche, un element par salarie
+        let ptOuverts = new Set();
         let ajoutsManuels = new Set();
         let filtreEquipe = 'toutes';
         let edition = null;     // { user, date, shift|null, nature, jours:Set }
@@ -475,6 +491,15 @@
             const rr = await sb.from('reservations_thefork').select('date, service, couverts, statut')
                 .eq('etablissement', currentEstablishment).gte('date', j[0]).lte('date', j[6]).neq('statut', 'CANCELED');
             reservations = rr.error ? [] : (rr.data || []);
+        }
+
+        async function chargerPointages() {
+            const j = joursSemaine();
+            const { data, error } = await sb.from('combo_pointages')
+                .select('date_service, etablissement, equipe, user_id, collaborateur_nom_combo, debut_planifie, fin_planifiee, pauses_planifiees_minutes, debut_pointe, fin_pointee, pauses_pointees_minutes, debut_valide, fin_validee, pauses_validees_minutes')
+                .gte('date_service', j[0]).lte('date_service', j[6]).order('debut_planifie');
+            if (error) throw error;
+            pointages = data || [];
         }
 
         async function chargerSignatures() {
@@ -732,6 +757,125 @@
                     : (e && e.signe_le ? '<span class="statut refaire">Modifié depuis la signature</span>' : '<span class="statut attente">Pas encore signé</span>');
                 html += `<tr><td><b>${esc(u.nom)}</b></td><td class="num">${hLib(h)}</td><td>${st}</td></tr>`;
             }
+            html += '</table></div></div>';
+            main.innerHTML = html;
+        }
+
+        // ============ POINTAGES ============
+        // Jusqu a la bascule, la source est Combo : prevu, pointe et valide y sont complets.
+        function ptDuree(debut, fin, pauses) {
+            if (!debut || !fin) return null;
+            return Math.round((new Date(fin) - new Date(debut)) / 60000) - (pauses || 0);
+        }
+        function ptPrevu(p) { return ptDuree(p.debut_planifie, p.fin_planifiee, p.pauses_planifiees_minutes); }
+        function ptPointe(p) { return ptDuree(p.debut_pointe, p.fin_pointee, p.pauses_pointees_minutes); }
+        function ptValide(p) { return ptDuree(p.debut_valide, p.fin_validee, p.pauses_validees_minutes); }
+        function ptSomme(liste, f) { return liste.reduce((t, p) => t + (f(p) || 0), 0); }
+        function ptHeure(iso) { const d = new Date(iso); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+        function ptPlage(debut, fin) { return debut ? ptHeure(debut) + ' – ' + (fin ? ptHeure(fin) : '?') : '—'; }
+        function ptEcart(min) {
+            if (Math.abs(min) < 1) return '0';
+            return `<span class="${min > 0 ? 'ecart-pos' : 'ecart-neg'}">${min > 0 ? '+' : '−'}${hLib(min)}</span>`;
+        }
+        function ptStatut(p) {
+            if (!p.debut_pointe) return { lib: 'Sans pointage', cls: 'refaire' };
+            if (!p.fin_pointee) return { lib: 'Fin non pointée', cls: 'refaire' };
+            if (!p.debut_valide || !p.fin_validee) return { lib: 'À valider', cls: 'attente' };
+            return { lib: 'Validé', cls: 'ok' };
+        }
+        function ptAVerifier(p) { return ptStatut(p).cls !== 'ok'; }
+
+        function construireRecapPointages() {
+            const parSalarie = new Map();
+            for (const p of pointages.filter(ici)) {
+                const cle = p.user_id || p.collaborateur_nom_combo;
+                if (!parSalarie.has(cle)) {
+                    const u = p.user_id ? userDe(p.user_id) : null;
+                    parSalarie.set(cle, { cle, user_id: p.user_id, nom: u ? u.nom : p.collaborateur_nom_combo, equipe: normEquipe(p.equipe), lignes: [] });
+                }
+                parSalarie.get(cle).lignes.push(p);
+            }
+            return [...parSalarie.values()].sort((a, b) => ORDRE_EQUIPES.indexOf(a.equipe) - ORDRE_EQUIPES.indexOf(b.equipe) || a.nom.localeCompare(b.nom, 'fr'));
+        }
+
+        function basculerPointage(i) {
+            const cle = ptListe[i].cle;
+            if (ptOuverts.has(cle)) ptOuverts.delete(cle); else ptOuverts.add(cle);
+            renderPointages();
+        }
+
+        function renderDetailPointage(s) {
+            const lignesJour = s.lignes.slice().sort((a, b) => a.date_service.localeCompare(b.date_service) || String(a.debut_planifie).localeCompare(String(b.debut_planifie)));
+            return `<tr><td colspan="7" class="pt-detail"><div class="scroll"><table class="pt-jours">
+                <tr><th>Jour</th><th>Prévu</th><th>Pointé</th><th>Validé</th><th>Durée validée</th><th>État</th></tr>
+                ${lignesJour.map(p => {
+                    const st = ptStatut(p);
+                    const v = ptValide(p);
+                    return `<tr><td>${esc(dateDe(p.date_service).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }))}</td>
+                        <td>${ptPlage(p.debut_planifie, p.fin_planifiee)}</td>
+                        <td>${ptPlage(p.debut_pointe, p.fin_pointee)}</td>
+                        <td>${ptPlage(p.debut_valide, p.fin_validee)}</td>
+                        <td>${v == null ? '—' : hLib(v)}</td>
+                        <td><span class="statut ${st.cls}">${st.lib}</span></td></tr>`;
+                }).join('')}
+            </table></div></td></tr>`;
+        }
+
+        function renderPointages() {
+            const main = document.getElementById('main');
+            const j = joursSemaine();
+            let html = `<div class="nav">
+                <button onclick="changerSemaine(-1)">‹</button>
+                <div class="lib">${libSemaine()}<small>Pointages Combo · lecture seule</small></div>
+                <button onclick="changerSemaine(1)">›</button>
+            </div>`;
+            if (j[0] >= DATE_BASCULE) {
+                main.innerHTML = html + '<div class="card"><div class="empty">À partir du 1er janvier 2027, les heures se suivent dans le module Équipe, onglet Validation des heures.</div></div>';
+                return;
+            }
+            const ici7 = pointages.filter(ici);
+            ptListe = construireRecapPointages();
+            const aVerifier = ici7.filter(ptAVerifier).length;
+            html += `<div class="kpis">
+                <div class="kpi"><div class="lbl">Heures prévues</div><div class="val">${hDec(ptSomme(ici7, ptPrevu))}</div></div>
+                <div class="kpi"><div class="lbl">Heures pointées</div><div class="val">${hDec(ptSomme(ici7, ptPointe))}</div></div>
+                <div class="kpi"><div class="lbl">Heures validées</div><div class="val" style="color:var(--green)">${hDec(ptSomme(ici7, ptValide))}</div></div>
+                <div class="kpi"><div class="lbl">Services à vérifier</div><div class="val" style="color:${aVerifier ? 'var(--orange)' : 'var(--gray-400)'}">${aVerifier}</div></div>
+            </div>`;
+            if (!ptListe.length) {
+                main.innerHTML = html + '<div class="card"><div class="empty">Aucun pointage reçu de Combo pour cette semaine.</div></div>';
+                return;
+            }
+            const terminee = j[6] < isoLocal(new Date());
+            html += `<div class="actions no-print"><span class="espace"></span><button class="btn-small" onclick="window.print()">🖨️ Imprimer</button></div>`;
+            html += `<div class="card"><div class="card-head"><span>Récapitulatif par salarié</span><span class="sub">Touche un nom pour voir le détail des jours</span></div>
+                <div class="scroll"><table class="liste pt-table">
+                <tr><th>Salarié</th><th class="num">Prévu</th><th class="num">Pointé</th><th class="num">Validé</th><th class="num">Validé − prévu</th><th class="num">Contrat</th><th class="num">Écart contrat</th></tr>`;
+            let equipe = null;
+            ptListe.forEach((s, i) => {
+                if (s.equipe !== equipe) { equipe = s.equipe; html += `<tr class="pt-groupe"><td colspan="7">${LIB_EQUIPE[equipe]}</td></tr>`; }
+                const prevu = ptSomme(s.lignes, ptPrevu);
+                const pointe = ptSomme(s.lignes, ptPointe);
+                const valide = ptSomme(s.lignes, ptValide);
+                // Un salarie partage : le contrat se compare au total des deux etablissements
+                const ailleurs = s.user_id ? ptSomme(pointages.filter(p => p.user_id === s.user_id && !ici(p)), ptValide) : 0;
+                const c = s.user_id ? contratDeLaSemaine(s.user_id) : null;
+                const nb = s.lignes.filter(ptAVerifier).length;
+                const ouvert = ptOuverts.has(s.cle);
+                const ecartContrat = !c ? '<span class="muted">—</span>'
+                    : terminee ? ptEcart(valide + ailleurs - Number(c.heures_hebdo) * 60)
+                    : '<span class="muted">semaine en cours</span>';
+                html += `<tr class="pt-ligne" onclick="basculerPointage(${i})">
+                    <td class="pt-nom">${ouvert ? '▾' : '▸'} ${esc(s.nom)}${nb ? ` <span class="pastille">${nb}</span>` : ''}${ailleurs ? `<small>+ ${hLib(ailleurs)} validées dans l’autre établissement</small>` : ''}</td>
+                    <td class="num">${hLib(prevu)}</td>
+                    <td class="num">${hLib(pointe)}</td>
+                    <td class="num">${hLib(valide)}</td>
+                    <td class="num">${ptEcart(valide - prevu)}</td>
+                    <td class="num">${c ? Number(c.heures_hebdo).toLocaleString('fr-FR') + ' h' : '<span class="muted">—</span>'}</td>
+                    <td class="num">${ecartContrat}</td>
+                </tr>`;
+                if (ouvert) html += renderDetailPointage(s);
+            });
             html += '</table></div></div>';
             main.innerHTML = html;
         }
@@ -1132,7 +1276,7 @@
 
         function renderTabs() {
             const tabs = peutGerer
-                ? [['semaine', '🗓️ Semaine'], ['jour', '📍 Jour'], ['signatures', '✍️ Signatures'], ['modeles', '⏱️ Horaires types'], ['moi', '👤 Mon planning']]
+                ? [['semaine', '🗓️ Semaine'], ['jour', '📍 Jour'], ['pointages', '⏰ Pointages'], ['signatures', '✍️ Signatures'], ['modeles', '⏱️ Horaires types'], ['moi', '👤 Mon planning']]
                 : [['moi', '👤 Mon planning'], ['semaine', '🗓️ L’équipe']];
             document.getElementById('tabs').innerHTML = tabs.map(t =>
                 `<button class="pl-tab${onglet === t[0] ? ' active' : ''}" onclick="changerOnglet('${t[0]}')">${t[1]}</button>`).join('');
@@ -1166,7 +1310,8 @@
                     const j = joursSemaine();
                     if (!j.includes(jourCourant)) jourCourant = j.includes(isoLocal(new Date())) ? isoLocal(new Date()) : j[0];
                     renderJour();
-                } else if (onglet === 'signatures') { await chargerSignatures(); renderSignatures(); }
+                } else if (onglet === 'pointages') { await chargerPointages(); renderPointages(); }
+                else if (onglet === 'signatures') { await chargerSignatures(); renderSignatures(); }
                 else if (onglet === 'modeles') renderModeles();
                 else if (onglet === 'moi') {
                     await chargerSignatures();
@@ -1199,7 +1344,7 @@
                 vue = sessionStorage.getItem('planning_vue') === 'brouillon' ? 'brouillon' : 'combo';
             } catch (e) {}
             if (isoLocal(semaineDebut) >= DATE_BASCULE) vue = 'brouillon';
-            const permis = peutGerer ? ['semaine', 'jour', 'signatures', 'modeles', 'moi'] : ['moi', 'semaine'];
+            const permis = peutGerer ? ['semaine', 'jour', 'pointages', 'signatures', 'modeles', 'moi'] : ['moi', 'semaine'];
             changerOnglet(permis.includes(o) ? o : permis[0]);
         })();
     </script>
