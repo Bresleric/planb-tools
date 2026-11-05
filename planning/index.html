@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Planning — PlanB Tools</title>
+    <style>
+        :root {
+            --accent: #0f766e; --accent-light: #f0fdfa;
+            --orange: #f97316; --orange-light: #fff7ed;
+            --green: #16a34a; --green-light: #f0fdf4;
+            --red: #dc2626; --red-light: #fef2f2;
+            --blue: #2563eb; --blue-light: #eff6ff;
+            --purple: #7c3aed; --purple-light: #f5f3ff;
+            --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-800: #1f2937;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--gray-800); padding-bottom: 40px; }
+
+        header { background: white; border-bottom: 3px solid var(--accent); padding: 10px 16px; position: sticky; top: 0; z-index: 20; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; max-width: 1280px; margin: 0 auto; gap: 8px; }
+        h1 { font-size: 17px; color: var(--accent); white-space: nowrap; }
+        .etab-badge { background: var(--accent-light); color: var(--accent); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+        .btn-back { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+        .pl-tabs { display: flex; gap: 6px; max-width: 1280px; margin: 10px auto 0; padding: 0 12px; overflow-x: auto; }
+        .pl-tab { flex: 1; min-width: max-content; border: 1px solid var(--gray-200); background: white; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+        .pl-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+        main { max-width: 1280px; margin: 0 auto; padding: 12px; }
+
+        .nav { display: flex; align-items: center; justify-content: space-between; background: white; border-radius: 14px; padding: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .nav button { border: 1px solid var(--gray-200); background: white; border-radius: 10px; width: 44px; height: 40px; font-size: 18px; cursor: pointer; }
+        .nav .lib { text-align: center; font-weight: 800; font-size: 15px; text-transform: none; }
+        .nav .lib small { display: block; font-weight: 600; font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .kpi { background: white; border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .kpi .lbl { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi .val { font-size: 22px; font-weight: 800; margin-top: 4px; }
+
+        .info { background: var(--blue-light); border: 1px solid #bfdbfe; color: var(--blue); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; }
+        .empty { text-align: center; color: var(--gray-400); padding: 36px 10px; font-size: 13px; }
+        .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+        .actions .espace { flex: 1; }
+
+        .card { background: white; border-radius: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+        .card-head { padding: 12px 14px; border-bottom: 1px solid var(--gray-100); font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .card-head .sub { font-weight: 500; font-size: 11px; color: var(--gray-500); }
+        .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        /* Grille de la semaine */
+        table.grille { width: 100%; min-width: 980px; border-collapse: separate; border-spacing: 0; font-size: 12px; table-layout: fixed; }
+        .grille th { background: var(--gray-50); padding: 7px 4px; font-size: 11px; color: var(--gray-600); border-bottom: 1px solid var(--gray-200); text-align: center; }
+        .grille th.auj { background: var(--accent-light); color: var(--accent); }
+        .grille th.col-nom, .grille td.col-nom { width: 160px; text-align: left; position: sticky; left: 0; z-index: 2; background: white; border-right: 1px solid var(--gray-200); padding: 6px 8px; }
+        .grille th.col-nom { background: var(--gray-50); }
+        .grille th.col-tot, .grille td.col-tot { width: 84px; text-align: right; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+        .grille td { border-bottom: 1px solid var(--gray-100); border-right: 1px solid var(--gray-100); vertical-align: top; padding: 3px; height: 50px; }
+        .grille td.jour.editable { cursor: pointer; }
+        .grille td.jour.editable:hover { background: var(--gray-50); }
+        .grille tr.groupe td { background: var(--gray-100); height: auto; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600); padding: 5px 8px; }
+        .grille tr.groupe td.col-nom { background: var(--gray-100); }
+        .grille tr.pied td { background: var(--gray-50); height: auto; padding: 5px 4px; text-align: center; font-size: 11px; color: var(--gray-600); font-variant-numeric: tabular-nums; }
+        .grille tr.pied td.col-nom { background: var(--gray-50); font-weight: 700; text-align: left; padding-left: 8px; }
+        .nom-sal { font-weight: 700; line-height: 1.25; }
+        .nom-sal small { display: block; font-weight: 500; color: var(--gray-500); font-size: 10px; }
+        .pastille { display: inline-block; padding: 0 6px; border-radius: 9px; font-size: 10px; font-weight: 700; background: var(--orange-light); color: var(--orange); }
+        .pastille.grave { background: var(--red-light); color: var(--red); }
+
+        .sh { display: block; width: 100%; border: 0; border-left: 3px solid var(--gray-400); background: var(--gray-100); border-radius: 5px; padding: 3px 5px; margin-bottom: 2px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-800); font-variant-numeric: tabular-nums; line-height: 1.25; font-family: inherit; }
+        .sh small { display: block; font-weight: 500; font-size: 10px; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sh.salle { background: var(--orange-light); border-left-color: var(--orange); }
+        .sh.cuisine { background: var(--blue-light); border-left-color: var(--blue); }
+        .sh.plonge { background: var(--purple-light); border-left-color: var(--purple); }
+        .sh.absence { background: var(--gray-200); border-left-color: var(--gray-500); color: var(--gray-600); }
+        .sh.ailleurs { background: white; border: 1px dashed var(--gray-300); border-left: 3px dashed var(--gray-400); color: var(--gray-500); }
+        .sh.alerte { box-shadow: inset 0 0 0 1.5px var(--red); }
+        button.sh { cursor: pointer; }
+        .plus { display: block; width: 100%; border: 0; background: none; color: var(--gray-400); font-size: 13px; line-height: 1; padding: 2px; cursor: pointer; }
+
+        .ecart-pos { color: var(--blue); font-weight: 700; }
+        .ecart-neg { color: var(--red); font-weight: 700; }
+        .muted { color: var(--gray-400); }
+
+        .alerte-ligne { padding: 8px 14px; border-top: 1px solid var(--gray-100); font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+        .alerte-ligne b { white-space: nowrap; }
+
+        /* Vue jour */
+        .tl { position: relative; min-width: 860px; }
+        .tl-echelle { display: flex; margin-left: 150px; border-bottom: 1px solid var(--gray-200); }
+        .tl-echelle span { flex: 1; font-size: 10px; color: var(--gray-500); padding: 4px 0 4px 2px; border-left: 1px solid var(--gray-100); }
+        .tl-ligne { display: flex; align-items: stretch; border-bottom: 1px solid var(--gray-100); min-height: 34px; }
+        .tl-nom { width: 150px; flex-shrink: 0; padding: 7px 8px; font-size: 12px; font-weight: 700; }
+        .tl-piste { flex: 1; position: relative; background-image: linear-gradient(to right, var(--gray-100) 1px, transparent 1px); background-size: 5.5555% 100%; }
+        .tl-barre { position: absolute; top: 5px; bottom: 5px; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 3px 6px; overflow: hidden; white-space: nowrap; font-variant-numeric: tabular-nums; border-left: 3px solid var(--gray-400); background: var(--gray-100); }
+        .tl-barre.salle { background: var(--orange-light); border-left-color: var(--orange); }
+        .tl-barre.cuisine { background: var(--blue-light); border-left-color: var(--blue); }
+        .tl-barre.plonge { background: var(--purple-light); border-left-color: var(--purple); }
+        .tl-groupe { background: var(--gray-100); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600); padding: 5px 8px; }
+        .tl-couv { display: flex; margin-left: 150px; }
+        .tl-couv span { flex: 1; text-align: center; font-size: 11px; font-weight: 700; padding: 5px 0; color: var(--gray-600); font-variant-numeric: tabular-nums; border-left: 1px solid white; background: var(--accent-light); }
+
+        /* Tableaux simples */
+        table.liste { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .liste th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-500); padding: 8px 12px; background: var(--gray-50); white-space: nowrap; }
+        .liste td { padding: 10px 12px; border-top: 1px solid var(--gray-100); vertical-align: middle; }
+        .liste td.num, .liste th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .statut { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .statut.ok { background: var(--green-light); color: var(--green); }
+        .statut.attente { background: var(--gray-100); color: var(--gray-600); }
+        .statut.refaire { background: var(--orange-light); color: var(--orange); }
+
+        .moi-jour { display: flex; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--gray-100); align-items: baseline; }
+        .moi-jour .j { width: 118px; flex-shrink: 0; font-weight: 700; font-size: 13px; text-transform: capitalize; }
+        .moi-jour .d { flex: 1; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .moi-jour .d small { display: block; font-weight: 500; font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        .moi-jour .repos { color: var(--gray-400); font-weight: 500; }
+
+        .btn-primary { background: var(--accent); color: white; border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-primary:disabled { opacity: 0.4; cursor: default; }
+        .btn-small { border: 1px solid var(--gray-200); background: white; border-radius: 8px; padding: 8px 11px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        select.btn-small { color: var(--gray-800); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { font-size: 16px; margin-bottom: 4px; }
+        .modal .sub { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; line-height: 1.5; }
+        .form-label { display: block; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 4px; }
+        .form-input { width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--gray-50); font-family: inherit; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-row.trois { grid-template-columns: 1fr 1fr 1fr; }
+        .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+        .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid var(--gray-200); background: white; }
+        .modal-btns button.primary { background: var(--accent); color: white; border: none; }
+        .modal-btns button.danger { background: var(--red); color: white; border: none; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip { border: 1px solid var(--gray-200); background: white; border-radius: 16px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; }
+        .chip.on { background: var(--accent); border-color: var(--accent); color: white; }
+        .duree-live { font-size: 12px; color: var(--gray-500); margin-top: 6px; }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; display: none; z-index: 200; max-width: 90%; text-align: center; }
+
+        @page { size: A4 landscape; margin: 8mm; }
+        @media print {
+            header .btn-back, .pl-tabs, .nav button, .actions, .info, .kpis, .plus, .no-print, #toast { display: none !important; }
+            body { background: white; padding: 0; }
+            header { position: static; border: 0; padding: 0; }
+            main { max-width: none; padding: 0; }
+            .card, .nav { box-shadow: none; border: 0; }
+            .scroll { overflow: visible; }
+            table.grille { min-width: 0; font-size: 10px; }
+            .grille th.col-nom, .grille td.col-nom { position: static; width: 120px; }
+            .sh, .sh small { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+
+        /* iOS 26 Liquid Glass : degager les en-tetes de la barre de statut. */
+        @supports (padding: env(safe-area-inset-top)) {
+            header, .header {
+                padding-top: calc(12px + env(safe-area-inset-top)) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <h1>🗓️ Planning</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="etab-badge" id="etab-badge"></span>
+                <button class="btn-back" onclick="location.href='../'">← Portail</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="pl-tabs" id="tabs"></div>
+
+    <main id="main"><div class="empty">Chargement…</div></main>
+
+    <!-- Modale : horaire ou absence -->
+    <div class="modal-overlay" id="shift-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="s-titre"></h2>
+            <div class="sub" id="s-sub"></div>
+            <label class="form-label">Type</label>
+            <div class="chips" id="s-natures"></div>
+            <div id="s-bloc-travail">
+                <div id="s-bloc-modeles">
+                    <label class="form-label">Horaires types</label>
+                    <div class="chips" id="s-modeles"></div>
+                </div>
+                <div class="form-row trois">
+                    <div><label class="form-label">Début</label><input class="form-input" type="time" id="s-debut" oninput="majDureeLive()"></div>
+                    <div><label class="form-label">Fin</label><input class="form-input" type="time" id="s-fin" oninput="majDureeLive()"></div>
+                    <div><label class="form-label">Pause (min)</label><input class="form-input" type="number" id="s-pause" inputmode="numeric" min="0" step="5" oninput="majDureeLive()"></div>
+                </div>
+                <div class="duree-live" id="s-duree"></div>
+                <div class="form-row">
+                    <div>
+                        <label class="form-label">Équipe</label>
+                        <select class="form-input" id="s-equipe">
+                            <option value="salle">Salle</option>
+                            <option value="cuisine">Cuisine</option>
+                            <option value="plonge">Plonge</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                    <div><label class="form-label">Note</label><input class="form-input" type="text" id="s-poste" placeholder="Ex : mise en place Liesel"></div>
+                </div>
+            </div>
+            <div id="s-bloc-repeter">
+                <label class="form-label">Appliquer aussi à</label>
+                <div class="chips" id="s-jours"></div>
+            </div>
+            <div class="modal-btns" id="s-btns"></div>
+        </div>
+    </div>
+
+    <!-- Modale : ajouter un salarie a la semaine -->
+    <div class="modal-overlay" id="ajout-modal" style="display:none;">
+        <div class="modal">
+            <h2>Ajouter un salarié à cette semaine</h2>
+            <div class="sub">Pour un renfort de l’autre établissement ou un salarié sans contrat saisi.</div>
+            <select class="form-input" id="ajout-user"></select>
+            <div class="modal-btns">
+                <button onclick="fermerModale('ajout-modal')">Annuler</button>
+                <button class="primary" onclick="validerAjout()">Ajouter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : copier une semaine -->
+    <div class="modal-overlay" id="copie-modal" style="display:none;">
+        <div class="modal">
+            <h2>Remplir cette semaine</h2>
+            <div class="sub" id="copie-sub"></div>
+            <label class="form-label">Copier depuis</label>
+            <select class="form-input" id="copie-source">
+                <option value="pbt">Planning PlanB-Tools</option>
+                <option value="combo">Planning Combo</option>
+            </select>
+            <label class="form-label">Un jour de la semaine à copier</label>
+            <input class="form-input" type="date" id="copie-date">
+            <div class="modal-btns">
+                <button onclick="fermerModale('copie-modal')">Annuler</button>
+                <button class="primary" onclick="lancerCopie()">Copier</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : horaire type -->
+    <div class="modal-overlay" id="modele-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="m-titre">Horaire type</h2>
+            <label class="form-label">Nom</label>
+            <input class="form-input" type="text" id="m-libelle" placeholder="Ex : Soir">
+            <label class="form-label">Équipe</label>
+            <select class="form-input" id="m-equipe">
+                <option value="salle">Salle</option>
+                <option value="cuisine">Cuisine</option>
+                <option value="plonge">Plonge</option>
+                <option value="autre">Autre</option>
+            </select>
+            <div class="form-row trois">
+                <div><label class="form-label">Début</label><input class="form-input" type="time" id="m-debut"></div>
+                <div><label class="form-label">Fin</label><input class="form-input" type="time" id="m-fin"></div>
+                <div><label class="form-label">Pause (min)</label><input class="form-input" type="number" id="m-pause" inputmode="numeric" min="0" step="5"></div>
+            </div>
+            <div class="modal-btns">
+                <button onclick="fermerModale('modele-modal')">Annuler</button>
+                <button class="primary" onclick="enregistrerModele()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : signature -->
+    <div class="modal-overlay" id="signature-modal" style="display:none;">
+        <div class="modal">
+            <h2>Signer mon planning</h2>
+            <div class="sub" id="sig-sub"></div>
+            <label class="form-label">Ton code personnel</label>
+            <input class="form-input" type="password" id="sig-pin" inputmode="numeric" autocomplete="off">
+            <div class="modal-btns">
+                <button onclick="fermerModale('signature-modal')">Annuler</button>
+                <button class="primary" onclick="signer()">Signer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale generique de confirmation -->
+    <div class="modal-overlay" id="confirm-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="confirm-titre"></h2>
+            <div class="sub" id="confirm-texte" style="white-space:pre-line"></div>
+            <div class="modal-btns" id="confirm-btns"></div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../js/planb-common.js"></script>
+    <script>
+        const sb = PLANB.client();
+        const currentUser = JSON.parse(sessionStorage.getItem('planb_user') || 'null');
+        const currentEstablishment = sessionStorage.getItem('planb_etablissement');
+        if (!currentUser || !currentEstablishment) location.replace('../');
+        // Meme regle que la fonction SQL pbt_planning_gestion
+        const peutGerer = !!currentUser && (['admin', 'manager'].includes(currentUser.role)
+            || (Array.isArray(currentUser.acces_modules) && currentUser.acces_modules.includes('planning_gestion')));
+
+        const DATE_BASCULE = '2027-01-01';
+        const ORDRE_EQUIPES = ['salle', 'cuisine', 'plonge', 'autre'];
+        const LIB_EQUIPE = { salle: 'Salle', cuisine: 'Cuisine', plonge: 'Plonge', autre: 'Autre' };
+        const LIB_NATURE = { travail: 'Travail', cp: 'Congé payé', maladie: 'Maladie', formation: 'Formation', absence: 'Absence', ferie: 'Férié' };
+        const LIB_ETAB = { freddy: 'Freddy', liesel: 'Liesel' };
+        const JOURS_COURTS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+        // Seuils HCR, a confirmer avec le cabinet paie avant la bascule
+        const REGLES = {
+            reposQuotidienMin: 11 * 60,
+            maxJourCuisineMin: 11 * 60,
+            maxJourAutresMin: 11 * 60 + 30,
+            maxSemaineMin: 48 * 60,
+            pauseApresMin: 6 * 60,
+            pauseMin: 20,
+        };
+        const TL_DEBUT = 6, TL_FIN = 24;   // vue jour : de 6 h a minuit
+
+        let onglet = peutGerer ? 'semaine' : 'moi';
+        let semaineDebut = null;
+        let jourCourant = null;
+        let lignes = [];        // brouillon (gestion) ou publie, semaine +/- 1 jour, tous etablissements
+        let publies = [];       // publie de la semaine et de l etablissement (gestion)
+        let derniere = null;    // derniere publication de la semaine
+        let modeles = [];
+        let contrats = [];
+        let users = [];
+        let reservations = [];
+        let signatures = [];
+        let ajoutsManuels = new Set();
+        let filtreEquipe = 'toutes';
+        let edition = null;     // { user, date, shift|null, nature, jours:Set }
+        let modeleEdition = null;
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? 'var(--red)' : (type === 'success' ? 'var(--green)' : 'var(--gray-800)');
+            t.style.display = 'block';
+            clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200);
+        }
+        function fermerModale(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Dates en heure locale (toISOString decalerait d un jour autour de minuit)
+        function isoLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        function lundiDe(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
+        function addJours(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function dateDe(iso) { return new Date(iso + 'T12:00:00'); }
+        function joursSemaine() { return [0, 1, 2, 3, 4, 5, 6].map(i => isoLocal(addJours(semaineDebut, i))); }
+        function libJour(iso) { return dateDe(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); }
+        function libSemaine() {
+            const o = { day: 'numeric', month: 'long' };
+            return 'Semaine du ' + semaineDebut.toLocaleDateString('fr-FR', o) + ' au ' + addJours(semaineDebut, 6).toLocaleDateString('fr-FR', { ...o, year: 'numeric' });
+        }
+        function hhmm(t) { return t ? String(t).slice(0, 5) : ''; }
+        function enMinutes(t) { const [h, m] = hhmm(t).split(':').map(Number); return h * 60 + m; }
+        function hLib(min) { const m = Math.round(min); return Math.floor(Math.abs(m) / 60) + 'h' + String(Math.abs(m) % 60).padStart(2, '0'); }
+        function hDec(min) { return ((min || 0) / 60).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' h'; }
+        function dureeBrute(s) { const d = enMinutes(s.heure_debut); let f = enMinutes(s.heure_fin); if (f <= d) f += 1440; return f - d; }
+        function dureeNette(s) { return s.nature === 'travail' ? dureeBrute(s) - (s.pause_minutes || 0) : 0; }
+        function jourIndex(iso) { return Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000); }
+        function debutAbs(s) { return jourIndex(s.date_service) * 1440 + enMinutes(s.heure_debut); }
+        function finAbs(s) { return debutAbs(s) + dureeBrute(s); }
+        function normEquipe(e) { const t = String(e || '').toLowerCase(); if (t.includes('plonge')) return 'plonge'; return LIB_EQUIPE[t] ? t : 'autre'; }
+
+        function contratAu(userId, iso) {
+            return contrats.filter(c => c.user_id === userId && c.date_debut <= iso && (!c.date_fin || c.date_fin >= iso))
+                .sort((a, b) => b.date_debut.localeCompare(a.date_debut))[0] || null;
+        }
+        function contratDeLaSemaine(userId) {
+            const j = joursSemaine();
+            return contratAu(userId, j[3]) || j.map(d => contratAu(userId, d)).find(Boolean) || null;
+        }
+        function equipeDe(u) { const c = contratDeLaSemaine(u.id); return c ? normEquipe(c.equipe) : normEquipe(u.equipe); }
+        function userDe(id) { return users.find(u => u.id === id) || null; }
+
+        function lignesSemaine() { const j = joursSemaine(); return lignes.filter(s => s.date_service >= j[0] && s.date_service <= j[6]); }
+        function ici(s) { return s.etablissement === currentEstablishment; }
+
+        // Salaries affiches : contrat dans cet etablissement, horaire deja pose ici, ou ajout manuel
+        function salariesGrille() {
+            const j = joursSemaine();
+            const ids = new Set(ajoutsManuels);
+            for (const c of contrats) {
+                if (c.etablissement === currentEstablishment && c.date_debut <= j[6] && (!c.date_fin || c.date_fin >= j[0])) ids.add(c.user_id);
+            }
+            for (const s of lignesSemaine()) if (ici(s)) ids.add(s.user_id);
+            return users.filter(u => ids.has(u.id));
+        }
+
+        // ============ ALERTES ============
+        // Calcul sur tous les etablissements : un salarie partage reste une seule personne.
+        function calculerAlertes() {
+            const res = [];
+            const j = joursSemaine();
+            const parUser = {};
+            for (const s of lignes) (parUser[s.user_id] = parUser[s.user_id] || []).push(s);
+            for (const uid of Object.keys(parUser)) {
+                const u = userDe(uid);
+                const nom = u ? u.nom : 'Salarié inconnu';
+                const ajouter = (date, txt, g, ids) => res.push({ uid, nom, date, txt, g, ids: ids || [] });
+                const tous = parUser[uid];
+                const travail = tous.filter(s => s.nature === 'travail').sort((a, b) => debutAbs(a) - debutAbs(b));
+                const dansSemaine = s => s.date_service >= j[0] && s.date_service <= j[6];
+
+                for (let i = 1; i < travail.length; i++) {
+                    const a = travail[i - 1], b = travail[i];
+                    if (!dansSemaine(a) && !dansSemaine(b)) continue;
+                    const ecart = debutAbs(b) - finAbs(a);
+                    if (ecart < 0) ajouter(b.date_service, 'Deux horaires se chevauchent', true, [a.id, b.id]);
+                    else if (a.date_service !== b.date_service && ecart < REGLES.reposQuotidienMin) ajouter(b.date_service, 'Repos de ' + hLib(ecart) + ' seulement depuis la veille (minimum 11 h)', true, [a.id, b.id]);
+                }
+
+                const semaine = travail.filter(dansSemaine);
+                const parJour = {};
+                for (const s of semaine) (parJour[s.date_service] = parJour[s.date_service] || []).push(s);
+                for (const [date, liste] of Object.entries(parJour)) {
+                    const total = liste.reduce((t, s) => t + dureeNette(s), 0);
+                    const max = liste.some(s => s.equipe === 'cuisine') ? REGLES.maxJourCuisineMin : REGLES.maxJourAutresMin;
+                    if (total > max) ajouter(date, hLib(total) + ' dans la journée (maximum ' + hLib(max) + ')', true, liste.map(s => s.id));
+                    if (tous.some(s => s.nature !== 'travail' && s.date_service === date)) ajouter(date, 'Horaire et absence le même jour', false, liste.map(s => s.id));
+                }
+                for (const s of semaine) {
+                    if (dureeBrute(s) > REGLES.pauseApresMin && (s.pause_minutes || 0) < REGLES.pauseMin) ajouter(s.date_service, 'Plus de 6 h avec moins de 20 min de pause', false, [s.id]);
+                    if (!contratAu(uid, s.date_service)) ajouter(s.date_service, contrats.some(c => c.user_id === uid) ? 'Hors des dates du contrat' : 'Aucun contrat saisi', contrats.some(c => c.user_id === uid), [s.id]);
+                }
+                const totalSemaine = semaine.reduce((t, s) => t + dureeNette(s), 0);
+                if (totalSemaine > REGLES.maxSemaineMin) ajouter(null, hLib(totalSemaine) + ' sur la semaine (maximum 48 h)', true);
+                const nbJours = Object.keys(parJour).length;
+                if (nbJours === 7) ajouter(null, 'Aucun jour de repos dans la semaine', true);
+                else if (nbJours === 6) ajouter(null, 'Un seul jour de repos dans la semaine (HCR : 2)', false);
+            }
+            return res;
+        }
+
+        // ============ CHARGEMENT ============
+        async function chargerSemaine() {
+            const j = joursSemaine();
+            const avant = isoLocal(addJours(semaineDebut, -1));
+            const apres = isoLocal(addJours(semaineDebut, 7));
+            const table = peutGerer ? 'planning_shifts' : 'planning_publies';
+            const [rl, rp, rd, rm, rc, ru] = await Promise.all([
+                sb.from(table).select('*').gte('date_service', avant).lte('date_service', apres),
+                peutGerer
+                    ? sb.from('planning_publies').select('*').eq('etablissement', currentEstablishment).gte('date_service', j[0]).lte('date_service', j[6])
+                    : Promise.resolve({ data: [] }),
+                sb.from('planning_publications').select('*').eq('etablissement', currentEstablishment).eq('semaine', j[0]).order('version', { ascending: false }).limit(1),
+                sb.from('planning_modeles').select('*').eq('actif', true).order('heure_debut'),
+                sb.from('rh_contrats').select('user_id, etablissement, equipe, heures_hebdo, date_debut, date_fin, type_contrat'),
+                sb.from('users').select('id, nom, initiales, equipe, etablissement, acces_etablissements, role').eq('actif', true).order('nom'),
+            ]);
+            for (const r of [rl, rp, rd, rm, rc, ru]) if (r.error) throw r.error;
+            lignes = rl.data || [];
+            publies = rp.data || [];
+            derniere = (rd.data || [])[0] || null;
+            modeles = rm.data || [];
+            contrats = rc.data || [];
+            users = ru.data || [];
+            // Couverts reserves : un plus, le planning reste utilisable sans
+            const rr = await sb.from('reservations_thefork').select('date, service, couverts, statut')
+                .eq('etablissement', currentEstablishment).gte('date', j[0]).lte('date', j[6]).neq('statut', 'CANCELED');
+            reservations = rr.error ? [] : (rr.data || []);
+        }
+
+        async function chargerSignatures() {
+            const { data, error } = await sb.rpc('pbt_planning_etat_signatures', { p_lundi: isoLocal(semaineDebut) });
+            if (error) throw error;
+            signatures = data || [];
+        }
+
+        // Modifications du brouillon pas encore publiees (cet etablissement, cette semaine)
+        function cle(s) { return [s.user_id, s.date_service, s.nature, hhmm(s.heure_debut), hhmm(s.heure_fin), s.pause_minutes || 0, s.equipe, s.poste || ''].join('|'); }
+        function nbModifsNonPubliees() {
+            const a = lignesSemaine().filter(ici).map(cle).sort();
+            const b = publies.map(cle).sort();
+            const reste = [...b];
+            let diff = 0;
+            for (const k of a) { const i = reste.indexOf(k); if (i >= 0) reste.splice(i, 1); else diff++; }
+            return diff + reste.length;
+        }
+
+        // ============ VUE SEMAINE ============
+        function chipShift(s, alerteIds) {
+            const u = hhmm(s.heure_debut) + '–' + hhmm(s.heure_fin);
+            const cliquable = peutGerer && ici(s);
+            const attrs = cliquable ? `onclick="event.stopPropagation(); ouvrirShift('${s.id}')"` : '';
+            const tag = cliquable ? 'button' : 'div';
+            if (s.nature !== 'travail') return `<${tag} class="sh absence" ${attrs}>${esc(LIB_NATURE[s.nature] || s.nature)}</${tag}>`;
+            if (!ici(s)) return `<div class="sh ailleurs">${u}<small>${esc(LIB_ETAB[s.etablissement] || s.etablissement)}</small></div>`;
+            const classes = 'sh ' + normEquipe(s.equipe) + (alerteIds.has(s.id) ? ' alerte' : '');
+            return `<${tag} class="${classes}" ${attrs}>${u}${s.poste ? `<small>${esc(s.poste)}</small>` : ''}</${tag}>`;
+        }
+
+        function renderGrille(alertes) {
+            const j = joursSemaine();
+            const auj = isoLocal(new Date());
+            const alerteIds = new Set(alertes.filter(a => a.g).flatMap(a => a.ids));
+            const sem = lignesSemaine();
+            let liste = salariesGrille();
+            if (filtreEquipe !== 'toutes') liste = liste.filter(u => equipeDe(u) === filtreEquipe);
+
+            let html = `<div class="card"><div class="scroll"><table class="grille"><thead><tr><th class="col-nom">Salarié</th>`;
+            j.forEach((d, i) => {
+                html += `<th class="${d === auj ? 'auj' : ''}">${JOURS_COURTS[i]} ${dateDe(d).getDate()}</th>`;
+            });
+            html += `${peutGerer ? '<th class="col-tot">Heures</th>' : ''}</tr></thead><tbody>`;
+
+            for (const eq of ORDRE_EQUIPES) {
+                const duGroupe = liste.filter(u => equipeDe(u) === eq);
+                if (!duGroupe.length) continue;
+                html += `<tr class="groupe"><td class="col-nom">${LIB_EQUIPE[eq]}</td><td colspan="${peutGerer ? 8 : 7}"></td></tr>`;
+                for (const u of duGroupe) {
+                    const c = contratDeLaSemaine(u.id);
+                    const a = alertes.filter(x => x.uid === u.id);
+                    const graves = a.filter(x => x.g).length;
+                    const pastille = peutGerer && a.length ? ` <span class="pastille${graves ? ' grave' : ''}">${a.length}</span>` : '';
+                    html += `<tr><td class="col-nom"><div class="nom-sal">${esc(u.nom)}${pastille}${peutGerer ? `<small>${c ? Number(c.heures_hebdo).toLocaleString('fr-FR') + ' h · ' + esc(c.type_contrat.toUpperCase()) : 'Contrat non saisi'}</small>` : ''}</div></td>`;
+                    for (const d of j) {
+                        const duJour = sem.filter(s => s.user_id === u.id && s.date_service === d).sort((x, y) => hhmm(x.heure_debut).localeCompare(hhmm(y.heure_debut)));
+                        const edit = peutGerer;
+                        const clic = edit ? `onclick="nouveauShift('${u.id}','${d}')"` : '';
+                        html += `<td class="jour${edit ? ' editable' : ''}" ${clic}>${duJour.map(s => chipShift(s, alerteIds)).join('')}${edit && duJour.length ? '<button class="plus">+</button>' : ''}</td>`;
+                    }
+                    if (peutGerer) html += `<td class="col-tot">${celluleTotal(u, c)}</td>`;
+                    html += '</tr>';
+                }
+            }
+            if (!liste.length) html += `<tr><td colspan="9" class="empty">Aucun salarié à afficher.</td></tr>`;
+
+            // Pied : effectifs, heures, couverts reserves
+            const iciSem = sem.filter(s => ici(s) && s.nature === 'travail');
+            const pied = (lib, f) => `<tr class="pied"><td class="col-nom">${lib}</td>${j.map(d => `<td>${f(d)}</td>`).join('')}${peutGerer ? '<td class="col-tot"></td>' : ''}</tr>`;
+            html += pied('Effectif', d => {
+                const noms = iciSem.filter(s => s.date_service === d);
+                const parts = ORDRE_EQUIPES.map(e => [e, new Set(noms.filter(s => normEquipe(s.equipe) === e).map(s => s.user_id)).size]).filter(x => x[1]);
+                return parts.length ? parts.map(p => LIB_EQUIPE[p[0]].charAt(0) + ' ' + p[1]).join(' · ') : '—';
+            });
+            if (peutGerer) html += pied('Heures', d => { const t = iciSem.filter(s => s.date_service === d).reduce((x, s) => x + dureeNette(s), 0); return t ? hDec(t) : '—'; });
+            if (reservations.length) {
+                html += pied('Couverts réservés', d => {
+                    const n = sv => reservations.filter(r => r.date === d && r.service === sv).reduce((t, r) => t + (r.couverts || 0), 0);
+                    return (n('midi') || n('soir')) ? n('midi') + ' / ' + n('soir') : '—';
+                });
+            }
+            html += '</tbody></table></div></div>';
+            return html;
+        }
+
+        function celluleTotal(u, c) {
+            const sem = lignesSemaine().filter(s => s.user_id === u.id);
+            const total = sem.reduce((t, s) => t + dureeNette(s), 0);
+            if (!c) return `<b>${hLib(total)}</b>`;
+            // Une journee d absence compte pour un cinquieme des heures du contrat
+            const jAbs = new Set(sem.filter(s => s.nature !== 'travail').map(s => s.date_service)).size;
+            const attendu = Number(c.heures_hebdo) * 60 * (1 - Math.min(jAbs, 5) / 5);
+            const e = total - attendu;
+            const ecart = Math.abs(e) < 1 ? '<span class="muted">=</span>' : `<span class="${e > 0 ? 'ecart-pos' : 'ecart-neg'}">${e > 0 ? '+' : '−'}${hLib(e)}</span>`;
+            return `<b>${hLib(total)}</b><br>${ecart}`;
+        }
+
+        function renderSemaine() {
+            const main = document.getElementById('main');
+            const alertes = peutGerer ? calculerAlertes().filter(a => salariesGrille().some(u => u.id === a.uid)) : [];
+            const sem = lignesSemaine().filter(ici);
+            const modifs = peutGerer ? nbModifsNonPubliees() : 0;
+            const graves = alertes.filter(a => a.g).length;
+            const etat = derniere
+                ? `Publié le ${new Date(derniere.publie_le).toLocaleDateString('fr-FR')} par ${esc(derniere.publie_par_nom || '?')} · version ${derniere.version}`
+                : 'Pas encore publié';
+
+            let html = `<div class="nav">
+                <button onclick="changerSemaine(-1)">‹</button>
+                <div class="lib">${libSemaine()}<small>${etat}</small></div>
+                <button onclick="changerSemaine(1)">›</button>
+            </div>`;
+
+            if (peutGerer) {
+                const heures = sem.reduce((t, s) => t + dureeNette(s), 0);
+                html += `<div class="kpis">
+                    <div class="kpi"><div class="lbl">Heures planifiées</div><div class="val">${hDec(heures)}</div></div>
+                    <div class="kpi"><div class="lbl">Alertes à corriger</div><div class="val" style="color:${graves ? 'var(--red)' : 'var(--gray-400)'}">${graves}</div></div>
+                    <div class="kpi"><div class="lbl">À vérifier</div><div class="val" style="color:${alertes.length - graves ? 'var(--orange)' : 'var(--gray-400)'}">${alertes.length - graves}</div></div>
+                    <div class="kpi"><div class="lbl">Non publié</div><div class="val" style="color:${modifs ? 'var(--accent)' : 'var(--gray-400)'}">${modifs}</div></div>
+                </div>`;
+                if (joursSemaine()[6] < DATE_BASCULE) {
+                    html += `<div class="info">Phase de test : avant le 1<sup>er</sup> janvier 2027, Combo reste la référence. Ce planning n’alimente ni le Briefing, ni le TAF, et les salariés ne le voient pas encore.</div>`;
+                }
+                html += `<div class="actions">
+                    <select class="btn-small" onchange="filtreEquipe=this.value; renderSemaine()">
+                        <option value="toutes">Toutes les équipes</option>
+                        ${ORDRE_EQUIPES.map(e => `<option value="${e}" ${filtreEquipe === e ? 'selected' : ''}>${LIB_EQUIPE[e]}</option>`).join('')}
+                    </select>
+                    <span class="espace"></span>
+                    <button class="btn-small" onclick="ouvrirAjout()">+ Salarié</button>
+                    <button class="btn-small" onclick="ouvrirCopie()">📋 Copier une semaine</button>
+                    <button class="btn-small" onclick="window.print()">🖨️ Imprimer</button>
+                    <button class="btn-primary" ${modifs ? '' : 'disabled'} onclick="demanderPublication()">📣 Publier${modifs ? ' (' + modifs + ')' : ''}</button>
+                </div>`;
+            } else {
+                html += `<div class="actions"><button class="btn-small" onclick="window.print()">🖨️ Imprimer</button></div>`;
+            }
+
+            html += renderGrille(alertes);
+
+            if (alertes.length) {
+                const tri = [...alertes].sort((a, b) => (b.g - a.g) || String(a.date || '').localeCompare(String(b.date || '')) || a.nom.localeCompare(b.nom, 'fr'));
+                html += `<div class="card no-print"><div class="card-head"><span>Points à vérifier</span><span class="sub">Seuils HCR à confirmer avec le cabinet paie</span></div>`;
+                for (const a of tri) {
+                    html += `<div class="alerte-ligne"><span class="pastille${a.g ? ' grave' : ''}">${a.g ? 'À corriger' : 'À vérifier'}</span><b>${esc(a.nom)}</b><span>${a.date ? esc(dateDe(a.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })) + ' : ' : ''}${esc(a.txt)}</span></div>`;
+                }
+                html += '</div>';
+            }
+            main.innerHTML = html;
+        }
+
+        // ============ VUE JOUR ============
+        function renderJour() {
+            const main = document.getElementById('main');
+            const duJour = lignes.filter(s => s.date_service === jourCourant && ici(s));
+            const travail = duJour.filter(s => s.nature === 'travail');
+            const absents = duJour.filter(s => s.nature !== 'travail');
+            const n = TL_FIN - TL_DEBUT;
+            const couv = sv => reservations.filter(r => r.date === jourCourant && r.service === sv).reduce((t, r) => t + (r.couverts || 0), 0);
+
+            let html = `<div class="nav">
+                <button onclick="changerJour(-1)">‹</button>
+                <div class="lib" style="text-transform:capitalize">${libJour(jourCourant)}<small style="text-transform:none">${new Set(travail.map(s => s.user_id)).size} personne(s)${reservations.length ? ' · ' + couv('midi') + ' couverts midi · ' + couv('soir') + ' couverts soir' : ''}</small></div>
+                <button onclick="changerJour(1)">›</button>
+            </div>`;
+
+            html += `<div class="card"><div class="scroll"><div class="tl"><div class="tl-echelle">`;
+            for (let h = TL_DEBUT; h < TL_FIN; h++) html += `<span>${h}h</span>`;
+            html += '</div>';
+            for (const eq of ORDRE_EQUIPES) {
+                const duGroupe = travail.filter(s => normEquipe(s.equipe) === eq);
+                if (!duGroupe.length) continue;
+                html += `<div class="tl-groupe">${LIB_EQUIPE[eq]}</div>`;
+                const ids = [...new Set(duGroupe.map(s => s.user_id))];
+                const parNom = ids.map(id => ({ id, nom: (userDe(id) || {}).nom || '?' })).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+                for (const p of parNom) {
+                    html += `<div class="tl-ligne"><div class="tl-nom">${esc(p.nom)}</div><div class="tl-piste">`;
+                    for (const s of duGroupe.filter(x => x.user_id === p.id)) {
+                        const d = Math.max(enMinutes(s.heure_debut) / 60, TL_DEBUT);
+                        const f = Math.min(enMinutes(s.heure_debut) / 60 + dureeBrute(s) / 60, TL_FIN);
+                        const g = (d - TL_DEBUT) / n * 100, l = (f - d) / n * 100;
+                        html += `<div class="tl-barre ${eq}" style="left:${g}%;width:${l}%" title="${esc(s.poste || '')}">${hhmm(s.heure_debut)}–${hhmm(s.heure_fin)}</div>`;
+                    }
+                    html += '</div></div>';
+                }
+            }
+            if (!travail.length) html += '<div class="empty">Personne de planifié ce jour.</div>';
+            else {
+                html += '<div class="tl-couv">';
+                for (let h = TL_DEBUT; h < TL_FIN; h++) {
+                    const presents = new Set(travail.filter(s => { const a = enMinutes(s.heure_debut); return a < (h + 1) * 60 && a + dureeBrute(s) > h * 60; }).map(s => s.user_id)).size;
+                    html += `<span>${presents || ''}</span>`;
+                }
+                html += '</div>';
+            }
+            html += '</div></div></div>';
+            if (absents.length) {
+                html += `<div class="card"><div class="card-head">Absents</div>${absents.map(s => `<div class="alerte-ligne"><b>${esc((userDe(s.user_id) || {}).nom || '?')}</b><span>${esc(LIB_NATURE[s.nature] || s.nature)}</span></div>`).join('')}</div>`;
+            }
+            main.innerHTML = html;
+        }
+
+        // ============ SIGNATURES ============
+        function renderSignatures() {
+            const main = document.getElementById('main');
+            const j = joursSemaine();
+            const concernes = new Set(publies.map(p => p.user_id));
+            const liste = users.filter(u => concernes.has(u.id));
+            const etat = id => signatures.find(s => s.user_id === id) || null;
+            const nbOk = liste.filter(u => (etat(u.id) || {}).a_jour).length;
+            const nbRefaire = liste.filter(u => { const e = etat(u.id); return e && e.signe_le && !e.a_jour; }).length;
+
+            let html = `<div class="nav">
+                <button onclick="changerSemaine(-1)">‹</button>
+                <div class="lib">${libSemaine()}<small>Chaque salarié signe avec son code personnel</small></div>
+                <button onclick="changerSemaine(1)">›</button>
+            </div>
+            <div class="kpis">
+                <div class="kpi"><div class="lbl">Signés</div><div class="val" style="color:var(--green)">${nbOk}</div></div>
+                <div class="kpi"><div class="lbl">À signer de nouveau</div><div class="val" style="color:${nbRefaire ? 'var(--orange)' : 'var(--gray-400)'}">${nbRefaire}</div></div>
+                <div class="kpi"><div class="lbl">Pas encore signés</div><div class="val">${liste.length - nbOk - nbRefaire}</div></div>
+            </div>
+            <div class="card"><div class="scroll"><table class="liste">
+                <tr><th>Salarié</th><th class="num">Heures publiées</th><th>Signature</th></tr>`;
+            if (!liste.length) html += '<tr><td colspan="3" class="empty">Aucun planning publié pour cette semaine.</td></tr>';
+            for (const u of liste) {
+                const e = etat(u.id);
+                const h = publies.filter(p => p.user_id === u.id).reduce((t, s) => t + dureeNette(s), 0);
+                const st = e && e.a_jour
+                    ? `<span class="statut ok">Signé le ${new Date(e.signe_le).toLocaleDateString('fr-FR')}</span>`
+                    : (e && e.signe_le ? '<span class="statut refaire">Modifié depuis la signature</span>' : '<span class="statut attente">Pas encore signé</span>');
+                html += `<tr><td><b>${esc(u.nom)}</b></td><td class="num">${hLib(h)}</td><td>${st}</td></tr>`;
+            }
+            html += '</table></div></div>';
+            main.innerHTML = html;
+        }
+
+        // ============ MON PLANNING ============
+        function mesLignes() {
+            const j = joursSemaine();
+            const source = peutGerer ? monPublie : lignes;
+            return source.filter(s => s.user_id === currentUser.id && s.date_service >= j[0] && s.date_service <= j[6]);
+        }
+        let monPublie = [];
+
+        function renderMoi() {
+            const main = document.getElementById('main');
+            const j = joursSemaine();
+            const miens = mesLignes();
+            const total = miens.reduce((t, s) => t + dureeNette(s), 0);
+            const e = signatures.find(s => s.user_id === currentUser.id) || null;
+
+            let html = `<div class="nav">
+                <button onclick="changerSemaine(-1)">‹</button>
+                <div class="lib">${libSemaine()}<small>${esc(currentUser.nom)} · ${hLib(total)} planifiées</small></div>
+                <button onclick="changerSemaine(1)">›</button>
+            </div><div class="card">`;
+            if (!miens.length) {
+                html += '<div class="empty">Aucun planning publié pour toi cette semaine.</div></div>';
+                main.innerHTML = html;
+                return;
+            }
+            for (const d of j) {
+                const duJour = miens.filter(s => s.date_service === d).sort((a, b) => hhmm(a.heure_debut).localeCompare(hhmm(b.heure_debut)));
+                const lib = dateDe(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
+                html += `<div class="moi-jour"><div class="j">${esc(lib)}</div><div class="d">`;
+                if (!duJour.length) html += '<span class="repos">Repos</span>';
+                for (const s of duJour) {
+                    if (s.nature !== 'travail') { html += `<div>${esc(LIB_NATURE[s.nature] || s.nature)}</div>`; continue; }
+                    const info = [LIB_ETAB[s.etablissement], s.pause_minutes ? 'pause ' + s.pause_minutes + ' min' : '', s.poste].filter(Boolean).join(' · ');
+                    html += `<div>${hhmm(s.heure_debut)} – ${hhmm(s.heure_fin)}<small>${esc(info)}</small></div>`;
+                }
+                html += '</div></div>';
+            }
+            html += '</div>';
+            if (e && e.a_jour) {
+                html += `<div class="info" style="background:var(--green-light);border-color:#bbf7d0;color:var(--green)">✅ Tu as signé ce planning le ${new Date(e.signe_le).toLocaleDateString('fr-FR')}.</div>`;
+            } else {
+                if (e && e.signe_le) html += `<div class="info" style="background:var(--orange-light);border-color:#fed7aa;color:var(--orange)">Ton planning a changé depuis ta dernière signature. Relis-le, puis signe à nouveau.</div>`;
+                html += `<div class="actions"><button class="btn-primary" onclick="ouvrirSignature()">✍️ Signer ma semaine</button></div>`;
+            }
+            main.innerHTML = html;
+        }
+
+        function ouvrirSignature() {
+            document.getElementById('sig-sub').textContent = 'En signant, tu confirmes avoir pris connaissance de ton planning. ' + libSemaine() + '.';
+            document.getElementById('sig-pin').value = '';
+            document.getElementById('signature-modal').style.display = 'flex';
+            document.getElementById('sig-pin').focus();
+        }
+
+        async function signer() {
+            const pin = document.getElementById('sig-pin').value.trim();
+            if (!pin) { showToast('Saisis ton code', 'error'); return; }
+            try {
+                const { error } = await sb.rpc('pbt_planning_signer', { p_lundi: isoLocal(semaineDebut), p_pin: pin });
+                if (error) throw error;
+                fermerModale('signature-modal');
+                showToast('Planning signé', 'success');
+                await recharger();
+            } catch (e) {
+                console.error(e);
+                if (PLANB.erreurAuth(e)) return;
+                showToast(String(e.message || '').includes('Code incorrect') ? 'Code incorrect' : (String(e.message || '').includes('Trop de tentatives') ? e.message : 'Erreur de signature'), 'error');
+            } finally {
+                document.getElementById('sig-pin').value = '';
+            }
+        }
+
+        // ============ HORAIRES TYPES ============
+        function renderModeles() {
+            const main = document.getElementById('main');
+            const liste = modeles.filter(m => m.etablissement === currentEstablishment);
+            let html = `<div class="actions"><button class="btn-primary" onclick="ouvrirModele(null)">+ Nouvel horaire type</button></div>`;
+            for (const eq of ORDRE_EQUIPES) {
+                const duGroupe = liste.filter(m => m.equipe === eq);
+                if (!duGroupe.length) continue;
+                html += `<div class="card"><div class="card-head">${LIB_EQUIPE[eq]}</div><table class="liste">
+                    <tr><th>Nom</th><th>Horaires</th><th class="num">Pause</th><th class="num">Durée</th><th></th></tr>`;
+                for (const m of duGroupe) {
+                    const net = dureeBrute(m) - (m.pause_minutes || 0);
+                    html += `<tr><td><b>${esc(m.libelle)}</b></td><td>${hhmm(m.heure_debut)} – ${hhmm(m.heure_fin)}</td><td class="num">${m.pause_minutes} min</td><td class="num">${hLib(net)}</td>
+                        <td style="text-align:right;white-space:nowrap"><button class="btn-small" onclick="ouvrirModele('${m.id}')">✏️</button> <button class="btn-small" onclick="demanderRetraitModele('${m.id}')">🗑️</button></td></tr>`;
+                }
+                html += '</table></div>';
+            }
+            if (!liste.length) html += '<div class="card"><div class="empty">Aucun horaire type.</div></div>';
+            main.innerHTML = html;
+        }
+
+        function ouvrirModele(id) {
+            const m = id ? modeles.find(x => x.id === id) : null;
+            modeleEdition = m;
+            document.getElementById('m-titre').textContent = m ? 'Modifier l’horaire type' : 'Nouvel horaire type';
+            document.getElementById('m-libelle').value = m ? m.libelle : '';
+            document.getElementById('m-equipe').value = m ? m.equipe : 'salle';
+            document.getElementById('m-debut').value = m ? hhmm(m.heure_debut) : '';
+            document.getElementById('m-fin').value = m ? hhmm(m.heure_fin) : '';
+            document.getElementById('m-pause').value = m ? m.pause_minutes : 30;
+            document.getElementById('modele-modal').style.display = 'flex';
+        }
+
+        async function enregistrerModele() {
+            const libelle = document.getElementById('m-libelle').value.trim();
+            const heure_debut = document.getElementById('m-debut').value;
+            const heure_fin = document.getElementById('m-fin').value;
+            const pause_minutes = parseInt(document.getElementById('m-pause').value, 10) || 0;
+            if (!libelle || !heure_debut || !heure_fin || heure_debut === heure_fin) { showToast('Nom et horaires obligatoires', 'error'); return; }
+            const ligne = { etablissement: currentEstablishment, equipe: document.getElementById('m-equipe').value, libelle, heure_debut, heure_fin, pause_minutes };
+            try {
+                const r = modeleEdition
+                    ? await sb.from('planning_modeles').update(ligne).eq('id', modeleEdition.id)
+                    : await sb.from('planning_modeles').upsert({ ...ligne, actif: true }, { onConflict: 'etablissement,equipe,heure_debut,heure_fin,pause_minutes' });
+                if (r.error) throw r.error;
+                fermerModale('modele-modal');
+                showToast('Horaire type enregistré', 'success');
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur d’enregistrement', 'error'); }
+        }
+
+        function demanderRetraitModele(id) {
+            const m = modeles.find(x => x.id === id);
+            if (!m) return;
+            openConfirm('Retirer « ' + m.libelle + ' » ?', 'Les horaires déjà posés sur le planning ne changent pas.', [{ label: 'Retirer', cls: 'danger', action: async () => {
+                try {
+                    const { error } = await sb.from('planning_modeles').update({ actif: false }).eq('id', id);
+                    if (error) throw error;
+                    showToast('Horaire type retiré', 'success');
+                    await recharger();
+                } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur de suppression', 'error'); }
+            } }]);
+        }
+
+        // ============ SAISIE D UN HORAIRE ============
+        function nouveauShift(userId, date) {
+            if (!peutGerer) return;
+            ouvrirSaisie(userDe(userId), date, null);
+        }
+        function ouvrirShift(id) {
+            const s = lignes.find(x => x.id === id);
+            if (!s || !peutGerer) return;
+            ouvrirSaisie(userDe(s.user_id), s.date_service, s);
+        }
+
+        function ouvrirSaisie(u, date, s) {
+            if (!u) { showToast('Salarié introuvable ou inactif', 'error'); return; }
+            const equipe = s ? normEquipe(s.equipe) : equipeDe(u);
+            edition = { user: u, date, shift: s, nature: s ? s.nature : 'travail', jours: new Set() };
+            document.getElementById('s-titre').textContent = u.nom;
+            document.getElementById('s-sub').textContent = libJour(date);
+            document.getElementById('s-debut').value = s ? hhmm(s.heure_debut) : '';
+            document.getElementById('s-fin').value = s ? hhmm(s.heure_fin) : '';
+            document.getElementById('s-pause').value = s ? s.pause_minutes : 30;
+            document.getElementById('s-equipe').value = equipe;
+            document.getElementById('s-poste').value = s ? (s.poste || '') : '';
+
+            const mods = modeles.filter(m => m.etablissement === currentEstablishment && m.equipe === equipe);
+            document.getElementById('s-bloc-modeles').style.display = mods.length ? 'block' : 'none';
+            document.getElementById('s-modeles').innerHTML = mods.map(m =>
+                `<button class="chip" onclick="appliquerModele('${m.id}')">${esc(m.libelle)} ${hhmm(m.heure_debut)}–${hhmm(m.heure_fin)}</button>`).join('');
+
+            document.getElementById('s-bloc-repeter').style.display = s ? 'none' : 'block';
+            document.getElementById('s-jours').innerHTML = joursSemaine().map((d, i) => d === date ? '' :
+                `<button class="chip" id="sj-${d}" onclick="basculerJour('${d}')">${JOURS_COURTS[i]} ${dateDe(d).getDate()}</button>`).join('');
+
+            const btns = document.getElementById('s-btns');
+            btns.innerHTML = '';
+            const ajouter = (txt, cls, fn) => { const b = document.createElement('button'); b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; btns.appendChild(b); };
+            ajouter('Annuler', '', () => fermerModale('shift-modal'));
+            if (s) ajouter('Supprimer', 'danger', demanderSuppression);
+            ajouter('Enregistrer', 'primary', enregistrerShift);
+
+            renderNatures();
+            majDureeLive();
+            document.getElementById('shift-modal').style.display = 'flex';
+        }
+
+        function renderNatures() {
+            document.getElementById('s-natures').innerHTML = Object.keys(LIB_NATURE).map(n =>
+                `<button class="chip${edition.nature === n ? ' on' : ''}" onclick="choisirNature('${n}')">${LIB_NATURE[n]}</button>`).join('');
+            document.getElementById('s-bloc-travail').style.display = edition.nature === 'travail' ? 'block' : 'none';
+        }
+        function choisirNature(n) { edition.nature = n; renderNatures(); }
+        function basculerJour(d) {
+            if (edition.jours.has(d)) edition.jours.delete(d); else edition.jours.add(d);
+            document.getElementById('sj-' + d).classList.toggle('on', edition.jours.has(d));
+        }
+        function appliquerModele(id) {
+            const m = modeles.find(x => x.id === id);
+            if (!m) return;
+            document.getElementById('s-debut').value = hhmm(m.heure_debut);
+            document.getElementById('s-fin').value = hhmm(m.heure_fin);
+            document.getElementById('s-pause').value = m.pause_minutes;
+            majDureeLive();
+        }
+        function majDureeLive() {
+            const d = document.getElementById('s-debut').value, f = document.getElementById('s-fin').value;
+            const p = parseInt(document.getElementById('s-pause').value, 10) || 0;
+            const zone = document.getElementById('s-duree');
+            if (!d || !f || d === f) { zone.textContent = ''; return; }
+            const net = dureeBrute({ heure_debut: d, heure_fin: f }) - p;
+            zone.textContent = 'Temps de travail : ' + hLib(net) + (f < d ? ' (finit le lendemain)' : '');
+        }
+
+        async function enregistrerShift() {
+            const ed = edition;
+            if (!ed) return;
+            const base = {
+                user_id: ed.user.id, etablissement: currentEstablishment, nature: ed.nature,
+                saisi_par_id: currentUser.id, saisi_par_nom: currentUser.nom, updated_at: new Date().toISOString(),
+            };
+            if (ed.nature === 'travail') {
+                const d = document.getElementById('s-debut').value, f = document.getElementById('s-fin').value;
+                const p = parseInt(document.getElementById('s-pause').value, 10) || 0;
+                if (!d || !f || d === f) { showToast('Heures de début et de fin obligatoires', 'error'); return; }
+                if (p < 0 || dureeBrute({ heure_debut: d, heure_fin: f }) - p <= 0) { showToast('La pause dépasse la durée de l’horaire', 'error'); return; }
+                Object.assign(base, { heure_debut: d, heure_fin: f, pause_minutes: p, equipe: document.getElementById('s-equipe').value, poste: document.getElementById('s-poste').value.trim() || null });
+            } else {
+                Object.assign(base, { heure_debut: null, heure_fin: null, pause_minutes: 0, equipe: equipeDe(ed.user), poste: null });
+            }
+            try {
+                let r;
+                if (ed.shift) {
+                    r = await sb.from('planning_shifts').update({ ...base, date_service: ed.date }).eq('id', ed.shift.id);
+                } else {
+                    r = await sb.from('planning_shifts').insert([ed.date, ...ed.jours].map(date_service => ({ ...base, date_service })));
+                }
+                if (r.error) throw r.error;
+                fermerModale('shift-modal');
+                edition = null;
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur d’enregistrement', 'error'); }
+        }
+
+        function demanderSuppression() {
+            const ed = edition;
+            if (!ed || !ed.shift) return;
+            openConfirm('Supprimer cet horaire ?', ed.user.nom + ' — ' + libJour(ed.date), [{ label: 'Supprimer', cls: 'danger', action: async () => {
+                try {
+                    const { error } = await sb.from('planning_shifts').delete().eq('id', ed.shift.id);
+                    if (error) throw error;
+                    fermerModale('shift-modal');
+                    edition = null;
+                    await recharger();
+                } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur de suppression', 'error'); }
+            } }]);
+        }
+
+        // ============ AJOUT D UN SALARIE ============
+        function ouvrirAjout() {
+            const presents = new Set(salariesGrille().map(u => u.id));
+            const dispo = users.filter(u => !presents.has(u.id));
+            if (!dispo.length) { showToast('Tous les salariés actifs sont déjà affichés'); return; }
+            document.getElementById('ajout-user').innerHTML = dispo.map(u => `<option value="${u.id}">${esc(u.nom)}</option>`).join('');
+            document.getElementById('ajout-modal').style.display = 'flex';
+        }
+        function validerAjout() {
+            ajoutsManuels.add(document.getElementById('ajout-user').value);
+            fermerModale('ajout-modal');
+            renderSemaine();
+        }
+
+        // ============ COPIE D UNE SEMAINE ============
+        function ouvrirCopie() {
+            document.getElementById('copie-sub').textContent = 'Les horaires sont recopiés sur la ' + libSemaine().toLowerCase() + '. Les absences de la semaine source ne sont pas copiées.';
+            document.getElementById('copie-date').value = isoLocal(addJours(semaineDebut, -7));
+            document.getElementById('copie-modal').style.display = 'flex';
+        }
+
+        function lancerCopie() {
+            const source = document.getElementById('copie-source').value;
+            const date = document.getElementById('copie-date').value;
+            if (!date) { showToast('Choisis une semaine', 'error'); return; }
+            const lundi = lundiDe(dateDe(date));
+            if (isoLocal(lundi) === isoLocal(semaineDebut)) { showToast('Choisis une autre semaine que celle affichée', 'error'); return; }
+            fermerModale('copie-modal');
+            const existants = lignesSemaine().filter(s => ici(s) && s.nature === 'travail').length;
+            if (existants) {
+                openConfirm('Remplacer le brouillon ?', existants + ' horaire(s) déjà posés sur cette semaine seront remplacés. Les absences sont conservées, et le planning déjà publié ne change pas tant que tu ne publies pas.',
+                    [{ label: 'Remplacer', cls: 'danger', action: () => copierSemaine(source, lundi) }]);
+            } else {
+                copierSemaine(source, lundi);
+            }
+        }
+
+        function heureLocale(iso) { const d = new Date(iso); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+
+        async function lireSemaineSource(source, lundi) {
+            const d1 = isoLocal(lundi), d2 = isoLocal(addJours(lundi, 6));
+            if (source === 'pbt') {
+                const { data, error } = await sb.from('planning_shifts').select('*').eq('etablissement', currentEstablishment)
+                    .eq('nature', 'travail').gte('date_service', d1).lte('date_service', d2);
+                if (error) throw error;
+                return { lignes: data || [], ignores: 0 };
+            }
+            const { data, error } = await sb.from('combo_pointages')
+                .select('date_service, user_id, equipe, debut_planifie, fin_planifiee, pauses_planifiees_minutes')
+                .eq('etablissement', currentEstablishment).gte('date_service', d1).lte('date_service', d2);
+            if (error) throw error;
+            const planifies = (data || []).filter(c => c.debut_planifie && c.fin_planifiee);
+            const rattaches = planifies.filter(c => c.user_id && userDe(c.user_id));
+            return {
+                ignores: planifies.length - rattaches.length,
+                lignes: rattaches.map(c => ({
+                    user_id: c.user_id, date_service: c.date_service, equipe: normEquipe(c.equipe), poste: null,
+                    heure_debut: heureLocale(c.debut_planifie), heure_fin: heureLocale(c.fin_planifiee),
+                    pause_minutes: c.pauses_planifiees_minutes || 0,
+                })).filter(c => c.heure_debut !== c.heure_fin),
+            };
+        }
+
+        async function copierSemaine(source, lundi) {
+            try {
+                const src = await lireSemaineSource(source, lundi);
+                if (!src.lignes.length) { showToast('Aucun horaire trouvé sur cette semaine', 'error'); return; }
+                const decalage = jourIndex(isoLocal(semaineDebut)) - jourIndex(isoLocal(lundi));
+                let horsContrat = 0;
+                const nouvelles = [];
+                for (const s of src.lignes) {
+                    if (!userDe(s.user_id)) continue;
+                    const date_service = isoLocal(addJours(dateDe(s.date_service), decalage));
+                    if (contrats.some(c => c.user_id === s.user_id) && !contratAu(s.user_id, date_service)) { horsContrat++; continue; }
+                    nouvelles.push({
+                        user_id: s.user_id, date_service, etablissement: currentEstablishment, nature: 'travail', equipe: normEquipe(s.equipe),
+                        heure_debut: hhmm(s.heure_debut), heure_fin: hhmm(s.heure_fin), pause_minutes: s.pause_minutes || 0, poste: s.poste || null,
+                        saisi_par_id: currentUser.id, saisi_par_nom: currentUser.nom,
+                    });
+                }
+                const j = joursSemaine();
+                const { error: e1 } = await sb.from('planning_shifts').delete().eq('etablissement', currentEstablishment).eq('nature', 'travail').gte('date_service', j[0]).lte('date_service', j[6]);
+                if (e1) throw e1;
+                if (nouvelles.length) {
+                    const { error: e2 } = await sb.from('planning_shifts').insert(nouvelles);
+                    if (e2) throw e2;
+                }
+                const notes = [];
+                if (horsContrat) notes.push(horsContrat + ' hors contrat');
+                if (src.ignores) notes.push(src.ignores + ' sans compte PlanB-Tools');
+                showToast(nouvelles.length + ' horaires copiés' + (notes.length ? ' (ignorés : ' + notes.join(', ') + ')' : ''), 'success');
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur de copie', 'error'); }
+        }
+
+        // ============ PUBLICATION ============
+        function demanderPublication() {
+            const graves = calculerAlertes().filter(a => a.g && salariesGrille().some(u => u.id === a.uid));
+            const texte = (graves.length
+                ? graves.length + ' alerte(s) à corriger restent sur cette semaine :\n' + graves.slice(0, 5).map(a => '• ' + a.nom + ' : ' + a.txt).join('\n') + (graves.length > 5 ? '\n…' : '') + '\n\n'
+                : '') + (joursSemaine()[6] >= DATE_BASCULE
+                    ? 'Les salariés verront ce planning et le Briefing et le TAF seront mis à jour.'
+                    : 'Les salariés concernés devront signer à nouveau si leurs horaires ont changé. Le Briefing et le TAF restent alimentés par Combo jusqu’à la bascule.');
+            openConfirm('Publier cette semaine ?', texte, [{ label: graves.length ? 'Publier quand même' : 'Publier', cls: graves.length ? 'danger' : 'primary', action: publier }]);
+        }
+
+        async function publier() {
+            try {
+                const { data, error } = await sb.rpc('pbt_planning_publier', { p_etab: currentEstablishment, p_lundi: isoLocal(semaineDebut) });
+                if (error) throw error;
+                showToast('Planning publié (version ' + data.version + ')', 'success');
+                await recharger();
+            } catch (e) { console.error(e); if (PLANB.erreurAuth(e)) return; showToast('Erreur de publication', 'error'); }
+        }
+
+        // ============ COMMUN ============
+        function openConfirm(titre, texte, boutons) {
+            document.getElementById('confirm-titre').textContent = titre;
+            document.getElementById('confirm-texte').textContent = texte;
+            const zone = document.getElementById('confirm-btns');
+            zone.innerHTML = '';
+            const close = () => { document.getElementById('confirm-modal').style.display = 'none'; };
+            [{ label: 'Annuler', cls: '', action: null }, ...boutons].forEach(b => {
+                const btn = document.createElement('button');
+                btn.textContent = b.label;
+                if (b.cls) btn.className = b.cls;
+                btn.onclick = async () => { close(); if (b.action) await b.action(); };
+                zone.appendChild(btn);
+            });
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        function renderTabs() {
+            const tabs = peutGerer
+                ? [['semaine', '🗓️ Semaine'], ['jour', '📍 Jour'], ['signatures', '✍️ Signatures'], ['modeles', '⏱️ Horaires types'], ['moi', '👤 Mon planning']]
+                : [['moi', '👤 Mon planning'], ['semaine', '🗓️ L’équipe']];
+            document.getElementById('tabs').innerHTML = tabs.map(t =>
+                `<button class="pl-tab${onglet === t[0] ? ' active' : ''}" onclick="changerOnglet('${t[0]}')">${t[1]}</button>`).join('');
+        }
+
+        async function changerSemaine(delta) {
+            semaineDebut = addJours(semaineDebut, 7 * delta);
+            ajoutsManuels = new Set();
+            await recharger();
+        }
+
+        async function changerJour(delta) {
+            const nouveau = addJours(dateDe(jourCourant), delta);
+            jourCourant = isoLocal(nouveau);
+            const lundi = lundiDe(nouveau);
+            if (isoLocal(lundi) !== isoLocal(semaineDebut)) { semaineDebut = lundi; await recharger(); }
+            else renderJour();
+        }
+
+        function changerOnglet(o) {
+            onglet = o;
+            try { sessionStorage.setItem('planning_onglet', o); } catch (e) {}
+            renderTabs();
+            recharger();
+        }
+
+        async function recharger() {
+            try {
+                await chargerSemaine();
+                if (onglet === 'jour') {
+                    const j = joursSemaine();
+                    if (!j.includes(jourCourant)) jourCourant = j.includes(isoLocal(new Date())) ? isoLocal(new Date()) : j[0];
+                    renderJour();
+                } else if (onglet === 'signatures') { await chargerSignatures(); renderSignatures(); }
+                else if (onglet === 'modeles') renderModeles();
+                else if (onglet === 'moi') {
+                    await chargerSignatures();
+                    if (peutGerer) {
+                        const j = joursSemaine();
+                        const { data, error } = await sb.from('planning_publies').select('*').eq('user_id', currentUser.id).gte('date_service', j[0]).lte('date_service', j[6]);
+                        if (error) throw error;
+                        monPublie = data || [];
+                    }
+                    renderMoi();
+                } else renderSemaine();
+            } catch (e) {
+                console.error(e);
+                if (PLANB.erreurAuth(e)) return;
+                const msg = String(e && (e.message || e.code) || '');
+                document.getElementById('main').innerHTML = (msg.includes('planning_') || String(e.code) === '42P01' || String(e.code) === 'PGRST205')
+                    ? '<div class="empty">Module pas encore initialisé côté base de données.<br>(migration scripts/migration-planning.sql à exécuter)</div>'
+                    : '<div class="empty">Erreur de chargement des données.</div>';
+                showToast('Erreur de chargement', 'error');
+            }
+        }
+
+        (async function init() {
+            document.getElementById('etab-badge').textContent = currentEstablishment === 'freddy' ? '🏪 Freddy' : '🍽️ Liesel';
+            semaineDebut = lundiDe(new Date());
+            jourCourant = isoLocal(new Date());
+            let o = onglet;
+            try { o = sessionStorage.getItem('planning_onglet') || onglet; } catch (e) {}
+            const permis = peutGerer ? ['semaine', 'jour', 'signatures', 'modeles', 'moi'] : ['moi', 'semaine'];
+            changerOnglet(permis.includes(o) ? o : permis[0]);
+        })();
+    </script>
+</body>
+</html>

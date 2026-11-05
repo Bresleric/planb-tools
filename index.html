@@ -962,6 +962,14 @@
                 url: './pointages/'
             },
             {
+                id: 'planning',
+                name: 'Planning',
+                icon: '🗓️',
+                description: 'Plannings, publication et signatures',
+                minRole: 'manager',
+                url: './planning/'
+            },
+            {
                 id: 'equipe',
                 name: 'Équipe',
                 icon: '👥',
@@ -1137,9 +1145,16 @@
         // (Tipps : montants individuels des pourboires, decision Eric 03/11/2026)
         const MODULES_ADMIN_SEUL = ['tipps'];
 
+        // Planning : visible des managers meme avec une liste personnalisee. A la bascule
+        // du 01/01/2027, passer 'planning' dans MODULES_UNIVERSELS pour tous les salaries.
+        const MODULES_MANAGERS = ['planning'];
+
         function canAccessModule(moduleId, minRole) {
             // Admin a toujours accès à tout (peu importe acces_modules)
             if (currentUser.role === 'admin') return true;
+
+            if (MODULES_MANAGERS.includes(moduleId) && (currentUser.role === 'manager'
+                || (currentUser.acces_modules || []).includes('planning_gestion'))) return true;
 
             if (MODULES_ADMIN_SEUL.includes(moduleId)) return false;
 

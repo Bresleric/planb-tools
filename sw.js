@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v134';  // bump a chaque mise a jour du SW (v134 : module Equipe - validation des heures et contrats 03/11/2026)
+const CACHE_NAME = 'planb-tools-v135';  // bump a chaque mise a jour du SW (v135 : module Planning 05/11/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
