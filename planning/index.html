@@ -236,7 +236,7 @@
             <h2>Remplir cette semaine</h2>
             <div class="sub" id="copie-sub"></div>
             <label class="form-label">Copier depuis</label>
-            <select class="form-input" id="copie-source">
+            <select class="form-input" id="copie-source" onchange="majDateCopie()">
                 <option value="pbt">Planning PlanB-Tools</option>
                 <option value="combo">Planning Combo</option>
             </select>
@@ -979,8 +979,12 @@
         // ============ COPIE D UNE SEMAINE ============
         function ouvrirCopie() {
             document.getElementById('copie-sub').textContent = 'Les horaires sont recopiés sur la ' + libSemaine().toLowerCase() + '. Les absences de la semaine source ne sont pas copiées.';
-            document.getElementById('copie-date').value = isoLocal(addJours(semaineDebut, -7));
+            majDateCopie();
             document.getElementById('copie-modal').style.display = 'flex';
+        }
+        function majDateCopie() {
+            const combo = document.getElementById('copie-source').value === 'combo';
+            document.getElementById('copie-date').value = isoLocal(combo ? semaineDebut : addJours(semaineDebut, -7));
         }
 
         function lancerCopie() {
@@ -988,7 +992,8 @@
             const date = document.getElementById('copie-date').value;
             if (!date) { showToast('Choisis une semaine', 'error'); return; }
             const lundi = lundiDe(dateDe(date));
-            if (isoLocal(lundi) === isoLocal(semaineDebut)) { showToast('Choisis une autre semaine que celle affichée', 'error'); return; }
+            // Combo peut etre repris sur sa propre semaine, pour comparer aux vraies dates
+            if (source === 'pbt' && isoLocal(lundi) === isoLocal(semaineDebut)) { showToast('Choisis une autre semaine que celle affichée', 'error'); return; }
             fermerModale('copie-modal');
             const existants = lignesSemaine().filter(s => ici(s) && s.nature === 'travail').length;
             if (existants) {
