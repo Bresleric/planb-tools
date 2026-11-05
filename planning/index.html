@@ -328,6 +328,7 @@
         const TL_DEBUT = 6, TL_FIN = 24;   // vue jour : de 6 h a minuit
 
         let onglet = peutGerer ? 'semaine' : 'moi';
+        let vue = 'combo';      // gestion : 'combo' (reflet, lecture seule) ou 'brouillon'
         let semaineDebut = null;
         let jourCourant = null;
         let lignes = [];        // brouillon (gestion) ou publie, semaine +/- 1 jour, tous etablissements
@@ -388,6 +389,8 @@
 
         function lignesSemaine() { const j = joursSemaine(); return lignes.filter(s => s.date_service >= j[0] && s.date_service <= j[6]); }
         function ici(s) { return s.etablissement === currentEstablishment; }
+        function vueCombo() { return peutGerer && vue === 'combo'; }
+        function peutEditer() { return peutGerer && vue !== 'combo'; }
 
         // Salaries affiches : contrat dans cet etablissement, horaire deja pose ici, ou ajout manuel
         function salariesGrille() {
@@ -450,7 +453,7 @@
             const j = joursSemaine();
             const avant = isoLocal(addJours(semaineDebut, -1));
             const apres = isoLocal(addJours(semaineDebut, 7));
-            const table = peutGerer ? 'planning_shifts' : 'planning_publies';
+            const table = !peutGerer ? 'planning_publies' : (vueCombo() ? 'planning_combo' : 'planning_shifts');
             const [rl, rp, rd, rm, rc, ru] = await Promise.all([
                 sb.from(table).select('*').gte('date_service', avant).lte('date_service', apres),
                 peutGerer
@@ -494,7 +497,7 @@
         // ============ VUE SEMAINE ============
         function chipShift(s, alerteIds) {
             const u = hhmm(s.heure_debut) + '–' + hhmm(s.heure_fin);
-            const cliquable = peutGerer && ici(s);
+            const cliquable = peutEditer() && ici(s);
             const attrs = cliquable ? `onclick="event.stopPropagation(); ouvrirShift('${s.id}')"` : '';
             const tag = cliquable ? 'button' : 'div';
             if (s.nature !== 'travail') return `<${tag} class="sh absence" ${attrs}>${esc(LIB_NATURE[s.nature] || s.nature)}</${tag}>`;
@@ -529,7 +532,7 @@
                     html += `<tr><td class="col-nom"><div class="nom-sal">${esc(u.nom)}${pastille}${peutGerer ? `<small>${c ? Number(c.heures_hebdo).toLocaleString('fr-FR') + ' h · ' + esc(c.type_contrat.toUpperCase()) : 'Contrat non saisi'}</small>` : ''}</div></td>`;
                     for (const d of j) {
                         const duJour = sem.filter(s => s.user_id === u.id && s.date_service === d).sort((x, y) => hhmm(x.heure_debut).localeCompare(hhmm(y.heure_debut)));
-                        const edit = peutGerer;
+                        const edit = peutEditer();
                         const clic = edit ? `onclick="nouveauShift('${u.id}','${d}')"` : '';
                         html += `<td class="jour${edit ? ' editable' : ''}" ${clic}>${duJour.map(s => chipShift(s, alerteIds)).join('')}${edit && duJour.length ? '<button class="plus">+</button>' : ''}</td>`;
                     }
@@ -570,13 +573,29 @@
             return `<b>${hLib(total)}</b><br>${ecart}`;
         }
 
+        function selecteurVue() {
+            return `<select class="btn-small" onchange="changerVue(this.value)">
+                <option value="combo" ${vue === 'combo' ? 'selected' : ''}>Planning Combo</option>
+                <option value="brouillon" ${vue === 'brouillon' ? 'selected' : ''}>Mon brouillon</option>
+            </select>`;
+        }
+        function changerVue(v) {
+            vue = v;
+            try { sessionStorage.setItem('planning_vue', v); } catch (e) {}
+            recharger();
+        }
+
         function renderSemaine() {
             const main = document.getElementById('main');
             const alertes = peutGerer ? calculerAlertes().filter(a => salariesGrille().some(u => u.id === a.uid)) : [];
             const sem = lignesSemaine().filter(ici);
-            const modifs = peutGerer ? nbModifsNonPubliees() : 0;
+            const modifs = peutEditer() ? nbModifsNonPubliees() : 0;
+            const sansCompte = vueCombo() ? [...new Set(lignesSemaine().filter(s => ici(s) && !userDe(s.user_id)).map(s => s.nom_combo))] : [];
+            const synchro = vueCombo() ? lignes.map(s => s.synchronise_le).filter(Boolean).sort().pop() : null;
             const graves = alertes.filter(a => a.g).length;
-            const etat = derniere
+            const etat = vueCombo()
+                ? (synchro ? 'Reflet de Combo · mis à jour le ' + new Date(synchro).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Aucun horaire Combo reçu pour cette semaine')
+                : derniere
                 ? `Publié le ${new Date(derniere.publie_le).toLocaleDateString('fr-FR')} par ${esc(derniere.publie_par_nom || '?')} · version ${derniere.version}`
                 : 'Pas encore publié';
 
@@ -592,21 +611,26 @@
                     <div class="kpi"><div class="lbl">Heures planifiées</div><div class="val">${hDec(heures)}</div></div>
                     <div class="kpi"><div class="lbl">Alertes à corriger</div><div class="val" style="color:${graves ? 'var(--red)' : 'var(--gray-400)'}">${graves}</div></div>
                     <div class="kpi"><div class="lbl">À vérifier</div><div class="val" style="color:${alertes.length - graves ? 'var(--orange)' : 'var(--gray-400)'}">${alertes.length - graves}</div></div>
-                    <div class="kpi"><div class="lbl">Non publié</div><div class="val" style="color:${modifs ? 'var(--accent)' : 'var(--gray-400)'}">${modifs}</div></div>
+                    ${vueCombo()
+                        ? `<div class="kpi"><div class="lbl">Sans compte</div><div class="val" style="color:${sansCompte.length ? 'var(--orange)' : 'var(--gray-400)'}">${sansCompte.length}</div></div>`
+                        : `<div class="kpi"><div class="lbl">Non publié</div><div class="val" style="color:${modifs ? 'var(--accent)' : 'var(--gray-400)'}">${modifs}</div></div>`}
                 </div>`;
-                if (joursSemaine()[6] < DATE_BASCULE) {
-                    html += `<div class="info">Phase de test : avant le 1<sup>er</sup> janvier 2027, Combo reste la référence. Ce planning n’alimente ni le Briefing, ni le TAF, et les salariés ne le voient pas encore.</div>`;
+                if (vueCombo()) {
+                    html += `<div class="info">Planning Combo recopié automatiquement, en lecture seule. Pour faire un essai, passe sur « Mon brouillon » : Combo n’y touchera jamais.${sansCompte.length ? '<br><b>Sans compte PlanB-Tools actif :</b> ' + esc(sansCompte.join(', ')) : ''}</div>`;
+                } else if (joursSemaine()[6] < DATE_BASCULE) {
+                    html += `<div class="info">Phase de test : avant le 1<sup>er</sup> janvier 2027, Combo reste la référence. Ce brouillon n’alimente ni le Briefing, ni le TAF, et les salariés ne le voient pas encore.</div>`;
                 }
                 html += `<div class="actions">
                     <select class="btn-small" onchange="filtreEquipe=this.value; renderSemaine()">
                         <option value="toutes">Toutes les équipes</option>
                         ${ORDRE_EQUIPES.map(e => `<option value="${e}" ${filtreEquipe === e ? 'selected' : ''}>${LIB_EQUIPE[e]}</option>`).join('')}
                     </select>
+                    ${selecteurVue()}
                     <span class="espace"></span>
-                    <button class="btn-small" onclick="ouvrirAjout()">+ Salarié</button>
-                    <button class="btn-small" onclick="ouvrirCopie()">📋 Copier une semaine</button>
+                    ${peutEditer() ? `<button class="btn-small" onclick="ouvrirAjout()">+ Salarié</button>
+                    <button class="btn-small" onclick="ouvrirCopie()">📋 Copier une semaine</button>` : ''}
                     <button class="btn-small" onclick="window.print()">🖨️ Imprimer</button>
-                    <button class="btn-primary" ${modifs ? '' : 'disabled'} onclick="demanderPublication()">📣 Publier${modifs ? ' (' + modifs + ')' : ''}</button>
+                    ${peutEditer() ? `<button class="btn-primary" ${modifs ? '' : 'disabled'} onclick="demanderPublication()">📣 Publier${modifs ? ' (' + modifs + ')' : ''}</button>` : ''}
                 </div>`;
             } else {
                 html += `<div class="actions"><button class="btn-small" onclick="window.print()">🖨️ Imprimer</button></div>`;
@@ -640,6 +664,7 @@
                 <button onclick="changerJour(1)">›</button>
             </div>`;
 
+            if (peutGerer) html += `<div class="actions" style="justify-content:flex-start">${selecteurVue()}</div>`;
             html += `<div class="card"><div class="scroll"><div class="tl"><div class="tl-echelle">`;
             for (let h = TL_DEBUT; h < TL_FIN; h++) html += `<span>${h}h</span>`;
             html += '</div>';
@@ -849,12 +874,12 @@
 
         // ============ SAISIE D UN HORAIRE ============
         function nouveauShift(userId, date) {
-            if (!peutGerer) return;
+            if (!peutEditer()) return;
             ouvrirSaisie(userDe(userId), date, null);
         }
         function ouvrirShift(id) {
             const s = lignes.find(x => x.id === id);
-            if (!s || !peutGerer) return;
+            if (!s || !peutEditer()) return;
             ouvrirSaisie(userDe(s.user_id), s.date_service, s);
         }
 
@@ -1014,6 +1039,12 @@
                 if (error) throw error;
                 return { lignes: data || [], ignores: 0 };
             }
+            const reflet = await sb.from('planning_combo').select('*').eq('etablissement', currentEstablishment).gte('date_service', d1).lte('date_service', d2);
+            if (reflet.error) throw reflet.error;
+            if ((reflet.data || []).length) {
+                const avecCompte = reflet.data.filter(c => userDe(c.user_id));
+                return { lignes: avecCompte, ignores: reflet.data.length - avecCompte.length };
+            }
             const { data, error } = await sb.from('combo_pointages')
                 .select('date_service, user_id, equipe, debut_planifie, fin_planifiee, pauses_planifiees_minutes')
                 .eq('etablissement', currentEstablishment).gte('date_service', d1).lte('date_service', d2);
@@ -1163,7 +1194,11 @@
             semaineDebut = lundiDe(new Date());
             jourCourant = isoLocal(new Date());
             let o = onglet;
-            try { o = sessionStorage.getItem('planning_onglet') || onglet; } catch (e) {}
+            try {
+                o = sessionStorage.getItem('planning_onglet') || onglet;
+                vue = sessionStorage.getItem('planning_vue') === 'brouillon' ? 'brouillon' : 'combo';
+            } catch (e) {}
+            if (isoLocal(semaineDebut) >= DATE_BASCULE) vue = 'brouillon';
             const permis = peutGerer ? ['semaine', 'jour', 'signatures', 'modeles', 'moi'] : ['moi', 'semaine'];
             changerOnglet(permis.includes(o) ? o : permis[0]);
         })();

@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v136';  // bump a chaque mise a jour du SW (v136 : Planning, reprise Combo sur la semaine affichee 05/11/2026)
+const CACHE_NAME = 'planb-tools-v137';  // bump a chaque mise a jour du SW (v137 : Planning, reflet automatique de Combo 05/11/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
