@@ -20,8 +20,10 @@
 *.swo
 *.code-workspace
 
-# Claude Code (worktrees + config locale)
-.claude/
+# Claude Code (worktrees + config locale) - sauf recettes et agents partages
+.claude/*
+!.claude/skills/
+!.claude/agents/
 
 # Logs
 *.log
