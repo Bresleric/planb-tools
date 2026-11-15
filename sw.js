@@ -12,7 +12,7 @@
 //   3. Gestion du clic sur la notification (focus tab existante OU ouvre l'app)
 // ============================================================================
 
-const CACHE_NAME = 'planb-tools-v138';  // bump a chaque mise a jour du SW (v138 : Planning, onglet Pointages 05/11/2026)
+const CACHE_NAME = 'planb-tools-v139';  // bump a chaque mise a jour du SW (v139 : fetch sans cache navigateur 14/11/2026)
 // Chemins RELATIFS : le site vit sous /planb-tools/ (GitHub Pages), pas a la racine
 const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
 
@@ -55,8 +55,11 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.origin !== self.location.origin) return;
 
+    // cache: 'no-cache' -> le navigateur redemande TOUJOURS au serveur si le
+    // fichier a change (reponse 304 legere si identique). Sans ca, GitHub Pages
+    // (max-age=600) laissait l ancienne version jusqu a 10 min apres un push.
     event.respondWith(
-        fetch(event.request)
+        fetch(event.request, { cache: 'no-cache' })
             .then((response) => {
                 // Reponse fraiche OK -> on met a jour le cache pour le mode hors-ligne
                 if (response && response.ok) {
