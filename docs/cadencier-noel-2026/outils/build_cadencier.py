@@ -77,7 +77,7 @@ texte = [
  ("", False),
  ("CELLULES A MODIFIER (fond jaune, texte bleu)", True),
  ("- Hypotheses : coefficients de croissance Freddy et Liesel (budget : +3 %), jours de tournee, seuils de la base essentielle.", False),
- ("- Top ventes Solide : les plats les plus vendus de chaque etablissement en 2025, part du total, budget 2026 et profil par jour de semaine, pour anticiper les commandes.", False),
+ ("- Top ventes Solide : les plats les plus vendus en 2025 (2 etablissements reunis, puis chaque etablissement), part du total, budget 2026 et profil par jour de semaine, pour anticiper les commandes.", False),
  ("- Cadencier 2026 : colonne Ouvert (1 = ouvert, 0 = ferme). Par defaut : fermes les 24, 25, 26 decembre 2026 et le 1er janvier 2027, comme en 2025.", False),
  ("Tout le reste est calcule par formules et se met a jour automatiquement.", False),
  ("", False),
@@ -296,13 +296,91 @@ ng['J1'].comment = Comment('Saisir ici le prix unitaire HT obtenu du fournisseur
 # ---------- 9. Top ventes Solide ----------
 tv = wb.create_sheet('Top ventes Solide', 3)
 tv['A1'] = 'PRINCIPALES VENTES SOLIDE (plats) - reference 27/11/2025 au 10/01/2026, budget 2026 = 2025 x coefficient (onglet Hypotheses)'; tv['A1'].font = F(bold=True, size=12)
-tv['A2'] = 'Liste arretee a 90 % du volume cumule de chaque etablissement (40 produits maximum). Moyennes par jour de semaine = quantite moyenne les jours OUVERTS de ce jour de semaine.'; tv['A2'].font = F(italic=True, color='808080')
+tv['A2'] = 'Trois blocs : les 2 etablissements reunis (libelles regroupes), puis Freddy, puis Liesel. Liste arretee a 90 % du volume cumule (40 produits maximum). Moyennes par jour de semaine = quantite moyenne les jours OUVERTS de ce jour de semaine.'; tv['A2'].font = F(italic=True, color='808080')
 cols = ['Rang', 'Produit', 'Type', 'Categorie', 'Qte 2025', 'Part du solide', 'Part cumulee', 'Budget 2026 (x coef)', 'Moy / jour ouvert', 'Max sur un jour', 'Date du max'] + [f'Moy {j}' for j in JOURS]
 widths = [6, 38, 12, 18, 9, 9, 9, 11, 9, 9, 11] + [7]*7
 ptype = {}; pcat = {}
 for v in ventes:
     if v['typologie'] == 'Solide': ptype[(v['etablissement'], v['produit'])] = v['type']; pcat[(v['etablissement'], v['produit'])] = v['categorie']
+import unicodedata
+def normp(x):
+    x = unicodedata.normalize('NFKD', x).encode('ascii', 'ignore').decode().lower()
+    return re.sub(r'[^a-z0-9]+', ' ', x).strip()
+# Appariement des libelles entre les deux caisses (cle normalisee -> libelle commun)
+GROUPES = {
+ 'buf bourguignon': 'Boeuf bourguignon', 'boeuf bourguignon': 'Boeuf bourguignon',
+ 'kasespaetzel': 'Kaesespaetzle (plat)', 'kasespaetzle munster': 'Kaesespaetzle (plat)',
+ 'munstiflette salade': 'Munstiflette', 'munstiflette': 'Munstiflette',
+ 'cuisse canard': 'Cuisse de canard', 'cuisse canard choucroute': 'Cuisse de canard',
+ 'cervelas grille alsacien': 'Cervelas (plat)', 'cervelas gratines munster': 'Cervelas (plat)',
+ 'escargots 6': 'Escargots x6', '6 escargots': 'Escargots x6',
+ 'escargots 12': 'Escargots x12', '12 escargots': 'Escargots x12',
+ 'saumon sur choucroute': 'Saumon sur choucroute', 'choucroute saumon': 'Saumon sur choucroute',
+ 'brownie choco': 'Brownie', 'brownie': 'Brownie',
+ 'petit kasespaetzel': 'Petit Kaesespaetzle (entree)', 'petit gratin spaetzel': 'Petit Kaesespaetzle (entree)',
+ 'entree tarte oignons': 'Entree tarte a l oignon', 'entree tarte oignon': 'Entree tarte a l oignon',
+ 'plat tarte a loignon': 'Plat tarte a l oignon', 'plat tarte oignons': 'Plat tarte a l oignon',
+ 'foie gras poelee': 'Foie gras poele', 'foie gras poele': 'Foie gras poele',
+ 'saumon confit entree': 'Saumon confit (entree)', 'saumon confit': 'Saumon confit (entree)',
+ 'petit cervelas grille': 'Petit cervelas (entree)', 'entree cervelas gratine': 'Petit cervelas (entree)',
+ 'cafe breddel': 'Cafe bredele', 'cafe bredele': 'Cafe bredele',
+ 'baeckehoffe salade': 'Baeckeoffe', 'cordon bleu': 'Cordon bleu', 'emince de vollaile': 'Emince de volaille',
+}
+label_g = {}
+def grp(e, pname):
+    k = normp(pname)
+    if k in GROUPES: return GROUPES[k]
+    return label_g.setdefault(k, pname)
+for e, nom in ETABS:   # Freddy d abord : son libelle fait reference quand les cles normalisees coincident
+    for (ee, pname), q in sorted(prodtot.items(), key=lambda x: -x[1]):
+        if ee == e: grp(e, pname)
+gtot = collections.defaultdict(lambda: collections.defaultdict(float)); gday = collections.defaultdict(float)
+for (e, d, pname), q in prod.items():
+    g = grp(e, pname); gtot[g][e] += q; gday[(g, d)] += q
+jours_ouverts_2 = jours_ouverts['freddy'] | jours_ouverts['liesel']
+total2 = sum(sum(v.values()) for v in gtot.values())
+
 r = 4
+tv.cell(row=r, column=1, value=f'LES 2 ETABLISSEMENTS - plats vendus 2025 : {int(total2)} - jours ouverts (au moins un) : {len(jours_ouverts_2)}').font = F(bold=True, size=11)
+r += 1
+cols2 = ['Rang', 'Plat (libelles regroupes)', 'Qte Freddy', 'Qte Liesel', 'Qte 2025 total', 'Part du solide', 'Part cumulee', 'Budget 2026 (x coef)', 'Moy / jour ouvert', 'Max sur un jour', 'Date du max'] + [f'Moy {j}' for j in JOURS]
+hdr(tv, r, cols2, widths); h2 = r; r += 1
+lst2 = sorted(gtot.items(), key=lambda x: -sum(x[1].values()))
+cum = 0; first2 = r
+for rank, (g, parts) in enumerate(lst2, 1):
+    q = sum(parts.values())
+    if rank > 40 or (cum >= 0.9 * total2 and rank > 10): break
+    cum += q
+    dmax = max(jours_ref, key=lambda d: gday.get((g, d), 0))
+    tv.cell(row=r, column=1, value=rank); tv.cell(row=r, column=2, value=g)
+    tv.cell(row=r, column=3, value=parts.get('freddy', 0)).number_format = '#,##0'
+    tv.cell(row=r, column=4, value=parts.get('liesel', 0)).number_format = '#,##0'
+    tv.cell(row=r, column=5, value=f'=C{r}+D{r}').number_format = '#,##0'
+    tv.cell(row=r, column=6, value=f'=E{r}/{total2}').number_format = '0.0%'
+    tv.cell(row=r, column=7, value=f'=SUM(E${first2}:E{r})/{total2}').number_format = '0.0%'
+    tv.cell(row=r, column=8, value=f'=ROUNDUP(C{r}*Hypotheses!$B$3+D{r}*Hypotheses!$B$4,0)').number_format = '#,##0'
+    tv.cell(row=r, column=9, value=f'=E{r}/{len(jours_ouverts_2)}').number_format = '0.0'
+    tv.cell(row=r, column=10, value=gday.get((g, dmax), 0)).number_format = '#,##0'
+    tv.cell(row=r, column=11, value=dmax).number_format = 'DD/MM/YYYY'
+    for wd in range(7):
+        ds = [d for d in jours_ouverts_2 if d.weekday() == wd]
+        tv.cell(row=r, column=12+wd, value=(sum(gday.get((g, d), 0) for d in ds)/len(ds)) if ds else 0).number_format = '0.0'
+    r += 1
+tv.cell(row=r, column=2, value='Total des produits listes').font = F(bold=True)
+for j in (3, 4, 5, 8): tv.cell(row=r, column=j, value=f'=SUM({L(j)}{first2}:{L(j)}{r-1})').number_format = '#,##0'
+tv.cell(row=r, column=6, value=f'=E{r}/{total2}').number_format = '0.0%'
+tv.cell(row=r, column=9, value=f'=E{r}/{len(jours_ouverts_2)}').number_format = '0.0'
+for wd in range(7): tv.cell(row=r, column=12+wd, value=f'=SUM({L(12+wd)}{first2}:{L(12+wd)}{r-1})').number_format = '0.0'
+for j in range(1, 19): tv.cell(row=r, column=j).fill = SUB
+tv.cell(row=r+1, column=2, value='Total solide 2 etablissements (tous produits)').font = F(italic=True)
+tv.cell(row=r+1, column=3, value=sum(v.get('freddy',0) for v in gtot.values())).number_format = '#,##0'
+tv.cell(row=r+1, column=4, value=sum(v.get('liesel',0) for v in gtot.values())).number_format = '#,##0'
+tv.cell(row=r+1, column=5, value=f'=C{r+1}+D{r+1}').number_format = '#,##0'
+tv.cell(row=r+1, column=8, value=f'=ROUNDUP(C{r+1}*Hypotheses!$B$3+D{r+1}*Hypotheses!$B$4,0)').number_format = '#,##0'
+style_all(tv, h2, r+1, 1, 18)
+paires = sorted({v for v in GROUPES.values()})
+tv.cell(row=r+2, column=2, value='Libelles regroupes entre les deux caisses : ' + ', '.join(paires) + '. Les autres plats sont apparies sur le libelle exact (accents et majuscules ignores).').font = F(italic=True, color='808080')
+r += 5
 TOPV = {}
 for e, nom in ETABS:
     coef = '$B$3' if e == 'freddy' else '$B$4'
