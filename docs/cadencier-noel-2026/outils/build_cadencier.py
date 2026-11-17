@@ -76,7 +76,8 @@ texte = [
  ("4. L'onglet Negociation additionne les quantites par article et fournisseur pour la periode : c'est la base d'engagement.", False),
  ("", False),
  ("CELLULES A MODIFIER (fond jaune, texte bleu)", True),
- ("- Hypotheses : coefficients de croissance Freddy et Liesel, jours de tournee, seuils de la base essentielle.", False),
+ ("- Hypotheses : coefficients de croissance Freddy et Liesel (budget : +3 %), jours de tournee, seuils de la base essentielle.", False),
+ ("- Top ventes Solide : les plats les plus vendus de chaque etablissement en 2025, part du total, budget 2026 et profil par jour de semaine, pour anticiper les commandes.", False),
  ("- Cadencier 2026 : colonne Ouvert (1 = ouvert, 0 = ferme). Par defaut : fermes les 24, 25, 26 decembre 2026 et le 1er janvier 2027, comme en 2025.", False),
  ("Tout le reste est calcule par formules et se met a jour automatiquement.", False),
  ("", False),
@@ -93,14 +94,14 @@ hy = wb.create_sheet('Hypotheses')
 hy.column_dimensions['A'].width = 34
 for col in 'BCDEFGH': hy.column_dimensions[col].width = 9
 hy['A1'] = 'HYPOTHESES (cellules jaunes modifiables)'; hy['A1'].font = F(bold=True, size=12)
-hy['A3'] = 'Coefficient de croissance Freddy'; hy['B3'] = 1.0
-hy['A4'] = 'Coefficient de croissance Liesel'; hy['B4'] = 1.0
+hy['A3'] = 'Coefficient de croissance Freddy'; hy['B3'] = 1.03
+hy['A4'] = 'Coefficient de croissance Liesel'; hy['B4'] = 1.03
 hy['A5'] = 'Seuil base essentielle : nb de livraisons 2025 minimum'; hy['B5'] = 3
 hy['A6'] = 'Seuil base essentielle : montant HT 2025 minimum (EUR)'; hy['B6'] = 100
 for r in (3,4,5,6):
     hy.cell(row=r, column=2).fill = INPUT; hy.cell(row=r, column=2).font = BLUE; hy.cell(row=r, column=1).font = F()
 hy['B3'].number_format = '0.00'; hy['B4'].number_format = '0.00'
-hy['B3'].comment = Comment('1,00 = memes volumes qu en 2025. 1,10 = +10 %. Saisi par Eric.', 'PBT')
+hy['B3'].comment = Comment('1,00 = memes volumes qu en 2025. 1,03 = +3 % (budget retenu par Eric le 17/11/2026).', 'PBT')
 hdr(hy, 8, ['Jours de tournee 2026 (1 = livre, 0 = ne livre pas)'] + JOURS)
 for i, (sup, days) in enumerate(TOURNEES.items(), 9):
     hy.cell(row=i, column=1, value=sup).font = F()
@@ -290,6 +291,58 @@ ng.cell(row=ln+1, column=1, value='TOTAL').font = F(bold=True)
 for j in (6, 9, 11): ng.cell(row=ln+1, column=j, value=f'=SUM({L(j)}2:{L(j)}{ln})').number_format = '#,##0.00'
 style_all(ng, 1, ln+1, 1, 11); ng.freeze_panes = 'D2'; ng.auto_filter.ref = f'A1:K{ln}'
 ng['J1'].comment = Comment('Saisir ici le prix unitaire HT obtenu du fournisseur. L economie se calcule seule.', 'PBT')
+
+
+# ---------- 9. Top ventes Solide ----------
+tv = wb.create_sheet('Top ventes Solide', 3)
+tv['A1'] = 'PRINCIPALES VENTES SOLIDE (plats) - reference 27/11/2025 au 10/01/2026, budget 2026 = 2025 x coefficient (onglet Hypotheses)'; tv['A1'].font = F(bold=True, size=12)
+tv['A2'] = 'Liste arretee a 90 % du volume cumule de chaque etablissement (40 produits maximum). Moyennes par jour de semaine = quantite moyenne les jours OUVERTS de ce jour de semaine.'; tv['A2'].font = F(italic=True, color='808080')
+cols = ['Rang', 'Produit', 'Type', 'Categorie', 'Qte 2025', 'Part du solide', 'Part cumulee', 'Budget 2026 (x coef)', 'Moy / jour ouvert', 'Max sur un jour', 'Date du max'] + [f'Moy {j}' for j in JOURS]
+widths = [6, 38, 12, 18, 9, 9, 9, 11, 9, 9, 11] + [7]*7
+ptype = {}; pcat = {}
+for v in ventes:
+    if v['typologie'] == 'Solide': ptype[(v['etablissement'], v['produit'])] = v['type']; pcat[(v['etablissement'], v['produit'])] = v['categorie']
+r = 4
+TOPV = {}
+for e, nom in ETABS:
+    coef = '$B$3' if e == 'freddy' else '$B$4'
+    tv.cell(row=r, column=1, value=f'{nom.upper()} - plats vendus 2025 : {int(sum(q for (ee,p),q in prodtot.items() if ee==e))} - jours ouverts : {len(jours_ouverts[e])}').font = F(bold=True, size=11)
+    r += 1; hdr(tv, r, cols, widths); h = r; r += 1
+    total = sum(q for (ee, p), q in prodtot.items() if ee == e)
+    lst = sorted(((p, q) for (ee, p), q in prodtot.items() if ee == e), key=lambda x: -x[1])
+    cum = 0; first = r
+    for rank, (p, q) in enumerate(lst, 1):
+        if rank > 40 or (cum >= 0.9 * total and rank > 10): break
+        cum += q
+        jours_p = [prod.get((e, d, p), 0) for d in jours_ref]
+        dmax = max(jours_ref, key=lambda d: prod.get((e, d, p), 0))
+        tv.cell(row=r, column=1, value=rank); tv.cell(row=r, column=2, value=p); tv.cell(row=r, column=3, value=ptype[(e,p)]); tv.cell(row=r, column=4, value=pcat[(e,p)])
+        tv.cell(row=r, column=5, value=q).number_format = '#,##0'
+        tv.cell(row=r, column=6, value=f'=E{r}/{total}').number_format = '0.0%'
+        tv.cell(row=r, column=7, value=f'=SUM(E${first}:E{r})/{total}').number_format = '0.0%'
+        tv.cell(row=r, column=8, value=f'=ROUNDUP(E{r}*Hypotheses!{coef},0)').number_format = '#,##0'
+        tv.cell(row=r, column=9, value=f'=E{r}/{len(jours_ouverts[e])}').number_format = '0.0'
+        tv.cell(row=r, column=10, value=prod.get((e, dmax, p), 0)).number_format = '#,##0'
+        tv.cell(row=r, column=11, value=dmax).number_format = 'DD/MM/YYYY'
+        for wd in range(7):
+            ds = [d for d in jours_ouverts[e] if d.weekday() == wd]
+            tv.cell(row=r, column=12+wd, value=(sum(prod.get((e, d, p), 0) for d in ds)/len(ds)) if ds else 0).number_format = '0.0'
+        r += 1
+    tv.cell(row=r, column=2, value='Total des produits listes').font = F(bold=True)
+    for j in (5, 8): tv.cell(row=r, column=j, value=f'=SUM({L(j)}{first}:{L(j)}{r-1})').number_format = '#,##0'
+    tv.cell(row=r, column=6, value=f'=E{r}/{total}').number_format = '0.0%'
+    tv.cell(row=r, column=9, value=f'=E{r}/{len(jours_ouverts[e])}').number_format = '0.0'
+    for wd in range(7):
+        tv.cell(row=r, column=12+wd, value=f'=SUM({L(12+wd)}{first}:{L(12+wd)}{r-1})').number_format = '0.0'
+    for j in range(1, 19): tv.cell(row=r, column=j).fill = SUB
+    tv.cell(row=r+1, column=2, value='Total solide etablissement (tous produits)').font = F(italic=True)
+    tv.cell(row=r+1, column=5, value=total).number_format = '#,##0'
+    tv.cell(row=r+1, column=8, value=f'=ROUNDUP(E{r+1}*Hypotheses!{coef},0)').number_format = '#,##0'
+    style_all(tv, h, r+1, 1, 18)
+    TOPV[e] = (first, r-1)
+    r += 4
+tv.freeze_panes = 'C4'
+tv['H5'].comment = Comment('Qte 2025 x coefficient de croissance de l onglet Hypotheses, arrondi au superieur.', 'PBT')
 
 for w in wb.worksheets:
     for row in w.iter_rows():
