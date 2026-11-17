@@ -40,3 +40,7 @@ dist/
 
 # NB : scripts/commit-*.sh sont versionnés volontairement (historique des
 #      opérations + permet de relancer une commande). Ne pas les ignorer.
+
+# Cadencier marche de Noel : donnees sensibles (prix fournisseurs, ventes) hors du depot public
+docs/cadencier-noel-2026/donnees/
+docs/cadencier-noel-2026/*.xlsx
