@@ -100,6 +100,7 @@
     .filter-chip:active { transform: scale(0.95); }
     .filter-chip.active { background: var(--orange); color: white; border-color: var(--orange); }
     .filter-chip.active-equipe { background: var(--blue); color: white; border-color: var(--blue); }
+    .filter-chip.active-categorie { background: var(--gray-700); color: white; border-color: var(--gray-700); }
     .filter-right {
       margin-left: auto; display: flex; align-items: center; gap: 6px;
     }
@@ -983,6 +984,10 @@
       <span class="filter-label">Équipe</span>
       <!-- Generated dynamically -->
     </div>
+    <div class="filter-row" id="categorie-filter-row">
+      <span class="filter-label">Catégorie</span>
+      <!-- Généré dynamiquement à partir des tâches du jour (renderCategorieFilter) -->
+    </div>
     <div class="filter-row" id="collab-filter-row" style="display:none">
       <span class="filter-label">Personne</span>
       <select class="filter-collab" id="filter-collab" onchange="setFilterCollab(this.value)"></select>
@@ -1197,6 +1202,7 @@
   let filterCreneau = 'all';
   let filterEquipe = null; // null = user's team
   let filterCollab = 'all'; // admin : 'all' | 'none' (non attribuées) | id utilisateur
+  let filterCategorie = 'all'; // 'all' | 'none' (sans catégorie) | valeur de tasks.categorie
   let showCompleted = false;
   let currentTab = 'taches';
   let tasks = [];
@@ -1712,6 +1718,53 @@
     renderFiltered();
   }
 
+  // Filtre par catégorie : chips construites à partir des tâches du jour
+  // (on ne propose que les catégories réellement présentes). Les valeurs
+  // techniques héritées des productions (mise_en_place, produit_fini…) sont
+  // affichées avec un libellé lisible.
+  const CATEGORIE_LABELS = {
+    'mise_en_place': '🔪 Mise en place (prod.)',
+    'produit_intermediaire': '🥘 Intermédiaire',
+    'produit_fini': '✨ Produit fini',
+    'Production': '🏭 Production',
+    'Mise en Place': '🔪 Mise en Place',
+    'Nettoyage': '🧽 Nettoyage',
+    'Rangements': '📦 Rangements'
+  };
+  function libelleCategorie(c) { return CATEGORIE_LABELS[c] || c; }
+  // Même libellé sans l emoji (pour le badge du tableau)
+  function libelleCategorieTexte(c) { return CATEGORIE_LABELS[c] ? CATEGORIE_LABELS[c].replace(/^\S+\s/, '') : c; }
+
+  function renderCategorieFilter() {
+    const row = document.getElementById('categorie-filter-row');
+    if (!row) return;
+    const compte = new Map();
+    let sansCategorie = 0;
+    tasks.forEach(t => {
+      if (!t.categorie) { sansCategorie++; return; }
+      compte.set(t.categorie, (compte.get(t.categorie) || 0) + 1);
+    });
+    // La catégorie filtrée a disparu (changement de date) : retour à Toutes
+    if (filterCategorie !== 'all' && filterCategorie !== 'none' && !compte.has(filterCategorie)) filterCategorie = 'all';
+    if (filterCategorie === 'none' && !sansCategorie) filterCategorie = 'all';
+    const chip = (val, label, n) => `<button class="filter-chip ${filterCategorie === val ? 'active-categorie' : ''}"
+        data-categorie="${esc(val)}" onclick="setFilterCategorie(this.dataset.categorie)">${label}${n != null ? ` <span style="opacity:.7">${n}</span>` : ''}</button>`;
+    let html = '<span class="filter-label">Catégorie</span>' + chip('all', 'Toutes', null);
+    [...compte.entries()]
+      .sort((a, b) => libelleCategorie(a[0]).localeCompare(libelleCategorie(b[0]), 'fr'))
+      .forEach(([c, n]) => { html += chip(c, esc(libelleCategorie(c)), n); });
+    if (sansCategorie) html += chip('none', 'Sans catégorie', sansCategorie);
+    row.innerHTML = html;
+  }
+
+  function setFilterCategorie(c) {
+    filterCategorie = c;
+    document.querySelectorAll('[data-categorie]').forEach(el => {
+      el.classList.toggle('active-categorie', el.dataset.categorie === c);
+    });
+    renderFiltered();
+  }
+
   function toggleShowCompleted() {
     showCompleted = document.getElementById('chk-completed').checked;
     renderFiltered();
@@ -2114,6 +2167,8 @@
         if (filterCollab === 'none' && (t.attribue_a_id || t.fait_par_id)) return false;
         if (filterCollab !== 'all' && filterCollab !== 'none'
             && t.attribue_a_id !== filterCollab && t.fait_par_id !== filterCollab) return false;
+        if (filterCategorie === 'none' && t.categorie) return false;
+        if (filterCategorie !== 'all' && filterCategorie !== 'none' && t.categorie !== filterCategorie) return false;
         if (!showCompleted && t.fait_par_id) return false;
         return true;
       })
@@ -2242,6 +2297,7 @@
   function renderTasksTab() {
     const mc = document.getElementById('main-content');
     renderCollabFilter();
+    renderCategorieFilter();
     const filtered = getFilteredTasks();
     const pLabels = ['', '!', '!!', '!!!', '!!!!', '!!!!!'];
     const cIcons = { Matin: '☀️', Midi: '🌤', Soir: '🌙' };
@@ -2318,7 +2374,7 @@
         <div class="task-cell-left"><span class="badge badge-creneau ${(t.creneau || '').toLowerCase()}">${cIcons[t.creneau] || ''} ${t.creneau || ''}</span></div>
         <div class="task-cell"><span class="badge badge-priority ${pClass}">${pLabels[t.priorite] || '!!!'}</span></div>
         <div class="task-note-cell">${t.observation ? `<span class="task-note" title="${esc(t.observation)}">${esc(t.observation)}</span>` : ''}</div>
-        <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(t.categorie)}</span>` : ''}</div>
+        <div class="task-cell">${t.categorie ? `<span class="cat-badge cat-${t.categorie.toLowerCase().replace(/ /g, '-')}">${esc(libelleCategorieTexte(t.categorie))}</span>` : ''}</div>
         <div class="task-cell">${(() => {
           if (done) {
             return `<span class="task-done-info">${esc(t.fait_par_initiales)} ${valTime}</span>${(t.duree_secondes != null) ? `<span class="task-duree-final">${formatDureeShort(t.duree_secondes)}</span>` : ''}`;
