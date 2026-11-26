@@ -3,8 +3,9 @@
 // Lance par pg_cron toutes les 30 min (job 'laddition-live-30min').
 // Source : https://live.laddition.com/api/data (l appli web "L addition live").
 // Pas d API officielle : on utilise le jeton de session du compte d Eric.
-//   - refreshToken : colle par Eric dans pbt_private.config (cle
-//     'laddition_refresh_token') via SQL Editor. Jamais dans le code.
+//   - refreshToken : colle par Eric depuis Admin > onglet L Addition (RPC
+//     pbt_admin_laddition_jeton -> pbt_private.config 'laddition_refresh_token').
+//     Vit 18 a 19 jours. Jamais dans le code, jamais affiche.
 //   - accessToken  : obtenu avec le refreshToken, mis en cache dans
 //     pbt_private.config, renouvele seulement si L Addition le refuse.
 // Ecrit :
