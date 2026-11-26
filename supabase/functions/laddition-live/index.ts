@@ -55,6 +55,23 @@ async function synchroTropRecente(): Promise<boolean> {
   return Date.now() - derniere < DELAI_MIN_MS;
 }
 
+// L appelant est-il un administrateur PBT ? On rejoue son jeton de session
+// (en-tete Authorization de la requete) aupres de pbt_role(), qui ne repond
+// 'admin' que pour une session PBT valide d un compte admin. Sert au bouton
+// "Enregistrer et tester" du module Admin : lui seul peut ignorer l anti-rafale
+// (le cron vient souvent d echouer moins de 2 min avant le collage du jeton).
+async function appelantEstAdmin(req: Request): Promise<boolean> {
+  const auth = req.headers.get("Authorization") || "";
+  if (!auth.startsWith("Bearer ")) return false;
+  try {
+    const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: auth } },
+    });
+    const { data, error } = await client.rpc("pbt_role");
+    return !error && data === "admin";
+  } catch (_) { return false; }
+}
+
 // ---- Alerte Telegram (le message ne contient jamais le jeton) ----
 const RAPPEL_ALERTE_MS = 6 * 3600 * 1000;
 
@@ -86,9 +103,7 @@ async function alerterEchec(msg: string) {
     const texte = `⚠️ PlanB Tools — Synchro L'Addition en échec${debut ? " (rappel)" : ""}\n`
       + `Depuis : ${depuis}\nErreur : ${msg}\n`
       + (jetonRefuse
-        ? "\nPour réparer : live.laddition.com → outils développeur → cookie refreshToken → Supabase SQL Editor :\n"
-          + "SELECT public.pbt_service_config_set('laddition_refresh_token', 'COLLER_ICI');\n"
-          + "SELECT public.pbt_service_config_set('laddition_access_token', '');"
+        ? "\nPour réparer : PlanB Tools → Admin → onglet L'Addition → coller le nouveau cookie refreshToken (Chrome › live.laddition.com › Cmd+Option+I › Application › Cookies)."
         : "\nLe CA live et le stock de Pilotage ne sont plus mis à jour.");
     if (await telegramAdmin(texte)) {
       if (!debut) await cfgSet("laddition_alerte_debut", String(Date.now()));
@@ -185,7 +200,11 @@ Deno.serve(async (req) => {
   const resume = { etabs: [] as string[], ruptures: 0, erreurs: [] as string[], skipped: false };
   const maintenant = new Date().toISOString();
   try {
-    if (await synchroTropRecente()) {
+    let body: any = {};
+    try { body = await req.json(); } catch (_) { /* cron : corps vide */ }
+    // force : reserve a un administrateur PBT (module Admin, test apres collage du jeton)
+    const forcer = body?.force === true && await appelantEstAdmin(req);
+    if (!forcer && await synchroTropRecente()) {
       resume.skipped = true;
       return new Response(JSON.stringify(resume), { headers: JSON_HEADERS });
     }

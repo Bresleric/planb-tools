@@ -86,6 +86,43 @@ Deno.serve(async (req) => {
     return json({ ok: res.ok === true, telegram: res });
   }
 
+  // --- Rappel jeton L Addition (pg_cron quotidien 'laddition-jeton-rappel') ---
+  // Le refreshToken L Addition vit 18 a 19 jours. A partir du 15e jour apres
+  // le dernier collage (pbt_private.config.laddition_jeton_colle_le), un rappel
+  // par jour maximum, jusqu au renouvellement (qui remet le compteur a zero via
+  // pbt_admin_laddition_jeton). Pas de rappel un jour ou l alerte d echec de la
+  // synchro (laddition_alerte_le, geree par laddition-live) est deja partie.
+  if (action === 'jeton_laddition') {
+    const cfg = async (cle: string) => {
+      const { data, error } = await supa.rpc('pbt_service_config_get', { p_cle: cle });
+      if (error) throw new Error('config_get: ' + error.message);
+      return (data as string | null) || '';
+    };
+    const colle = await cfg('laddition_jeton_colle_le');
+    if (!colle) return json({ ok: true, envoye: false, motif: 'date du jeton inconnue' });
+    const colleLe = new Date(colle).getTime();
+    const ageJours = Math.floor((Date.now() - colleLe) / 86400000);
+    if (ageJours < 15) return json({ ok: true, envoye: false, age_jours: ageJours });
+
+    const jourParis = (t: number) => new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date(t));
+    const aujourdhui = jourParis(Date.now());
+    const dernierRappel = await cfg('laddition_rappel_jeton_le');
+    if (dernierRappel && jourParis(new Date(dernierRappel).getTime()) === aujourdhui) return json({ ok: true, envoye: false, motif: 'deja rappele aujourd hui' });
+    const alerteLe = Number(await cfg('laddition_alerte_le')) || 0;
+    if (alerteLe && jourParis(alerteLe) === aujourdhui) return json({ ok: true, envoye: false, motif: 'alerte echec deja envoyee aujourd hui' });
+
+    const expire = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit' }).format(new Date(colleLe + 18 * 86400000));
+    const texte = ageJours >= 18
+      ? `🔑 Jeton L'Addition probablement expiré (collé il y a ${ageJours} jours, expirait vers le ${expire}).\nPlanB Tools → Admin → onglet L'Addition.`
+      : `🔑 Jeton L'Addition à renouveler : expire vers le ${expire} (collé il y a ${ageJours} jours).\nPlanB Tools → Admin → onglet L'Addition.`;
+    const res = await tg('sendMessage', { chat_id: chatId, text: texte });
+    if (res.ok === true) {
+      const { error } = await supa.rpc('pbt_service_config_set', { p_cle: 'laddition_rappel_jeton_le', p_valeur: new Date().toISOString() });
+      if (error) console.warn('config_set rappel', error.message);
+    }
+    return json({ ok: res.ok === true, envoye: true, age_jours: ageJours });
+  }
+
   // --- Digest periodique (pg_cron) ---
   if (action === 'digest') {
     const since = (await getCfg('dernier_digest')) || new Date(Date.now() - 24 * 3600 * 1000).toISOString();

@@ -570,6 +570,29 @@
         .admin-section { display: none; }
             .admin-section.active { display: block; }
 
+        /* Onglet L Addition (jeton) */
+        .ladd-card { background: white; border: 1px solid var(--gray-200); border-radius: 12px; padding: 18px 20px; max-width: 760px; }
+        .ladd-card h3 { margin: 0 0 6px; font-size: 17px; }
+        .ladd-intro { margin: 0 0 14px; font-size: 13px; color: var(--gray-500); line-height: 1.45; }
+        .ladd-etat { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .ladd-tile { background: var(--gray-50, #f9fafb); border: 1px solid var(--gray-200); border-radius: 10px; padding: 10px 12px; }
+        .ladd-tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); font-weight: 600; }
+        .ladd-tile .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+        .ladd-tile .s { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        .ladd-tile.ok { border-color: #a7f3d0; background: #ecfdf5; }
+        .ladd-tile.warn { border-color: #fcd34d; background: #fffbeb; }
+        .ladd-tile.bad { border-color: #fca5a5; background: #fef2f2; }
+        .ladd-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .ladd-form label { flex-basis: 100%; font-size: 13px; font-weight: 600; }
+        .ladd-form input { flex: 1; min-width: 220px; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 14px; }
+        .ladd-btn { padding: 10px 16px; background: var(--orange); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+        .ladd-btn:disabled { opacity: .55; cursor: wait; }
+        .ladd-resultat { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.45; }
+        .ladd-resultat.ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+        .ladd-resultat.bad { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+        .ladd-aide { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--gray-200); font-size: 12.5px; color: var(--gray-600, #4b5563); line-height: 1.6; }
+        .ladd-aide code { background: var(--gray-100, #f3f4f6); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
             /* Device cards */
             .device-card {
                 background: white; border-radius: 12px; padding: 16px;
@@ -623,6 +646,7 @@
                         <button class="admin-tab-btn" data-admin-tab="droits" onclick="switchAdminTab('droits')">Droits</button>
                             <button class="admin-tab-btn" data-admin-tab="devices" onclick="switchAdminTab('devices')">Appareils</button>
                             <button class="admin-tab-btn" data-admin-tab="taf" onclick="switchAdminTab('taf')">TAF</button>
+                            <button class="admin-tab-btn" data-admin-tab="laddition" onclick="switchAdminTab('laddition')">L'Addition</button>
                         </div>
                     </div>
                 </div>
@@ -714,6 +738,28 @@
                 <div id="taf-count" style="font-size:13px; color:var(--gray-500); margin-bottom:8px;"></div>
                 <div id="taf-list">
                     <div class="loading-spinner">Chargement des tâches prédéfinies...</div>
+                </div>
+            </div>
+
+            <!-- Jeton L Addition : renouvellement du refreshToken sans passer par le SQL Editor.
+                 Le jeton n est jamais affiche, jamais logge, jamais stocke dans le navigateur. -->
+            <div id="laddition-section" class="admin-section">
+                <div class="ladd-card">
+                    <h3>🔑 Jeton L'Addition</h3>
+                    <p class="ladd-intro">La synchro du CA live et du stock caisse utilise un jeton de session L'Addition qui vit <strong>18 à 19 jours</strong>, sans prolongation possible. Un rappel Telegram part chaque matin à partir du 15<sup>e</sup> jour.</p>
+                    <div id="ladd-etat" class="ladd-etat"><div class="loading-spinner">Chargement…</div></div>
+                    <div class="ladd-form">
+                        <label for="ladd-jeton">Nouveau jeton (cookie <code>refreshToken</code>)</label>
+                        <input type="password" id="ladd-jeton" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Coller la valeur du cookie ici">
+                        <button class="ladd-btn" id="ladd-btn" onclick="enregistrerJetonLaddition()">Enregistrer et tester</button>
+                    </div>
+                    <div id="ladd-resultat" class="ladd-resultat" style="display:none;"></div>
+                    <div class="ladd-aide">
+                        <strong>Où trouver le jeton</strong> (sur le Mac, 3 lignes) :<br>
+                        1. Chrome → <code>live.laddition.com</code>, connecté avec le compte habituel.<br>
+                        2. <code>Cmd + Option + I</code> → onglet <strong>Application</strong> → <strong>Cookies</strong> → <code>https://live.laddition.com</code>.<br>
+                        3. Ligne <code>refreshToken</code> → double-clic sur la <strong>valeur</strong> → copier → coller ci-dessus.
+                    </div>
                 </div>
             </div>
 
@@ -1573,6 +1619,125 @@
             if (tab === 'devices') loadDevices();
             if (tab === 'droits') renderDroits();
             if (tab === 'taf') loadPredefTasks();
+            if (tab === 'laddition') loadLaddition();
+        }
+
+        // ========== JETON L ADDITION ==========
+        // Etat lu via pbt_admin_laddition_etat() (admin seul, ne renvoie jamais le
+        // jeton). Enregistrement via pbt_admin_laddition_jeton(), puis relance de
+        // la synchro (edge function laddition-live, force = admin ignore l anti-rafale).
+        const fmtDateHeure = (iso) => iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+        const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '—';
+        const fmtEuros = (v) => (Number(v) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+        const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        async function loadLaddition() {
+            const zone = document.getElementById('ladd-etat');
+            if (DEMO_MODE) { zone.innerHTML = '<p>Mode démo</p>'; return; }
+            try {
+                const { data, error } = await supabaseClient.rpc('pbt_admin_laddition_etat');
+                if (error) throw error;
+                renderLadditionEtat(data || {});
+            } catch (e) {
+                console.error('Etat L Addition :', e);
+                zone.innerHTML = `<div class="ladd-tile bad"><div class="k">Erreur</div><div class="s">${escHtml(e.message || e)}</div></div>`;
+            }
+        }
+
+        function renderLadditionEtat(etat) {
+            const zone = document.getElementById('ladd-etat');
+            const age = etat.age_jours;
+            let clsJeton = 'ok';
+            if (!etat.jeton_present || age == null || age >= 18) clsJeton = 'bad';
+            else if (age >= 15) clsJeton = 'warn';
+            const texteAge = !etat.jeton_present ? 'aucun jeton enregistré'
+                : age == null ? 'date inconnue'
+                : age === 0 ? 'collé aujourd’hui' : `collé il y a ${age} jour${age > 1 ? 's' : ''}`;
+            let html = `<div class="ladd-tile ${clsJeton}">
+                <div class="k">Dernier jeton</div>
+                <div class="v">${fmtDateHeure(etat.colle_le)}</div>
+                <div class="s">${texteAge}</div>
+            </div>
+            <div class="ladd-tile ${clsJeton}">
+                <div class="k">Expiration estimée</div>
+                <div class="v">${fmtDate(etat.expire_vers)}</div>
+                <div class="s">${age == null ? '' : age >= 18 ? 'probablement expiré' : `dans ${18 - age} jour${18 - age > 1 ? 's' : ''} (18 j après collage)`}</div>
+            </div>`;
+            (etat.live || []).forEach(l => {
+                const nom = l.etablissement === 'freddy' ? 'Freddy' : 'Liesel';
+                const enErreur = !!l.erreur && (!l.synchro_le || new Date(l.erreur_le) > new Date(l.synchro_le));
+                html += `<div class="ladd-tile ${enErreur ? 'bad' : 'ok'}">
+                    <div class="k">Synchro ${nom}</div>
+                    <div class="v">${enErreur ? '⛔ En échec' : '✅ OK'}</div>
+                    <div class="s">${enErreur
+                        ? `depuis ${fmtDateHeure(l.erreur_le)}<br>${escHtml(l.erreur)}`
+                        : `dernière : ${fmtDateHeure(l.synchro_le)}${l.ca != null ? `<br>CA du ${fmtDate(l.date_service)} : ${fmtEuros(l.ca)} · ${l.couverts || 0} couv.` : ''}`}</div>
+                </div>`;
+            });
+            zone.innerHTML = html;
+        }
+
+        async function enregistrerJetonLaddition() {
+            if (DEMO_MODE) return;
+            const input = document.getElementById('ladd-jeton');
+            const btn = document.getElementById('ladd-btn');
+            const res = document.getElementById('ladd-resultat');
+            const jeton = (input.value || '').trim();
+            if (jeton.length < 20) {
+                showToast('Colle d’abord la valeur du cookie refreshToken', 'error');
+                input.focus();
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Enregistrement…';
+            res.style.display = 'none';
+            try {
+                // 1. Enregistrement en base (le jeton part chiffre en HTTPS, n est jamais logge ni affiche)
+                const { error } = await supabaseClient.rpc('pbt_admin_laddition_jeton', { p_jeton: jeton });
+                input.value = '';
+                if (error) throw new Error(error.message);
+
+                // 2. Test immediat : relance de la synchro
+                btn.textContent = 'Test de la synchro…';
+                const { data, error: eInv } = await supabaseClient.functions.invoke('laddition-live', { body: { action: 'actualiser', force: true } });
+                let detail = data;
+                if (eInv && !detail) {
+                    // Supabase renvoie une erreur generique en HTTP 500 : on lit le corps pour afficher la vraie cause
+                    try { detail = await eInv.context?.json?.(); } catch (_) { detail = null; }
+                }
+                const erreurs = (detail && detail.erreurs) || [];
+                if (detail && detail.skipped) {
+                    afficherResultatLaddition('ok', 'Jeton enregistré. Une synchro vient de tourner, la prochaine aura lieu dans moins de 30 minutes.');
+                } else if (erreurs.length) {
+                    afficherResultatLaddition('bad', `Jeton enregistré mais L'Addition le refuse : ${escHtml(erreurs[0])}<br>Vérifie que tu as copié la <strong>valeur</strong> du cookie <code>refreshToken</code> en entier, puis recommence.`);
+                } else if (detail && Array.isArray(detail.etabs)) {
+                    const lignes = detail.etabs.map(t => {
+                        // "freddy: CA 2343.92 / 120 couv. (12 photos)" ou "freddy: aucun service ouvert"
+                        const [etab, reste] = String(t).split(/:\s*/, 2);
+                        const nom = etab === 'freddy' ? 'Freddy' : etab === 'liesel' ? 'Liesel' : etab;
+                        const m = /CA ([\d.]+) \/ (\d+) couv/.exec(reste || '');
+                        return m ? `${nom} : CA du jour ${fmtEuros(m[1])} · ${m[2]} couv.` : `${nom} : ${escHtml(reste || '')}`;
+                    });
+                    afficherResultatLaddition('ok', `✅ Jeton accepté, synchro réussie.<br>${lignes.join('<br>') || 'Aucun service ouvert pour le moment.'}`);
+                } else {
+                    afficherResultatLaddition('bad', `Jeton enregistré, mais le test n’a pas répondu clairement${eInv ? ' (' + escHtml(eInv.message || eInv) + ')' : ''}. Regarde l’état ci-dessus dans 30 minutes.`);
+                }
+            } catch (e) {
+                console.error('Jeton L Addition :', e && e.message);
+                afficherResultatLaddition('bad', `Enregistrement refusé : ${escHtml(e.message || e)}`);
+            } finally {
+                input.value = '';
+                btn.disabled = false;
+                btn.textContent = 'Enregistrer et tester';
+                loadLaddition();
+            }
+        }
+
+        function afficherResultatLaddition(cls, html) {
+            const res = document.getElementById('ladd-resultat');
+            res.className = 'ladd-resultat ' + cls;
+            res.innerHTML = html;
+            res.style.display = '';
         }
 
         async function loadDevices() {
