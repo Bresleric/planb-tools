@@ -47,6 +47,38 @@
 - **Où** : `caisse/index.html` (`chargerCaLaddition`, `appliquerCaLaddition`),
   `supabase/functions/laddition-live/index.ts`, `scripts/migration-caisse-ca-laddition.sql`.
 
+## 🔑 Jeton L'Addition : renouvellement depuis Admin + rappel Telegram (v141, déployé le 26/11/2026)
+
+- **Pourquoi** : le refreshToken L'Addition vit **18 à 19 jours, durée fixe, sans
+  prolongation** (expirations constatées : 31/10, 19/11 vers 16h30, puis panne du
+  24/11 9h au 26/11 17h50). L'Addition ne garde que la veille : chaque panne non vue
+  à temps perd des journées dans `laddition_ventes_jour` (20-22/11 et 24-26/11
+  perdues, caisse de ces jours en saisie manuelle). Le collage dans le SQL Editor
+  était le seul moyen de réparer : supprimé.
+- **Quoi** : onglet « L'Addition » du module Admin (admin seul). Tuiles : dernier
+  jeton (date, âge), expiration estimée (+18 j, orange dès 15 j, rouge dès 18 j),
+  synchro Freddy/Liesel (OK + CA du jour, ou en échec + erreur). Champ masqué +
+  « Enregistrer et tester » : RPC `pbt_admin_laddition_jeton` (SECURITY DEFINER,
+  refuse si `pbt_role()` ≠ admin, nettoie espaces/guillemets, vide le jeton
+  d'accès, horodate `laddition_jeton_colle_le`, **ne renvoie jamais la valeur**),
+  puis relance de `laddition-live` avec `force: true` : la fonction rejoue le
+  jeton de session de l'appelant sur `pbt_role()` et ne contourne l'anti-rafale
+  2 min que pour un admin. Résultat affiché (CA du jour ou erreur), champ vidé
+  dans tous les cas, rien en localStorage ni console.
+- **Rappel Telegram** : cron `laddition-jeton-rappel` (8h UTC = 9h Paris en hiver)
+  → `telegram-notif` action `jeton_laddition` : à partir du 15e jour, un message
+  par jour (clé `laddition_rappel_jeton_le`), « probablement expiré » dès 18 j,
+  pas de rappel un jour où l'alerte d'échec (`laddition_alerte_le`) est déjà
+  partie. Le collage d'un nouveau jeton remet le compteur à zéro. L'alerte
+  d'échec renvoie désormais vers Admin › L'Addition au lieu du SQL.
+- **Vérifié le 26/11** : jeton collé depuis l'iPad, synchro rétablie à 17h51
+  (CA Freddy 1 583 € / Liesel 1 471 €), alertes remises à zéro.
+- **Où** : `admin/index.html` (onglet laddition), `scripts/migration-laddition-jeton-admin.sql`,
+  `supabase/functions/laddition-live/index.ts` (v9), `supabase/functions/telegram-notif/index.ts` (v8).
+- **Reste à surveiller** : si un jeton frais tient moins de 18 jours, suspecter la
+  rotation du cookie `refreshToken` renvoyé par L'Addition (stockée ligne
+  `nouveau !== refresh` dans `nouveauAccessToken`).
+
 ## 💶 L'Addition Live : CA et stock en direct dans Pilotage (v113, déployé le 12/10/2026)
 
 - **Quoi** : onglets « CA live » et « Stock » du module Pilotage, alimentés toutes les
@@ -59,9 +91,8 @@
   ni repo, ni logs, ni affichage. Si L'Addition casse la synchro (rotation,
   changement d'API), l'erreur s'affiche dans Pilotage et il faut recoller un
   jeton frais depuis le navigateur.
-- **Durée de vie constatée du jeton : ~8 jours** (collé le 12/10 vers 16h30,
-  refusé le 20/10 à 18h30, recollé le 21/10). Panne suivante attendue vers le
-  28-29/10.
+- **Durée de vie du jeton** : ~8 jours constatés en octobre (12/10 → 20/10), puis
+  18-19 jours fixes (voir l'entrée « Jeton L'Addition » ci-dessus, 26/11/2026).
 - **Alerte Telegram (21/10/2026)** : au 1er échec de synchro, Eric reçoit sur
   Telegram l'erreur + les 2 lignes SQL de réparation ; rappel toutes les 6 h
   maximum tant que ça dure ; message « rétablie » au retour. État dans
